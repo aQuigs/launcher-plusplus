@@ -19,6 +19,8 @@ scripts/emulator.sh                  # AVD from the newest installed arm64 image
 ./gradlew connectedDebugAndroidTest  # Compose UI + activity tests on the running emulator
 scripts/run.sh                       # install debug build, make it the home app, go home
 scripts/screenshot.sh [name]         # adb screencap → screenshots/<name>.png (gitignored)
+scripts/record.sh [name] [seconds]   # adb screenrecord → screenshots/<name>.mp4 (gitignored)
+scripts/pr-media.sh <files>          # push shots to the orphan pr-media branch, print markdown for the PR body
 scrcpy                               # mirror the emulator interactively
 ```
 
@@ -39,10 +41,11 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 
 ## How we work
 
-- Every change after the initial scaffold ships as a PR against `main`, using the PR template. Run an adversarial-review pass and `/simplify` on the branch before handing it over.
+- Every change after the initial scaffold ships as a PR against `main`, using the PR template. Code changes get an adversarial-review pass and `/simplify` on the branch before handover; docs-only PRs skip those.
+- User-visible changes carry before/after screenshots (or a recording) in the PR's "Screenshots / recording" section: capture the before shot on `main` and the after shot on the branch, publish both with `scripts/pr-media.sh` and paste its markdown. Media lives on the orphan `pr-media` branch, never in `main`.
 - The emulator is the test target. Gradle auto-downloads the platform and build-tools for `compileSdk` on first build; common-configs `bootstrap.sh` installs the newest stable Google APIs arm64 system image; `scripts/emulator.sh` only creates an AVD from whatever image is installed. Never run `sdkmanager` installs from this repo.
 - Pure logic goes in `domain` with a unit test. UI behaviour gets a Compose test in `androidTest` that renders the composable with fake data. `MainActivityTest` is the one end-to-end smoke test against the real system.
-- A passing test is not a passing feature: for UI changes, install on the emulator, screenshot, and look at the PNG before calling it done.
+- A passing test is not a passing feature: for UI changes, install on the emulator, screenshot, and look at the PNG before calling it done. That after shot is the one that goes in the PR.
 - Pre-commit runs hygiene checks, markdownlint, and the unit tests. Install with `pre-commit install`.
 
 ## Conventions
