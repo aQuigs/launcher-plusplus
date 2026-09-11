@@ -16,7 +16,8 @@ BUG=<!-- JIRA ID -->
 ## Screenshots / recording
 
 <!-- Before and after screenshots, or a recording, for any user-visible change; write N/A otherwise.
-     Capture with scripts/screenshot.sh or scripts/record.sh, publish with scripts/pr-media.sh <files>, paste the printed markdown. -->
+     Capture with scripts/screenshot.sh or scripts/record.sh, publish with scripts/pr-media.sh <files>, paste the printed markdown
+     (images come out as <img width="300"> tags so phone screenshots stay a sane size; put before and after side by side). -->
 
 ## Pre-publish checklist
 

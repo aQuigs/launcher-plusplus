@@ -11,6 +11,7 @@ cd "$(dirname "$0")/.."
 (( $# )) || { echo "Usage: scripts/pr-media.sh <file>..." >&2; exit 1; }
 
 MEDIA_BRANCH=pr-media
+IMG_WIDTH=${IMG_WIDTH:-300}
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 dir=${$(git branch --show-current)//\//-}
 
@@ -38,7 +39,7 @@ rm -f "$GIT_INDEX_FILE"
 for file in "$@"; do
   url="https://raw.githubusercontent.com/$repo/$MEDIA_BRANCH/$dir/${file:t}"
   case ${file:e} in
-    png|jpg|jpeg|gif) echo "![${file:t:r}]($url)" ;;
+    png|jpg|jpeg|gif) echo "<img src=\"$url\" alt=\"${file:t:r}\" width=\"$IMG_WIDTH\">" ;;
     *) echo "[${file:t}]($url)" ;;
   esac
 done
