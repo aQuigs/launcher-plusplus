@@ -4,7 +4,7 @@ A custom Android launcher (home screen). Native Kotlin + Jetpack Compose, CLI-on
 
 ## Local dev
 
-Requires JDK 21, the Android command-line tools, and gradle, all installed by common-configs `bootstrap.sh` with `ANDROID_DEV=1`.
+Requires JDK 21, the Android command-line tools, gradle, and a Play Store emulator image, all installed by common-configs `bootstrap.sh` with `ANDROID_DEV=1` and `ANDROID_DEV_PLAYSTORE=1`.
 
 ```bash
 ./gradlew testDebugUnitTest          # unit tests
