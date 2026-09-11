@@ -38,6 +38,8 @@ fi
 
 if ! avdmanager list avd -c | grep -qxF "$AVD_NAME"; then
   echo no | avdmanager create avd --name "$AVD_NAME" --package "$system_image" --device "$DEVICE_PROFILE"
+  # avdmanager defaults to hw.keyboard=no, which blocks typing from the host keyboard.
+  sed -i '' 's/^hw.keyboard=no$/hw.keyboard=yes/' "${ANDROID_AVD_HOME:-$HOME/.android/avd}/$AVD_NAME.avd/config.ini"
 fi
 
 # WebView (and so Google sign-in) aborts on the host-GPU translator of this image with an empty GL version;
