@@ -40,7 +40,9 @@ if ! avdmanager list avd -c | grep -qxF "$AVD_NAME"; then
   echo no | avdmanager create avd --name "$AVD_NAME" --package "$system_image" --device "$DEVICE_PROFILE"
 fi
 
-emulator -avd "$AVD_NAME" -no-boot-anim ${HEADLESS:+-no-window} > "${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" 2>&1 &
+# WebView (and so Google sign-in) aborts on the host-GPU translator of this image with an empty GL version;
+# SwiftShader is the only renderer mode where it survives.
+emulator -avd "$AVD_NAME" -gpu swiftshader_indirect -no-boot-anim ${HEADLESS:+-no-window} > "${TMPDIR:-/tmp}/emulator-$AVD_NAME.log" 2>&1 &
 
 adb wait-for-device
 until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; do
