@@ -1,4 +1,5 @@
 #!/bin/zsh
+# shared-source: android/screenshot.sh
 
 # Captures the connected device's screen to screenshots/<name>.png (default name: a timestamp).
 

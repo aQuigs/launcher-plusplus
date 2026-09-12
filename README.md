@@ -12,5 +12,3 @@ scripts/emulator.sh                  # boot the emulator (creates the AVD on fir
 ./gradlew connectedDebugAndroidTest  # UI tests on the emulator
 scripts/run.sh                       # install and set as the home app
 ```
-
-The generic scripts (`emulator.sh`, `screenshot.sh`, `record.sh`, `pr-media.sh`, `sync-common.sh`) are copies of common-configs `repo-scripts/`; the pre-commit hook keeps them identical when that checkout is present, and they work as-is without it.

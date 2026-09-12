@@ -1,4 +1,5 @@
 #!/bin/zsh
+# shared-source: android/record.sh
 
 # Records the connected device's screen for N seconds (default 10) to screenshots/<name>.mp4.
 # Usage: scripts/record.sh [name] [seconds]
