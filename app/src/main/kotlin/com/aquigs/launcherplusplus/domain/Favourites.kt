@@ -1,6 +1,6 @@
 package com.aquigs.launcherplusplus.domain
 
-/** The apps in one place on the home screen, in order, kept by [AppEntry.key] so a reload of the app list keeps them. */
+/** Favourite apps in one place on the home screen, in order, kept by [AppEntry.key] so a reload of the app list keeps them. */
 data class Favourites(val keys: List<String> = emptyList()) {
     operator fun contains(app: AppEntry): Boolean = app.key in keys
 
@@ -8,8 +8,8 @@ data class Favourites(val keys: List<String> = emptyList()) {
     fun toggle(app: AppEntry): Favourites = Favourites(if (app in this) keys - app.key else keys + app.key)
 
     /**
-     * The installed apps in order. An app that is missing is skipped but kept, so an app that disappears while it updates
-     * comes back in its old place.
+     * The installed favourites in order. A favourite whose app is missing is skipped but kept, so an app that disappears
+     * while it updates comes back in its old place.
      */
     fun resolve(apps: List<AppEntry>): List<AppEntry> {
         val byKey = apps.associateBy { it.key }

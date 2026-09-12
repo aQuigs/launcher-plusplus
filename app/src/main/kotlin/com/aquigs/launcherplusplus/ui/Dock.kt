@@ -22,21 +22,28 @@ object DockTags {
 
 private val FULL_DOCK_ICON_SIZE = 56.dp
 
-/** The user's dock [apps] in one row, each in an equal share of the width. While the dock is empty it draws nothing. */
+/**
+ * The user's dock [apps] in one row, each in an equal share of the width. The row is as tall as a full-size icon, so a
+ * crowded dock shrinks its icons but not the row, and an empty dock still holds its place.
+ */
 @Composable
 fun Dock(apps: List<AppEntry>, icon: suspend (AppEntry) -> ImageBitmap?, onLaunch: (AppEntry) -> Unit, modifier: Modifier = Modifier) {
-    if (apps.isEmpty()) return
-
     Layout(
         content = { apps.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(DockTags.slot(app))) } } },
         modifier = modifier.fillMaxWidth().padding(vertical = 12.dp).testTag(DockTags.DOCK),
     ) { measurables, constraints ->
-        val slot = constraints.maxWidth.toFloat() / apps.size
-        val size = dockIconSize(FULL_DOCK_ICON_SIZE.toPx(), constraints.maxWidth.toFloat(), apps.size).roundToInt()
+        val width = constraints.maxWidth
+        val height = FULL_DOCK_ICON_SIZE.roundToPx()
+        if (measurables.isEmpty()) return@Layout layout(width, height) {}
+
+        val slot = width.toFloat() / measurables.size
+        val size = dockIconSize(FULL_DOCK_ICON_SIZE.toPx(), width.toFloat(), measurables.size).roundToInt()
         val icons = measurables.map { it.measure(Constraints.fixed(size, size)) }
 
-        layout(constraints.maxWidth, size) {
-            icons.forEachIndexed { index, placeable -> placeable.place((slot * index + (slot - size) / 2f).roundToInt(), 0) }
+        layout(width, height) {
+            icons.forEachIndexed { index, placeable ->
+                placeable.placeRelative((slot * index + (slot - size) / 2f).roundToInt(), (height - size) / 2)
+            }
         }
     }
 }

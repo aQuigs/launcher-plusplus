@@ -22,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.domain.HomeApps
+import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.ui.DockTags
 import com.aquigs.launcherplusplus.ui.LauncherTags
@@ -29,6 +30,7 @@ import com.aquigs.launcherplusplus.ui.appList
 import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
 import com.aquigs.launcherplusplus.ui.page
+import com.aquigs.launcherplusplus.ui.placeOption
 import com.aquigs.launcherplusplus.ui.swipePager
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -106,24 +108,27 @@ class MainActivityTest {
 
     private fun dockIcon(label: String) = hasContentDescription(label) and hasAnyAncestor(hasTestTag(DockTags.DOCK))
 
+    private fun assertSettingsOnTheRingAndInTheDock() {
+        compose.onNode(ringIcon("Settings")).assertIsDisplayed()
+        compose.onNode(dockIcon("Settings")).assertIsDisplayed()
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun homeScreenAppsSurviveRecreatingTheActivity() {
         compose.emblem().performClick()
         scrollDrawerTo("Settings")
         compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Dock").performClick()
+        compose.placeOption(HomePlace.Dock).performClick()
         compose.onNodeWithText("Settings").performClick()
         Espresso.pressBack()
-        compose.onNode(ringIcon("Settings")).assertIsDisplayed()
-        compose.onNode(dockIcon("Settings")).assertIsDisplayed()
+        assertSettingsOnTheRingAndInTheDock()
 
         compose.activityRule.scenario.recreate()
 
         // The app list loads again after recreation, and the ring and the dock only show installed apps.
         compose.waitUntilAtLeastOneExists(dockIcon("Settings"), timeoutMillis = 10_000)
-        compose.onNode(ringIcon("Settings")).assertIsDisplayed()
-        compose.onNode(dockIcon("Settings")).assertIsDisplayed()
+        assertSettingsOnTheRingAndInTheDock()
     }
 
     @Test

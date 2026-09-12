@@ -17,18 +17,14 @@ class HomeAppsTest {
     }
 
     @Test
-    fun `an app can be on the ring and in the dock at once`() {
-        val homeApps = HomeApps().toggle(HomePlace.Ring, clock).toggle(HomePlace.Dock, clock)
+    fun `an app can be in both places and leave one without the other`() {
+        val both = HomeApps().toggle(HomePlace.Ring, clock).toggle(HomePlace.Dock, clock)
+        assertTrue(clock in both[HomePlace.Ring])
+        assertTrue(clock in both[HomePlace.Dock])
 
-        assertTrue(clock in homeApps[HomePlace.Ring])
-        assertTrue(clock in homeApps[HomePlace.Dock])
-    }
+        val ringOnly = both.toggle(HomePlace.Dock, clock)
 
-    @Test
-    fun `taking an app out of the dock keeps it on the ring`() {
-        val homeApps = HomeApps().toggle(HomePlace.Ring, clock).toggle(HomePlace.Dock, clock).toggle(HomePlace.Dock, clock)
-
-        assertTrue(clock in homeApps.ring)
-        assertEquals(Favourites(), homeApps.dock)
+        assertTrue(clock in ringOnly.ring)
+        assertEquals(Favourites(), ringOnly.dock)
     }
 }

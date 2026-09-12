@@ -142,8 +142,8 @@ fun LauncherScreen(
                     when (page) {
                         LauncherPage.Home -> HomeRing(
                             ring = ring,
-                            // Stored ring apps hold the hint back until the app list can say none of them is installed, so
-                            // neither the hint nor the mark flashes while apps load.
+                            // Favourites stored for the ring hold the hint back until the app list can say none of them is
+                            // installed, so neither the hint nor the mark flashes while apps load.
                             showHint = homeApps.ring.keys.isEmpty() || (apps != null && ring.isEmpty()),
                             icon = icon,
                             onLaunch = onLaunch,
@@ -156,8 +156,11 @@ fun LauncherScreen(
                     }
                 }
             }
-            // Outside the pager, so it stays put while the pages swipe.
-            Dock(apps = dock, icon = icon, onLaunch = onLaunch)
+            // Outside the pager, so it stays put while the pages swipe. Stored dock apps hold its row until the app list
+            // loads, so the pages do not move when it arrives.
+            if (dock.isNotEmpty() || (apps == null && homeApps.dock.keys.isNotEmpty())) {
+                Dock(apps = dock, icon = icon, onLaunch = onLaunch)
+            }
         }
     }
 }

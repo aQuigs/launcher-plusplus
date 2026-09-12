@@ -38,8 +38,8 @@ object HomeRingTags {
 private val FULL_ICON_SIZE = 64.dp
 
 /**
- * The [ring] of the user's apps round a static emblem. Tap an icon to launch it; tap the emblem to choose the apps on the
- * home screen.
+ * The [ring] of favourite apps round a static emblem. Tap an icon to launch it; tap the emblem to choose the favourites on
+ * the ring and in the dock.
  * With [showHint] the emblem invites you to add apps instead of showing its mark.
  */
 @Composable

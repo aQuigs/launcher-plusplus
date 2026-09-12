@@ -9,5 +9,4 @@ private const val DOCK_ICON_FILL = 0.8f
  * The size of each of [count] icons in a dock [width] wide, in the unit of [fullSize] and [width]. The row is split into
  * equal slots. Icons keep [fullSize] while it fits a slot with a gap, and shrink together once the row gets crowded.
  */
-fun dockIconSize(fullSize: Float, width: Float, count: Int): Float =
-    if (count == 0) fullSize else min(fullSize, width / count * DOCK_ICON_FILL)
+fun dockIconSize(fullSize: Float, width: Float, count: Int): Float = min(fullSize, width / count * DOCK_ICON_FILL)

@@ -20,11 +20,13 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.height
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.Favourites
 import com.aquigs.launcherplusplus.domain.HomeApps
+import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -89,7 +91,7 @@ class LauncherScreenTest {
 
         compose.emblem().performClick()
         assertDrawerOpen(true)
-        compose.pickHint().assertIsDisplayed()
+        compose.placePicker().assertIsDisplayed()
 
         compose.onNodeWithText("Mail").performClick()
         compose.onNodeWithText("Mail").assertIsOn()
@@ -134,7 +136,7 @@ class LauncherScreenTest {
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
 
-        compose.pickHint().assertDoesNotExist()
+        compose.placePicker().assertDoesNotExist()
         compose.onNodeWithText("Mail").performClick()
         compose.runOnIdle { assertEquals(listOf(mail), launched) }
     }
@@ -157,7 +159,7 @@ class LauncherScreenTest {
         }
 
         assertDrawerOpen(true)
-        compose.pickHint().assertIsDisplayed()
+        compose.placePicker().assertIsDisplayed()
     }
 
     @Test
@@ -166,7 +168,7 @@ class LauncherScreenTest {
         compose.emblem().performClick()
         assertDrawerOpen(true)
 
-        compose.onNodeWithText("Dock").performClick()
+        compose.placeOption(HomePlace.Dock).performClick()
         compose.onNodeWithText("Mail").performClick()
         compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(mail.key))), homeApps) }
 
@@ -185,10 +187,35 @@ class LauncherScreenTest {
         compose.onNodeWithText("Clock").assertIsOn()
         compose.onNodeWithText("Mail").assertIsOff()
 
-        compose.onNodeWithText("Dock").performClick()
+        compose.placeOption(HomePlace.Dock).performClick()
 
         compose.onNodeWithText("Clock").assertIsOff()
         compose.onNodeWithText("Mail").assertIsOn()
+    }
+
+    @Test
+    fun anEmptyDockTakesNoSpace() {
+        show()
+        compose.dock().assertDoesNotExist()
+        val undocked = compose.pager().getUnclippedBoundsInRoot().height
+
+        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+
+        compose.dockSlot(mail).assertIsDisplayed()
+        assertTrue("the dock takes space", compose.pager().getUnclippedBoundsInRoot().height < undocked)
+    }
+
+    @Test
+    fun storedDockAppsHoldTheDockRowUntilTheAppsLoad() {
+        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        apps = null
+        show()
+        val loading = compose.pager().getUnclippedBoundsInRoot()
+
+        apps = listOf(clock, mail)
+
+        compose.dockSlot(mail).assertIsDisplayed()
+        assertEquals(loading, compose.pager().getUnclippedBoundsInRoot())
     }
 
     @Test
