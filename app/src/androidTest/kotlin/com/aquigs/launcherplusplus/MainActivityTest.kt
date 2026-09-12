@@ -1,8 +1,7 @@
 package com.aquigs.launcherplusplus
 
 import android.content.Intent
-import android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-import android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -15,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.swipeLeft
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -27,7 +27,8 @@ import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
 import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.swipePager
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -37,17 +38,38 @@ import org.junit.runner.RunWith
 class MainActivityTest {
     private val favouritesStore = SharedPreferencesFavouritesStore(InstrumentationRegistry.getInstrumentation().targetContext)
 
+    // On a dark system the default bar styles draw light icons too, so the tests run on a light system, where the default
+    // went wrong. The user's setting comes back afterwards.
+    @get:Rule(order = 0)
+    val lightSystemTheme = object : ExternalResource() {
+        private lateinit var previous: String
+
+        override fun before() {
+            previous = shell("cmd uimode night").substringAfter(": ").trim()
+            shell("cmd uimode night no")
+        }
+
+        override fun after() {
+            shell("cmd uimode night $previous")
+        }
+    }
+
     // The activity reads the ring in onCreate, so it is emptied before the compose rule starts the activity, whatever an
     // earlier run or by-hand use left there, and emptied again afterwards.
-    @get:Rule(order = 0)
+    @get:Rule(order = 1)
     val emptyRing = object : ExternalResource() {
         override fun before() = favouritesStore.save(Favourites())
 
         override fun after() = favouritesStore.save(Favourites())
     }
 
-    @get:Rule(order = 1)
+    @get:Rule(order = 2)
     val compose = createAndroidComposeRule<MainActivity>()
+
+    private fun shell(command: String): String {
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        return ParcelFileDescriptor.AutoCloseInputStream(output).bufferedReader().use { it.readText() }
+    }
 
     /**
      * Delivers a HOME intent as the system does: with the launcher in front it arrives while the activity is paused; from
@@ -104,8 +126,10 @@ class MainActivityTest {
     @Test
     fun theSystemBarsDrawLightIconsOverTheWallpaper() {
         compose.activityRule.scenario.onActivity { activity ->
-            val appearance = checkNotNull(activity.window.insetsController).systemBarsAppearance
-            assertEquals("light-bar flags", 0, appearance and (APPEARANCE_LIGHT_STATUS_BARS or APPEARANCE_LIGHT_NAVIGATION_BARS))
+            val bars = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+            assertFalse("status bar icons are dark", bars.isAppearanceLightStatusBars)
+            assertFalse("navigation bar icons are dark", bars.isAppearanceLightNavigationBars)
+            assertTrue("three-button navigation lost its backing", activity.window.isNavigationBarContrastEnforced)
         }
     }
 

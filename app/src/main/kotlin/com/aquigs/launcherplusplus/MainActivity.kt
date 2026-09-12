@@ -31,11 +31,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // The launcher draws light content straight on the wallpaper whatever the system theme, so the bar icons are light
-        // too. The default follows the system theme, and on a light system it drew dark icons over a dark wallpaper.
+        // LauncherTheme is dark only, so both bars draw light icons whatever the system theme. The navigation bar says so
+        // through auto, because dark would also take away the backing the system draws behind three-button navigation.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { true },
         )
         val repository = LauncherAppsRepository(this)
         val favouritesStore = SharedPreferencesFavouritesStore(this)
