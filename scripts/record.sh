@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
 # Records the connected device's screen to screenshots/<name>.mp4 in this repo and prints the path.
 # Usage: scripts/record.sh [name] [seconds]

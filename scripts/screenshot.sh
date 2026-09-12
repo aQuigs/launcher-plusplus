@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
 # Captures the connected device's screen to screenshots/<name>.png in this repo and prints the path.
 # Usage: scripts/screenshot.sh [name]   (default name: a timestamp; set ANDROID_SERIAL when several devices are connected)

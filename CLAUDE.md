@@ -24,7 +24,7 @@ scripts/pr-media.sh <files>          # upload shots as GitHub attachments, print
 scrcpy                               # mirror the emulator interactively
 ```
 
-`emulator.sh`, `screenshot.sh`, `record.sh` and `pr-media.sh` are verbatim copies of scripts kept in a separate tooling checkout, matched by file name. When that checkout's `sync-common` is on PATH, every build refreshes the copies (`syncSharedScripts`), so change a shared script at its source, never here; without the command the task is skipped and the copies work as-is. `run.sh` belongs to this repo. Adopt another shared script by copying it once under its own name.
+A script whose second line starts with `# Shared script:` is a verbatim copy of a file kept in a separate tooling checkout (`grep -l '^# Shared script:' scripts/*` lists them). When that checkout's `sync-common` is on PATH, every build refreshes the copies (`syncSharedScripts`), so change a shared script at its source, never here; without the command the task is skipped and the copies work as-is. Scripts without the header belong to this repo. Adopt another shared script by copying it once under its own name.
 
 ## Layout
 

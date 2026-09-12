@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
 # Boots this repo's emulator, creating its AVD on first use, and waits until Android is ready.
 # Uses the system image bootstrap.sh installed; this script never installs anything.

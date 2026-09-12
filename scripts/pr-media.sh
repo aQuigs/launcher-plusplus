@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
 # Uploads screenshots or recordings as GitHub attachments and prints markdown for the PR body.
 # This is the same upload the web editor does on paste; the endpoint is undocumented but accepts the gh token.
