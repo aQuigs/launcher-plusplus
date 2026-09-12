@@ -3,7 +3,7 @@
 
 # Creates this repo's AVD from the newest installed arm64 image (Play Store by default,
 # IMAGE_TAG=google_apis for the rootable one) and boots it, then blocks until Android is ready.
-# Images come from common-configs bootstrap.sh, never from here. HEADLESS=1 runs without a window.
+# Images come from the machine setup (bootstrap.sh), never from here. HEADLESS=1 runs without a window.
 
 set -e
 
@@ -18,7 +18,7 @@ esac
 
 images=("$ANDROID_HOME"/system-images/android-*/$IMAGE_TAG/arm64-v8a(N))
 if (( ! $#images )); then
-  echo "No arm64 $IMAGE_TAG system image is installed. Set ANDROID_DEV=1 and $toggle=1 in ~/.zsh_toggles and re-run common-configs bootstrap.sh." >&2
+  echo "No arm64 $IMAGE_TAG system image is installed. Set ANDROID_DEV=1 and $toggle=1 in ~/.zsh_toggles and re-run bootstrap.sh." >&2
   exit 1
 fi
 

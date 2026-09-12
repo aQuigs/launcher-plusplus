@@ -25,16 +25,15 @@ android {
     }
 }
 
-// Scripts marked "# shared-source:" are copies of common-configs files. Every build refreshes them from the
-// local checkout so a copy cannot drift; clones without that checkout, or a checkout without the tool, skip it.
-val commonConfigs = file(System.getenv("COMMON_CONFIGS") ?: "${System.getProperty("user.home")}/repos/common-configs")
-val syncTool = commonConfigs.resolve("bin/sync-common")
+// Scripts marked "# shared-source:" are verbatim copies of files kept in a separate tooling checkout. When that
+// checkout's sync-common is on PATH, every build refreshes the copies so they cannot drift; otherwise nothing runs.
+val syncCommon = System.getenv("PATH").orEmpty().split(File.pathSeparator)
+    .map { File(it, "sync-common") }
+    .firstOrNull { it.canExecute() }
 val syncSharedScripts by tasks.registering(Exec::class) {
-    // A local copy keeps the predicate free of script references, which the configuration cache cannot serialize.
-    val tool = syncTool
-    onlyIf { tool.canExecute() }
+    enabled = syncCommon != null
     workingDir = rootDir
-    commandLine(tool.path, "scripts")
+    commandLine(syncCommon?.path ?: "sync-common", "scripts")
 }
 tasks.named("preBuild") { dependsOn(syncSharedScripts) }
 
