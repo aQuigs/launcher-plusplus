@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
-import com.aquigs.launcherplusplus.apps.SharedPreferencesFavouritesStore
+import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.ui.HomePress
@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { true },
         )
         val repository = LauncherAppsRepository(this)
-        val favouritesStore = SharedPreferencesFavouritesStore(this)
+        val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val layout = PageLayout()
         val icon: suspend (AppEntry) -> ImageBitmap? = { app -> withContext(Dispatchers.IO) { repository.icon(app) } }
 
@@ -47,15 +47,15 @@ class MainActivity : ComponentActivity() {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys.
-                var favourites by remember { mutableStateOf(favouritesStore.load()) }
+                var homeApps by remember { mutableStateOf(homeAppsStore.load()) }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
                     apps = apps,
-                    favourites = favourites,
-                    onFavouritesChange = {
-                        favourites = it
-                        favouritesStore.save(it)
+                    homeApps = homeApps,
+                    onHomeAppsChange = {
+                        homeApps = it
+                        homeAppsStore.save(it)
                     },
                     icon = icon,
                     onLaunch = repository::launch,

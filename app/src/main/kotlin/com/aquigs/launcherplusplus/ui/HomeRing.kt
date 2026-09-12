@@ -1,7 +1,5 @@
 package com.aquigs.launcherplusplus.ui
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,9 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +19,6 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -43,7 +38,8 @@ object HomeRingTags {
 private val FULL_ICON_SIZE = 64.dp
 
 /**
- * The [ring] of favourite apps round a static emblem. Tap an icon to launch it; tap the emblem to choose the favourites.
+ * The [ring] of the user's apps round a static emblem. Tap an icon to launch it; tap the emblem to choose the apps on the
+ * home screen.
  * With [showHint] the emblem invites you to add apps instead of showing its mark.
  */
 @Composable
@@ -60,7 +56,7 @@ fun HomeRing(
     Layout(
         content = {
             Emblem(showHint = showHint, onClick = onEdit)
-            ring.forEach { app -> key(app.key) { RingIcon(app, icon, onLaunch) } }
+            ring.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(app))) } }
         },
         modifier = modifier
             .fillMaxSize()
@@ -95,7 +91,7 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(CircleShape)
-            .clickable(onClickLabel = "Choose the apps on the ring", onClick = onClick)
+            .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
             .drawBehind {
                 drawCircle(primary.copy(alpha = 0.12f))
                 drawCircle(primary, radius = size.minDimension * 0.46f, style = Stroke(3.dp.toPx()))
@@ -114,21 +110,5 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
                 modifier = Modifier.clearAndSetSemantics { contentDescription = "Favourites" },
             )
         }
-    }
-}
-
-@Composable
-private fun RingIcon(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, onLaunch: (AppEntry) -> Unit) {
-    val bitmap by produceState<ImageBitmap?>(null, app.key) { value = icon(app) }
-
-    Box(
-        Modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onLaunch(app) }
-            .semantics { contentDescription = app.label }
-            .testTag(HomeRingTags.slot(app)),
-    ) {
-        bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
     }
 }

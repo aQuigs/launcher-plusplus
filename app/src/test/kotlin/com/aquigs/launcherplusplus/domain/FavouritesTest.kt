@@ -11,14 +11,14 @@ class FavouritesTest {
     private val maps = app("Maps")
 
     @Test
-    fun `toggling adds apps at the end of the ring`() {
+    fun `toggling adds apps at the end`() {
         val favourites = Favourites().toggle(mail).toggle(clock)
 
         assertEquals(listOf(mail, clock), favourites.resolve(listOf(clock, mail, maps)))
     }
 
     @Test
-    fun `toggling a favourite again takes it off the ring`() {
+    fun `toggling an app again takes it off`() {
         val favourites = Favourites().toggle(mail).toggle(clock).toggle(mail)
 
         assertEquals(listOf(clock), favourites.resolve(listOf(clock, mail)))

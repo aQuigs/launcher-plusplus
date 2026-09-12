@@ -8,7 +8,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -22,6 +24,7 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.Favourites
+import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,7 +43,7 @@ class LauncherScreenTest {
     private val pager = PagerState(currentPage = layout.homeIndex) { layout.pages.size }
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
-    private var favourites by mutableStateOf(Favourites())
+    private var homeApps by mutableStateOf(HomeApps())
     private val launched = mutableListOf<AppEntry>()
 
     private fun show() = compose.setContent {
@@ -48,8 +51,8 @@ class LauncherScreenTest {
             layout = layout,
             homePresses = homePresses,
             apps = apps,
-            favourites = favourites,
-            onFavouritesChange = { favourites = it },
+            homeApps = homeApps,
+            onHomeAppsChange = { homeApps = it },
             icon = { null },
             onLaunch = launched::add,
             pagerState = pager,
@@ -91,7 +94,7 @@ class LauncherScreenTest {
         compose.onNodeWithText("Mail").performClick()
         compose.onNodeWithText("Mail").assertIsOn()
         compose.runOnIdle {
-            assertTrue(mail in favourites)
+            assertTrue(mail in homeApps.ring)
             assertEquals(emptyList<AppEntry>(), launched)
         }
 
@@ -110,7 +113,7 @@ class LauncherScreenTest {
 
     @Test
     fun storedFavouritesHoldBackTheHintUntilTheAppsLoadWithoutThem() {
-        favourites = Favourites(listOf(clock.key))
+        homeApps = HomeApps(ring = Favourites(listOf(clock.key)))
         apps = null
         show()
         compose.onNodeWithText("Add apps").assertDoesNotExist()
@@ -155,6 +158,50 @@ class LauncherScreenTest {
 
         assertDrawerOpen(true)
         compose.pickHint().assertIsDisplayed()
+    }
+
+    @Test
+    fun pickingForTheDockFillsTheDockAndLeavesTheRing() {
+        show()
+        compose.emblem().performClick()
+        assertDrawerOpen(true)
+
+        compose.onNodeWithText("Dock").performClick()
+        compose.onNodeWithText("Mail").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(mail.key))), homeApps) }
+
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+        compose.dockSlot(mail).assertIsDisplayed()
+        compose.ringSlot(mail).assertDoesNotExist()
+    }
+
+    @Test
+    fun eachPlaceChecksTheAppsAlreadyThere() {
+        homeApps = HomeApps(ring = Favourites(listOf(clock.key)), dock = Favourites(listOf(mail.key)))
+        show()
+        compose.emblem().performClick()
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Clock").assertIsOn()
+        compose.onNodeWithText("Mail").assertIsOff()
+
+        compose.onNodeWithText("Dock").performClick()
+
+        compose.onNodeWithText("Clock").assertIsOff()
+        compose.onNodeWithText("Mail").assertIsOn()
+    }
+
+    @Test
+    fun theDockStaysPutWhileThePagesSwipe() {
+        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        show()
+        val docked = compose.dockSlot(mail).getUnclippedBoundsInRoot()
+
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(LauncherPage.Collections)
+
+        compose.dockSlot(mail).assertIsDisplayed()
+        assertEquals(docked, compose.dockSlot(mail).getUnclippedBoundsInRoot())
     }
 
     @Test

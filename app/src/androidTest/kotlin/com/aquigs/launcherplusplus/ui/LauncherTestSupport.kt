@@ -32,8 +32,12 @@ fun SemanticsNodeInteractionsProvider.sectionHeader(initial: Char) = onNodeWithT
 
 fun SemanticsNodeInteractionsProvider.railLetter(initial: Char) = onNodeWithTag(AppDrawerTags.letter(initial))
 
-fun SemanticsNodeInteractionsProvider.pickHint() = onNodeWithTag(AppDrawerTags.PICK_HINT)
+fun SemanticsNodeInteractionsProvider.pickHint() = onNodeWithTag(PlacePickerTags.HINT)
 
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
+
+fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
+
+fun SemanticsNodeInteractionsProvider.dockSlot(app: AppEntry) = onNodeWithTag(DockTags.slot(app))

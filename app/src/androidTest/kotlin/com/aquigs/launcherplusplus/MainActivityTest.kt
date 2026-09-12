@@ -5,11 +5,12 @@ import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onChildren
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -19,9 +20,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.aquigs.launcherplusplus.apps.SharedPreferencesFavouritesStore
-import com.aquigs.launcherplusplus.domain.Favourites
+import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
+import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.LauncherPage
+import com.aquigs.launcherplusplus.ui.DockTags
+import com.aquigs.launcherplusplus.ui.LauncherTags
 import com.aquigs.launcherplusplus.ui.appList
 import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
@@ -36,7 +39,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
-    private val favouritesStore = SharedPreferencesFavouritesStore(InstrumentationRegistry.getInstrumentation().targetContext)
+    private val homeAppsStore = SharedPreferencesHomeAppsStore(InstrumentationRegistry.getInstrumentation().targetContext)
 
     // On a dark system the default bar styles draw light icons too, so the tests run on a light system, where the default
     // went wrong. The user's setting comes back afterwards.
@@ -54,13 +57,13 @@ class MainActivityTest {
         }
     }
 
-    // The activity reads the ring in onCreate, so it is emptied before the compose rule starts the activity, whatever an
-    // earlier run or by-hand use left there, and emptied again afterwards.
+    // The activity reads the home screen apps in onCreate, so the ring and the dock are emptied before the compose rule
+    // starts the activity, whatever an earlier run or by-hand use left there, and emptied again afterwards.
     @get:Rule(order = 1)
-    val emptyRing = object : ExternalResource() {
-        override fun before() = favouritesStore.save(Favourites())
+    val emptyHome = object : ExternalResource() {
+        override fun before() = homeAppsStore.save(HomeApps())
 
-        override fun after() = favouritesStore.save(Favourites())
+        override fun after() = homeAppsStore.save(HomeApps())
     }
 
     @get:Rule(order = 2)
@@ -98,20 +101,29 @@ class MainActivityTest {
         list.performScrollToNode(hasText(label))
     }
 
+    private fun ringIcon(label: String) =
+        hasContentDescription(label) and hasAnyAncestor(hasTestTag(LauncherTags.page(LauncherPage.Home)))
+
+    private fun dockIcon(label: String) = hasContentDescription(label) and hasAnyAncestor(hasTestTag(DockTags.DOCK))
+
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun aFavouriteSurvivesRecreatingTheActivity() {
+    fun homeScreenAppsSurviveRecreatingTheActivity() {
         compose.emblem().performClick()
         scrollDrawerTo("Settings")
         compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithText("Dock").performClick()
+        compose.onNodeWithText("Settings").performClick()
         Espresso.pressBack()
-        compose.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        compose.onNode(ringIcon("Settings")).assertIsDisplayed()
+        compose.onNode(dockIcon("Settings")).assertIsDisplayed()
 
         compose.activityRule.scenario.recreate()
 
-        // The app list loads again after recreation, and the ring only shows installed apps.
-        compose.waitUntilAtLeastOneExists(hasContentDescription("Settings"), timeoutMillis = 10_000)
-        compose.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        // The app list loads again after recreation, and the ring and the dock only show installed apps.
+        compose.waitUntilAtLeastOneExists(dockIcon("Settings"), timeoutMillis = 10_000)
+        compose.onNode(ringIcon("Settings")).assertIsDisplayed()
+        compose.onNode(dockIcon("Settings")).assertIsDisplayed()
     }
 
     @Test
