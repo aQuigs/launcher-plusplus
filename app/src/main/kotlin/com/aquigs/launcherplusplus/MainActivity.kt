@@ -1,8 +1,10 @@
 package com.aquigs.launcherplusplus
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -29,7 +31,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The launcher draws light content straight on the wallpaper whatever the system theme, so the bar icons are light
+        // too. The default follows the system theme, and on a light system it drew dark icons over a dark wallpaper.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         val repository = LauncherAppsRepository(this)
         val favouritesStore = SharedPreferencesFavouritesStore(this)
         val layout = PageLayout()

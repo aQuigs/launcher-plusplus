@@ -1,6 +1,8 @@
 package com.aquigs.launcherplusplus
 
 import android.content.Intent
+import android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+import android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -25,6 +27,7 @@ import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
 import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.swipePager
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -96,6 +99,14 @@ class MainActivityTest {
 
         scrollDrawerTo("Settings")
         compose.onNodeWithText("Settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun theSystemBarsDrawLightIconsOverTheWallpaper() {
+        compose.activityRule.scenario.onActivity { activity ->
+            val appearance = checkNotNull(activity.window.insetsController).systemBarsAppearance
+            assertEquals("light-bar flags", 0, appearance and (APPEARANCE_LIGHT_STATUS_BARS or APPEARANCE_LIGHT_NAVIGATION_BARS))
+        }
     }
 
     @Test
