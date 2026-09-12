@@ -25,6 +25,12 @@ repos:
       - id: check-added-large-files
   - repo: local
     hooks:
+      - id: sync-common-scripts
+        name: Refresh scripts shared with common-configs
+        entry: scripts/sync-common.sh
+        language: script
+        pass_filenames: false
+        always_run: true
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

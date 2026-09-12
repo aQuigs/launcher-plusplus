@@ -24,6 +24,8 @@ scripts/pr-media.sh <files>          # push shots to the orphan pr-media branch,
 scrcpy                               # mirror the emulator interactively
 ```
 
+`emulator.sh`, `screenshot.sh`, `record.sh`, `pr-media.sh` and `sync-common.sh` are verbatim copies of common-configs `repo-scripts/`; the pre-commit hook refreshes them from the local checkout, so change them in common-configs (from a session rooted there), never here. `run.sh` is repo-specific. A file under `scripts/` is either identical to its common-configs source or unique to this repo, nothing in between.
+
 ## Layout
 
 ```text

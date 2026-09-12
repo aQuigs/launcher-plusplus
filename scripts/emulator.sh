@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# Creates the project AVD from the newest installed arm64 image (Play Store by default,
+# Creates this repo's AVD from the newest installed arm64 image (Play Store by default,
 # IMAGE_TAG=google_apis for the rootable one) and boots it, then blocks until Android is ready.
 # Images come from common-configs bootstrap.sh, never from here. HEADLESS=1 runs without a window.
 
@@ -24,7 +24,9 @@ fi
 # Sort the API levels on their own: version-sorting whole paths puts android-36.1 before android-36.
 api=$(printf '%s\n' ${${images:h:h:t}#android-} | sort -V | tail -1)
 system_image="system-images;android-$api;$IMAGE_TAG;arm64-v8a"
-AVD_NAME=${AVD_NAME:-launcher_plusplus_${DEVICE_PROFILE}_${api}_$IMAGE_TAG}
+# Named after the repo folder so every Android repo that shares this script gets its own AVD.
+repo=${${$(git -C "$(dirname "$0")" rev-parse --show-toplevel):t}//-/_}
+AVD_NAME=${AVD_NAME:-${repo}_${DEVICE_PROFILE}_${api}_$IMAGE_TAG}
 
 if adb get-state >/dev/null 2>&1; then
   running=$(adb emu avd name 2>/dev/null | head -1 | tr -d '\r')
