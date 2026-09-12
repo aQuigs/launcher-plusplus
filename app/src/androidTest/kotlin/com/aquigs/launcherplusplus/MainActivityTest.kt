@@ -1,5 +1,6 @@
 package com.aquigs.launcherplusplus
 
+import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -7,8 +8,13 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.ui.AppListTags
+import com.aquigs.launcherplusplus.ui.LauncherTags
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,5 +35,19 @@ class MainActivityTest {
         // Images with many preinstalled apps push Settings below the fold, where LazyColumn has not composed it yet.
         list.performScrollToNode(hasText("Settings"))
         compose.onNodeWithText("Settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun homeKeyReturnsToTheHomePage() {
+        compose.onNodeWithTag(LauncherTags.PAGER).performTouchInput { swipeLeft() }
+        compose.onNodeWithTag(LauncherTags.page(LauncherPage.Collections)).assertIsDisplayed()
+
+        // The system delivers a HOME press to the running singleTask home activity as a new intent.
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        compose.activityRule.scenario.onActivity {
+            InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, home)
+        }
+
+        compose.onNodeWithTag(LauncherTags.page(LauncherPage.Home)).assertIsDisplayed()
     }
 }
