@@ -11,7 +11,6 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -40,23 +39,22 @@ class LauncherScreenTest {
     private val layout = PageLayout()
     private val pager = PagerState(currentPage = layout.homeIndex) { layout.pages.size }
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
+    private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var favourites by mutableStateOf(Favourites())
     private val launched = mutableListOf<AppEntry>()
 
-    private fun show(apps: List<AppEntry> = listOf(clock)) = compose.setContent {
+    private fun show() = compose.setContent {
         LauncherScreen(
             layout = layout,
             homePresses = homePresses,
             apps = apps,
             favourites = favourites,
+            onFavouritesChange = { favourites = it },
             icon = { null },
             onLaunch = launched::add,
-            onToggleFavourite = { favourites = favourites.toggle(it) },
             pagerState = pager,
         )
     }
-
-    private fun emblem() = compose.onNodeWithTag(HomeRingTags.EMBLEM)
 
     private fun pressHome(launcherInFront: Boolean) = compose.runOnIdle { assertTrue(homePresses.tryEmit(HomePress(launcherInFront))) }
 
@@ -79,42 +77,53 @@ class LauncherScreenTest {
         assertSettledOn(LauncherPage.Home)
         assertDrawerOpen(false)
         compose.drawerHandle().assertIsDisplayed()
-        emblem().assertIsDisplayed()
+        compose.emblem().assertIsDisplayed()
     }
 
     @Test
-    fun theEmblemOpensTheDrawerToPickFavourites() {
-        show(apps = listOf(clock, mail))
+    fun theEmblemOpensTheDrawerToPickAppsForTheRing() {
+        show()
 
-        emblem().performClick()
+        compose.emblem().performClick()
         assertDrawerOpen(true)
-        compose.onNodeWithTag(AppDrawerTags.PICK_HINT).assertIsDisplayed()
+        compose.pickHint().assertIsDisplayed()
 
         compose.onNodeWithText("Mail").performClick()
-
         compose.onNodeWithText("Mail").assertIsOn()
         compose.runOnIdle {
             assertTrue(mail in favourites)
             assertEquals(emptyList<AppEntry>(), launched)
         }
-    }
-
-    @Test
-    fun aPickedFavouriteAppearsOnTheRing() {
-        show(apps = listOf(clock, mail))
-        emblem().performClick()
-        compose.onNodeWithText("Mail").performClick()
 
         Espresso.pressBack()
-
         assertDrawerOpen(false)
         compose.onNodeWithContentDescription("Mail").assertIsDisplayed()
     }
 
     @Test
+    fun anEmptyRingInvitesYouToAddAppsBeforeTheAppListLoads() {
+        apps = null
+        show()
+
+        compose.onNodeWithText("Add apps").assertIsDisplayed()
+    }
+
+    @Test
+    fun storedFavouritesHoldBackTheHintUntilTheAppsLoadWithoutThem() {
+        favourites = Favourites(listOf(clock.key))
+        apps = null
+        show()
+        compose.onNodeWithText("Add apps").assertDoesNotExist()
+
+        apps = listOf(mail)
+
+        compose.onNodeWithText("Add apps").assertIsDisplayed()
+    }
+
+    @Test
     fun closingTheDrawerEndsPicking() {
-        show(apps = listOf(clock, mail))
-        emblem().performClick()
+        show()
+        compose.emblem().performClick()
         assertDrawerOpen(true)
 
         Espresso.pressBack()
@@ -122,9 +131,30 @@ class LauncherScreenTest {
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
 
-        compose.onNodeWithTag(AppDrawerTags.PICK_HINT).assertDoesNotExist()
+        compose.pickHint().assertDoesNotExist()
         compose.onNodeWithText("Mail").performClick()
         compose.runOnIdle { assertEquals(listOf(mail), launched) }
+    }
+
+    @Test
+    fun aDragThatLeavesTheDrawerOpenKeepsPicking() {
+        show()
+        compose.emblem().performClick()
+        assertDrawerOpen(true)
+        val handle = compose.drawerHandle().fetchSemanticsNode().boundsInRoot.center
+
+        compose.onRoot().performTouchInput {
+            down(handle)
+            moveBy(Offset(0f, height / 3f))
+        }
+        compose.waitForIdle()
+        compose.onRoot().performTouchInput {
+            moveBy(Offset(0f, -height / 3f))
+            up()
+        }
+
+        assertDrawerOpen(true)
+        compose.pickHint().assertIsDisplayed()
     }
 
     @Test
@@ -164,7 +194,7 @@ class LauncherScreenTest {
 
     @Test
     fun slidingDownTheRailDoesNotCloseTheDrawer() {
-        show(apps = listOf(clock, mail))
+        show()
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
 

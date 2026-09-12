@@ -40,12 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
-import com.aquigs.launcherplusplus.domain.key
 import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.launch
 
@@ -79,19 +79,26 @@ fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
 }
 
 /**
- * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. With
- * [checked] set the drawer is picking apps: rows show whether they are checked and [onClick] toggles instead of launching.
+ * Picking apps instead of launching them: the drawer shows [hint] at the top, checks the rows [isPicked] says, and a tap
+ * calls [onToggle].
+ */
+class Picking(val hint: String, val isPicked: (AppEntry) -> Boolean, val onToggle: (AppEntry) -> Unit)
+
+/**
+ * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
+ * launches the app unless the drawer is [picking].
  */
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
-    onClick: (AppEntry) -> Unit,
+    onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
-    checked: ((AppEntry) -> Boolean)? = null,
+    picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val scope = rememberCoroutineScope()
     val sections = remember(apps) { apps.sectionsByInitial() }
+    val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
     val headerIndices = remember(sections) {
         sections.runningFold(0) { index, section -> index + 1 + section.apps.size }.dropLast(1)
@@ -108,9 +115,9 @@ fun AppDrawer(
     }
 
     Column(modifier.fillMaxSize()) {
-        if (checked != null) {
+        if (picking != null) {
             Text(
-                text = "Tap apps to add them to the ring or take them off",
+                text = picking.hint,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(AppDrawerTags.PICK_HINT),
@@ -125,12 +132,12 @@ fun AppDrawer(
                 sections.forEach { section ->
                     item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                     items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, onClick, checked?.invoke(app))
+                        AppRow(app, onLaunch, picking)
                     }
                 }
             }
             LetterRail(
-                initials = sections.map { it.initial },
+                initials = initials,
                 highlighted = highlighted,
                 onSelect = { section ->
                     lastSelected = section
@@ -157,13 +164,13 @@ private fun SectionHeader(initial: Char) {
     )
 }
 
-/** [checked] is null while launching, otherwise whether the app is picked. */
 @Composable
-private fun AppRow(app: AppEntry, onClick: (AppEntry) -> Unit, checked: Boolean?) {
-    val action = if (checked == null) {
-        Modifier.clickable { onClick(app) }
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?) {
+    val picked = picking?.isPicked(app) == true
+    val action = if (picking == null) {
+        Modifier.clickable { onLaunch(app) }
     } else {
-        Modifier.toggleable(value = checked, onValueChange = { onClick(app) })
+        Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
     }
 
     Row(
@@ -174,7 +181,7 @@ private fun AppRow(app: AppEntry, onClick: (AppEntry) -> Unit, checked: Boolean?
             .padding(horizontal = 24.dp, vertical = 14.dp),
     ) {
         Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        if (checked == true) {
+        if (picked) {
             Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
     }

@@ -7,31 +7,54 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 class RingGeometryTest {
-    @Test
-    fun `slots start at the top and go round evenly`() {
-        assertEquals(0.0, ringSlotAngle(0, 4), 1e-9)
-        assertEquals(PI / 2, ringSlotAngle(1, 4), 1e-9)
-        assertEquals(3 * PI / 2, ringSlotAngle(3, 4), 1e-9)
+    private val fullSize = 64f
+    private val roomySide = 400f
+    private val sides = listOf(120f, 180f, 229f, 400f, 1000f)
+
+    private fun assertOffset(expected: Pair<Float, Float>, actual: Pair<Float, Float>) {
+        assertEquals("x", expected.first, actual.first, 1e-6f)
+        assertEquals("y", expected.second, actual.second, 1e-6f)
     }
 
     @Test
-    fun `up to six icons keep full size`() {
-        (0..FULL_SIZE_RING_SLOTS).forEach { assertEquals(1f, ringIconScale(it)) }
+    fun `the first slot is at the top and the rest go clockwise`() {
+        assertOffset(0f to -1f, ringSlotOffset(0, 4))
+        assertOffset(1f to 0f, ringSlotOffset(1, 4))
+        assertOffset(0f to 1f, ringSlotOffset(2, 4))
+        assertOffset(-1f to 0f, ringSlotOffset(3, 4))
+    }
+
+    @Test
+    fun `on a roomy page up to six icons keep full size`() {
+        (0..FULL_SIZE_RING_SLOTS).forEach { assertEquals(fullSize, ringIconSize(fullSize, roomySide, it)) }
     }
 
     @Test
     fun `past six every extra icon shrinks them all`() {
-        val scales = (FULL_SIZE_RING_SLOTS..24).map(::ringIconScale)
+        val sizes = (FULL_SIZE_RING_SLOTS..24).map { ringIconSize(fullSize, roomySide, it) }
 
-        assertTrue(scales.toString(), scales.zipWithNext().all { (bigger, smaller) -> smaller < bigger })
+        assertTrue(sizes.toString(), sizes.zipWithNext().all { (bigger, smaller) -> smaller < bigger })
     }
 
     @Test
-    fun `shrunk icons keep the spacing of a full ring of six`() {
-        fun neighbourDistance(count: Int) = 2 * sin(PI / count)
+    fun `icons stay clear of the emblem and the page edge on any page`() {
+        sides.forEach { side ->
+            val radius = side * RING_RADIUS_FRACTION
+            (1..24).forEach { count ->
+                val half = ringIconSize(fullSize, side, count) / 2
+                assertTrue("$count icons on $side reach the emblem", radius - half >= side * EMBLEM_FRACTION / 2 - 1e-3f)
+                assertTrue("$count icons on $side cross the edge", radius + half <= side / 2 + 1e-3f)
+            }
+        }
+    }
 
-        (FULL_SIZE_RING_SLOTS + 1..24).forEach { count ->
-            assertEquals(neighbourDistance(FULL_SIZE_RING_SLOTS), neighbourDistance(count) / ringIconScale(count), 1e-6)
+    @Test
+    fun `neighbouring icons never overlap on any page`() {
+        sides.forEach { side ->
+            (2..24).forEach { count ->
+                val distance = 2 * side * RING_RADIUS_FRACTION * sin(PI / count).toFloat()
+                assertTrue("$count icons on $side overlap", ringIconSize(fullSize, side, count) <= distance)
+            }
         }
     }
 }

@@ -37,9 +37,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LauncherTheme {
-                val apps by produceState(emptyList<AppEntry>()) {
-                    value = withContext(Dispatchers.IO) { repository.installedApps() }
-                }
+                val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys.
                 var favourites by remember { mutableStateOf(favouritesStore.load()) }
@@ -48,9 +46,12 @@ class MainActivity : ComponentActivity() {
                     homePresses = homePresses,
                     apps = apps,
                     favourites = favourites,
+                    onFavouritesChange = {
+                        favourites = it
+                        favouritesStore.save(it)
+                    },
                     icon = icon,
                     onLaunch = repository::launch,
-                    onToggleFavourite = { app -> favourites = favourites.toggle(app).also(favouritesStore::save) },
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }
