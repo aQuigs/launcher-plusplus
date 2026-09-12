@@ -4,8 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AppSectionTest {
-    private fun app(label: String) = AppEntry(label, "pkg.$label", "pkg.$label.Main")
-
     @Test
     fun `files apps under their upper-cased first letter`() {
         val sections = listOf(app("Calendar"), app("clock"), app("Mail")).sectionsByInitial()
@@ -16,10 +14,21 @@ class AppSectionTest {
 
     @Test
     fun `digits, symbols and other scripts go first under the hash`() {
-        val sections = listOf(app("7zip"), app("Mail"), app("Éclair"), app("  Zip")).sectionsByInitial()
+        val sections = listOf(app("7zip"), app("Mail"), app("Яндекс"), app("  Zip")).sectionsByInitial()
 
         assertEquals(listOf(OTHER_INITIAL, 'M', 'Z'), sections.map { it.initial })
-        assertEquals(listOf("7zip", "Éclair"), sections[0].apps.map { it.label })
+        assertEquals(listOf("7zip", "Яндекс"), sections[0].apps.map { it.label })
+    }
+
+    @Test
+    fun `accented letters file under their base letter`() {
+        assertEquals(listOf('E', 'O', 'N'), listOf(app("Éclair"), app("österreich"), app("Ñu")).map { it.initial })
+    }
+
+    @Test
+    fun `invisible marks before the first letter are skipped`() {
+        assertEquals('M', app("‎Mail").initial)
+        assertEquals('M', app("﻿Mail").initial)
     }
 
     @Test

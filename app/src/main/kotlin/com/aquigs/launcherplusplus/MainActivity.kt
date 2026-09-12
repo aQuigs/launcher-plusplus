@@ -6,14 +6,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
 import com.aquigs.launcherplusplus.ui.theme.LauncherTheme
 import kotlinx.coroutines.Dispatchers
@@ -21,9 +20,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-    private val homeRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -37,7 +35,7 @@ class MainActivity : ComponentActivity() {
                 }
                 LauncherScreen(
                     layout = layout,
-                    homeRequests = homeRequests,
+                    homePresses = homePresses,
                     apps = apps,
                     onLaunch = repository::launch,
                     modifier = Modifier.safeDrawingPadding(),
@@ -46,15 +44,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // A HOME press relaunches the home activity, which singleTask delivers here. It only counts while the launcher is
-    // already in front; coming back from an app keeps the page you left, like the stock launcher. The framework pauses
-    // a resumed activity around onNewIntent, so "in front" arrives as STARTED, while a launcher stopped behind another
-    // app arrives as CREATED. getIntent() deliberately stays the launch intent: nothing reads it later, and
-    // ActivityScenario identifies the activity by it.
+    // A HOME press relaunches the home activity, which singleTask delivers here. The lifecycle state cannot say where the
+    // press came from: the framework pauses a resumed launcher and starts a stopped one before delivering, so both arrive
+    // STARTED. The system does flag the press that brought the launcher's task to the front. getIntent() deliberately
+    // stays the launch intent: nothing reads it later, and ActivityScenario identifies the activity by it.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasCategory(Intent.CATEGORY_HOME) && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            homeRequests.tryEmit(Unit)
+        if (intent.hasCategory(Intent.CATEGORY_HOME)) {
+            val broughtToFront = intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0
+            homePresses.tryEmit(HomePress(launcherInFront = !broughtToFront))
         }
     }
 }

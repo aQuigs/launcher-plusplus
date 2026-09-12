@@ -11,14 +11,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -28,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
-import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -38,34 +35,37 @@ object LauncherTags {
     fun page(page: LauncherPage) = "page_${page.name}"
 }
 
+/** A HOME press. [launcherInFront] is false when the press brought the launcher back from another app. */
+data class HomePress(val launcherInFront: Boolean)
+
 /**
- * The whole launcher: a horizontal pager over [layout] with the app drawer peeking below it as a chevron. Each element
- * of [homeRequests] (a HOME press while the launcher is in front) closes the drawer and scrolls to the home page; Back
- * closes the drawer if it is open, otherwise it returns to the home page.
+ * The whole launcher: a horizontal pager over [layout] with the app drawer peeking below it as a chevron. Every
+ * [HomePress] closes the drawer; one made while the launcher was in front also scrolls to the home page. Back closes the
+ * drawer if it is open, otherwise it returns to the home page.
  */
-@ExperimentalMaterial3Api
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LauncherScreen(
     layout: PageLayout,
-    homeRequests: Flow<Unit>,
+    homePresses: Flow<HomePress>,
     apps: List<AppEntry>,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
-    drawerState: SheetState = rememberStandardBottomSheetState(skipHiddenState = true),
 ) {
     val scope = rememberCoroutineScope()
-    val drawerOpen = drawerState.currentValue == SheetValue.Expanded
-    val sections = remember(apps) { apps.sectionsByInitial() }
+    val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
+    val drawerOpen = drawerState.targetValue == SheetValue.Expanded
 
-    // Each scroll gets its own job: a drag in progress cancels the animation, and that must not stop the collector.
+    // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
     fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
 
-    LaunchedEffect(homeRequests, pagerState, drawerState, layout) {
-        homeRequests.collect {
+    LaunchedEffect(homePresses, pagerState, drawerState, layout) {
+        homePresses.collect { press ->
             closeDrawer()
-            goHome()
+            // Coming back from an app keeps the page you left, like the stock launcher.
+            if (press.launcherInFront) goHome()
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order.
@@ -76,10 +76,11 @@ fun LauncherScreen(
     BottomSheetScaffold(
         scaffoldState = rememberBottomSheetScaffoldState(drawerState),
         sheetPeekHeight = 48.dp,
-        sheetDragHandle = { DrawerHandle(drawerState) },
-        sheetContainerColor = drawerContainerColor,
+        sheetDragHandle = { DrawerHandle(open = drawerOpen) },
+        // Translucent so the wallpaper still shows through the open drawer.
+        sheetContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         containerColor = Color.Transparent,
-        sheetContent = { AppDrawer(sections = sections, onLaunch = onLaunch) },
+        sheetContent = { AppDrawer(apps = apps, onLaunch = onLaunch) },
         // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
         // navigation-bar inset.
         modifier = modifier.clipToBounds(),
@@ -92,7 +93,7 @@ fun LauncherScreen(
             val page = layout.pages[index]
             Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                 when (page) {
-                    // Empty until the home layout PR: the drawer handle below is its only control for now.
+                    // Empty until the home layout lands: the drawer strip below is its only control for now.
                     LauncherPage.Home -> Unit
                     LauncherPage.Widgets, LauncherPage.Collections -> PlaceholderPage(page)
                 }

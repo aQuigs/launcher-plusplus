@@ -2,17 +2,18 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.swipe
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.OTHER_INITIAL
-import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -26,8 +27,11 @@ class AppDrawerTest {
 
     private val listState = LazyListState()
 
+    // Each letter of the alphabet fixture is one header row followed by its apps.
+    private val itemsPerLetter = APPS_PER_LETTER + 1
+
     private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}) = compose.setContent {
-        AppDrawer(sections = apps.sectionsByInitial(), onLaunch = onLaunch, listState = listState)
+        AppDrawer(apps = apps, onLaunch = onLaunch, listState = listState)
     }
 
     @Test
@@ -56,13 +60,32 @@ class AppDrawerTest {
     @Test
     fun tappingARailLetterJumpsToItsSection() {
         show(alphabet)
-        compose.assertNotShown("T1")
+        compose.onNodeWithText("T1").assertIsNotDisplayed()
 
         compose.railLetter('T').performTouchInput { click() }
 
         compose.onNodeWithText("T1").assertIsDisplayed()
-        compose.assertNotShown("A1")
-        compose.runOnIdle { assertEquals(alphabet.sectionsByInitial().indexOfFirst { it.initial == 'T' } * 4, listState.firstVisibleItemIndex) }
+        compose.onNodeWithText("A1").assertIsNotDisplayed()
+        compose.railLetter('T').assertIsSelected()
+        compose.runOnIdle { assertEquals(('T' - 'A') * itemsPerLetter, listState.firstVisibleItemIndex) }
+    }
+
+    @Test
+    fun aLetterNearTheEndStaysHighlightedThoughTheListStopsShort() {
+        show(alphabet)
+
+        compose.railLetter('Z').performTouchInput { click() }
+
+        compose.onNodeWithText("Z1").assertIsDisplayed()
+        compose.railLetter('Z').assertIsSelected()
+    }
+
+    @Test
+    fun noAppsMeansNoRail() {
+        show(emptyList())
+
+        compose.appList().assertIsDisplayed()
+        compose.railLetter('A').assertDoesNotExist()
     }
 
     @Test
@@ -74,7 +97,10 @@ class AppDrawerTest {
         val m = compose.railLetter('M').fetchSemanticsNode().boundsInRoot.center
         compose.onRoot().performTouchInput { swipe(start = a, end = m) }
 
-        compose.runOnIdle { assertTrue("scrolled to item ${listState.firstVisibleItemIndex}", listState.firstVisibleItemIndex >= 4 * 10) }
-        compose.assertNotShown("A1")
+        compose.runOnIdle {
+            assertTrue("scrolled to item ${listState.firstVisibleItemIndex}", listState.firstVisibleItemIndex >= 10 * itemsPerLetter)
+        }
+        compose.onNodeWithText("A1").assertIsNotDisplayed()
+        compose.railLetter('M').assertIsSelected()
     }
 }

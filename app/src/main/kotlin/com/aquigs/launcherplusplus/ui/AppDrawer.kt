@@ -19,14 +19,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -34,47 +30,45 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
-import com.aquigs.launcherplusplus.domain.AppSection
+import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
     const val HANDLE = "drawer_handle"
     const val LIST = "app_list"
-    const val RAIL = "letter_rail"
 
     fun section(initial: Char) = "section_$initial"
 
     fun letter(initial: Char) = "rail_$initial"
 }
 
-/** The chevron that peeks above the home page: tap or drag it to open the drawer, and again to close it. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The chevron on the strip that peeks above the pages, pointing the way the drawer will move. It only draws: the sheet's
+ * drag-handle slot already makes the strip one clickable control that toggles the drawer.
+ */
 @Composable
-fun DrawerHandle(state: SheetState, modifier: Modifier = Modifier) {
-    val scope = rememberCoroutineScope()
-    val open = state.targetValue == SheetValue.Expanded
+fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
 
     Icon(
         imageVector = Icons.Default.KeyboardArrowUp,
         contentDescription = if (open) "Close the app drawer" else "Open the app drawer",
         modifier = modifier
-            .clip(CircleShape)
-            .clickable { scope.launch { if (open) state.partialExpand() else state.expand() } }
             .padding(vertical = 8.dp)
             .size(32.dp)
-            .rotate(rotation)
+            .graphicsLayer { rotationZ = rotation }
             .testTag(AppDrawerTags.HANDLE),
     )
 }
@@ -82,18 +76,26 @@ fun DrawerHandle(state: SheetState, modifier: Modifier = Modifier) {
 /** Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. */
 @Composable
 fun AppDrawer(
-    sections: List<AppSection>,
+    apps: List<AppEntry>,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val scope = rememberCoroutineScope()
+    val sections = remember(apps) { apps.sectionsByInitial() }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
-    val headerIndices = remember(sections) { sections.runningFold(0) { index, section -> index + 1 + section.apps.size } }
-    // Remembered so the rail's pointer handler, keyed on it, is not reset mid-slide by a recomposition.
-    val initials = remember(sections) { sections.map { it.initial } }
-    val currentSection by remember(headerIndices) {
-        derivedStateOf { headerIndices.indexOfLast { it <= listState.firstVisibleItemIndex }.coerceAtMost(sections.lastIndex) }
+    val headerIndices = remember(sections) {
+        sections.runningFold(0) { index, section -> index + 1 + section.apps.size }.dropLast(1)
+    }
+    var lastSelected by remember { mutableStateOf<Int?>(null) }
+    // The chosen letter stays lit while its header is on screen: near the end of the list the scroll stops short, and
+    // the section at the top is then an earlier one.
+    val highlighted by remember(headerIndices, listState) {
+        derivedStateOf {
+            val chosenHeader = lastSelected?.let(headerIndices::getOrNull)
+            lastSelected.takeIf { chosenHeader != null && listState.layoutInfo.visibleItemsInfo.any { it.index == chosenHeader } }
+                ?: headerIndices.indexOfLast { it <= listState.firstVisibleItemIndex }
+        }
     }
 
     Box(modifier.fillMaxSize()) {
@@ -103,24 +105,25 @@ fun AppDrawer(
             modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
         ) {
             sections.forEach { section ->
-                item(key = "section_${section.initial}") { SectionHeader(section.initial) }
-                items(section.apps, key = { "${it.packageName}/${it.activityName}" }) { app -> AppRow(app, onLaunch) }
+                item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                items(section.apps, key = { "${it.packageName}/${it.activityName}" }, contentType = { "app" }) { app ->
+                    AppRow(app, onLaunch)
+                }
             }
         }
         LetterRail(
-            initials = initials,
-            current = currentSection,
-            onSelect = { scope.launch { listState.scrollToItem(headerIndices[it]) } },
+            initials = sections.map { it.initial },
+            highlighted = highlighted,
+            onSelect = { section ->
+                lastSelected = section
+                scope.launch { listState.scrollToItem(headerIndices[section]) }
+            },
             modifier = Modifier.align(Alignment.CenterEnd),
         )
     }
 }
 
 private val RAIL_WIDTH = 28.dp
-
-/** Translucent so the wallpaper still shows through the open drawer. */
-val drawerContainerColor: Color
-    @Composable get() = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
 
 @Composable
 private fun SectionHeader(initial: Char) {
@@ -152,26 +155,29 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit) {
  * and a tap between two letters should still land on one of them.
  */
 @Composable
-private fun LetterRail(initials: List<Char>, current: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    // While a finger is on the rail its letter is the one to show, whatever the list managed to scroll to.
-    var pressed by remember { mutableStateOf<Int?>(null) }
-    val highlighted = pressed ?: current
+private fun LetterRail(initials: List<Char>, highlighted: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    // The gesture loop outlives recompositions, so it reads the latest letters and targets through these.
+    val latestInitials by rememberUpdatedState(initials)
+    val latestOnSelect by rememberUpdatedState(onSelect)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .fillMaxHeight()
             .width(RAIL_WIDTH)
-            .pointerInput(initials) {
-                fun select(y: Float) {
-                    if (initials.isEmpty()) return
-                    val index = (y / size.height * initials.size).toInt().coerceIn(0, initials.lastIndex)
-                    if (index != pressed) {
-                        pressed = index
-                        onSelect(index)
-                    }
-                }
+            .pointerInput(Unit) {
                 awaitEachGesture {
+                    var selected = -1
+                    fun select(y: Float) {
+                        val count = latestInitials.size
+                        if (count == 0) return
+                        val index = (y / size.height * count).toInt().coerceIn(0, count - 1)
+                        if (index != selected) {
+                            selected = index
+                            latestOnSelect(index)
+                        }
+                    }
+
                     val down = awaitFirstDown()
                     select(down.position.y)
                     // Consumed so the sheet underneath does not read a slide down the rail as a drag to close.
@@ -179,18 +185,21 @@ private fun LetterRail(initials: List<Char>, current: Int, onSelect: (Int) -> Un
                         change.consume()
                         select(change.position.y)
                     }
-                    pressed = null
                 }
-            }
-            .testTag(AppDrawerTags.RAIL),
+            },
     ) {
         initials.forEachIndexed { index, initial ->
+            val isHighlighted = index == highlighted
             Text(
                 text = initial.toString(),
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (index == highlighted) FontWeight.Bold else FontWeight.Normal,
-                color = if (index == highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f).wrapContentHeight().testTag(AppDrawerTags.letter(initial)),
+                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .weight(1f)
+                    .wrapContentHeight()
+                    .semantics { selected = isHighlighted }
+                    .testTag(AppDrawerTags.letter(initial)),
             )
         }
     }

@@ -27,18 +27,24 @@ class MainActivityTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
 
-    private val scenario get() = compose.activityRule.scenario
-
     /**
-     * Stands in for the system: a HOME press reaches the running singleTask home activity as this intent, and the
-     * framework has the activity in [state] when it arrives: STARTED (paused around onNewIntent) when the launcher was
-     * in front, CREATED (stopped) when another app was.
+     * Delivers a HOME intent as the system does: with the launcher in front it arrives while the activity is paused; from
+     * another app it arrives after the launcher was stopped, flagged as bringing its task to the front.
      */
-    private fun deliverHomeIntent(state: Lifecycle.State) {
+    private fun deliverHomeIntent(fromAnotherApp: Boolean) {
+        val scenario = compose.activityRule.scenario
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        scenario.moveToState(state)
+        if (fromAnotherApp) home.addFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
+        scenario.moveToState(if (fromAnotherApp) Lifecycle.State.CREATED else Lifecycle.State.STARTED)
         scenario.onActivity { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, home) }
         scenario.moveToState(Lifecycle.State.RESUMED)
+    }
+
+    private fun openDrawerOnCollections() {
+        compose.swipePager { swipeLeft() }
+        compose.page(LauncherPage.Collections).assertIsDisplayed()
+        compose.drawerHandle().performClick()
+        compose.appList().assertIsDisplayed()
     }
 
     @Test
@@ -56,32 +62,22 @@ class MainActivityTest {
     }
 
     @Test
-    fun homeKeyWhileInFrontReturnsToTheHomePage() {
-        compose.swipePager { swipeLeft() }
-        compose.page(LauncherPage.Collections).assertIsDisplayed()
+    fun homeKeyWhileInFrontClosesTheDrawerAndReturnsToTheHomePage() {
+        openDrawerOnCollections()
 
-        deliverHomeIntent(Lifecycle.State.STARTED)
+        deliverHomeIntent(fromAnotherApp = false)
 
         compose.page(LauncherPage.Home).assertIsDisplayed()
-    }
-
-    @Test
-    fun homeKeyWhileInFrontClosesTheDrawer() {
-        compose.drawerHandle().performClick()
-        compose.appList().assertIsDisplayed()
-
-        deliverHomeIntent(Lifecycle.State.STARTED)
-
         compose.appList().assertIsNotDisplayed()
     }
 
     @Test
-    fun homeKeyFromAnotherAppKeepsThePage() {
-        compose.swipePager { swipeLeft() }
-        compose.page(LauncherPage.Collections).assertIsDisplayed()
+    fun homeKeyFromAnotherAppClosesTheDrawerAndKeepsThePage() {
+        openDrawerOnCollections()
 
-        deliverHomeIntent(Lifecycle.State.CREATED)
+        deliverHomeIntent(fromAnotherApp = true)
 
         compose.page(LauncherPage.Collections).assertIsDisplayed()
+        compose.appList().assertIsNotDisplayed()
     }
 }

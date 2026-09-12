@@ -1,11 +1,10 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.pager.PagerState
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -16,6 +15,7 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,7 +25,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-@OptIn(ExperimentalMaterial3Api::class)
 @RunWith(AndroidJUnit4::class)
 class LauncherScreenTest {
     @get:Rule
@@ -33,25 +32,13 @@ class LauncherScreenTest {
 
     private val layout = PageLayout()
     private val pager = PagerState(currentPage = layout.homeIndex) { layout.pages.size }
-    private val drawer = SheetState(
-        skipPartiallyExpanded = false,
-        positionalThreshold = { 56f },
-        velocityThreshold = { 125f },
-        initialValue = SheetValue.PartiallyExpanded,
-        skipHiddenState = true,
-    )
-    private val homeRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
 
-    private fun show() = compose.setContent {
-        LauncherScreen(
-            layout = layout,
-            homeRequests = homeRequests,
-            apps = listOf(clock),
-            onLaunch = {},
-            pagerState = pager,
-            drawerState = drawer,
-        )
+    private fun show(apps: List<AppEntry> = listOf(clock)) = compose.setContent {
+        LauncherScreen(layout = layout, homePresses = homePresses, apps = apps, onLaunch = {}, pagerState = pager)
     }
+
+    private fun pressHome(launcherInFront: Boolean) = compose.runOnIdle { assertTrue(homePresses.tryEmit(HomePress(launcherInFront))) }
 
     private fun assertSettledOn(page: LauncherPage) {
         compose.waitForIdle()
@@ -59,10 +46,10 @@ class LauncherScreenTest {
         compose.page(page).assertIsDisplayed()
     }
 
-    private fun assertDrawer(value: SheetValue) {
+    private fun assertDrawerOpen(open: Boolean) {
         compose.waitForIdle()
-        assertEquals(value, drawer.currentValue)
-        if (value == SheetValue.Expanded) compose.onNodeWithText("Clock").assertIsDisplayed() else compose.assertNotShown("Clock")
+        compose.drawerHandle().assertContentDescriptionEquals(if (open) "Close the app drawer" else "Open the app drawer")
+        if (open) compose.onNodeWithText("Clock").assertIsDisplayed() else compose.onNodeWithText("Clock").assertIsNotDisplayed()
     }
 
     @Test
@@ -70,7 +57,7 @@ class LauncherScreenTest {
         show()
 
         assertSettledOn(LauncherPage.Home)
-        assertDrawer(SheetValue.PartiallyExpanded)
+        assertDrawerOpen(false)
         compose.drawerHandle().assertIsDisplayed()
     }
 
@@ -93,10 +80,10 @@ class LauncherScreenTest {
         show()
 
         compose.drawerHandle().performClick()
-        assertDrawer(SheetValue.Expanded)
+        assertDrawerOpen(true)
 
         compose.drawerHandle().performClick()
-        assertDrawer(SheetValue.PartiallyExpanded)
+        assertDrawerOpen(false)
     }
 
     @Test
@@ -106,21 +93,59 @@ class LauncherScreenTest {
         val handle = compose.drawerHandle().fetchSemanticsNode().boundsInRoot.center
         compose.onRoot().performTouchInput { swipe(start = handle, end = Offset(handle.x, top + height / 4)) }
 
-        assertDrawer(SheetValue.Expanded)
+        assertDrawerOpen(true)
     }
 
     @Test
-    fun homeRequestClosesTheDrawerAndReturnsToTheHomePage() {
+    fun slidingDownTheRailDoesNotCloseTheDrawer() {
+        show(apps = listOf(clock, mail))
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        val c = compose.railLetter('C').fetchSemanticsNode().boundsInRoot.center
+        val m = compose.railLetter('M').fetchSemanticsNode().boundsInRoot.center
+        compose.onRoot().performTouchInput { swipe(start = c, end = m) }
+
+        assertDrawerOpen(true)
+    }
+
+    @Test
+    fun backWhileTheDrawerIsStillOpeningClosesIt() {
+        show()
+        compose.mainClock.autoAdvance = false
+        compose.drawerHandle().performClick()
+        compose.mainClock.advanceTimeBy(100)
+
+        Espresso.pressBack()
+        compose.mainClock.autoAdvance = true
+
+        assertDrawerOpen(false)
+    }
+
+    @Test
+    fun homeWhileInFrontClosesTheDrawerAndReturnsToTheHomePage() {
         show()
         compose.swipePager { swipeLeft() }
         compose.drawerHandle().performClick()
-        assertSettledOn(LauncherPage.Collections)
-        assertDrawer(SheetValue.Expanded)
+        assertDrawerOpen(true)
 
-        compose.runOnIdle { assertTrue(homeRequests.tryEmit(Unit)) }
+        pressHome(launcherInFront = true)
 
         assertSettledOn(LauncherPage.Home)
-        assertDrawer(SheetValue.PartiallyExpanded)
+        assertDrawerOpen(false)
+    }
+
+    @Test
+    fun homeFromAnotherAppClosesTheDrawerAndKeepsThePage() {
+        show()
+        compose.swipePager { swipeLeft() }
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        pressHome(launcherInFront = false)
+
+        assertSettledOn(LauncherPage.Collections)
+        assertDrawerOpen(false)
     }
 
     @Test
@@ -128,11 +153,10 @@ class LauncherScreenTest {
         show()
         compose.swipePager { swipeRight() }
         compose.drawerHandle().performClick()
-        assertSettledOn(LauncherPage.Widgets)
-        assertDrawer(SheetValue.Expanded)
+        assertDrawerOpen(true)
 
         Espresso.pressBack()
-        assertDrawer(SheetValue.PartiallyExpanded)
+        assertDrawerOpen(false)
         assertSettledOn(LauncherPage.Widgets)
 
         Espresso.pressBack()
