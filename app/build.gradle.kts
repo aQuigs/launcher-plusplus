@@ -25,7 +25,7 @@ android {
     }
 }
 
-// Scripts marked "# shared-source:" are verbatim copies of files kept in a separate tooling checkout. When that
+// Files under scripts/ that share a name with a script in a separate tooling checkout are verbatim copies. When that
 // checkout's sync-common is on PATH, every build refreshes the copies so they cannot drift; otherwise nothing runs.
 val syncCommon = System.getenv("PATH").orEmpty().split(File.pathSeparator)
     .map { File(it, "sync-common") }
