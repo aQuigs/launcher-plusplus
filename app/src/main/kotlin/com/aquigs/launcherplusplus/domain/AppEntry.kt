@@ -1,9 +1,11 @@
 package com.aquigs.launcherplusplus.domain
 
+/** One launchable activity. [canUninstall] is false for an app built into the system with no updates to remove. */
 data class AppEntry(
     val label: String,
     val packageName: String,
     val activityName: String,
+    val canUninstall: Boolean = true,
 ) {
     /** Identifies one launchable activity whatever its label, so it survives relabelling and reloads of the app list. */
     val key: String = "$packageName/$activityName"

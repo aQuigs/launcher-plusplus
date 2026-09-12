@@ -1,7 +1,6 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -85,7 +84,7 @@ class Picking(val header: @Composable () -> Unit, val isPicked: (AppEntry) -> Bo
 
 /**
  * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
- * launches the app unless the drawer is [picking].
+ * launches the app and a long press opens its [menu], unless the drawer is [picking].
  */
 @Composable
 fun AppDrawer(
@@ -94,6 +93,7 @@ fun AppDrawer(
     modifier: Modifier = Modifier,
     picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
+    menu: AppMenu? = null,
 ) {
     val scope = rememberCoroutineScope()
     val sections = remember(apps) { apps.sectionsByInitial() }
@@ -124,7 +124,7 @@ fun AppDrawer(
                 sections.forEach { section ->
                     item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                     items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, onLaunch, picking)
+                        AppRow(app, onLaunch, picking, menu)
                     }
                 }
             }
@@ -157,10 +157,10 @@ private fun SectionHeader(initial: Char) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?) {
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?) {
     val picked = picking?.isPicked(app) == true
     val action = if (picking == null) {
-        Modifier.clickable { onLaunch(app) }
+        Modifier.launchable(app, onLaunch, menu)
     } else {
         Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
     }
@@ -176,6 +176,7 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking
         if (picked) {
             Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
+        if (picking == null) menu?.content?.invoke(app)
     }
 }
 

@@ -14,11 +14,11 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.ui.AppActions
 import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
 import com.aquigs.launcherplusplus.ui.theme.LauncherTheme
@@ -40,7 +40,15 @@ class MainActivity : ComponentActivity() {
         val repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val layout = PageLayout()
-        val icon: suspend (AppEntry) -> ImageBitmap? = { app -> withContext(Dispatchers.IO) { repository.icon(app) } }
+        val actions = AppActions(
+            icon = { withContext(Dispatchers.IO) { repository.icon(it) } },
+            launch = repository::launch,
+            shortcuts = { withContext(Dispatchers.IO) { repository.shortcuts(it) } },
+            shortcutIcon = { withContext(Dispatchers.IO) { repository.shortcutIcon(it) } },
+            startShortcut = repository::startShortcut,
+            openAppInfo = repository::openAppInfo,
+            uninstall = repository::uninstall,
+        )
 
         setContent {
             LauncherTheme {
@@ -57,8 +65,7 @@ class MainActivity : ComponentActivity() {
                         homeApps = it
                         homeAppsStore.save(it)
                     },
-                    icon = icon,
-                    onLaunch = repository::launch,
+                    actions = actions,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }

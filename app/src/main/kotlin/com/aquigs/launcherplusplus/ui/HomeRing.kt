@@ -38,8 +38,8 @@ object HomeRingTags {
 private val FULL_ICON_SIZE = 64.dp
 
 /**
- * The [ring] of favourite apps round a static emblem. Tap an icon to launch it; tap the emblem to choose the favourites on
- * the ring and in the dock.
+ * The [ring] of favourite apps round a static emblem. Tap an icon to launch it or long-press it for its [menu]; tap the
+ * emblem to choose the favourites on the ring and in the dock.
  * With [showHint] the emblem invites you to add apps instead of showing its mark.
  */
 @Composable
@@ -50,13 +50,14 @@ fun HomeRing(
     onLaunch: (AppEntry) -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
+    menu: AppMenu? = null,
 ) {
     val track = MaterialTheme.colorScheme.outlineVariant
 
     Layout(
         content = {
             Emblem(showHint = showHint, onClick = onEdit)
-            ring.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(app))) } }
+            ring.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(app)), menu) } }
         },
         modifier = modifier
             .fillMaxSize()

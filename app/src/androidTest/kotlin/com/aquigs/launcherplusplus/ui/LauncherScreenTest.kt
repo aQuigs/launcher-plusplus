@@ -12,7 +12,9 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.height
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.Favourites
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
@@ -47,6 +50,19 @@ class LauncherScreenTest {
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var homeApps by mutableStateOf(HomeApps())
     private val launched = mutableListOf<AppEntry>()
+    private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
+    private val started = mutableListOf<AppShortcut>()
+    private val infoOpened = mutableListOf<AppEntry>()
+    private val uninstalled = mutableListOf<AppEntry>()
+    private val actions = AppActions(
+        icon = { null },
+        launch = launched::add,
+        shortcuts = { if (it == mail) listOf(composeMail) else emptyList() },
+        shortcutIcon = { null },
+        startShortcut = started::add,
+        openAppInfo = infoOpened::add,
+        uninstall = uninstalled::add,
+    )
 
     private fun show() = compose.setContent {
         LauncherScreen(
@@ -55,8 +71,7 @@ class LauncherScreenTest {
             apps = apps,
             homeApps = homeApps,
             onHomeAppsChange = { homeApps = it },
-            icon = { null },
-            onLaunch = launched::add,
+            actions = actions,
             pagerState = pager,
         )
     }
@@ -229,6 +244,90 @@ class LauncherScreenTest {
 
         compose.dockSlot(mail).assertIsDisplayed()
         assertEquals(docked, compose.dockSlot(mail).getUnclippedBoundsInRoot())
+    }
+
+    @Test
+    fun longPressingARingAppShowsItsShortcutsThenItsOptions() {
+        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        show()
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+
+        val tops = listOf("Compose", "Remove from the ring", "App info", "Uninstall").map {
+            compose.onNodeWithText(it).assertIsDisplayed().getUnclippedBoundsInRoot().top
+        }
+        assertEquals(tops.sorted(), tops)
+        compose.onNodeWithText("Remove from the dock").assertDoesNotExist()
+    }
+
+    @Test
+    fun theMenuStartsShortcutsAndHandsTheOptionsToTheSystem() {
+        show()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        for (item in listOf("Compose", "App info", "Uninstall")) {
+            compose.onNodeWithText("Mail").performTouchInput { longClick() }
+            compose.onNodeWithText(item).performClick()
+            compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+        }
+
+        compose.runOnIdle {
+            assertEquals(listOf(composeMail), started)
+            assertEquals(listOf(mail), infoOpened)
+            assertEquals(listOf(mail), uninstalled)
+            assertEquals(emptyList<AppEntry>(), launched)
+        }
+    }
+
+    @Test
+    fun removingAnAppFromTheDockKeepsItOnTheRing() {
+        homeApps = HomeApps(ring = Favourites(listOf(mail.key)), dock = Favourites(listOf(mail.key)))
+        show()
+
+        compose.dockSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from the dock").performClick()
+
+        compose.dockSlot(mail).assertDoesNotExist()
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(HomeApps(ring = Favourites(listOf(mail.key))), homeApps) }
+    }
+
+    @Test
+    fun homeClosesTheMenu() {
+        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        show()
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("App info").assertIsDisplayed()
+
+        pressHome(launcherInFront = true)
+
+        compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+    }
+
+    @Test
+    fun backClosesTheMenuBeforeTheDrawer() {
+        show()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("App info").assertIsDisplayed()
+
+        Espresso.pressBack()
+
+        compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+        assertDrawerOpen(true)
+    }
+
+    @Test
+    fun aLongPressWhilePickingOpensNoMenu() {
+        show()
+        compose.emblem().performClick()
+        assertDrawerOpen(true)
+
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+
+        compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
     }
 
     @Test

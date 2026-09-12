@@ -2,6 +2,7 @@ package com.aquigs.launcherplusplus.apps
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.AppShortcut
 import kotlinx.coroutines.flow.Flow
 
 interface AppRepository {
@@ -13,4 +14,19 @@ interface AppRepository {
 
     /** Starts [app]. Does nothing if it has gone since the list was loaded. */
     fun launch(app: AppEntry)
+
+    /** Blocking: at most four of the app's shortcuts, manifest ones first. Empty unless the launcher is the home app. */
+    fun shortcuts(app: AppEntry): List<AppShortcut>
+
+    /** Blocking: the shortcut's icon. Null when it has none, has gone, or cannot be drawn. */
+    fun shortcutIcon(shortcut: AppShortcut): ImageBitmap?
+
+    /** Starts [shortcut]. Does nothing if it has gone or been disabled since it was listed. */
+    fun startShortcut(shortcut: AppShortcut)
+
+    /** Opens the system's details page for [app]. */
+    fun openAppInfo(app: AppEntry)
+
+    /** Asks the system to uninstall [app], which confirms with the user first. */
+    fun uninstall(app: AppEntry)
 }
