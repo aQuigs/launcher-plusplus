@@ -5,15 +5,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onChildren
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.swipeLeft
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aquigs.launcherplusplus.domain.LauncherPage
-import com.aquigs.launcherplusplus.ui.AppListTags
+import com.aquigs.launcherplusplus.ui.appList
+import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.swipePager
 import org.junit.Rule
@@ -34,8 +35,9 @@ class MainActivityTest {
     }
 
     @Test
-    fun listsInstalledAppsIncludingSettings() {
-        val list = compose.onNodeWithTag(AppListTags.LIST)
+    fun theDrawerListsInstalledAppsIncludingSettings() {
+        compose.drawerHandle().performClick()
+        val list = compose.appList()
         list.assertIsDisplayed()
 
         compose.waitUntil(timeoutMillis = 10_000) {

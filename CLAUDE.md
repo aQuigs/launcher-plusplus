@@ -41,7 +41,7 @@ scripts/                 # emulator, run, screenshot helpers (zsh)
 
 Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the only place that wires them together. `domain` never imports `android.*`; `ui` reaches the system only through the interfaces in `apps`.
 
-`MainActivity` turns system callbacks (the HOME key) into one-shot events on flows it owns and knows nothing about pages; a one-shot event is never modelled as state the composition could replay. `LauncherScreen` owns all screen state and decides what an event means. Pages are the `LauncherPage` enum, ordered by `PageLayout` in `domain` and dispatched by an exhaustive `when`, so a new page does not compile until it has content.
+`MainActivity` turns system callbacks (the HOME key) into one-shot events on flows it owns and knows nothing about pages; a one-shot event is never modelled as state the composition could replay. `LauncherScreen` owns all screen state and decides what an event means. Pages are the `LauncherPage` enum, ordered by `PageLayout` in `domain` and dispatched by an exhaustive `when`, so a new page does not compile until it has content. Anything dismissable (the app drawer) hoists its state to `LauncherScreen`, which has the one `BackHandler` and spells out the order: close what is open, then return home. Do not add a second `BackHandler` whose priority depends on composition order.
 
 ## How we work
 
