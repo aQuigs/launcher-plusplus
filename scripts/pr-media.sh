@@ -1,5 +1,5 @@
 #!/bin/zsh
-# shared-source: github/pr-media.sh
+# shared-source: scripts/github/pr-media.sh
 
 # Publishes screenshots or recordings for the current branch's PR and prints markdown for the PR body.
 # Files land on the orphan `pr-media` branch under <branch>/, so binaries never enter main's history.

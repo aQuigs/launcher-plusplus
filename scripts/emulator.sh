@@ -1,5 +1,5 @@
 #!/bin/zsh
-# shared-source: android/emulator.sh
+# shared-source: scripts/android/emulator.sh
 
 # Creates this repo's AVD from the newest installed arm64 image (Play Store by default,
 # IMAGE_TAG=google_apis for the rootable one) and boots it, then blocks until Android is ready.
