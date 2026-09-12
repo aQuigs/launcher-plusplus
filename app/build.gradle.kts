@@ -25,6 +25,18 @@ android {
     }
 }
 
+// Scripts headed "# Shared script:" are verbatim copies of same-named files in a separate tooling checkout. When that
+// checkout's sync-common is on PATH, every build refreshes the copies so they cannot drift; otherwise nothing runs.
+val syncCommon = System.getenv("PATH").orEmpty().split(File.pathSeparator)
+    .map { File(it, "sync-common") }
+    .firstOrNull { it.canExecute() }
+val syncSharedScripts by tasks.registering(Exec::class) {
+    enabled = syncCommon != null
+    workingDir = rootDir
+    commandLine(syncCommon?.path ?: "sync-common", "scripts")
+}
+tasks.named("preBuild") { dependsOn(syncSharedScripts) }
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

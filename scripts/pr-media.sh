@@ -1,45 +1,56 @@
 #!/bin/zsh
+# Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
-# Publishes screenshots or recordings for the current branch's PR and prints markdown for the PR body.
-# Files land on the orphan `pr-media` branch under <branch>/, so binaries never enter main's history.
-# Usage: scripts/pr-media.sh <file>...
+# Uploads screenshots or recordings as GitHub attachments and prints markdown for the PR body.
+# This is the same upload the web editor does on paste; the endpoint is undocumented but accepts the gh token.
+# Progress goes to stderr, the markdown to stdout.
+# Usage: scripts/pr-media.sh <file>...   (IMG_WIDTH sets the image width, default 300)
 
 set -e
 
-cd "$(dirname "$0")/.."
-
-(( $# )) || { echo "Usage: scripts/pr-media.sh <file>..." >&2; exit 1; }
-
-MEDIA_BRANCH=pr-media
+if (( $# == 0 )); then
+  echo "Usage: scripts/pr-media.sh <file>..."
+  exit 1
+fi
+FILES=("$@")
 IMG_WIDTH=${IMG_WIDTH:-300}
-repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-dir=${$(git branch --show-current)//\//-}
+UPLOAD_URL=https://uploads.github.com/user-attachments/assets
 
-if git fetch -q origin "$MEDIA_BRANCH" 2>/dev/null; then
-  parent=(-p FETCH_HEAD)
-else
-  parent=()
-fi
-
-export GIT_INDEX_FILE=$(mktemp -u)
-if (( $#parent )); then
-  git read-tree FETCH_HEAD
-else
-  git read-tree --empty
-fi
-
-for file in "$@"; do
-  git update-index --add --cacheinfo "100644,$(git hash-object -w "$file"),$dir/${file:t}"
+for FILE in "${FILES[@]}"; do
+  if [[ ! -f $FILE ]]; then
+    echo "No such file: $FILE"
+    exit 1
+  fi
+  NAME=$(basename "$FILE")
+  if [[ $NAME == *[^A-Za-z0-9._-]* ]]; then
+    echo "File name '$NAME' may only contain letters, digits, dots, underscores, and dashes"
+    exit 1
+  fi
 done
 
-commit=$(git commit-tree $parent -m "Media for $dir" "$(git write-tree)")
-git push -q origin "${commit}:refs/heads/$MEDIA_BRANCH"
-rm -f "$GIT_INDEX_FILE"
+TOKEN=$(gh auth token)
+REPO_ID=$(gh api 'repos/{owner}/{repo}' --jq .id)
 
-for file in "$@"; do
-  url="https://raw.githubusercontent.com/$repo/$MEDIA_BRANCH/$dir/${file:t}"
-  case ${file:e} in
-    png|jpg|jpeg|gif) echo "<img src=\"$url\" alt=\"${file:t:r}\" width=\"$IMG_WIDTH\">" ;;
-    *) echo "[${file:t}]($url)" ;;
+for FILE in "${FILES[@]}"; do
+  NAME=$(basename "$FILE")
+  MIME_TYPE=$(file -b --mime-type "$FILE")
+  echo "Uploading $NAME ($MIME_TYPE)" >&2
+
+  # Temporary workaround: replace this curl with `gh pr comment --attach` / `gh pr create --attach` once that flag ships in a stable gh release
+  RESPONSE=$(curl -sS -X POST \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Accept: application/json" \
+    --data-binary "@$FILE" \
+    "$UPLOAD_URL?name=$NAME&content_type=$MIME_TYPE&repository_id=$REPO_ID")
+  URL=$(echo "$RESPONSE" | jq -r '.url // empty' 2>/dev/null || true)
+  if [[ -z $URL ]]; then
+    echo "Upload of $NAME failed, response was:"
+    echo "$RESPONSE"
+    exit 1
+  fi
+
+  case $NAME in
+    *.png|*.jpg|*.jpeg|*.gif) echo "<img src=\"$URL\" alt=\"${NAME%.*}\" width=\"$IMG_WIDTH\">" ;;
+    *) echo "$URL" ;;
   esac
 done
