@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -79,7 +80,9 @@ fun LauncherScreen(
         sheetContainerColor = drawerContainerColor,
         containerColor = Color.Transparent,
         sheetContent = { AppDrawer(sections = sections, onLaunch = onLaunch) },
-        modifier = modifier,
+        // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
+        // navigation-bar inset.
+        modifier = modifier.clipToBounds(),
     ) { padding ->
         HorizontalPager(
             state = pagerState,

@@ -47,12 +47,13 @@ class MainActivity : ComponentActivity() {
     }
 
     // A HOME press relaunches the home activity, which singleTask delivers here. It only counts while the launcher is
-    // already in front (resumed); coming back from an app keeps the page you left, like the stock launcher.
-    // getIntent() deliberately stays the launch intent: nothing reads it later, and ActivityScenario identifies the
-    // activity by it.
+    // already in front; coming back from an app keeps the page you left, like the stock launcher. The framework pauses
+    // a resumed activity around onNewIntent, so "in front" arrives as STARTED, while a launcher stopped behind another
+    // app arrives as CREATED. getIntent() deliberately stays the launch intent: nothing reads it later, and
+    // ActivityScenario identifies the activity by it.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasCategory(Intent.CATEGORY_HOME) && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+        if (intent.hasCategory(Intent.CATEGORY_HOME) && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             homeRequests.tryEmit(Unit)
         }
     }

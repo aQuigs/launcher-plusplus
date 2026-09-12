@@ -1,7 +1,6 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -20,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,10 +31,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -67,6 +70,7 @@ fun DrawerHandle(state: SheetState, modifier: Modifier = Modifier) {
         imageVector = Icons.Default.KeyboardArrowUp,
         contentDescription = if (open) "Close the app drawer" else "Open the app drawer",
         modifier = modifier
+            .clip(CircleShape)
             .clickable { scope.launch { if (open) state.partialExpand() else state.expand() } }
             .padding(vertical = 8.dp)
             .size(32.dp)
@@ -99,7 +103,7 @@ fun AppDrawer(
             modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
         ) {
             sections.forEach { section ->
-                stickyHeader(key = "section_${section.initial}") { SectionHeader(section.initial) }
+                item(key = "section_${section.initial}") { SectionHeader(section.initial) }
                 items(section.apps, key = { "${it.packageName}/${it.activityName}" }) { app -> AppRow(app, onLaunch) }
             }
         }
@@ -114,7 +118,7 @@ fun AppDrawer(
 
 private val RAIL_WIDTH = 28.dp
 
-/** Translucent so the wallpaper still shows through the open drawer; sticky headers reuse it to cover the rows under them. */
+/** Translucent so the wallpaper still shows through the open drawer. */
 val drawerContainerColor: Color
     @Composable get() = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
 
@@ -126,7 +130,6 @@ private fun SectionHeader(initial: Char) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .background(drawerContainerColor)
             .padding(horizontal = 24.dp, vertical = 6.dp)
             .testTag(AppDrawerTags.section(initial)),
     )
@@ -150,6 +153,10 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit) {
  */
 @Composable
 private fun LetterRail(initials: List<Char>, current: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    // While a finger is on the rail its letter is the one to show, whatever the list managed to scroll to.
+    var pressed by remember { mutableStateOf<Int?>(null) }
+    val highlighted = pressed ?: current
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -157,7 +164,12 @@ private fun LetterRail(initials: List<Char>, current: Int, onSelect: (Int) -> Un
             .width(RAIL_WIDTH)
             .pointerInput(initials) {
                 fun select(y: Float) {
-                    if (initials.isNotEmpty()) onSelect((y / size.height * initials.size).toInt().coerceIn(0, initials.lastIndex))
+                    if (initials.isEmpty()) return
+                    val index = (y / size.height * initials.size).toInt().coerceIn(0, initials.lastIndex)
+                    if (index != pressed) {
+                        pressed = index
+                        onSelect(index)
+                    }
                 }
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -167,6 +179,7 @@ private fun LetterRail(initials: List<Char>, current: Int, onSelect: (Int) -> Un
                         change.consume()
                         select(change.position.y)
                     }
+                    pressed = null
                 }
             }
             .testTag(AppDrawerTags.RAIL),
@@ -175,8 +188,8 @@ private fun LetterRail(initials: List<Char>, current: Int, onSelect: (Int) -> Un
             Text(
                 text = initial.toString(),
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (index == current) FontWeight.Bold else FontWeight.Normal,
-                color = if (index == current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (index == highlighted) FontWeight.Bold else FontWeight.Normal,
+                color = if (index == highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f).wrapContentHeight().testTag(AppDrawerTags.letter(initial)),
             )
         }

@@ -2,6 +2,7 @@ package com.aquigs.launcherplusplus
 
 import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onChildren
@@ -26,12 +27,18 @@ class MainActivityTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
 
-    // Stands in for the system: a HOME press reaches the running singleTask home activity as this intent.
-    private fun deliverHomeIntent() {
+    private val scenario get() = compose.activityRule.scenario
+
+    /**
+     * Stands in for the system: a HOME press reaches the running singleTask home activity as this intent, and the
+     * framework has the activity in [state] when it arrives: STARTED (paused around onNewIntent) when the launcher was
+     * in front, CREATED (stopped) when another app was.
+     */
+    private fun deliverHomeIntent(state: Lifecycle.State) {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        compose.activityRule.scenario.onActivity {
-            InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, home)
-        }
+        scenario.moveToState(state)
+        scenario.onActivity { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, home) }
+        scenario.moveToState(Lifecycle.State.RESUMED)
     }
 
     @Test
@@ -53,9 +60,19 @@ class MainActivityTest {
         compose.swipePager { swipeLeft() }
         compose.page(LauncherPage.Collections).assertIsDisplayed()
 
-        deliverHomeIntent()
+        deliverHomeIntent(Lifecycle.State.STARTED)
 
         compose.page(LauncherPage.Home).assertIsDisplayed()
+    }
+
+    @Test
+    fun homeKeyWhileInFrontClosesTheDrawer() {
+        compose.drawerHandle().performClick()
+        compose.appList().assertIsDisplayed()
+
+        deliverHomeIntent(Lifecycle.State.STARTED)
+
+        compose.appList().assertIsNotDisplayed()
     }
 
     @Test
@@ -63,10 +80,7 @@ class MainActivityTest {
         compose.swipePager { swipeLeft() }
         compose.page(LauncherPage.Collections).assertIsDisplayed()
 
-        // Another activity in front stops the launcher; the HOME intent arrives before it resumes.
-        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
-        deliverHomeIntent()
-        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        deliverHomeIntent(Lifecycle.State.CREATED)
 
         compose.page(LauncherPage.Collections).assertIsDisplayed()
     }
