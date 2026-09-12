@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,12 +45,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.key
 import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
     const val HANDLE = "drawer_handle"
     const val LIST = "app_list"
+    const val PICK_HINT = "pick_hint"
 
     fun section(initial: Char) = "section_$initial"
 
@@ -73,12 +78,16 @@ fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
     )
 }
 
-/** Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. */
+/**
+ * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. With
+ * [checked] set the drawer is picking apps: rows show whether they are checked and [onClick] toggles instead of launching.
+ */
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
-    onLaunch: (AppEntry) -> Unit,
+    onClick: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
+    checked: ((AppEntry) -> Boolean)? = null,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val scope = rememberCoroutineScope()
@@ -98,28 +107,38 @@ fun AppDrawer(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(end = RAIL_WIDTH),
-            modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
-        ) {
-            sections.forEach { section ->
-                item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
-                items(section.apps, key = { "${it.packageName}/${it.activityName}" }, contentType = { "app" }) { app ->
-                    AppRow(app, onLaunch)
+    Column(modifier.fillMaxSize()) {
+        if (checked != null) {
+            Text(
+                text = "Tap apps to add them to the ring or take them off",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(AppDrawerTags.PICK_HINT),
+            )
+        }
+        Box(Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(end = RAIL_WIDTH),
+                modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
+            ) {
+                sections.forEach { section ->
+                    item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                    items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
+                        AppRow(app, onClick, checked?.invoke(app))
+                    }
                 }
             }
+            LetterRail(
+                initials = sections.map { it.initial },
+                highlighted = highlighted,
+                onSelect = { section ->
+                    lastSelected = section
+                    scope.launch { listState.scrollToItem(headerIndices[section]) }
+                },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
-        LetterRail(
-            initials = sections.map { it.initial },
-            highlighted = highlighted,
-            onSelect = { section ->
-                lastSelected = section
-                scope.launch { listState.scrollToItem(headerIndices[section]) }
-            },
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
     }
 }
 
@@ -138,16 +157,27 @@ private fun SectionHeader(initial: Char) {
     )
 }
 
+/** [checked] is null while launching, otherwise whether the app is picked. */
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit) {
-    Text(
-        text = app.label,
-        style = MaterialTheme.typography.titleMedium,
+private fun AppRow(app: AppEntry, onClick: (AppEntry) -> Unit, checked: Boolean?) {
+    val action = if (checked == null) {
+        Modifier.clickable { onClick(app) }
+    } else {
+        Modifier.toggleable(value = checked, onValueChange = { onClick(app) })
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onLaunch(app) }
+            .then(action)
             .padding(horizontal = 24.dp, vertical = 14.dp),
-    )
+    ) {
+        Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (checked == true) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
 }
 
 /**

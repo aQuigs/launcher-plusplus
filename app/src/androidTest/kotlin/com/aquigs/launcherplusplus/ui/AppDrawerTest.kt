@@ -3,9 +3,12 @@ package com.aquigs.launcherplusplus.ui
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -31,7 +34,7 @@ class AppDrawerTest {
     private val itemsPerLetter = APPS_PER_LETTER + 1
 
     private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}) = compose.setContent {
-        AppDrawer(apps = apps, onLaunch = onLaunch, listState = listState)
+        AppDrawer(apps = apps, onClick = onLaunch, listState = listState)
     }
 
     @Test
@@ -55,6 +58,20 @@ class AppDrawerTest {
         compose.onNodeWithText("Mail").performClick()
 
         assertEquals(listOf(mail), launched)
+    }
+
+    @Test
+    fun pickingTogglesAppsInsteadOfLaunchingThem() {
+        val clicked = mutableListOf<AppEntry>()
+        compose.setContent { AppDrawer(apps = listOf(clock, mail), onClick = clicked::add, checked = { it == mail }, listState = listState) }
+
+        compose.onNodeWithTag(AppDrawerTags.PICK_HINT).assertIsDisplayed()
+        compose.onNodeWithText("Mail").assertIsOn()
+        compose.onNodeWithText("Clock").assertIsOff()
+
+        compose.onNodeWithText("Clock").performClick()
+
+        assertEquals(listOf(clock), clicked)
     }
 
     @Test

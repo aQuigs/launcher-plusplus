@@ -7,9 +7,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
+import com.aquigs.launcherplusplus.apps.SharedPreferencesFavouritesStore
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.ui.HomePress
@@ -26,18 +31,26 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val repository = LauncherAppsRepository(this)
+        val favouritesStore = SharedPreferencesFavouritesStore(this)
         val layout = PageLayout()
+        val icon: suspend (AppEntry) -> ImageBitmap? = { app -> withContext(Dispatchers.IO) { repository.icon(app) } }
 
         setContent {
             LauncherTheme {
                 val apps by produceState(emptyList<AppEntry>()) {
                     value = withContext(Dispatchers.IO) { repository.installedApps() }
                 }
+                // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
+                // file holds a few keys.
+                var favourites by remember { mutableStateOf(favouritesStore.load()) }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
                     apps = apps,
+                    favourites = favourites,
+                    icon = icon,
                     onLaunch = repository::launch,
+                    onToggleFavourite = { app -> favourites = favourites.toggle(app).also(favouritesStore::save) },
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }
