@@ -41,7 +41,7 @@ scripts/                 # emulator, run, screenshot helpers (zsh)
 
 Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the only place that wires them together. `domain` never imports `android.*`; `ui` reaches the system only through the interfaces in `apps`.
 
-The screen is `LauncherScreen`: a pager over the `PageLayout` in `domain`, with one `when` branch per `LauncherPage` (the compiler flags a page without content). System events such as the HOME key reach the UI as state owned by `MainActivity` (`homeRequests`), never as calls into composables.
+The screen is `LauncherScreen`: a pager over the `PageLayout` in `domain`, with every `LauncherPage` covered by its `when` (the compiler flags a page without content). System events such as the HOME key reach the UI as flows owned by `MainActivity` (`homeRequests`), never as calls into composables.
 
 ## How we work
 
