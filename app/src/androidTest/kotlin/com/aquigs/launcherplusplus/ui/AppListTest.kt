@@ -17,9 +17,6 @@ class AppListTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
-    private val mail = AppEntry("Mail", "com.example.mail", "com.example.mail.Main")
-
     @Test
     fun showsEveryAppLabel() {
         compose.setContent { AppList(apps = listOf(clock, mail), onLaunch = {}) }

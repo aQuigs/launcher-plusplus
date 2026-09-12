@@ -8,14 +8,14 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.ui.AppListTags
-import com.aquigs.launcherplusplus.ui.LauncherTags
+import com.aquigs.launcherplusplus.ui.page
+import com.aquigs.launcherplusplus.ui.swipePager
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,8 +24,6 @@ import org.junit.runner.RunWith
 class MainActivityTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
-
-    private fun page(page: LauncherPage) = compose.onNodeWithTag(LauncherTags.page(page))
 
     // Stands in for the system: a HOME press reaches the running singleTask home activity as this intent.
     private fun deliverHomeIntent() {
@@ -50,24 +48,24 @@ class MainActivityTest {
 
     @Test
     fun homeKeyWhileInFrontReturnsToTheHomePage() {
-        compose.onNodeWithTag(LauncherTags.PAGER).performTouchInput { swipeLeft() }
-        page(LauncherPage.Collections).assertIsDisplayed()
+        compose.swipePager { swipeLeft() }
+        compose.page(LauncherPage.Collections).assertIsDisplayed()
 
         deliverHomeIntent()
 
-        page(LauncherPage.Home).assertIsDisplayed()
+        compose.page(LauncherPage.Home).assertIsDisplayed()
     }
 
     @Test
     fun homeKeyFromAnotherAppKeepsThePage() {
-        compose.onNodeWithTag(LauncherTags.PAGER).performTouchInput { swipeLeft() }
-        page(LauncherPage.Collections).assertIsDisplayed()
+        compose.swipePager { swipeLeft() }
+        compose.page(LauncherPage.Collections).assertIsDisplayed()
 
         // Another activity in front stops the launcher; the HOME intent arrives before it resumes.
         compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         deliverHomeIntent()
         compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
 
-        page(LauncherPage.Collections).assertIsDisplayed()
+        compose.page(LauncherPage.Collections).assertIsDisplayed()
     }
 }
