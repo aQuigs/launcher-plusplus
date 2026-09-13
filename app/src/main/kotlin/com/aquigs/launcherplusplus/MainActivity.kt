@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
+import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.ui.AppActions
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
         )
         val repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
+        val wallClock = SystemWallClock(this)
         val layout = PageLayout()
         val actions = AppActions(
             icon = repository::icon,
@@ -54,6 +56,8 @@ class MainActivity : ComponentActivity() {
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys.
                 var homeApps by remember { mutableStateOf(homeAppsStore.load()) }
+                // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
+                val clock by produceState(remember { wallClock.face() }) { wallClock.faces().collect { value = it } }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
@@ -64,6 +68,9 @@ class MainActivity : ComponentActivity() {
                         homeAppsStore.save(it)
                     },
                     actions = actions,
+                    clock = clock,
+                    onOpenClock = wallClock::openClock,
+                    onOpenCalendar = wallClock::openCalendar,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }

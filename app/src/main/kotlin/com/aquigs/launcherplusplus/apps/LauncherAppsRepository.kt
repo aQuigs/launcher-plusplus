@@ -1,7 +1,6 @@
 package com.aquigs.launcherplusplus.apps
 
 import android.app.ActivityManager
-import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -66,7 +65,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
     }
 
-    override fun launch(app: AppEntry) = startOrLog(app.key) { launcherApps.startMainActivity(app.component, user, null, null) }
+    override fun launch(app: AppEntry) = startOrLog(TAG, app.key) { launcherApps.startMainActivity(app.component, user, null, null) }
 
     override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
         try {
@@ -93,15 +92,15 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             ?.let { launcherApps.getShortcutIconDrawable(it, density) }
     }
 
-    override fun startShortcut(shortcut: AppShortcut) = startOrLog(shortcut.logName) {
+    override fun startShortcut(shortcut: AppShortcut) = startOrLog(TAG, shortcut.logName) {
         launcherApps.startShortcut(shortcut.packageName, shortcut.id, null, null, user)
     }
 
-    override fun openAppInfo(app: AppEntry) = startOrLog("app info for ${app.key}") {
+    override fun openAppInfo(app: AppEntry) = startOrLog(TAG, "app info for ${app.key}") {
         launcherApps.startAppDetailsActivity(app.component, user, null, null)
     }
 
-    override fun uninstall(app: AppEntry) = startOrLog("uninstall for ${app.key}") {
+    override fun uninstall(app: AppEntry) = startOrLog(TAG, "uninstall for ${app.key}") {
         // In a task of its own, left out of recents: in the launcher's task, HOME would clear the confirmation and count as
         // a press inside the launcher.
         val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null))
@@ -116,19 +115,6 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             // An app on the home screen whose icon cannot be drawn would otherwise crash the launcher on every start.
             Log.w(TAG, "No icon for $what", e)
             null
-        }
-    }
-
-    // What the user tapped may have gone since it was listed: an uninstall the package callback has not reported yet, a
-    // shortcut the app disabled, a locked user. None of that may crash the launcher.
-    private inline fun startOrLog(what: String, start: () -> Unit) {
-        try {
-            start()
-        } catch (e: RuntimeException) {
-            when (e) {
-                is ActivityNotFoundException, is SecurityException, is IllegalStateException -> Log.w(TAG, "Cannot start $what", e)
-                else -> throw e
-            }
         }
     }
 

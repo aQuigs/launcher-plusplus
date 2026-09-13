@@ -37,6 +37,10 @@ fun SemanticsNodeInteractionsProvider.placePicker() = onNodeWithTag(PlacePickerT
 
 fun SemanticsNodeInteractionsProvider.placeOption(place: HomePlace) = onNodeWithTag(PlacePickerTags.place(place))
 
+fun SemanticsNodeInteractionsProvider.clockTime() = onNodeWithTag(HomeClockTags.TIME)
+
+fun SemanticsNodeInteractionsProvider.clockDate() = onNodeWithTag(HomeClockTags.DATE)
+
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))

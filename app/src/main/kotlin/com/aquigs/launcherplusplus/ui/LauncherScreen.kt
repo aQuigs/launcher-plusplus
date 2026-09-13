@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppOption
 import com.aquigs.launcherplusplus.domain.AppShortcut
+import com.aquigs.launcherplusplus.domain.ClockFace
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
@@ -55,10 +57,11 @@ data class HomePress(val launcherInFront: Boolean)
 
 /**
  * The whole launcher: a horizontal pager over [layout] with the dock under it and the app drawer peeking below as a
- * chevron. The home page is the ring from [homeApps]; tapping its emblem opens the drawer to pick the apps on the ring or
- * in the dock. Long-pressing an app anywhere opens its menu of shortcuts and options. [apps] is null until the installed
- * apps have loaded. Every [HomePress] closes the menu and the drawer; one made while the launcher was in front also
- * scrolls to the home page. Back closes the menu, then the drawer, then returns to the home page.
+ * chevron. The home page shows the [clock] over the ring from [homeApps]: the time and the date open the clock app and
+ * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Long-pressing an app
+ * anywhere opens its menu of shortcuts and options. [apps] is null until the installed apps have loaded. Every
+ * [HomePress] closes the menu and the drawer; one made while the launcher was in front also scrolls to the home page.
+ * Back closes the menu, then the drawer, then returns to the home page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +72,9 @@ fun LauncherScreen(
     homeApps: HomeApps,
     onHomeAppsChange: (HomeApps) -> Unit,
     actions: AppActions,
+    clock: ClockFace,
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -192,19 +198,28 @@ fun LauncherScreen(
                 val page = layout.pages[index]
                 Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                     when (page) {
-                        LauncherPage.Home -> HomeRing(
-                            ring = ring,
-                            // Favourites stored for the ring hold the hint back until the app list can say none of them is
-                            // installed, so neither the hint nor the mark flashes while apps load.
-                            showHint = homeApps.ring.keys.isEmpty() || (apps != null && ring.isEmpty()),
-                            icon = actions.icon,
-                            onLaunch = actions.launch,
-                            menu = ringMenu,
-                            onEdit = {
-                                picking = HomePlace.Ring
-                                openDrawer()
-                            },
-                        )
+                        LauncherPage.Home -> Column {
+                            HomeClock(
+                                face = clock,
+                                onTimeClick = onOpenClock,
+                                onDateClick = onOpenCalendar,
+                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 24.dp),
+                            )
+                            HomeRing(
+                                ring = ring,
+                                // Favourites stored for the ring hold the hint back until the app list can say none of them
+                                // is installed, so neither the hint nor the mark flashes while apps load.
+                                showHint = homeApps.ring.keys.isEmpty() || (apps != null && ring.isEmpty()),
+                                icon = actions.icon,
+                                onLaunch = actions.launch,
+                                onEdit = {
+                                    picking = HomePlace.Ring
+                                    openDrawer()
+                                },
+                                modifier = Modifier.weight(1f),
+                                menu = ringMenu,
+                            )
+                        }
                         LauncherPage.Widgets, LauncherPage.Collections -> PlaceholderPage(page)
                     }
                 }
