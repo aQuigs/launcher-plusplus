@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.EMBLEM_FRACTION
 import com.aquigs.launcherplusplus.domain.RING_RADIUS_FRACTION
+import com.aquigs.launcherplusplus.domain.RingItem
 import com.aquigs.launcherplusplus.domain.ringIconSize
 import com.aquigs.launcherplusplus.domain.ringSlotOffset
 import kotlin.math.min
@@ -33,31 +34,44 @@ object HomeRingTags {
     const val EMBLEM = "ring_emblem"
 
     fun slot(app: AppEntry) = "ring_${app.key}"
+
+    fun folder(index: Int) = "ring_folder_$index"
 }
 
 private val FULL_ICON_SIZE = 64.dp
 
 /**
- * The [ring] of favourite apps round a static emblem. Tap an icon to launch it or long-press it for its [menu]; tap the
- * emblem to choose the favourites on the ring and in the dock.
- * With [showHint] the emblem invites you to add apps instead of showing its mark.
+ * The [ring] of favourite apps and folders round a static emblem. Tap an app to launch it or long-press it for its
+ * [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap the emblem to choose the favourites on the
+ * ring and in the dock. With [showHint] the emblem invites you to add apps instead of showing its mark.
  */
 @Composable
 fun HomeRing(
-    ring: List<AppEntry>,
+    ring: List<RingItem>,
     showHint: Boolean,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
+    onOpenFolder: (RingItem.Folder) -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
     menu: AppMenu? = null,
+    folderMenu: FolderMenu? = null,
 ) {
     val track = MaterialTheme.colorScheme.outlineVariant
 
     Layout(
         content = {
             Emblem(showHint = showHint, onClick = onEdit)
-            ring.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(app)), menu) } }
+            ring.forEach { item ->
+                when (item) {
+                    is RingItem.App -> key(item.app.key) {
+                        AppIcon(item.app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(item.app)), menu)
+                    }
+                    is RingItem.Folder -> key(item.index) {
+                        FolderIcon(item, icon, onOpenFolder, Modifier.testTag(HomeRingTags.folder(item.index)), folderMenu)
+                    }
+                }
+            }
         },
         modifier = modifier
             .fillMaxSize()

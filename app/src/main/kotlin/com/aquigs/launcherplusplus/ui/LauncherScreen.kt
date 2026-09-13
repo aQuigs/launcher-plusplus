@@ -42,6 +42,8 @@ import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.domain.Ring
+import com.aquigs.launcherplusplus.domain.RingItem
 import com.aquigs.launcherplusplus.domain.appOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -61,9 +63,10 @@ data class HomePress(val launcherInFront: Boolean)
  * chevron. The home page shows the [clock] over the ring from [homeApps]: the time and the date open the clock app and
  * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Until [isHomeApp], a card
  * between them says so and offers [onBecomeHomeApp]. Long-pressing an app anywhere opens its menu of shortcuts and
- * options. [apps] is null until the installed apps have loaded. Every [HomePress] closes the menu and the drawer; one
- * made while the launcher was in front also scrolls to the home page.
- * Back closes the menu, then the drawer, then returns to the home page.
+ * options; a ring app's menu can start a folder in its slot. A folder opens as a popup over the page, and its own menu
+ * renames it, fills it from the drawer or removes it. [apps] is null until the installed apps have loaded. Every
+ * [HomePress] closes the menu, the folder and the drawer; one made while the launcher was in front also scrolls to the
+ * home page. Back closes the menu, then the folder, then the drawer, then returns to the home page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +90,15 @@ fun LauncherScreen(
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
     val ring = remember(homeApps.ring, apps) { homeApps.ring.resolve(apps.orEmpty()) }
     val dock = remember(homeApps.dock, apps) { homeApps.dock.resolve(apps.orEmpty()) }
+    val latestHomeApps by rememberUpdatedState(homeApps)
+    val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
+
+    // Callbacks built once read the home apps through the latest state, so what they change is always the current ring.
+    fun changeRing(change: Ring.() -> Ring) {
+        val changed = latestHomeApps.copy(ring = latestHomeApps.ring.change())
+        if (changed != latestHomeApps) latestOnHomeAppsChange(changed)
+    }
+
     // Picking and searching are modes of the drawer, so they end however the drawer closes: chevron, drag, Back or HOME.
     // They wait for the drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up
     // open. Dropping focus takes the keyboard down with the drawer.
@@ -96,39 +108,47 @@ fun LauncherScreen(
     val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen
     LaunchedEffect(drawerSettledClosed) {
         if (drawerSettledClosed) {
+            // A folder being filled may pass through one app or none; it dissolves once the picking is over, not before.
+            if (picking is HomePlace.Folder) changeRing { dissolved() }
             picking = null
             query = ""
             focusManager.clearFocus()
         }
     }
-    // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
+    // The menu, the open folder and the rename dialog are focusable windows of their own, so Back reaches their
+    // onDismissRequest before this screen's BackHandler. The folder and the dialog are named by the folder's slot.
     var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
     var openingMenu by remember { mutableStateOf<Job?>(null) }
-    val latestHomeApps by rememberUpdatedState(homeApps)
-    val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
+    var openFolder by rememberSaveable { mutableStateOf<Int?>(null) }
+    var renaming by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
     fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
 
+    fun pickFor(place: HomePlace) {
+        picking = place
+        openDrawer()
+    }
+
     // A menu still loading its shortcuts is cancelled too, or HOME pressed meanwhile would not stop it opening afterwards.
     fun closeMenu() {
         openingMenu?.cancel()
-        openMenu = openMenu?.copy(expanded = false)
+        openMenu = openMenu?.closed()
     }
 
     fun appMenu(place: HomePlace?) = AppMenu(
         onOpen = { app ->
             openingMenu?.cancel()
-            openingMenu = scope.launch { openMenu = OpenMenu(app, place, actions.shortcuts(app)) }
+            openingMenu = scope.launch { openMenu = OpenMenu.App(app, place, actions.shortcuts(app)) }
         },
         content = { app ->
-            openMenu?.takeIf { it.isFor(app, place) }?.let { shown ->
+            (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, place) }?.let { shown ->
                 // An app that leaves the screen takes its popup away undismissed; without closing here the menu would reopen
                 // by itself when the app returns, as after an update.
                 DisposableEffect(Unit) {
-                    onDispose { if (openMenu?.isFor(app, place) == true) closeMenu() }
+                    onDispose { if ((openMenu as? OpenMenu.App)?.isFor(app, place) == true) closeMenu() }
                 }
                 AppOptionsMenu(
                     expanded = shown.expanded,
@@ -138,7 +158,13 @@ fun LauncherScreen(
                     onShortcut = actions.startShortcut,
                     onOption = { option ->
                         when (option) {
-                            is AppOption.Remove -> latestOnHomeAppsChange(latestHomeApps.toggle(option.place, app))
+                            // Unlike a toggle from the drawer, taking an app out of a folder settles the folder at once.
+                            is AppOption.Remove -> latestOnHomeAppsChange(latestHomeApps.toggle(option.place, app).dissolved())
+                            AppOption.NewFolder -> {
+                                val slot = latestHomeApps.ring.indexOf(app)
+                                changeRing { newFolder(app, "Folder") }
+                                pickFor(HomePlace.Folder(slot))
+                            }
                             AppOption.AppInfo -> actions.openAppInfo(app)
                             AppOption.Uninstall -> actions.uninstall(app)
                         }
@@ -152,10 +178,38 @@ fun LauncherScreen(
     val drawerMenu = remember(actions) { appMenu(place = null) }
     val ringMenu = remember(actions) { appMenu(HomePlace.Ring) }
     val dockMenu = remember(actions) { appMenu(HomePlace.Dock) }
+    val folderMenu = remember {
+        FolderMenu(
+            onOpen = { folder ->
+                openingMenu?.cancel()
+                openMenu = OpenMenu.Folder(folder.index)
+            },
+            content = { folder ->
+                (openMenu as? OpenMenu.Folder)?.takeIf { it.index == folder.index }?.let { shown ->
+                    DisposableEffect(Unit) {
+                        onDispose { if ((openMenu as? OpenMenu.Folder)?.index == folder.index) closeMenu() }
+                    }
+                    FolderOptionsMenu(
+                        expanded = shown.expanded,
+                        onOption = { option ->
+                            when (option) {
+                                FolderOption.Rename -> renaming = folder.index
+                                FolderOption.AddApps -> pickFor(HomePlace.Folder(folder.index))
+                                FolderOption.Remove -> changeRing { remove(folder.index) }
+                            }
+                        },
+                        onDismiss = ::closeMenu,
+                    )
+                }
+            },
+        )
+    }
 
     LaunchedEffect(homePresses, pagerState, drawerState, layout) {
         homePresses.collect { press ->
             closeMenu()
+            openFolder = null
+            renaming = null
             closeDrawer()
             // Coming back from an app keeps the page you left, like the stock launcher.
             if (press.launcherInFront) goHome()
@@ -183,7 +237,12 @@ fun LauncherScreen(
                 onQueryChange = { query = it },
                 picking = picking?.let { place ->
                     Picking(
-                        header = { PlacePicker(place = place, onPlaceChange = { picking = it }) },
+                        header = {
+                            when (place) {
+                                is HomePlace.Folder -> FolderPicker(name = homeApps.ring.folder(place.index)?.name.orEmpty())
+                                HomePlace.Ring, HomePlace.Dock -> PlacePicker(place = place, onPlaceChange = { picking = it })
+                            }
+                        },
                         isPicked = { it in homeApps[place] },
                         onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
                     )
@@ -230,17 +289,16 @@ fun LauncherScreen(
                             }
                             HomeRing(
                                 ring = ring,
-                                // Favourites stored for the ring hold the hint back until the app list can say none of them
+                                // Slots stored for the ring hold the hint back until the app list can say none of their apps
                                 // is installed, so neither the hint nor the mark flashes while apps load.
-                                showHint = homeApps.ring.keys.isEmpty() || (apps != null && ring.isEmpty()),
+                                showHint = homeApps.ring.isEmpty || (apps != null && ring.isEmpty()),
                                 icon = actions.icon,
                                 onLaunch = actions.launch,
-                                onEdit = {
-                                    picking = HomePlace.Ring
-                                    openDrawer()
-                                },
+                                onOpenFolder = { openFolder = it.index },
+                                onEdit = { pickFor(HomePlace.Ring) },
                                 modifier = Modifier.weight(1f),
                                 menu = ringMenu,
+                                folderMenu = folderMenu,
                             )
                         }
                         LauncherPage.Widgets, LauncherPage.Collections -> PlaceholderPage(page)
@@ -254,12 +312,65 @@ fun LauncherScreen(
             }
         }
     }
+
+    ring.filterIsInstance<RingItem.Folder>().find { it.index == openFolder }?.let { folder ->
+        // A folder that dissolves, or whose apps all go, takes its popup away undismissed; without clearing here a folder
+        // made later in the same slot would open by itself.
+        DisposableEffect(folder.index) {
+            onDispose { if (openFolder == folder.index) openFolder = null }
+        }
+        FolderPopup(
+            folder = folder,
+            icon = actions.icon,
+            onLaunch = { app ->
+                openFolder = null
+                actions.launch(app)
+            },
+            onAddApps = {
+                openFolder = null
+                pickFor(HomePlace.Folder(folder.index))
+            },
+            onDismiss = { openFolder = null },
+            menu = remember(actions, folder.index) { appMenu(HomePlace.Folder(folder.index)) },
+        )
+    }
+    renaming?.let { index ->
+        homeApps.ring.folder(index)?.let { folder ->
+            RenameFolderDialog(
+                name = folder.name,
+                onRename = { name ->
+                    renaming = null
+                    changeRing { rename(index, name) }
+                },
+                onDismiss = { renaming = null },
+            )
+        }
+    }
 }
 
-/** The app whose menu is showing, where it was pressed (null for the drawer), and its shortcuts. */
-private data class OpenMenu(val app: AppEntry, val place: HomePlace?, val shortcuts: List<AppShortcut>, val expanded: Boolean = true) {
-    // By key, so a reload that relabels the app keeps its menu.
-    fun isFor(app: AppEntry, place: HomePlace?) = app.key == this.app.key && place == this.place
+/** The long-press menu that is showing. It keeps what it shows while [expanded] turns false, so it animates away whole. */
+private sealed interface OpenMenu {
+    val expanded: Boolean
+
+    fun closed(): OpenMenu
+
+    /** [app]'s menu, where it was pressed (null for the drawer), and its shortcuts. */
+    data class App(
+        val app: AppEntry,
+        val place: HomePlace?,
+        val shortcuts: List<AppShortcut>,
+        override val expanded: Boolean = true,
+    ) : OpenMenu {
+        // By key, so a reload that relabels the app keeps its menu.
+        fun isFor(app: AppEntry, place: HomePlace?) = app.key == this.app.key && place == this.place
+
+        override fun closed() = copy(expanded = false)
+    }
+
+    /** The menu of the folder in the ring's slot [index]. */
+    data class Folder(val index: Int, override val expanded: Boolean = true) : OpenMenu {
+        override fun closed() = copy(expanded = false)
+    }
 }
 
 @Composable

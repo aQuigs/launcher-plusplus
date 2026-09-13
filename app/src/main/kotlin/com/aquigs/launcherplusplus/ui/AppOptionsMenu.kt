@@ -30,8 +30,10 @@ object AppOptionsTags {
     const val MENU = "app_options"
 }
 
-/** A long-press menu for apps: [onOpen] asks for it, and [content], drawn inside each app, shows it while it is open there. */
-class AppMenu(val onOpen: (AppEntry) -> Unit, val content: @Composable (AppEntry) -> Unit)
+/** A long-press menu: [onOpen] asks for it on one item, and [content], drawn inside each item, shows it while it is open there. */
+class LongPressMenu<T>(val onOpen: (T) -> Unit, val content: @Composable (T) -> Unit)
+
+typealias AppMenu = LongPressMenu<AppEntry>
 
 /** A tap launches [app]; with a [menu], a long press opens it. */
 fun Modifier.launchable(app: AppEntry, onLaunch: (AppEntry) -> Unit, menu: AppMenu?): Modifier =
@@ -55,12 +57,7 @@ fun AppOptionsMenu(
     onOption: (AppOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Items stay tappable while the menu animates away, and a second tap must not start the same thing twice.
-    fun choose(choice: () -> Unit) {
-        if (!expanded) return
-        onDismiss()
-        choice()
-    }
+    fun choose(choice: () -> Unit) = chooseFrom(expanded, onDismiss, choice)
 
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(AppOptionsTags.MENU)) {
         shortcuts.forEach { shortcut ->
@@ -81,6 +78,13 @@ fun AppOptionsMenu(
     }
 }
 
+/** Dismisses a menu, then acts. Items stay tappable while the menu animates away, and a second tap must not start the same thing twice. */
+internal fun chooseFrom(expanded: Boolean, onDismiss: () -> Unit, choice: () -> Unit) {
+    if (!expanded) return
+    onDismiss()
+    choice()
+}
+
 @Composable
 private fun ShortcutIcon(shortcut: AppShortcut, icon: suspend (AppShortcut) -> ImageBitmap?) {
     val bitmap by produceState<ImageBitmap?>(null, shortcut) { value = icon(shortcut) }
@@ -95,7 +99,9 @@ private val AppOption.label
         is AppOption.Remove -> when (place) {
             HomePlace.Ring -> "Remove from the ring"
             HomePlace.Dock -> "Remove from the dock"
+            is HomePlace.Folder -> "Remove from folder"
         }
+        AppOption.NewFolder -> "New folder"
         AppOption.AppInfo -> "App info"
         AppOption.Uninstall -> "Uninstall"
     }
@@ -103,6 +109,7 @@ private val AppOption.label
 private val AppOption.icon
     get() = when (this) {
         is AppOption.Remove -> Icons.Default.Close
+        AppOption.NewFolder -> FolderGlyph
         AppOption.AppInfo -> Icons.Default.Info
         AppOption.Uninstall -> Icons.Default.Delete
     }

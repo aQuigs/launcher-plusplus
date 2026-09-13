@@ -2,11 +2,17 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
+import com.aquigs.launcherplusplus.domain.Ring
+import com.aquigs.launcherplusplus.domain.RingItem
+import com.aquigs.launcherplusplus.domain.RingSlot
 
 val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
 val mail = AppEntry("Mail", "com.example.mail", "com.example.mail.Main")
@@ -17,6 +23,12 @@ const val APPS_PER_LETTER = 3
 val alphabet: List<AppEntry> = ('A'..'Z').flatMap { letter ->
     (1..APPS_PER_LETTER).map { n -> AppEntry("$letter$n", "com.example.${letter.lowercase()}$n", "Main") }
 }
+
+fun ringOf(vararg apps: AppEntry) = Ring(apps.map { RingSlot.App(it.key) })
+
+fun folderOf(name: String, vararg apps: AppEntry) = RingSlot.Folder(name, apps.map { it.key })
+
+fun List<AppEntry>.asRingItems() = map(RingItem::App)
 
 fun SemanticsNodeInteractionsProvider.pager() = onNodeWithTag(LauncherTags.PAGER)
 
@@ -46,6 +58,19 @@ fun SemanticsNodeInteractionsProvider.clockDate() = onNodeWithTag(HomeClockTags.
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
+
+fun SemanticsNodeInteractionsProvider.folderSlot(index: Int) = onNodeWithTag(HomeRingTags.folder(index))
+
+fun SemanticsNodeInteractionsProvider.folderPopup() = onNodeWithTag(FolderTags.POPUP)
+
+// By text within the popup: the drawer, always composed, lists the same app under the same label.
+fun SemanticsNodeInteractionsProvider.folderApp(app: AppEntry) = onNode(hasText(app.label) and hasAnyAncestor(hasTestTag(FolderTags.POPUP)))
+
+fun SemanticsNodeInteractionsProvider.folderOptionsMenu() = onNodeWithTag(FolderTags.MENU)
+
+fun SemanticsNodeInteractionsProvider.renameDialog() = onNodeWithTag(FolderTags.RENAME)
+
+fun SemanticsNodeInteractionsProvider.folderNameField() = onNodeWithTag(FolderTags.NAME)
 
 fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
 

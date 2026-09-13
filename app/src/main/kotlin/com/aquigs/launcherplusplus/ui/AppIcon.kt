@@ -28,8 +28,6 @@ fun AppIcon(
     modifier: Modifier = Modifier,
     menu: AppMenu? = null,
 ) {
-    val bitmap by produceState<ImageBitmap?>(null, app.key) { value = icon(app) }
-
     Box(
         modifier
             .clip(CircleShape)
@@ -37,7 +35,17 @@ fun AppIcon(
             .launchable(app, onLaunch, menu)
             .semantics { contentDescription = app.label },
     ) {
-        bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
+        AppImage(app, icon, Modifier.fillMaxSize())
         menu?.content?.invoke(app)
+    }
+}
+
+/** An app's icon alone, with no name and nothing to tap; blank until it has loaded. */
+@Composable
+fun AppImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier = Modifier) {
+    val bitmap by produceState<ImageBitmap?>(null, app.key) { value = icon(app) }
+
+    Box(modifier) {
+        bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
     }
 }

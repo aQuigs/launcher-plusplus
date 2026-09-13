@@ -18,29 +18,44 @@ import com.aquigs.launcherplusplus.domain.HomePlace
 object PlacePickerTags {
     const val PICKER = "place_picker"
 
-    fun place(place: HomePlace) = "place_${place.name}"
+    fun place(place: HomePlace) = "place_$place"
 }
 
-/** Heads the drawer while picking: which [place] a tap fills, with a switch to the other places, and what a tap does. */
+private val switchablePlaces = listOf(HomePlace.Ring to "Ring", HomePlace.Dock to "Dock")
+
+/** Heads the drawer while picking for the ring or the dock: which [place] a tap fills, with a switch to the other, and what a tap does. */
 @Composable
 fun PlacePicker(place: HomePlace, onPlaceChange: (HomePlace) -> Unit, modifier: Modifier = Modifier) {
-    val places = HomePlace.entries
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(PlacePickerTags.PICKER),
-    ) {
+    PickingHeader(modifier) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            places.forEachIndexed { index, option ->
+            switchablePlaces.forEachIndexed { index, (option, label) ->
                 SegmentedButton(
                     selected = option == place,
                     onClick = { onPlaceChange(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index, places.size),
-                    label = { Text(option.name) },
+                    shape = SegmentedButtonDefaults.itemShape(index, switchablePlaces.size),
+                    label = { Text(label) },
                     modifier = Modifier.testTag(PlacePickerTags.place(option)),
                 )
             }
         }
+    }
+}
+
+/** Heads the drawer while picking for a folder: which folder a tap fills, and what a tap does. */
+@Composable
+fun FolderPicker(name: String, modifier: Modifier = Modifier) {
+    PickingHeader(modifier) {
+        Text(text = "Adding apps to “$name”", style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun PickingHeader(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(PlacePickerTags.PICKER),
+    ) {
+        content()
         Text(
             text = "Tap apps to add them or take them off",
             style = MaterialTheme.typography.bodyMedium,
