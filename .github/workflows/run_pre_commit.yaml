@@ -1,33 +1,26 @@
 name: run-pre-commit-checks
-run-name: Running pre-commit checks against all files
 on: [push]
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: 'lts/*'
 
       - name: Install Markdownlint
         run: npm install -g markdownlint-cli
 
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.10'
-
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+          python-version: '3.x'
 
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
+        env:
+          # The Android workflow builds the app and runs the unit tests, so the hook would only repeat them here.
+          SKIP: gradle-unit-tests
