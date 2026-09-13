@@ -27,6 +27,15 @@ jobs:
       - name: Build, lint and run the unit tests
         run: ./gradlew assembleDebug assembleDebugAndroidTest lintDebug testDebugUnitTest
 
+      - name: Check the build left the tree clean
+        # A file the build rewrites or creates inside the tree belongs in the commit; otherwise every local build shows a stray diff.
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --short
+            echo "::error::The build changed or created files that are not committed"
+            exit 1
+          fi
+
       - name: Upload the reports
         if: failure()
         uses: actions/upload-artifact@v7
