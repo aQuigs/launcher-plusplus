@@ -44,6 +44,7 @@ import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingItem
+import com.aquigs.launcherplusplus.domain.WidgetPage
 import com.aquigs.launcherplusplus.domain.appOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -64,10 +65,11 @@ data class HomePress(val launcherInFront: Boolean)
  * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Until [isHomeApp], a card
  * between them says so and offers [onBecomeHomeApp]. Long-pressing an app anywhere opens its menu of shortcuts and
  * options; a ring app's menu can start a folder in its slot. A folder opens in place, as in Arc: its apps take the ring's
- * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. [apps]
- * is null until the installed apps have loaded. Every [HomePress] closes the menu, the drawer and the folder; one made
- * while the launcher was in front also scrolls to the home page. Back undoes what is on top: it closes the menu, then the
- * drawer, then returns to the home page, then closes the folder.
+ * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. The
+ * widget page shows [widgetPage] through [widgets], and a widget's long-press menu removes it. [apps] is null until the
+ * installed apps have loaded. Every [HomePress] closes the menu, the drawer and the folder; one made while the launcher
+ * was in front also scrolls to the home page. Back undoes what is on top: it closes the menu, then the drawer, then
+ * returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +85,8 @@ fun LauncherScreen(
     onOpenCalendar: () -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
+    widgetPage: WidgetPage,
+    widgets: WidgetActions,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -211,6 +215,23 @@ fun LauncherScreen(
         )
     }
 
+    val widgetMenu = remember(widgets) {
+        WidgetMenu(
+            onOpen = { widget ->
+                openingMenu?.cancel()
+                openMenu = OpenMenu.Widget(widget.id)
+            },
+            content = { widget ->
+                (openMenu as? OpenMenu.Widget)?.takeIf { it.id == widget.id }?.let { shown ->
+                    DisposableEffect(Unit) {
+                        onDispose { if ((openMenu as? OpenMenu.Widget)?.id == widget.id) closeMenu() }
+                    }
+                    WidgetOptionsMenu(expanded = shown.expanded, onRemove = { widgets.remove(widget.id) }, onDismiss = ::closeMenu)
+                }
+            },
+        )
+    }
+
     LaunchedEffect(homePresses, pagerState, drawerState, layout) {
         homePresses.collect { press ->
             closeMenu()
@@ -315,7 +336,8 @@ fun LauncherScreen(
                                 folderAppMenu = folderAppMenu,
                             )
                         }
-                        LauncherPage.Widgets, LauncherPage.Collections -> PlaceholderPage(page)
+                        LauncherPage.Widgets -> WidgetColumn(page = widgetPage, view = widgets.view, onAdd = widgets.add, menu = widgetMenu)
+                        LauncherPage.Collections -> PlaceholderPage(page)
                     }
                 }
             }
@@ -349,6 +371,11 @@ private sealed interface OpenMenu {
 
     /** The menu of the folder in the ring's slot [index]. */
     data class Folder(val index: Int, override val expanded: Boolean = true) : OpenMenu {
+        override fun closed() = copy(expanded = false)
+    }
+
+    /** The menu of the widget [id]. */
+    data class Widget(val id: Int, override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 }

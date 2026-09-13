@@ -19,17 +19,21 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
 import com.aquigs.launcherplusplus.apps.RoleManagerHomeRole
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
+import com.aquigs.launcherplusplus.apps.SharedPreferencesWidgetPageStore
 import com.aquigs.launcherplusplus.apps.SystemWallClock
+import com.aquigs.launcherplusplus.apps.SystemWidgetHost
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.ui.AppActions
 import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
+import com.aquigs.launcherplusplus.ui.WidgetActions
 import com.aquigs.launcherplusplus.ui.theme.LauncherTheme
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
+    private lateinit var widgetHost: SystemWidgetHost
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +47,8 @@ class MainActivity : ComponentActivity() {
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
+        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
+        val widgetActions = WidgetActions(view = widgetHost::view, add = widgetHost::add, remove = widgetHost::remove)
         val layout = PageLayout()
         val actions = AppActions(
             icon = repository::icon,
@@ -69,6 +75,10 @@ class MainActivity : ComponentActivity() {
                 val isHomeApp by produceState(remember { homeRole.isHeld() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { homeRole.held().collect { value = it } }
                 }
+                // The widgets only draw their updates while the launcher is visible, like the clock.
+                val widgetPage by produceState(remember { widgetHost.page() }) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { widgetHost.updates().collect { value = it } }
+                }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
@@ -84,10 +94,20 @@ class MainActivity : ComponentActivity() {
                     onOpenCalendar = wallClock::openCalendar,
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
+                    widgetPage = widgetPage,
+                    widgets = widgetActions,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }
         }
+    }
+
+    // The widget host's configuration step is an activity API that answers here, not through the result registry, which
+    // dispatches the registry's own requests first.
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        widgetHost.onActivityResult(requestCode, resultCode)
     }
 
     // A HOME press relaunches the home activity, which singleTask delivers here. The lifecycle state cannot say where the

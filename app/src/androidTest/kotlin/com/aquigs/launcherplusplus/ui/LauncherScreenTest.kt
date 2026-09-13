@@ -1,5 +1,6 @@
 package com.aquigs.launcherplusplus.ui
 
+import android.view.View
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,10 +32,12 @@ import com.aquigs.launcherplusplus.domain.ClockFace
 import com.aquigs.launcherplusplus.domain.Favourites
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
+import com.aquigs.launcherplusplus.domain.HostedWidget
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingSlot
+import com.aquigs.launcherplusplus.domain.WidgetPage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
@@ -64,6 +67,11 @@ class LauncherScreenTest {
     private val infoOpened = mutableListOf<AppEntry>()
     private val uninstalled = mutableListOf<AppEntry>()
     private var shortcutsLoaded = CompletableDeferred(Unit)
+    private val search = HostedWidget(id = 3, rows = 1)
+    private var widgetPage by mutableStateOf(WidgetPage())
+    private val widgetsAdded = mutableListOf<Int>()
+    private val widgetsRemoved = mutableListOf<Int>()
+    private val widgets = WidgetActions(view = { context, _ -> View(context) }, add = widgetsAdded::add, remove = widgetsRemoved::add)
     private val actions = AppActions(
         icon = { null },
         launch = launched::add,
@@ -90,6 +98,8 @@ class LauncherScreenTest {
             onOpenCalendar = { opened += "calendar" },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
+            widgetPage = widgetPage,
+            widgets = widgets,
             pagerState = pager,
         )
     }
@@ -627,6 +637,54 @@ class LauncherScreenTest {
 
         compose.swipePager { swipeRight() }
         assertSettledOn(LauncherPage.Widgets)
+    }
+
+    @Test
+    fun theWidgetPageAddsAndRemovesWidgetsAndBackClosesItsMenuFirst() {
+        widgetPage = WidgetPage(listOf(search))
+        show()
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Widgets)
+
+        compose.addWidgetButton().performClick()
+        compose.runOnIdle { assertEquals(1, widgetsAdded.size) }
+        assertTrue("the page holds ${widgetsAdded.single()} rows", widgetsAdded.single() >= 4)
+
+        compose.widget(search).performTouchInput { longClick() }
+        compose.widgetOptionsMenu().assertIsDisplayed()
+        Espresso.pressBack()
+        compose.widgetOptionsMenu().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Widgets)
+
+        compose.widget(search).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove").performClick()
+        compose.runOnIdle { assertEquals(listOf(search.id), widgetsRemoved) }
+        widgetPage = WidgetPage()
+
+        compose.widget(search).assertDoesNotExist()
+        compose.onNodeWithText("No widgets yet").assertIsDisplayed()
+        pressHome(launcherInFront = true)
+        assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
+    fun aSlowDragAcrossAWidgetSwipesThePageAndOpensNoMenu() {
+        widgetPage = WidgetPage(listOf(search))
+        show()
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Widgets)
+
+        compose.widget(search).performTouchInput {
+            down(center)
+            // Steps under the touch slop for longer than a long press, so the pager follows the finger the whole way and
+            // the widget under it barely moves in its own frame; then a fling the rest of the way.
+            repeat(20) { moveBy(Offset(-10f, 0f), delayMillis = viewConfiguration.longPressTimeoutMillis / 8) }
+            repeat(8) { moveBy(Offset(-100f, 0f)) }
+            up()
+        }
+
+        compose.widgetOptionsMenu().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Home)
     }
 
     @Test
