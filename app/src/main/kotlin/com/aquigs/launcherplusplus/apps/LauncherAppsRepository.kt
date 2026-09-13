@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
 import android.content.pm.LauncherApps.ShortcutQuery
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 private const val TAG = "LauncherAppsRepository"
 private const val MAX_SHORTCUTS = 4
@@ -50,33 +52,23 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     private fun loadApps(): List<AppEntry> =
         launcherApps.getActivityList(null, user)
             .map { info ->
-                val flags = info.applicationInfo.flags
                 AppEntry(
                     label = info.label.toString(),
                     packageName = info.componentName.packageName,
                     activityName = info.componentName.className,
-                    // An app built into the system can only lose its updates, so without any there is nothing to remove.
-                    canUninstall = flags and ApplicationInfo.FLAG_SYSTEM == 0 || flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0,
+                    // An app built into the system can only lose its updates, which its App info page offers.
+                    canUninstall = info.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0,
                 )
             }
             .sortedByLabel()
 
-    override fun icon(app: AppEntry): ImageBitmap? =
-        try {
-            val size = activityManager.launcherLargeIconSize
-            launcherApps.resolveActivity(Intent().setComponent(app.component), user)
-                ?.getIcon(activityManager.launcherLargeIconDensity)
-                ?.toBitmap(size, size)
-                ?.asImageBitmap()
-        } catch (e: RuntimeException) {
-            // A favourite whose icon cannot be drawn would otherwise crash the launcher on every start.
-            Log.w(TAG, "No icon for ${app.key}", e)
-            null
-        }
+    override suspend fun icon(app: AppEntry): ImageBitmap? = draw(app.key) { density ->
+        launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
+    }
 
     override fun launch(app: AppEntry) = startOrLog(app.key) { launcherApps.startMainActivity(app.component, user, null, null) }
 
-    override fun shortcuts(app: AppEntry): List<AppShortcut> =
+    override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
         try {
             if (launcherApps.hasShortcutHostPermission()) {
                 launcherApps.getShortcuts(shortcutQuery(app.packageName).setActivity(app.component), user).orEmpty()
@@ -93,21 +85,15 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             Log.w(TAG, "No shortcuts for ${app.key}", e)
             emptyList()
         }
+    }
 
-    override fun shortcutIcon(shortcut: AppShortcut): ImageBitmap? =
-        try {
-            val size = activityManager.launcherLargeIconSize
-            launcherApps.getShortcuts(shortcutQuery(shortcut.packageName).setShortcutIds(listOf(shortcut.id)), user)
-                ?.firstOrNull()
-                ?.let { launcherApps.getShortcutIconDrawable(it, activityManager.launcherLargeIconDensity) }
-                ?.toBitmap(size, size)
-                ?.asImageBitmap()
-        } catch (e: RuntimeException) {
-            Log.w(TAG, "No icon for ${shortcut.packageName} shortcut ${shortcut.id}", e)
-            null
-        }
+    override suspend fun shortcutIcon(shortcut: AppShortcut): ImageBitmap? = draw(shortcut.logName) { density ->
+        launcherApps.getShortcuts(shortcutQuery(shortcut.packageName).setShortcutIds(listOf(shortcut.id)), user)
+            ?.firstOrNull()
+            ?.let { launcherApps.getShortcutIconDrawable(it, density) }
+    }
 
-    override fun startShortcut(shortcut: AppShortcut) = startOrLog("${shortcut.packageName} shortcut ${shortcut.id}") {
+    override fun startShortcut(shortcut: AppShortcut) = startOrLog(shortcut.logName) {
         launcherApps.startShortcut(shortcut.packageName, shortcut.id, null, null, user)
     }
 
@@ -116,7 +102,21 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     }
 
     override fun uninstall(app: AppEntry) = startOrLog("uninstall for ${app.key}") {
-        context.startActivity(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null)))
+        // In a task of its own, left out of recents: in the launcher's task, HOME would clear the confirmation and count as
+        // a press inside the launcher.
+        val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null))
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS))
+    }
+
+    private suspend fun draw(what: String, drawable: (density: Int) -> Drawable?): ImageBitmap? = withContext(Dispatchers.IO) {
+        try {
+            val size = activityManager.launcherLargeIconSize
+            drawable(activityManager.launcherLargeIconDensity)?.toBitmap(size, size)?.asImageBitmap()
+        } catch (e: RuntimeException) {
+            // An app on the home screen whose icon cannot be drawn would otherwise crash the launcher on every start.
+            Log.w(TAG, "No icon for $what", e)
+            null
+        }
     }
 
     // What the user tapped may have gone since it was listed: an uninstall the package callback has not reported yet, a
@@ -125,8 +125,10 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         try {
             start()
         } catch (e: RuntimeException) {
-            if (e !is ActivityNotFoundException && e !is SecurityException && e !is IllegalStateException) throw e
-            Log.w(TAG, "Cannot start $what", e)
+            when (e) {
+                is ActivityNotFoundException, is SecurityException, is IllegalStateException -> Log.w(TAG, "Cannot start $what", e)
+                else -> throw e
+            }
         }
     }
 
@@ -134,6 +136,8 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         ShortcutQuery().setPackage(packageName).setQueryFlags(ShortcutQuery.FLAG_MATCH_MANIFEST or ShortcutQuery.FLAG_MATCH_DYNAMIC)
 
     private val AppEntry.component get() = ComponentName(packageName, activityName)
+
+    private val AppShortcut.logName get() = "$packageName shortcut $id"
 
     // Any of these can add, remove or relabel launchable activities, so each reloads the whole list.
     private class PackageChanges(private val onChange: () -> Unit) : LauncherApps.Callback() {

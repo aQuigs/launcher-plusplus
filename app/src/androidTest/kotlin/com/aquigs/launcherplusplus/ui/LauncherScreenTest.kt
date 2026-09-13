@@ -14,7 +14,6 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -32,6 +31,7 @@ import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -54,10 +54,14 @@ class LauncherScreenTest {
     private val started = mutableListOf<AppShortcut>()
     private val infoOpened = mutableListOf<AppEntry>()
     private val uninstalled = mutableListOf<AppEntry>()
+    private var shortcutsLoaded = CompletableDeferred(Unit)
     private val actions = AppActions(
         icon = { null },
         launch = launched::add,
-        shortcuts = { if (it == mail) listOf(composeMail) else emptyList() },
+        shortcuts = {
+            shortcutsLoaded.await()
+            if (it == mail) listOf(composeMail) else emptyList()
+        },
         shortcutIcon = { null },
         startShortcut = started::add,
         openAppInfo = infoOpened::add,
@@ -269,7 +273,7 @@ class LauncherScreenTest {
         for (item in listOf("Compose", "App info", "Uninstall")) {
             compose.onNodeWithText("Mail").performTouchInput { longClick() }
             compose.onNodeWithText(item).performClick()
-            compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+            compose.appOptionsMenu().assertDoesNotExist()
         }
 
         compose.runOnIdle {
@@ -302,7 +306,7 @@ class LauncherScreenTest {
 
         pressHome(launcherInFront = true)
 
-        compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+        compose.appOptionsMenu().assertDoesNotExist()
     }
 
     @Test
@@ -315,19 +319,64 @@ class LauncherScreenTest {
 
         Espresso.pressBack()
 
-        compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+        compose.appOptionsMenu().assertDoesNotExist()
         assertDrawerOpen(true)
     }
 
     @Test
-    fun aLongPressWhilePickingOpensNoMenu() {
+    fun aLongPressWhilePickingPicksTheAppAndOpensNoMenu() {
         show()
         compose.emblem().performClick()
         assertDrawerOpen(true)
 
         compose.onNodeWithText("Mail").performTouchInput { longClick() }
 
-        compose.onNodeWithTag(AppOptionsTags.MENU).assertDoesNotExist()
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(ring = Favourites(listOf(mail.key))), homeApps) }
+    }
+
+    @Test
+    fun homeWhileTheShortcutsLoadOpensNoMenu() {
+        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        shortcutsLoaded = CompletableDeferred()
+        show()
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        pressHome(launcherInFront = true)
+        shortcutsLoaded.complete(Unit)
+
+        compose.appOptionsMenu().assertDoesNotExist()
+    }
+
+    @Test
+    fun anAppThatGoesWithItsMenuOpenComesBackWithoutIt() {
+        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        show()
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("App info").assertIsDisplayed()
+
+        apps = listOf(clock)
+        compose.ringSlot(mail).assertDoesNotExist()
+        apps = listOf(clock, mail)
+
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.appOptionsMenu().assertDoesNotExist()
+    }
+
+    @Test
+    fun aSecondTapWhileTheMenuClosesStartsNothingAgain() {
+        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        show()
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Uninstall").assertIsDisplayed()
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("Uninstall").performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Uninstall").performClick()
+        compose.mainClock.autoAdvance = true
+
+        compose.runOnIdle { assertEquals(listOf(mail), uninstalled) }
     }
 
     @Test

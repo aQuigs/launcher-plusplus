@@ -1,6 +1,6 @@
 package com.aquigs.launcherplusplus.domain
 
-/** One launchable activity. [canUninstall] is false for an app built into the system with no updates to remove. */
+/** One launchable activity. [canUninstall] is false for an app built into the system. */
 data class AppEntry(
     val label: String,
     val packageName: String,

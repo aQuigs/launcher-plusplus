@@ -44,3 +44,5 @@ fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(Ho
 fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
 
 fun SemanticsNodeInteractionsProvider.dockSlot(app: AppEntry) = onNodeWithTag(DockTags.slot(app))
+
+fun SemanticsNodeInteractionsProvider.appOptionsMenu() = onNodeWithTag(AppOptionsTags.MENU)

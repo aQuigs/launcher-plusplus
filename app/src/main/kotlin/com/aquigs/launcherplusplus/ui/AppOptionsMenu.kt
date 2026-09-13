@@ -1,6 +1,7 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppOption
 import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.HomePlace
@@ -28,9 +30,20 @@ object AppOptionsTags {
     const val MENU = "app_options"
 }
 
+/** A long-press menu for apps: [onOpen] asks for it, and [content], drawn inside each app, shows it while it is open there. */
+class AppMenu(val onOpen: (AppEntry) -> Unit, val content: @Composable (AppEntry) -> Unit)
+
+/** A tap launches [app]; with a [menu], a long press opens it. */
+fun Modifier.launchable(app: AppEntry, onLaunch: (AppEntry) -> Unit, menu: AppMenu?): Modifier =
+    combinedClickable(
+        onLongClickLabel = menu?.let { "App options" },
+        onLongClick = menu?.let { m -> { m.onOpen(app) } },
+        onClick = { onLaunch(app) },
+    )
+
 /**
- * An app's long-press menu: its [shortcuts] first, then the [options] for where it was pressed. It keeps what it shows
- * while [expanded] turns false, so it animates away whole.
+ * An app's long-press menu: its [shortcuts] first, then the [options] for where it was pressed. Choosing an item dismisses
+ * the menu, then hands on the choice. It keeps what it shows while [expanded] turns false, so it animates away whole.
  */
 @Composable
 fun AppOptionsMenu(
@@ -42,12 +55,19 @@ fun AppOptionsMenu(
     onOption: (AppOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // Items stay tappable while the menu animates away, and a second tap must not start the same thing twice.
+    fun choose(choice: () -> Unit) {
+        if (!expanded) return
+        onDismiss()
+        choice()
+    }
+
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(AppOptionsTags.MENU)) {
         shortcuts.forEach { shortcut ->
             DropdownMenuItem(
                 text = { Text(shortcut.label) },
                 leadingIcon = { ShortcutIcon(shortcut, shortcutIcon) },
-                onClick = { onShortcut(shortcut) },
+                onClick = { choose { onShortcut(shortcut) } },
             )
         }
         if (shortcuts.isNotEmpty()) HorizontalDivider()
@@ -55,7 +75,7 @@ fun AppOptionsMenu(
             DropdownMenuItem(
                 text = { Text(option.label) },
                 leadingIcon = { Icon(option.icon, contentDescription = null) },
-                onClick = { onOption(option) },
+                onClick = { choose { onOption(option) } },
             )
         }
     }

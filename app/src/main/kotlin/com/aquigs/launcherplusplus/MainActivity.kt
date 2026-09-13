@@ -22,9 +22,7 @@ import com.aquigs.launcherplusplus.ui.AppActions
 import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
 import com.aquigs.launcherplusplus.ui.theme.LauncherTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -41,10 +39,10 @@ class MainActivity : ComponentActivity() {
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val layout = PageLayout()
         val actions = AppActions(
-            icon = { withContext(Dispatchers.IO) { repository.icon(it) } },
+            icon = repository::icon,
             launch = repository::launch,
-            shortcuts = { withContext(Dispatchers.IO) { repository.shortcuts(it) } },
-            shortcutIcon = { withContext(Dispatchers.IO) { repository.shortcutIcon(it) } },
+            shortcuts = repository::shortcuts,
+            shortcutIcon = repository::shortcutIcon,
             startShortcut = repository::startShortcut,
             openAppInfo = repository::openAppInfo,
             uninstall = repository::uninstall,

@@ -13,8 +13,9 @@ class AppOptionsTest {
 
     @Test
     fun `a place on the home screen first offers to take the app out of it`() {
-        assertEquals(listOf(AppOption.Remove(HomePlace.Ring), AppOption.AppInfo, AppOption.Uninstall), appOptions(maps, HomePlace.Ring))
-        assertEquals(listOf(AppOption.Remove(HomePlace.Dock), AppOption.AppInfo, AppOption.Uninstall), appOptions(maps, HomePlace.Dock))
+        for (place in HomePlace.entries) {
+            assertEquals(listOf(AppOption.Remove(place), AppOption.AppInfo, AppOption.Uninstall), appOptions(maps, place))
+        }
     }
 
     @Test

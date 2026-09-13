@@ -96,6 +96,7 @@ fun AppDrawer(
     menu: AppMenu? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val rowMenu = menu.takeIf { picking == null }
     val sections = remember(apps) { apps.sectionsByInitial() }
     val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
@@ -124,7 +125,7 @@ fun AppDrawer(
                 sections.forEach { section ->
                     item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                     items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, onLaunch, picking, menu)
+                        AppRow(app, onLaunch, picking, rowMenu)
                     }
                 }
             }
@@ -176,7 +177,7 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking
         if (picked) {
             Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
-        if (picking == null) menu?.content?.invoke(app)
+        menu?.content?.invoke(app)
     }
 }
 

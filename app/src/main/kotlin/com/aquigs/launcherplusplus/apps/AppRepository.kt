@@ -9,17 +9,17 @@ interface AppRepository {
     /** The launchable apps sorted by label, loaded off the main thread and again whenever a package changes. */
     fun installedApps(): Flow<List<AppEntry>>
 
-    /** Blocking: reads the icon from the app's package. Null when the activity is gone or its icon cannot be drawn. */
-    fun icon(app: AppEntry): ImageBitmap?
+    /** Reads the icon from the app's package. Null when the activity is gone or its icon cannot be drawn. */
+    suspend fun icon(app: AppEntry): ImageBitmap?
 
     /** Starts [app]. Does nothing if it has gone since the list was loaded. */
     fun launch(app: AppEntry)
 
-    /** Blocking: at most four of the app's shortcuts, manifest ones first. Empty unless the launcher is the home app. */
-    fun shortcuts(app: AppEntry): List<AppShortcut>
+    /** At most four of the app's shortcuts, manifest ones first. Empty unless the launcher is the home app. */
+    suspend fun shortcuts(app: AppEntry): List<AppShortcut>
 
-    /** Blocking: the shortcut's icon. Null when it has none, has gone, or cannot be drawn. */
-    fun shortcutIcon(shortcut: AppShortcut): ImageBitmap?
+    /** The shortcut's icon. Null when it has none, has gone, or cannot be drawn. */
+    suspend fun shortcutIcon(shortcut: AppShortcut): ImageBitmap?
 
     /** Starts [shortcut]. Does nothing if it has gone or been disabled since it was listed. */
     fun startShortcut(shortcut: AppShortcut)
