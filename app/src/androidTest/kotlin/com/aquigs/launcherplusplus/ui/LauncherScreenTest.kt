@@ -26,6 +26,7 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppShortcut
+import com.aquigs.launcherplusplus.domain.ClockFace
 import com.aquigs.launcherplusplus.domain.Favourites
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
@@ -49,6 +50,8 @@ class LauncherScreenTest {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var homeApps by mutableStateOf(HomeApps())
+    private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September"))
+    private val opened = mutableListOf<String>()
     private val launched = mutableListOf<AppEntry>()
     private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
     private val started = mutableListOf<AppShortcut>()
@@ -76,6 +79,9 @@ class LauncherScreenTest {
             homeApps = homeApps,
             onHomeAppsChange = { homeApps = it },
             actions = actions,
+            clock = face,
+            onOpenClock = { opened += "clock" },
+            onOpenCalendar = { opened += "calendar" },
             pagerState = pager,
         )
     }
@@ -102,6 +108,19 @@ class LauncherScreenTest {
         assertDrawerOpen(false)
         compose.drawerHandle().assertIsDisplayed()
         compose.emblem().assertIsDisplayed()
+    }
+
+    @Test
+    fun theHomePageShowsTheClockAndKeepsItCurrent() {
+        show()
+        compose.onNodeWithText("10:19").assertIsDisplayed()
+
+        compose.runOnIdle { face = ClockFace("10:20", "Saturday 13 September") }
+
+        compose.onNodeWithText("10:20").assertIsDisplayed()
+        compose.clockTime().performClick()
+        compose.clockDate().performClick()
+        assertEquals(listOf("clock", "calendar"), opened)
     }
 
     @Test

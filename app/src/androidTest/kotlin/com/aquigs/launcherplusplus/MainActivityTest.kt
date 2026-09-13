@@ -1,7 +1,6 @@
 package com.aquigs.launcherplusplus
 
 import android.content.Intent
-import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -70,11 +69,6 @@ class MainActivityTest {
 
     @get:Rule(order = 2)
     val compose = createAndroidComposeRule<MainActivity>()
-
-    private fun shell(command: String): String {
-        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
-        return ParcelFileDescriptor.AutoCloseInputStream(output).bufferedReader().use { it.readText() }
-    }
 
     /**
      * Delivers a HOME intent as the system does: with the launcher in front it arrives while the activity is paused; from
