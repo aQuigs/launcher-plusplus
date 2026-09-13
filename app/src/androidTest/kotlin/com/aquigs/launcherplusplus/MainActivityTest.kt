@@ -2,18 +2,20 @@ package com.aquigs.launcherplusplus
 
 import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onChildren
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.swipeLeft
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aquigs.launcherplusplus.domain.LauncherPage
-import com.aquigs.launcherplusplus.ui.AppListTags
+import com.aquigs.launcherplusplus.ui.appList
+import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.swipePager
 import org.junit.Rule
@@ -25,17 +27,30 @@ class MainActivityTest {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
 
-    // Stands in for the system: a HOME press reaches the running singleTask home activity as this intent.
-    private fun deliverHomeIntent() {
+    /**
+     * Delivers a HOME intent as the system does: with the launcher in front it arrives while the activity is paused; from
+     * another app it arrives after the launcher was stopped, flagged as bringing its task to the front.
+     */
+    private fun deliverHomeIntent(fromAnotherApp: Boolean) {
+        val scenario = compose.activityRule.scenario
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        compose.activityRule.scenario.onActivity {
-            InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, home)
-        }
+        if (fromAnotherApp) home.addFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
+        scenario.moveToState(if (fromAnotherApp) Lifecycle.State.CREATED else Lifecycle.State.STARTED)
+        scenario.onActivity { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, home) }
+        scenario.moveToState(Lifecycle.State.RESUMED)
+    }
+
+    private fun openDrawerOnCollections() {
+        compose.swipePager { swipeLeft() }
+        compose.page(LauncherPage.Collections).assertIsDisplayed()
+        compose.drawerHandle().performClick()
+        compose.appList().assertIsDisplayed()
     }
 
     @Test
-    fun listsInstalledAppsIncludingSettings() {
-        val list = compose.onNodeWithTag(AppListTags.LIST)
+    fun theDrawerListsInstalledAppsIncludingSettings() {
+        compose.drawerHandle().performClick()
+        val list = compose.appList()
         list.assertIsDisplayed()
 
         compose.waitUntil(timeoutMillis = 10_000) {
@@ -47,25 +62,22 @@ class MainActivityTest {
     }
 
     @Test
-    fun homeKeyWhileInFrontReturnsToTheHomePage() {
-        compose.swipePager { swipeLeft() }
-        compose.page(LauncherPage.Collections).assertIsDisplayed()
+    fun homeKeyWhileInFrontClosesTheDrawerAndReturnsToTheHomePage() {
+        openDrawerOnCollections()
 
-        deliverHomeIntent()
+        deliverHomeIntent(fromAnotherApp = false)
 
         compose.page(LauncherPage.Home).assertIsDisplayed()
+        compose.appList().assertIsNotDisplayed()
     }
 
     @Test
-    fun homeKeyFromAnotherAppKeepsThePage() {
-        compose.swipePager { swipeLeft() }
-        compose.page(LauncherPage.Collections).assertIsDisplayed()
+    fun homeKeyFromAnotherAppClosesTheDrawerAndKeepsThePage() {
+        openDrawerOnCollections()
 
-        // Another activity in front stops the launcher; the HOME intent arrives before it resumes.
-        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
-        deliverHomeIntent()
-        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        deliverHomeIntent(fromAnotherApp = true)
 
         compose.page(LauncherPage.Collections).assertIsDisplayed()
+        compose.appList().assertIsNotDisplayed()
     }
 }

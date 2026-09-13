@@ -4,8 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AppEntrySortTest {
-    private fun app(label: String, packageName: String = "pkg.$label") = AppEntry(label, packageName, "$packageName.Main")
-
     @Test
     fun `sorts labels case-insensitively`() {
         val sorted = listOf(app("zebra"), app("Apple"), app("mango")).sortedByLabel()
