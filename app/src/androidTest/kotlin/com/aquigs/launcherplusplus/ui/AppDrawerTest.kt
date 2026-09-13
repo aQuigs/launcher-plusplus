@@ -1,8 +1,14 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -30,9 +36,8 @@ class AppDrawerTest {
     // Each letter of the alphabet fixture is one header row followed by its apps.
     private val itemsPerLetter = APPS_PER_LETTER + 1
 
-    private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}) = compose.setContent {
-        AppDrawer(apps = apps, onLaunch = onLaunch, listState = listState)
-    }
+    private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}, picking: Picking? = null) =
+        compose.setContent { AppDrawer(apps = apps, onLaunch = onLaunch, picking = picking, listState = listState) }
 
     @Test
     fun filesEveryAppUnderItsInitialWithTheRailToMatch() {
@@ -55,6 +60,24 @@ class AppDrawerTest {
         compose.onNodeWithText("Mail").performClick()
 
         assertEquals(listOf(mail), launched)
+    }
+
+    @Test
+    fun pickingTogglesAppsInsteadOfLaunchingThem() {
+        val launched = mutableListOf<AppEntry>()
+        val toggled = mutableListOf<AppEntry>()
+        val picking = Picking(hint = "Pick apps", isPicked = { it == mail }, onToggle = toggled::add)
+        show(listOf(clock, mail), onLaunch = launched::add, picking = picking)
+
+        compose.onNodeWithText("Pick apps").assertIsDisplayed()
+        compose.onNodeWithText("Mail").assertIsOn()
+        compose.onNodeWithText("Clock").assertIsOff()
+        compose.onNodeWithText("Clock").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox))
+
+        compose.onNodeWithText("Clock").performClick()
+
+        assertEquals(listOf(clock), toggled)
+        assertEquals(emptyList<AppEntry>(), launched)
     }
 
     @Test

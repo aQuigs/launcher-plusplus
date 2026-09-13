@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +52,7 @@ import kotlinx.coroutines.launch
 object AppDrawerTags {
     const val HANDLE = "drawer_handle"
     const val LIST = "app_list"
+    const val PICK_HINT = "pick_hint"
 
     fun section(initial: Char) = "section_$initial"
 
@@ -73,16 +78,27 @@ fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
     )
 }
 
-/** Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. */
+/**
+ * Picking apps instead of launching them: the drawer shows [hint] at the top, checks the rows [isPicked] says, and a tap
+ * calls [onToggle].
+ */
+class Picking(val hint: String, val isPicked: (AppEntry) -> Boolean, val onToggle: (AppEntry) -> Unit)
+
+/**
+ * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
+ * launches the app unless the drawer is [picking].
+ */
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
+    picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val scope = rememberCoroutineScope()
     val sections = remember(apps) { apps.sectionsByInitial() }
+    val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
     val headerIndices = remember(sections) {
         sections.runningFold(0) { index, section -> index + 1 + section.apps.size }.dropLast(1)
@@ -98,28 +114,38 @@ fun AppDrawer(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(end = RAIL_WIDTH),
-            modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
-        ) {
-            sections.forEach { section ->
-                item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
-                items(section.apps, key = { "${it.packageName}/${it.activityName}" }, contentType = { "app" }) { app ->
-                    AppRow(app, onLaunch)
+    Column(modifier.fillMaxSize()) {
+        if (picking != null) {
+            Text(
+                text = picking.hint,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(AppDrawerTags.PICK_HINT),
+            )
+        }
+        Box(Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(end = RAIL_WIDTH),
+                modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
+            ) {
+                sections.forEach { section ->
+                    item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                    items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
+                        AppRow(app, onLaunch, picking)
+                    }
                 }
             }
+            LetterRail(
+                initials = initials,
+                highlighted = highlighted,
+                onSelect = { section ->
+                    lastSelected = section
+                    scope.launch { listState.scrollToItem(headerIndices[section]) }
+                },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
-        LetterRail(
-            initials = sections.map { it.initial },
-            highlighted = highlighted,
-            onSelect = { section ->
-                lastSelected = section
-                scope.launch { listState.scrollToItem(headerIndices[section]) }
-            },
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
     }
 }
 
@@ -139,15 +165,26 @@ private fun SectionHeader(initial: Char) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit) {
-    Text(
-        text = app.label,
-        style = MaterialTheme.typography.titleMedium,
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?) {
+    val picked = picking?.isPicked(app) == true
+    val action = if (picking == null) {
+        Modifier.clickable { onLaunch(app) }
+    } else {
+        Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onLaunch(app) }
+            .then(action)
             .padding(horizontal = 24.dp, vertical = 14.dp),
-    )
+    ) {
+        Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (picked) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
 }
 
 /**

@@ -17,13 +17,21 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.Favourites
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import kotlinx.coroutines.flow.Flow
@@ -39,16 +47,20 @@ object LauncherTags {
 data class HomePress(val launcherInFront: Boolean)
 
 /**
- * The whole launcher: a horizontal pager over [layout] with the app drawer peeking below it as a chevron. Every
- * [HomePress] closes the drawer; one made while the launcher was in front also scrolls to the home page. Back closes the
- * drawer if it is open, otherwise it returns to the home page.
+ * The whole launcher: a horizontal pager over [layout] with the app drawer peeking below it as a chevron. The home page
+ * is the ring of [favourites]; tapping its emblem opens the drawer to pick them. [apps] is null until the installed apps
+ * have loaded. Every [HomePress] closes the drawer; one made while the launcher was in front also scrolls to the home
+ * page. Back closes the drawer if it is open, otherwise it returns to the home page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LauncherScreen(
     layout: PageLayout,
     homePresses: Flow<HomePress>,
-    apps: List<AppEntry>,
+    apps: List<AppEntry>?,
+    favourites: Favourites,
+    onFavouritesChange: (Favourites) -> Unit,
+    icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
@@ -56,8 +68,15 @@ fun LauncherScreen(
     val scope = rememberCoroutineScope()
     val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
+    val ring = remember(favourites, apps) { favourites.resolve(apps.orEmpty()) }
+    // Picking is a mode of the drawer, so it ends however the drawer closes: chevron, drag, Back or HOME. It waits for the
+    // drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up open.
+    var picking by rememberSaveable { mutableStateOf(false) }
+    val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen
+    LaunchedEffect(drawerSettledClosed) { if (drawerSettledClosed) picking = false }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
+    fun openDrawer() = scope.launch { drawerState.expand() }
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
     fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
 
@@ -80,7 +99,21 @@ fun LauncherScreen(
         // Translucent so the wallpaper still shows through the open drawer.
         sheetContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         containerColor = Color.Transparent,
-        sheetContent = { AppDrawer(apps = apps, onLaunch = onLaunch) },
+        sheetContent = {
+            AppDrawer(
+                apps = apps.orEmpty(),
+                onLaunch = onLaunch,
+                picking = if (picking) {
+                    Picking(
+                        hint = "Tap apps to add them to the ring or take them off",
+                        isPicked = { it in favourites },
+                        onToggle = { onFavouritesChange(favourites.toggle(it)) },
+                    )
+                } else {
+                    null
+                },
+            )
+        },
         // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
         // navigation-bar inset.
         modifier = modifier.clipToBounds(),
@@ -88,13 +121,33 @@ fun LauncherScreen(
         HorizontalPager(
             state = pagerState,
             key = { layout.pages[it].name },
-            modifier = Modifier.fillMaxSize().padding(padding).testTag(LauncherTags.PAGER),
+            // Every page stays composed, so swiping back does not rebuild the ring and reload its icons.
+            beyondViewportPageCount = layout.pages.size - 1,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // The pages fade as the drawer rises, so only the wallpaper shows through the translucent drawer. The
+                // pager is exactly as tall as the drawer travels.
+                .graphicsLayer {
+                    if (size.height > 0f) alpha = (drawerState.requireOffset() / size.height).coerceIn(0f, 1f)
+                }
+                .testTag(LauncherTags.PAGER),
         ) { index ->
             val page = layout.pages[index]
             Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                 when (page) {
-                    // Empty until the home layout lands: the drawer strip below is its only control for now.
-                    LauncherPage.Home -> Unit
+                    LauncherPage.Home -> HomeRing(
+                        ring = ring,
+                        // Stored favourites hold the hint back until the app list can say none of them is installed, so
+                        // neither the hint nor the mark flashes while apps load.
+                        showHint = favourites.keys.isEmpty() || (apps != null && ring.isEmpty()),
+                        icon = icon,
+                        onLaunch = onLaunch,
+                        onEdit = {
+                            picking = true
+                            openDrawer()
+                        },
+                    )
                     LauncherPage.Widgets, LauncherPage.Collections -> PlaceholderPage(page)
                 }
             }
