@@ -25,7 +25,7 @@ scripts/pr-media.sh <files>          # upload shots as GitHub attachments, print
 scrcpy                               # mirror the emulator interactively
 ```
 
-Every file under `scripts/` or `.github/workflows/` whose name matches a file in the separate tooling checkout is a verbatim copy of it and carries a `# Shared script:` or `# Shared workflow:` header (`grep -l '^# Shared' scripts/* .github/workflows/*` lists them). When that checkout's `sync-common` is on PATH, every build overwrites the copies by name, so change a shared file at its source, never here, and never give a repo-owned file a shared file's name; without the command the copies work as-is. Adopt another shared file by copying it once under its own name; if this repo needs one to behave differently, ask for a setting in the shared file rather than keeping a diverging copy.
+Files headed `# Shared script:` or `# Shared workflow:` are copies of files in a separate tooling checkout. When its `sync-common` is on PATH, every build overwrites them, matched by name. Edit them at the source, never here, and do not name a repo-owned file after a shared one. To adopt another shared file, create it once under the same name and let the build fill it.
 
 ## Layout
 
