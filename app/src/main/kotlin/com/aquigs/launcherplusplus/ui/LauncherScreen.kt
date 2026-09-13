@@ -198,12 +198,12 @@ fun LauncherScreen(
                 val page = layout.pages[index]
                 Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                     when (page) {
-                        LauncherPage.Home -> Column {
+                        LauncherPage.Home -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             HomeClock(
                                 face = clock,
                                 onTimeClick = onOpenClock,
                                 onDateClick = onOpenCalendar,
-                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 24.dp),
+                                modifier = Modifier.padding(top = 24.dp),
                             )
                             HomeRing(
                                 ring = ring,
