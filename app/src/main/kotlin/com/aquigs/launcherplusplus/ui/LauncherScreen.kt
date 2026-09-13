@@ -59,9 +59,10 @@ data class HomePress(val launcherInFront: Boolean)
 /**
  * The whole launcher: a horizontal pager over [layout] with the dock under it and the app drawer peeking below as a
  * chevron. The home page shows the [clock] over the ring from [homeApps]: the time and the date open the clock app and
- * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Long-pressing an app
- * anywhere opens its menu of shortcuts and options. [apps] is null until the installed apps have loaded. Every
- * [HomePress] closes the menu and the drawer; one made while the launcher was in front also scrolls to the home page.
+ * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Until [isHomeApp], a card
+ * between them says so and offers [onBecomeHomeApp]. Long-pressing an app anywhere opens its menu of shortcuts and
+ * options. [apps] is null until the installed apps have loaded. Every [HomePress] closes the menu and the drawer; one
+ * made while the launcher was in front also scrolls to the home page.
  * Back closes the menu, then the drawer, then returns to the home page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,6 +77,8 @@ fun LauncherScreen(
     clock: ClockFace,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
+    isHomeApp: Boolean,
+    onBecomeHomeApp: () -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -218,6 +221,13 @@ fun LauncherScreen(
                                 onDateClick = onOpenCalendar,
                                 modifier = Modifier.padding(top = 24.dp),
                             )
+                            // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
+                            if (!isHomeApp) {
+                                HomeAppCard(
+                                    onBecomeHomeApp = onBecomeHomeApp,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                )
+                            }
                             HomeRing(
                                 ring = ring,
                                 // Favourites stored for the ring hold the hint back until the app list can say none of them

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
+import com.aquigs.launcherplusplus.apps.RoleManagerHomeRole
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
         val repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
+        val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val layout = PageLayout()
         val actions = AppActions(
             icon = repository::icon,
@@ -63,6 +65,10 @@ class MainActivity : ComponentActivity() {
                 val clock by produceState(remember { wallClock.face() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { wallClock.faces().collect { value = it } }
                 }
+                // Read again on each return to the front, since the user may have picked another home app in Settings.
+                val isHomeApp by produceState(remember { homeRole.isHeld() }) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { homeRole.held().collect { value = it } }
+                }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
@@ -76,6 +82,8 @@ class MainActivity : ComponentActivity() {
                     clock = clock,
                     onOpenClock = wallClock::openClock,
                     onOpenCalendar = wallClock::openCalendar,
+                    isHomeApp = isHomeApp,
+                    onBecomeHomeApp = homeRole::request,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }
