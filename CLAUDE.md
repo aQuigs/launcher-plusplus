@@ -13,9 +13,9 @@ Custom Android home screen (launcher). Native Kotlin + Jetpack Compose, built an
 ## Commands
 
 ```bash
-./gradlew testDebugUnitTest          # JVM unit tests (also runs in pre-commit)
+./gradlew testDebugUnitTest          # JVM unit tests (pre-commit runs them too)
 ./gradlew assembleDebug              # → app/build/outputs/apk/debug/app-debug.apk
-./gradlew lintDebug                  # Android lint → app/build/reports/lint-results-debug.html
+./gradlew lintDebug                  # Android lint → app/build/reports/lint-results-debug.html (pre-commit runs it too)
 scripts/emulator.sh                  # AVD from the installed Play Store image, boot, wait (IMAGE_TAG=google_apis for adb root, HEADLESS=1 for no window)
 ./gradlew connectedDebugAndroidTest  # Compose UI + activity tests on the running emulator
 scripts/run.sh                       # install debug build, make it the home app, go home
@@ -51,7 +51,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 - The emulator is the test target. Gradle auto-downloads the platform and build-tools for `compileSdk` on first build; system images come from the machine setup (toggles in `~/.zsh_toggles`); `scripts/emulator.sh` only creates an AVD from the installed Play Store image and names the toggle to set if it is missing. Never run `sdkmanager` installs from this repo.
 - Pure logic goes in `domain` with a unit test. UI behaviour gets a Compose test in `androidTest` that renders the composable with fake data. `MainActivityTest` is the one end-to-end smoke test against the real system.
 - A passing test is not a passing feature: for UI changes, install on the emulator, screenshot, and look at the PNG before calling it done. That after shot is the one that goes in the PR.
-- Pre-commit runs hygiene checks, markdownlint, and the unit tests. Install with `pre-commit install`.
+- Pre-commit runs hygiene checks, markdownlint, lint and the unit tests. Install with `pre-commit install`.
 - GitHub Actions run on every push: `android-ci` (build, lint, unit tests) and the pre-commit hooks. The emulator tests run locally only.
 
 ## Conventions
