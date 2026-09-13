@@ -24,7 +24,7 @@ scripts/pr-media.sh <files>          # upload shots as GitHub attachments, print
 scrcpy                               # mirror the emulator interactively
 ```
 
-A script whose second line starts with `# Shared script:` is a verbatim copy of a file kept in a separate tooling checkout (`grep -l '^# Shared script:' scripts/*` lists them). When that checkout's `sync-common` is on PATH, every build refreshes the copies (`syncSharedScripts`), so change a shared script at its source, never here; without the command the task is skipped and the copies work as-is. Scripts without the header belong to this repo. Adopt another shared script by copying it once under its own name.
+A script whose second line starts with `# Shared script:`, or a workflow whose first line starts with `# Shared workflow:`, is a verbatim copy of a file kept in a separate tooling checkout (`grep -l '^# Shared' scripts/* .github/workflows/*` lists them). When that checkout's `sync-common` is on PATH, every build refreshes the copies (`syncSharedScripts`, `syncSharedWorkflows`), so change a shared file at its source, never here; without the command the tasks are skipped and the copies work as-is. Files without the header belong to this repo. Adopt another shared file by copying it once under its own name.
 
 ## Layout
 
@@ -51,6 +51,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 - Pure logic goes in `domain` with a unit test. UI behaviour gets a Compose test in `androidTest` that renders the composable with fake data. `MainActivityTest` is the one end-to-end smoke test against the real system.
 - A passing test is not a passing feature: for UI changes, install on the emulator, screenshot, and look at the PNG before calling it done. That after shot is the one that goes in the PR.
 - Pre-commit runs hygiene checks, markdownlint, and the unit tests. Install with `pre-commit install`.
+- GitHub Actions: `android-ci` builds the app and the instrumented tests and runs lint and the unit tests, on every push. `run-pre-commit-checks` runs the hooks on every push, skipping the unit tests that `android-ci` already runs. The emulator tests run locally only.
 
 ## Conventions
 

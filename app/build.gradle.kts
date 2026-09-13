@@ -25,17 +25,20 @@ android {
     }
 }
 
-// Scripts headed "# Shared script:" are verbatim copies of same-named files in a separate tooling checkout. When that
-// checkout's sync-common is on PATH, every build refreshes the copies so they cannot drift; otherwise nothing runs.
+// Scripts headed "# Shared script:" and workflows headed "# Shared workflow:" are verbatim copies of same-named files in a
+// separate tooling checkout. When that checkout's sync-common is on PATH, every build refreshes the copies so they cannot
+// drift; otherwise nothing runs.
 val syncCommon = System.getenv("PATH").orEmpty().split(File.pathSeparator)
     .map { File(it, "sync-common") }
     .firstOrNull { it.canExecute() }
-val syncSharedScripts by tasks.registering(Exec::class) {
-    enabled = syncCommon != null
-    workingDir = rootDir
-    commandLine(syncCommon?.path ?: "sync-common", "scripts")
+val syncShared = mapOf("syncSharedScripts" to "scripts", "syncSharedWorkflows" to ".github/workflows").map { (name, dir) ->
+    tasks.register<Exec>(name) {
+        enabled = syncCommon != null
+        workingDir = rootDir
+        commandLine(syncCommon?.path ?: "sync-common", dir)
+    }
 }
-tasks.named("preBuild") { dependsOn(syncSharedScripts) }
+tasks.named("preBuild") { dependsOn(syncShared) }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
