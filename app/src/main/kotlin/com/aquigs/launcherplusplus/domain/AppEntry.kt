@@ -9,6 +9,9 @@ data class AppEntry(
 ) {
     /** Identifies one launchable activity whatever its label, so it survives relabelling and reloads of the app list. */
     val key: String = "$packageName/$activityName"
+
+    /** The label as a search sees it: lower case, without accents. Made once here rather than on every keystroke. */
+    val searchableLabel: String = label.unaccented().lowercase()
 }
 
 fun List<AppEntry>.sortedByLabel(): List<AppEntry> =

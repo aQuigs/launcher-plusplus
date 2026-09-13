@@ -1,7 +1,5 @@
 package com.aquigs.launcherplusplus.domain
 
-import java.text.Normalizer
-
 /**
  * Where every label that does not start with a Latin letter (digits, symbols, other scripts) is filed. It sorts before
  * 'A', so its section comes first.
@@ -16,8 +14,7 @@ val AppEntry.initial: Char
     get() {
         val first = label.firstOrNull { !it.isWhitespace() && Character.getType(it) != Character.FORMAT.toInt() }
             ?: return OTHER_INITIAL
-        // Decomposition splits an accent off into its own character, leaving the base letter first.
-        val base = Normalizer.normalize(first.toString(), Normalizer.Form.NFD).first().uppercaseChar()
+        val base = first.toString().unaccented().first().uppercaseChar()
         return if (base in 'A'..'Z') base else OTHER_INITIAL
     }
 

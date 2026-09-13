@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -15,12 +16,14 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -43,10 +46,9 @@ class AppDrawerTest {
     // Each letter of the alphabet fixture is one header row followed by its apps.
     private val itemsPerLetter = APPS_PER_LETTER + 1
 
-    private var query by mutableStateOf("")
-
     private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}, picking: Picking? = null) = compose.setContent {
-        AppDrawer(apps = apps, onLaunch = onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it })
+        var query by remember { mutableStateOf("") }
+        AppDrawer(apps, onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it })
     }
 
     @Test
@@ -113,7 +115,20 @@ class AppDrawerTest {
         compose.onNodeWithContentDescription("Clear the search").performClick()
 
         compose.sectionHeader('P').assertIsDisplayed()
-        compose.onNodeWithText("B2").assertIsNotDisplayed()
+        compose.onNodeWithText("B2").assertDoesNotExist()
+    }
+
+    @Test
+    fun eachNewSearchStartsAtTheTopOfItsMatches() {
+        show(alphabet)
+        compose.searchField().performTextInput("1")
+        compose.appList().performScrollToNode(hasText("Z1"))
+        compose.onNodeWithText("A1").assertIsNotDisplayed()
+
+        compose.onNodeWithContentDescription("Clear the search").performClick()
+        compose.searchField().performTextInput("2")
+
+        compose.onNodeWithText("A2").assertIsDisplayed()
     }
 
     @Test

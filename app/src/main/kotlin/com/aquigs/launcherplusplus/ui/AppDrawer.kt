@@ -19,10 +19,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -106,16 +108,17 @@ fun AppDrawer(
     picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
     menu: AppMenu? = null,
-    query: String = "",
-    onQueryChange: (String) -> Unit = {},
+    query: String,
+    onQueryChange: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val rowMenu = menu.takeIf { picking == null }
     val searching = query.isNotBlank()
     val matches = remember(apps, query) { if (searching) apps.matching(query) else emptyList() }
     // The matches scroll on their own, so the sections come back where they were and a match does not become the top of
-    // the sections' list because it was the first thing on screen when the search ended.
+    // the sections' list because it was the first thing on screen when the search ended. Each new query starts at its top.
     val matchesState = rememberLazyListState()
+    LaunchedEffect(matches) { matchesState.scrollToItem(0) }
     val sections = remember(apps) { apps.sectionsByInitial() }
     val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
@@ -146,16 +149,17 @@ fun AppDrawer(
                 contentPadding = PaddingValues(end = if (searching) 0.dp else RAIL_WIDTH),
                 modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
             ) {
-                if (searching) {
-                    items(matches, key = { it.key }, contentType = { "app" }) { app -> AppRow(app, onLaunch, picking, rowMenu) }
-                    if (matches.isEmpty()) item(contentType = "empty") { NoMatches() }
-                } else {
+                if (!searching) {
                     sections.forEach { section ->
                         item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                         items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
                             AppRow(app, onLaunch, picking, rowMenu)
                         }
                     }
+                } else if (matches.isEmpty()) {
+                    item(contentType = "empty") { NoMatches() }
+                } else {
+                    items(matches, key = { it.key }, contentType = { "app" }) { app -> AppRow(app, onLaunch, picking, rowMenu) }
                 }
             }
             if (!searching) {
@@ -192,6 +196,8 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 8.dp)
+            // The placeholder goes once there is text, and a screen reader should still say what the field is for.
+            .semantics { contentDescription = "Search apps" }
             .testTag(AppDrawerTags.SEARCH),
     )
 }

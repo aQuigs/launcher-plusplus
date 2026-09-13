@@ -158,7 +158,8 @@ fun LauncherScreen(
             if (press.launcherInFront) goHome()
         }
     }
-    // One handler with the order spelled out, instead of one per dismissable relying on composition order.
+    // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
+    // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search.
     BackHandler(enabled = drawerOpen || pagerState.currentPage != layout.homeIndex) {
         if (drawerOpen) closeDrawer() else goHome()
     }
