@@ -113,6 +113,9 @@ fun AppDrawer(
     val rowMenu = menu.takeIf { picking == null }
     val searching = query.isNotBlank()
     val matches = remember(apps, query) { if (searching) apps.matching(query) else emptyList() }
+    // The matches scroll on their own, so the sections come back where they were and a match does not become the top of
+    // the sections' list because it was the first thing on screen when the search ended.
+    val matchesState = rememberLazyListState()
     val sections = remember(apps) { apps.sectionsByInitial() }
     val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
@@ -139,7 +142,7 @@ fun AppDrawer(
         )
         Box(Modifier.weight(1f)) {
             LazyColumn(
-                state = listState,
+                state = if (searching) matchesState else listState,
                 contentPadding = PaddingValues(end = if (searching) 0.dp else RAIL_WIDTH),
                 modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
             ) {

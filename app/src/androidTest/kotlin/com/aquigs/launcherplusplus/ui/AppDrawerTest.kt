@@ -103,15 +103,17 @@ class AppDrawerTest {
     }
 
     @Test
-    fun clearingTheSearchBringsTheSectionsBack() {
-        show(listOf(clock, mail))
-        compose.searchField().performTextInput("ma")
-        compose.onNodeWithText("Clock").assertDoesNotExist()
+    fun clearingTheSearchBringsTheSectionsBackWhereTheyWere() {
+        show(alphabet)
+        compose.railLetter('P').performClick()
+        compose.sectionHeader('P').assertIsDisplayed()
+        compose.searchField().performTextInput("b2")
+        compose.onNodeWithText("P1").assertDoesNotExist()
 
         compose.onNodeWithContentDescription("Clear the search").performClick()
 
-        compose.onNodeWithText("Clock").assertIsDisplayed()
-        compose.sectionHeader('C').assertIsDisplayed()
+        compose.sectionHeader('P').assertIsDisplayed()
+        compose.onNodeWithText("B2").assertIsNotDisplayed()
     }
 
     @Test
