@@ -22,6 +22,24 @@ class RingTest {
     }
 
     @Test
+    fun `adding puts an app in a slot of its own at the end, once`() {
+        val ring = ringOf(clock).add(mail)
+
+        assertEquals(ringOf(clock, mail), ring)
+        assertEquals(ring, ring.add(mail))
+        assertEquals(ring, ring.add(clock))
+    }
+
+    @Test
+    fun `adding into a folder is a no-op for an app already in it`() {
+        val ring = Ring(listOf(folder(mail))).add(0, maps)
+
+        assertEquals(folder(mail, maps), ring.folder(0))
+        assertEquals(ring, ring.add(0, mail))
+        assertEquals(ring, ring.add(1, clock))
+    }
+
+    @Test
     fun `toggling into a folder adds at the end and toggling again takes out`() {
         val ring = Ring(listOf(folder(mail))).toggle(0, maps).toggle(0, clock)
         assertEquals(folder(mail, maps, clock), ring.folder(0))

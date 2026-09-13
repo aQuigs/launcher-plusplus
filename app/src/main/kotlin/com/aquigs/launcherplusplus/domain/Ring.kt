@@ -26,20 +26,20 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
 
     fun indexOf(app: AppEntry): Int = slots.indexOf(RingSlot.App(app.key))
 
+    /** Adds [app] in a slot of its own at the end, unless it has one. */
+    fun add(app: AppEntry): Ring = if (app in apps) this else Ring(slots + RingSlot.App(app.key))
+
     /** Adds [app] in a slot of its own at the end, or takes that slot off if it has one. */
-    fun toggle(app: AppEntry): Ring {
-        val slot = RingSlot.App(app.key)
-        return Ring(if (slot in slots) slots - slot else slots + slot)
-    }
+    fun toggle(app: AppEntry): Ring = if (app in apps) Ring(slots - RingSlot.App(app.key)) else add(app)
+
+    /** Adds [app] to the folder at [index], unless it is already there; a slot that is not a folder is left alone. */
+    fun add(index: Int, app: AppEntry): Ring = updateFolder(index) { Favourites(it).add(app).keys }
 
     /**
      * Adds [app] to the folder at [index], or takes it out if it is already there. The folder stays, whatever is left in
      * it; a slot that is not a folder is left alone.
      */
-    fun toggle(index: Int, app: AppEntry): Ring {
-        val folder = folder(index) ?: return this
-        return replace(index, RingSlot.Folder(Favourites(folder.keys).toggle(app).keys))
-    }
+    fun toggle(index: Int, app: AppEntry): Ring = updateFolder(index) { Favourites(it).toggle(app).keys }
 
     /** Turns [app]'s slot into a folder holding just [app]; an app without a slot changes nothing. */
     fun newFolder(app: AppEntry): Ring {
@@ -63,6 +63,11 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
                 is RingSlot.Folder -> RingItem.Folder(index, slot.keys.mapNotNull(byKey::get))
             }
         }
+    }
+
+    private fun updateFolder(index: Int, change: (List<String>) -> List<String>): Ring {
+        val folder = folder(index) ?: return this
+        return replace(index, RingSlot.Folder(change(folder.keys)))
     }
 
     private fun replace(index: Int, slot: RingSlot) = Ring(slots.toMutableList().apply { this[index] = slot })

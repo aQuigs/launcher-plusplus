@@ -1,11 +1,14 @@
 package com.aquigs.launcherplusplus.ui
 
 import android.view.View
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -23,6 +26,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -56,6 +60,7 @@ class LauncherScreenTest {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var homeApps by mutableStateOf(HomeApps())
+    private var homeAppsChanges = 0
     private val work = folderOf(clock, mail)
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September"))
     private var isHomeApp by mutableStateOf(true)
@@ -85,13 +90,16 @@ class LauncherScreenTest {
         uninstall = uninstalled::add,
     )
 
-    private fun show() = compose.setContent {
+    private fun show(modifier: Modifier = Modifier) = compose.setContent {
         LauncherScreen(
             layout = layout,
             homePresses = homePresses,
             apps = apps,
             homeApps = homeApps,
-            onHomeAppsChange = { homeApps = it },
+            onHomeAppsChange = {
+                homeApps = it
+                homeAppsChanges++
+            },
             actions = actions,
             clock = face,
             onOpenClock = { opened += "clock" },
@@ -100,6 +108,7 @@ class LauncherScreenTest {
             onBecomeHomeApp = { homeRequests++ },
             widgetPage = widgetPage,
             widgets = widgets,
+            modifier = modifier,
             pagerState = pager,
         )
     }
@@ -116,6 +125,35 @@ class LauncherScreenTest {
         compose.waitForIdle()
         compose.drawerHandle().assertContentDescriptionEquals(if (open) "Close the app drawer" else "Open the app drawer")
         if (open) compose.onNodeWithText("Clock").assertIsDisplayed() else compose.onNodeWithText("Clock").assertIsNotDisplayed()
+    }
+
+    private fun centreOf(node: SemanticsNodeInteraction) = node.fetchSemanticsNode().boundsInRoot.center
+
+    /** Opens the drawer, long-presses [app]'s row and drags it off the row, leaving the finger down where it started. */
+    private fun startDraggingFromDrawer(app: AppEntry) {
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        val row = centreOf(compose.onNodeWithText(app.label))
+        compose.onRoot().performTouchInput {
+            down(row)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveTo(row + Offset(0f, -viewConfiguration.touchSlop * 2))
+        }
+        compose.dragGhost().assertIsDisplayed()
+    }
+
+    /** Continues a drag to [target], in root coordinates. */
+    private fun dragTo(target: Offset) {
+        compose.onRoot().performTouchInput {
+            moveTo(target)
+            advanceEventTime()
+        }
+        compose.waitForIdle()
+    }
+
+    private fun letGo() {
+        compose.onRoot().performTouchInput { up() }
+        compose.waitForIdle()
     }
 
     @Test
@@ -579,6 +617,141 @@ class LauncherScreenTest {
 
         compose.appOptionsMenu().assertDoesNotExist()
         compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
+    }
+
+    @Test
+    fun aLongPressInTheDrawerThatStaysPutOpensTheMenuAndDragsNothing() {
+        show()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        compose.onNodeWithText("Mail").performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(viewConfiguration.touchSlop / 2, 0f))
+            up()
+        }
+
+        compose.appOptionsMenu().assertIsDisplayed()
+        compose.dragGhost().assertDoesNotExist()
+        assertDrawerOpen(true)
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+    }
+
+    @Test
+    fun draggingAnAppFromTheDrawerOntoTheRingAddsItThereAndClosesTheDrawer() {
+        // Padded like the real launcher under its insets, so the ghost's position is checked against a moved origin.
+        show(Modifier.padding(top = 24.dp))
+        startDraggingFromDrawer(mail)
+        compose.appOptionsMenu().assertDoesNotExist()
+
+        val target = centreOf(compose.emblem())
+        dragTo(target)
+        assertDrawerOpen(false)
+        val ghost = centreOf(compose.dragGhost())
+        assertTrue("the ghost $ghost sits on the finger $target", (ghost - target).getDistance() < 2f)
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        compose.ringSlot(mail).assertIsDisplayed()
+        assertDrawerOpen(false)
+        compose.runOnIdle {
+            assertEquals(HomeApps(ring = ringOf(mail)), homeApps)
+            assertEquals(emptyList<AppEntry>(), launched)
+        }
+    }
+
+    @Test
+    fun draggingAnAppOntoTheDockAddsItToTheDock() {
+        show()
+        compose.dock().assertDoesNotExist()
+        startDraggingFromDrawer(mail)
+
+        // An empty dock has no row until an app is dragged, so its place is only known once the drag is under way.
+        dragTo(centreOf(compose.dock()))
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        compose.dockSlot(mail).assertIsDisplayed()
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(mail.key))), homeApps) }
+    }
+
+    @Test
+    fun droppingAnAppOffTheRingAndTheDockAddsNothing() {
+        show()
+        startDraggingFromDrawer(mail)
+
+        dragTo(centreOf(compose.clockTime()))
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        assertDrawerOpen(false)
+        compose.runOnIdle {
+            assertEquals(HomeApps(), homeApps)
+            assertEquals(0, homeAppsChanges)
+        }
+    }
+
+    @Test
+    fun draggingAnAppAlreadyOnTheRingOntoItChangesNothing() {
+        homeApps = HomeApps(ring = ringOf(mail, clock))
+        show()
+        startDraggingFromDrawer(mail)
+
+        dragTo(centreOf(compose.emblem()))
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(HomeApps(ring = ringOf(mail, clock)), homeApps)
+            assertEquals(0, homeAppsChanges)
+        }
+    }
+
+    @Test
+    fun homeDuringADragCancelsIt() {
+        show()
+        startDraggingFromDrawer(mail)
+        dragTo(centreOf(compose.emblem()))
+
+        pressHome(launcherInFront = true)
+        compose.dragGhost().assertDoesNotExist()
+        letGo()
+
+        assertDrawerOpen(false)
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+    }
+
+    @Test
+    fun backDuringADragCancelsItAndStaysOnTheHomePage() {
+        show()
+        startDraggingFromDrawer(mail)
+        dragTo(centreOf(compose.emblem()))
+
+        Espresso.pressBack()
+        compose.dragGhost().assertDoesNotExist()
+        letGo()
+
+        assertSettledOn(LauncherPage.Home)
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+    }
+
+    @Test
+    fun aDragWhoseTouchIsTakenAwayAddsNothing() {
+        show()
+        startDraggingFromDrawer(mail)
+        dragTo(centreOf(compose.emblem()))
+
+        compose.onRoot().performTouchInput { cancel() }
+
+        compose.dragGhost().assertDoesNotExist()
+        assertDrawerOpen(false)
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
     }
 
     @Test

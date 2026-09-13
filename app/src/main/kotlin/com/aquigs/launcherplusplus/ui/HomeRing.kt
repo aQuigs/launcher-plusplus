@@ -1,5 +1,6 @@
 package com.aquigs.launcherplusplus.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
@@ -39,14 +42,16 @@ object HomeRingTags {
     fun folder(index: Int) = "ring_folder_$index"
 }
 
-private val FULL_ICON_SIZE = 64.dp
+/** The size of a ring icon while the ring has room, and of an icon being dragged onto it. */
+internal val RING_ICON_SIZE = 64.dp
 
 /**
  * The [ring] of favourite apps and folders round a static emblem. Tap an app to launch it or long-press it for its
  * [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap the emblem to choose the favourites on the
- * ring and in the dock. With [showHint] the emblem invites you to add apps instead of showing its mark. An [openFolder]
- * takes the ring over: its apps sit in the slots, each with the [folderAppMenu], and the emblem gives way to a target
- * that calls [onCloseFolder].
+ * ring and in the dock. With [showHint] the emblem invites you to add apps instead of showing its mark. While
+ * [highlighted], the disc the ring fills glows as the place an app being dragged would land. An [openFolder] takes the
+ * ring over: its apps sit in the slots, each with the [folderAppMenu], and the emblem gives way to a target that calls
+ * [onCloseFolder].
  */
 @Composable
 fun HomeRing(
@@ -58,12 +63,15 @@ fun HomeRing(
     onCloseFolder: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
+    highlighted: Boolean = false,
     openFolder: RingItem.Folder? = null,
     menu: AppMenu? = null,
     folderMenu: FolderMenu? = null,
     folderAppMenu: AppMenu? = null,
 ) {
     val track = MaterialTheme.colorScheme.outlineVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
 
     Layout(
         content = {
@@ -88,12 +96,15 @@ fun HomeRing(
         },
         modifier = modifier
             .fillMaxSize()
-            .drawBehind { drawCircle(track, radius = size.minDimension * RING_RADIUS_FRACTION, style = Stroke(1.dp.toPx())) },
+            .drawBehind {
+                if (glow > 0f) drawCircle(primary.copy(alpha = 0.1f * glow), radius = size.minDimension / 2)
+                drawCircle(lerp(track, primary, glow), radius = size.minDimension * RING_RADIUS_FRACTION, style = Stroke(1.dp.toPx()))
+            },
     ) { measurables, constraints ->
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
         val radius = side * RING_RADIUS_FRACTION
         val centreSize = (side * EMBLEM_FRACTION).roundToInt()
-        val iconSize = ringIconSize(FULL_ICON_SIZE.toPx(), side, measurables.size - 1).roundToInt()
+        val iconSize = ringIconSize(RING_ICON_SIZE.toPx(), side, measurables.size - 1).roundToInt()
         val centre = measurables.first().measure(Constraints.fixed(centreSize, centreSize))
         val icons = measurables.drop(1).map { it.measure(Constraints.fixed(iconSize, iconSize)) }
 

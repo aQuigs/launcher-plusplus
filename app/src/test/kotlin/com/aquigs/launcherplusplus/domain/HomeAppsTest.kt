@@ -30,6 +30,23 @@ class HomeAppsTest {
     }
 
     @Test
+    fun `adding to a place is a no-op once the app is there`() {
+        val homeApps = HomeApps().add(HomePlace.Ring, clock).add(HomePlace.Dock, clock).add(HomePlace.Dock, mail)
+
+        assertEquals(HomeApps(ring = ringOf(clock), dock = Favourites(listOf(clock.key, mail.key))), homeApps)
+        assertEquals(homeApps, homeApps.add(HomePlace.Ring, clock))
+        assertEquals(homeApps, homeApps.add(HomePlace.Dock, mail))
+        assertEquals(homeApps, homeApps.add(HomePlace.Folder(0), maps))
+    }
+
+    @Test
+    fun `adding to a folder fills that folder only`() {
+        val homeApps = HomeApps(ring = Ring(listOf(folder(clock)))).add(HomePlace.Folder(0), mail)
+
+        assertEquals(HomeApps(ring = Ring(listOf(folder(clock, mail)))), homeApps)
+    }
+
+    @Test
     fun `a folder is a place of its own on the ring`() {
         val homeApps = HomeApps(ring = ringOf(clock).newFolder(clock)).toggle(HomePlace.Folder(0), mail)
 
