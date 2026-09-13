@@ -22,5 +22,5 @@ jobs:
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
         env:
-          # The Android workflow builds the app and runs the unit tests, so the hook would only repeat them here.
-          SKIP: gradle-unit-tests
+          # The Android workflow runs lint and the unit tests, so the hook would only repeat them here.
+          SKIP: gradle-checks
