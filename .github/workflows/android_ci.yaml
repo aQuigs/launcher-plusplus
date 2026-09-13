@@ -1,7 +1,11 @@
 # Shared workflow: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 name: android-ci
-run-name: Building, linting and unit testing the Android app
 on: [push]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -16,6 +20,9 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          # The default provider is proprietary and free only for public repos, and copies of this workflow can be private.
+          cache-provider: basic
 
       - name: Build, lint and run the unit tests
         run: ./gradlew assembleDebug assembleDebugAndroidTest lintDebug testDebugUnitTest

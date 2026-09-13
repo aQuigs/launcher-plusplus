@@ -25,12 +25,11 @@ android {
     }
 }
 
-// Scripts headed "# Shared script:" and workflows headed "# Shared workflow:" are verbatim copies of same-named files in a
-// separate tooling checkout. When that checkout's sync-common is on PATH, every build refreshes the copies so they cannot
-// drift; otherwise nothing runs.
+// Refreshes the shared copies described in CLAUDE.md when sync-common is on PATH. The configuration cache records isFile
+// but not canExecute, so isFile is what makes installing or removing the command re-run this lookup.
 val syncCommon = System.getenv("PATH").orEmpty().split(File.pathSeparator)
     .map { File(it, "sync-common") }
-    .firstOrNull { it.canExecute() }
+    .firstOrNull { it.isFile && it.canExecute() }
 val syncShared = mapOf("syncSharedScripts" to "scripts", "syncSharedWorkflows" to ".github/workflows").map { (name, dir) ->
     tasks.register<Exec>(name) {
         enabled = syncCommon != null
