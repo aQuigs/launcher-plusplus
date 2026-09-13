@@ -52,7 +52,6 @@ import kotlinx.coroutines.launch
 object AppDrawerTags {
     const val HANDLE = "drawer_handle"
     const val LIST = "app_list"
-    const val PICK_HINT = "pick_hint"
 
     fun section(initial: Char) = "section_$initial"
 
@@ -79,10 +78,10 @@ fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
 }
 
 /**
- * Picking apps instead of launching them: the drawer shows [hint] at the top, checks the rows [isPicked] says, and a tap
- * calls [onToggle].
+ * Picking apps instead of launching them: the drawer shows [header] above the list, checks the rows [isPicked] says, and a
+ * tap calls [onToggle].
  */
-class Picking(val hint: String, val isPicked: (AppEntry) -> Boolean, val onToggle: (AppEntry) -> Unit)
+class Picking(val header: @Composable () -> Unit, val isPicked: (AppEntry) -> Boolean, val onToggle: (AppEntry) -> Unit)
 
 /**
  * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
@@ -115,14 +114,7 @@ fun AppDrawer(
     }
 
     Column(modifier.fillMaxSize()) {
-        if (picking != null) {
-            Text(
-                text = picking.hint,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(AppDrawerTags.PICK_HINT),
-            )
-        }
+        picking?.header?.invoke()
         Box(Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,

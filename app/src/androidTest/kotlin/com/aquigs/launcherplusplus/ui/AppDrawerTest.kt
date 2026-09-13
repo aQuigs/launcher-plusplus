@@ -1,6 +1,7 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.Text
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -66,7 +67,7 @@ class AppDrawerTest {
     fun pickingTogglesAppsInsteadOfLaunchingThem() {
         val launched = mutableListOf<AppEntry>()
         val toggled = mutableListOf<AppEntry>()
-        val picking = Picking(hint = "Pick apps", isPicked = { it == mail }, onToggle = toggled::add)
+        val picking = Picking(header = { Text("Pick apps") }, isPicked = { it == mail }, onToggle = toggled::add)
         show(listOf(clock, mail), onLaunch = launched::add, picking = picking)
 
         compose.onNodeWithText("Pick apps").assertIsDisplayed()

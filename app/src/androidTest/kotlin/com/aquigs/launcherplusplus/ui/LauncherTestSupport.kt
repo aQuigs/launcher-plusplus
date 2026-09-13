@@ -5,6 +5,7 @@ import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 
 val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
@@ -32,8 +33,14 @@ fun SemanticsNodeInteractionsProvider.sectionHeader(initial: Char) = onNodeWithT
 
 fun SemanticsNodeInteractionsProvider.railLetter(initial: Char) = onNodeWithTag(AppDrawerTags.letter(initial))
 
-fun SemanticsNodeInteractionsProvider.pickHint() = onNodeWithTag(AppDrawerTags.PICK_HINT)
+fun SemanticsNodeInteractionsProvider.placePicker() = onNodeWithTag(PlacePickerTags.PICKER)
+
+fun SemanticsNodeInteractionsProvider.placeOption(place: HomePlace) = onNodeWithTag(PlacePickerTags.place(place))
 
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
+
+fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
+
+fun SemanticsNodeInteractionsProvider.dockSlot(app: AppEntry) = onNodeWithTag(DockTags.slot(app))
