@@ -38,8 +38,7 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     /** Turns [app]'s slot into a folder called [name] holding just [app]. */
     fun newFolder(app: AppEntry, name: String): Ring {
         val index = indexOf(app)
-        if (index < 0) return this
-        return Ring(slots.toMutableList().apply { this[index] = RingSlot.Folder(name, listOf(app.key)) })
+        return if (index < 0) this else replace(index, RingSlot.Folder(name, listOf(app.key)))
     }
 
     fun rename(index: Int, name: String): Ring = updateFolder(index) { copy(name = name) }
@@ -49,18 +48,20 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
 
     /**
      * The ring once the user has finished taking apps out of folders: a folder left with one app becomes that app in its
-     * slot, and one left with none goes. Apps missing from the installed list do not count as taken out, so a folder
-     * outlives its apps' updates like a favourite does.
+     * slot, unless the ring already holds it, and one left with none goes. Apps missing from the installed list do not
+     * count as taken out, so a folder outlives its apps' updates like a favourite does.
      */
-    fun dissolved(): Ring = Ring(
-        slots.mapNotNull { slot ->
-            when {
-                slot !is RingSlot.Folder -> slot
-                slot.keys.size > 1 -> slot
-                else -> slot.keys.singleOrNull()?.let(RingSlot::App)
-            }
-        },
-    )
+    fun dissolved(): Ring {
+        val onRing = apps.keys.toMutableSet()
+        return Ring(
+            slots.mapNotNull { slot ->
+                when {
+                    slot !is RingSlot.Folder || slot.keys.size > 1 -> slot
+                    else -> slot.keys.singleOrNull()?.takeIf(onRing::add)?.let(RingSlot::App)
+                }
+            },
+        )
+    }
 
     /**
      * The slots with their installed apps, in order. An app that is missing is skipped but kept, and so is a folder none
@@ -80,6 +81,18 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
 
     private fun updateFolder(index: Int, change: RingSlot.Folder.() -> RingSlot.Folder): Ring {
         val folder = folder(index) ?: return this
-        return Ring(slots.toMutableList().apply { this[index] = folder.change() })
+        return replace(index, folder.change())
+    }
+
+    private fun replace(index: Int, slot: RingSlot) = Ring(slots.toMutableList().apply { this[index] = slot })
+
+    companion object {
+        private val FORMAT_CHARACTERS = Regex("[\t\r\n]")
+
+        /**
+         * [raw] as a folder's name: trimmed, with the tabs and line breaks the stored format is made of turned into
+         * spaces, or null when nothing is left.
+         */
+        fun name(raw: String): String? = raw.replace(FORMAT_CHARACTERS, " ").trim().takeIf(String::isNotEmpty)
     }
 }

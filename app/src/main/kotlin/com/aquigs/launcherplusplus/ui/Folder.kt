@@ -37,7 +37,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingItem
 
 object FolderTags {
@@ -225,15 +225,15 @@ fun FolderOptionsMenu(expanded: Boolean, onOption: (FolderOption) -> Unit, onDis
     }
 }
 
-/** Asks for a folder's new name, starting from [name]. A blank name cannot be confirmed; a confirmed one is trimmed. */
+/** Asks for a folder's new name, starting from [name]. A name that [Ring.name] rejects cannot be confirmed. */
 @Composable
 fun RenameFolderDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
-    var text by rememberSaveable(name) { mutableStateOf(name) }
+    var text by remember(name) { mutableStateOf(name) }
     val focusRequester = remember { FocusRequester() }
-    val valid = text.isNotBlank()
+    val newName = Ring.name(text)
 
     fun confirm() {
-        if (valid) onRename(text.trim())
+        newName?.let(onRename)
     }
 
     AlertDialog(
@@ -249,7 +249,7 @@ fun RenameFolderDialog(name: String, onRename: (String) -> Unit, onDismiss: () -
                 modifier = Modifier.focusRequester(focusRequester).testTag(FolderTags.NAME),
             )
         },
-        confirmButton = { TextButton(onClick = ::confirm, enabled = valid) { Text("Rename") } },
+        confirmButton = { TextButton(onClick = ::confirm, enabled = newName != null) { Text("Rename") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         modifier = Modifier.testTag(FolderTags.RENAME),
     )

@@ -64,6 +64,19 @@ class RingTest {
     }
 
     @Test
+    fun `dissolving never puts an app on the ring twice`() {
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder("Solo", clock), folder("Again", mail), folder("More", mail)))
+
+        assertEquals(ringOf(clock, mail), ring.dissolved())
+    }
+
+    @Test
+    fun `a name is trimmed, keeps no tabs or line breaks, and may not be empty`() {
+        assertEquals("Work and play", Ring.name("  Work\tand\nplay "))
+        assertEquals(null, Ring.name(" \t\n"))
+    }
+
+    @Test
     fun `a missing app is skipped but kept, in a folder too`() {
         val ring = Ring(listOf(RingSlot.App(clock.key), folder("Work", mail, maps)))
 

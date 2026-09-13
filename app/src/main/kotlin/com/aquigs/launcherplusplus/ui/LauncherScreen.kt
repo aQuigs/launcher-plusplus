@@ -119,8 +119,8 @@ fun LauncherScreen(
     // onDismissRequest before this screen's BackHandler. The folder and the dialog are named by the folder's slot.
     var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
     var openingMenu by remember { mutableStateOf<Job?>(null) }
-    var openFolder by rememberSaveable { mutableStateOf<Int?>(null) }
-    var renaming by rememberSaveable { mutableStateOf<Int?>(null) }
+    var openFolder by remember { mutableStateOf<Int?>(null) }
+    var renaming by remember { mutableStateOf<Int?>(null) }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
@@ -158,12 +158,14 @@ fun LauncherScreen(
                     onShortcut = actions.startShortcut,
                     onOption = { option ->
                         when (option) {
-                            // Unlike a toggle from the drawer, taking an app out of a folder settles the folder at once.
+                            // Unlike a toggle from the drawer, a removal settles the ring's folders at once.
                             is AppOption.Remove -> latestOnHomeAppsChange(latestHomeApps.toggle(option.place, app).dissolved())
                             AppOption.NewFolder -> {
                                 val slot = latestHomeApps.ring.indexOf(app)
-                                changeRing { newFolder(app, "Folder") }
-                                pickFor(HomePlace.Folder(slot))
+                                if (slot >= 0) {
+                                    changeRing { newFolder(app, "Folder") }
+                                    pickFor(HomePlace.Folder(slot))
+                                }
                             }
                             AppOption.AppInfo -> actions.openAppInfo(app)
                             AppOption.Uninstall -> actions.uninstall(app)
@@ -236,6 +238,7 @@ fun LauncherScreen(
                 query = query,
                 onQueryChange = { query = it },
                 picking = picking?.let { place ->
+                    val picked = homeApps[place]
                     Picking(
                         header = {
                             when (place) {
@@ -243,7 +246,7 @@ fun LauncherScreen(
                                 HomePlace.Ring, HomePlace.Dock -> PlacePicker(place = place, onPlaceChange = { picking = it })
                             }
                         },
-                        isPicked = { it in homeApps[place] },
+                        isPicked = { it in picked },
                         onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
                     )
                 },
