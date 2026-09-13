@@ -17,25 +17,30 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.AppOption
+import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.domain.appOptions
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -51,9 +56,9 @@ data class HomePress(val launcherInFront: Boolean)
 /**
  * The whole launcher: a horizontal pager over [layout] with the dock under it and the app drawer peeking below as a
  * chevron. The home page is the ring from [homeApps]; tapping its emblem opens the drawer to pick the apps on the ring or
- * in the dock. [apps] is null until the installed apps have loaded. Every [HomePress] closes the drawer; one made while
- * the launcher was in front also scrolls to the home page. Back closes the drawer if it is open, otherwise it returns to
- * the home page.
+ * in the dock. Long-pressing an app anywhere opens its menu of shortcuts and options. [apps] is null until the installed
+ * apps have loaded. Every [HomePress] closes the menu and the drawer; one made while the launcher was in front also
+ * scrolls to the home page. Back closes the menu, then the drawer, then returns to the home page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,8 +68,7 @@ fun LauncherScreen(
     apps: List<AppEntry>?,
     homeApps: HomeApps,
     onHomeAppsChange: (HomeApps) -> Unit,
-    icon: suspend (AppEntry) -> ImageBitmap?,
-    onLaunch: (AppEntry) -> Unit,
+    actions: AppActions,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -78,14 +82,61 @@ fun LauncherScreen(
     var picking by rememberSaveable { mutableStateOf<HomePlace?>(null) }
     val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen
     LaunchedEffect(drawerSettledClosed) { if (drawerSettledClosed) picking = null }
+    // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
+    var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
+    var openingMenu by remember { mutableStateOf<Job?>(null) }
+    val latestHomeApps by rememberUpdatedState(homeApps)
+    val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
     fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
 
+    // A menu still loading its shortcuts is cancelled too, or HOME pressed meanwhile would not stop it opening afterwards.
+    fun closeMenu() {
+        openingMenu?.cancel()
+        openMenu = openMenu?.copy(expanded = false)
+    }
+
+    fun appMenu(place: HomePlace?) = AppMenu(
+        onOpen = { app ->
+            openingMenu?.cancel()
+            openingMenu = scope.launch { openMenu = OpenMenu(app, place, actions.shortcuts(app)) }
+        },
+        content = { app ->
+            openMenu?.takeIf { it.isFor(app, place) }?.let { shown ->
+                // An app that leaves the screen takes its popup away undismissed; without closing here the menu would reopen
+                // by itself when the app returns, as after an update.
+                DisposableEffect(Unit) {
+                    onDispose { if (openMenu?.isFor(app, place) == true) closeMenu() }
+                }
+                AppOptionsMenu(
+                    expanded = shown.expanded,
+                    shortcuts = shown.shortcuts,
+                    options = appOptions(app, place),
+                    shortcutIcon = actions.shortcutIcon,
+                    onShortcut = actions.startShortcut,
+                    onOption = { option ->
+                        when (option) {
+                            is AppOption.Remove -> latestOnHomeAppsChange(latestHomeApps.toggle(option.place, app))
+                            AppOption.AppInfo -> actions.openAppInfo(app)
+                            AppOption.Uninstall -> actions.uninstall(app)
+                        }
+                    },
+                    onDismiss = ::closeMenu,
+                )
+            }
+        },
+    )
+    // Built once, so the ring, the dock and the drawer can skip recomposing while only the page or the drawer moves.
+    val drawerMenu = remember(actions) { appMenu(place = null) }
+    val ringMenu = remember(actions) { appMenu(HomePlace.Ring) }
+    val dockMenu = remember(actions) { appMenu(HomePlace.Dock) }
+
     LaunchedEffect(homePresses, pagerState, drawerState, layout) {
         homePresses.collect { press ->
+            closeMenu()
             closeDrawer()
             // Coming back from an app keeps the page you left, like the stock launcher.
             if (press.launcherInFront) goHome()
@@ -106,7 +157,8 @@ fun LauncherScreen(
         sheetContent = {
             AppDrawer(
                 apps = apps.orEmpty(),
-                onLaunch = onLaunch,
+                onLaunch = actions.launch,
+                menu = drawerMenu,
                 picking = picking?.let { place ->
                     Picking(
                         header = { PlacePicker(place = place, onPlaceChange = { picking = it }) },
@@ -145,8 +197,9 @@ fun LauncherScreen(
                             // Favourites stored for the ring hold the hint back until the app list can say none of them is
                             // installed, so neither the hint nor the mark flashes while apps load.
                             showHint = homeApps.ring.keys.isEmpty() || (apps != null && ring.isEmpty()),
-                            icon = icon,
-                            onLaunch = onLaunch,
+                            icon = actions.icon,
+                            onLaunch = actions.launch,
+                            menu = ringMenu,
                             onEdit = {
                                 picking = HomePlace.Ring
                                 openDrawer()
@@ -159,10 +212,16 @@ fun LauncherScreen(
             // Outside the pager, so it stays put while the pages swipe. Stored dock apps hold its row until the app list
             // loads, so the pages do not move when it arrives.
             if (dock.isNotEmpty() || (apps == null && homeApps.dock.keys.isNotEmpty())) {
-                Dock(apps = dock, icon = icon, onLaunch = onLaunch)
+                Dock(apps = dock, icon = actions.icon, onLaunch = actions.launch, menu = dockMenu)
             }
         }
     }
+}
+
+/** The app whose menu is showing, where it was pressed (null for the drawer), and its shortcuts. */
+private data class OpenMenu(val app: AppEntry, val place: HomePlace?, val shortcuts: List<AppShortcut>, val expanded: Boolean = true) {
+    // By key, so a reload that relabels the app keeps its menu.
+    fun isFor(app: AppEntry, place: HomePlace?) = app.key == this.app.key && place == this.place
 }
 
 @Composable

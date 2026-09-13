@@ -27,9 +27,15 @@ private val FULL_DOCK_ICON_SIZE = 56.dp
  * crowded dock shrinks its icons but not the row, and an empty dock still holds its place.
  */
 @Composable
-fun Dock(apps: List<AppEntry>, icon: suspend (AppEntry) -> ImageBitmap?, onLaunch: (AppEntry) -> Unit, modifier: Modifier = Modifier) {
+fun Dock(
+    apps: List<AppEntry>,
+    icon: suspend (AppEntry) -> ImageBitmap?,
+    onLaunch: (AppEntry) -> Unit,
+    modifier: Modifier = Modifier,
+    menu: AppMenu? = null,
+) {
     Layout(
-        content = { apps.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(DockTags.slot(app))) } } },
+        content = { apps.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(DockTags.slot(app)), menu) } } },
         modifier = modifier.fillMaxWidth().padding(vertical = 12.dp).testTag(DockTags.DOCK),
     ) { measurables, constraints ->
         val width = constraints.maxWidth

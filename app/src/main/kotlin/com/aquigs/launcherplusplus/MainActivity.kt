@@ -14,17 +14,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.ui.AppActions
 import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
 import com.aquigs.launcherplusplus.ui.theme.LauncherTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -40,7 +38,15 @@ class MainActivity : ComponentActivity() {
         val repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val layout = PageLayout()
-        val icon: suspend (AppEntry) -> ImageBitmap? = { app -> withContext(Dispatchers.IO) { repository.icon(app) } }
+        val actions = AppActions(
+            icon = repository::icon,
+            launch = repository::launch,
+            shortcuts = repository::shortcuts,
+            shortcutIcon = repository::shortcutIcon,
+            startShortcut = repository::startShortcut,
+            openAppInfo = repository::openAppInfo,
+            uninstall = repository::uninstall,
+        )
 
         setContent {
             LauncherTheme {
@@ -57,8 +63,7 @@ class MainActivity : ComponentActivity() {
                         homeApps = it
                         homeAppsStore.save(it)
                     },
-                    icon = icon,
-                    onLaunch = repository::launch,
+                    actions = actions,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }
