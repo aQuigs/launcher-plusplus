@@ -28,9 +28,11 @@ import com.aquigs.launcherplusplus.ui.LauncherTags
 import com.aquigs.launcherplusplus.ui.appList
 import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
+import com.aquigs.launcherplusplus.ui.homeAppCard
 import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.placeOption
 import com.aquigs.launcherplusplus.ui.swipePager
+import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -69,6 +71,16 @@ class MainActivityTest {
 
     @get:Rule(order = 2)
     val compose = createAndroidComposeRule<MainActivity>()
+
+    @After
+    fun restoreTheLauncherAsHome() = makeLauncherHome()
+
+    /** Stops and restarts the activity, as leaving for Settings and coming back does. */
+    private fun leaveAndComeBack() {
+        val scenario = compose.activityRule.scenario
+        scenario.moveToState(Lifecycle.State.CREATED)
+        scenario.moveToState(Lifecycle.State.RESUMED)
+    }
 
     /**
      * Delivers a HOME intent as the system does: with the launcher in front it arrives while the activity is paused; from
@@ -142,6 +154,18 @@ class MainActivityTest {
             assertFalse("navigation bar icons are dark", bars.isAppearanceLightNavigationBars)
             assertTrue("three-button navigation lost its backing", activity.window.isNavigationBarContrastEnforced)
         }
+    }
+
+    @Test
+    fun theHomePageAsksToBeTheHomeAppUntilTheRoleIsHeld() {
+        makeHomeApp(otherHomeApp())
+        leaveAndComeBack()
+        compose.homeAppCard().assertIsDisplayed()
+
+        makeLauncherHome()
+        leaveAndComeBack()
+
+        compose.homeAppCard().assertDoesNotExist()
     }
 
     @Test

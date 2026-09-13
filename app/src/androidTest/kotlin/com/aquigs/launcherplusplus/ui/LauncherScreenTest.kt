@@ -52,6 +52,8 @@ class LauncherScreenTest {
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var homeApps by mutableStateOf(HomeApps())
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September"))
+    private var isHomeApp by mutableStateOf(true)
+    private var homeRequests = 0
     private val opened = mutableListOf<String>()
     private val launched = mutableListOf<AppEntry>()
     private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
@@ -83,6 +85,8 @@ class LauncherScreenTest {
             clock = face,
             onOpenClock = { opened += "clock" },
             onOpenCalendar = { opened += "calendar" },
+            isHomeApp = isHomeApp,
+            onBecomeHomeApp = { homeRequests++ },
             pagerState = pager,
         )
     }
@@ -109,6 +113,23 @@ class LauncherScreenTest {
         assertDrawerOpen(false)
         compose.drawerHandle().assertIsDisplayed()
         compose.emblem().assertIsDisplayed()
+        compose.homeAppCard().assertDoesNotExist()
+    }
+
+    @Test
+    fun theHomePageAsksToBeTheHomeAppUntilItIs() {
+        isHomeApp = false
+        show()
+        val card = compose.homeAppCard().assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue("the card sits under the clock", compose.clockDate().getUnclippedBoundsInRoot().bottom <= card.top)
+        assertTrue("the card sits over the ring", card.bottom <= compose.emblem().getUnclippedBoundsInRoot().top)
+
+        compose.becomeHomeAppButton().performClick()
+        compose.runOnIdle { assertEquals(1, homeRequests) }
+
+        isHomeApp = true
+
+        compose.homeAppCard().assertDoesNotExist()
     }
 
     @Test
