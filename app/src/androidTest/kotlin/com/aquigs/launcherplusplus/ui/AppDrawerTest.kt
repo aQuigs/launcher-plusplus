@@ -2,6 +2,9 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -13,9 +16,12 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,8 +43,11 @@ class AppDrawerTest {
     // Each letter of the alphabet fixture is one header row followed by its apps.
     private val itemsPerLetter = APPS_PER_LETTER + 1
 
-    private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}, picking: Picking? = null) =
-        compose.setContent { AppDrawer(apps = apps, onLaunch = onLaunch, picking = picking, listState = listState) }
+    private var query by mutableStateOf("")
+
+    private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}, picking: Picking? = null) = compose.setContent {
+        AppDrawer(apps = apps, onLaunch = onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it })
+    }
 
     @Test
     fun filesEveryAppUnderItsInitialWithTheRailToMatch() {
@@ -79,6 +88,61 @@ class AppDrawerTest {
 
         assertEquals(listOf(clock), toggled)
         assertEquals(emptyList<AppEntry>(), launched)
+    }
+
+    @Test
+    fun typingFiltersTheListWithoutSectionsOrRail() {
+        show(alphabet)
+
+        compose.searchField().performTextInput("b2")
+
+        compose.onNodeWithText("B2").assertIsDisplayed()
+        compose.onNodeWithText("A1").assertDoesNotExist()
+        compose.sectionHeader('B').assertDoesNotExist()
+        compose.railLetter('B').assertDoesNotExist()
+    }
+
+    @Test
+    fun clearingTheSearchBringsTheSectionsBack() {
+        show(listOf(clock, mail))
+        compose.searchField().performTextInput("ma")
+        compose.onNodeWithText("Clock").assertDoesNotExist()
+
+        compose.onNodeWithContentDescription("Clear the search").performClick()
+
+        compose.onNodeWithText("Clock").assertIsDisplayed()
+        compose.sectionHeader('C').assertIsDisplayed()
+    }
+
+    @Test
+    fun theSearchKeyLaunchesTheFirstMatch() {
+        val launched = mutableListOf<AppEntry>()
+        show(listOf(clock, mail), onLaunch = launched::add)
+
+        compose.searchField().performTextInput("cl")
+        compose.searchField().performImeAction()
+
+        assertEquals(listOf(clock), launched)
+    }
+
+    @Test
+    fun theSearchKeyTogglesTheFirstMatchWhilePicking() {
+        val toggled = mutableListOf<AppEntry>()
+        show(listOf(clock, mail), picking = Picking(header = {}, isPicked = { false }, onToggle = toggled::add))
+
+        compose.searchField().performTextInput("ma")
+        compose.searchField().performImeAction()
+
+        assertEquals(listOf(mail), toggled)
+    }
+
+    @Test
+    fun noMatchSaysSo() {
+        show(listOf(clock, mail))
+
+        compose.searchField().performTextInput("zz")
+
+        compose.onNodeWithText("No apps match").assertIsDisplayed()
     }
 
     @Test

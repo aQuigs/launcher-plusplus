@@ -29,6 +29,8 @@ fun SemanticsNodeInteractionsProvider.drawerHandle() = onNodeWithTag(AppDrawerTa
 
 fun SemanticsNodeInteractionsProvider.appList() = onNodeWithTag(AppDrawerTags.LIST)
 
+fun SemanticsNodeInteractionsProvider.searchField() = onNodeWithTag(AppDrawerTags.SEARCH)
+
 fun SemanticsNodeInteractionsProvider.sectionHeader(initial: Char) = onNodeWithTag(AppDrawerTags.section(initial))
 
 fun SemanticsNodeInteractionsProvider.railLetter(initial: Char) = onNodeWithTag(AppDrawerTags.letter(initial))

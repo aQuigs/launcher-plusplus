@@ -19,12 +19,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -43,14 +50,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.matching
 import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
     const val HANDLE = "drawer_handle"
     const val LIST = "app_list"
+    const val SEARCH = "app_search"
 
     fun section(initial: Char) = "section_$initial"
 
@@ -84,7 +94,9 @@ class Picking(val header: @Composable () -> Unit, val isPicked: (AppEntry) -> Bo
 
 /**
  * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
- * launches the app and a long press opens its [menu], unless the drawer is [picking].
+ * launches the app and a long press opens its [menu], unless the drawer is [picking]. A search field heads the list:
+ * with a [query] the list holds only the matching apps, without sections or rail, and the keyboard's search key acts
+ * on the first of them as a tap would.
  */
 @Composable
 fun AppDrawer(
@@ -94,9 +106,13 @@ fun AppDrawer(
     picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
     menu: AppMenu? = null,
+    query: String = "",
+    onQueryChange: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val rowMenu = menu.takeIf { picking == null }
+    val searching = query.isNotBlank()
+    val matches = remember(apps, query) { if (searching) apps.matching(query) else emptyList() }
     val sections = remember(apps) { apps.sectionsByInitial() }
     val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
@@ -116,30 +132,75 @@ fun AppDrawer(
 
     Column(modifier.fillMaxSize()) {
         picking?.header?.invoke()
+        SearchField(
+            query = query,
+            onQueryChange = onQueryChange,
+            onSearch = { matches.firstOrNull()?.let(picking?.onToggle ?: onLaunch) },
+        )
         Box(Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(end = RAIL_WIDTH),
+                contentPadding = PaddingValues(end = if (searching) 0.dp else RAIL_WIDTH),
                 modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
             ) {
-                sections.forEach { section ->
-                    item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
-                    items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, onLaunch, picking, rowMenu)
+                if (searching) {
+                    items(matches, key = { it.key }, contentType = { "app" }) { app -> AppRow(app, onLaunch, picking, rowMenu) }
+                    if (matches.isEmpty()) item(contentType = "empty") { NoMatches() }
+                } else {
+                    sections.forEach { section ->
+                        item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                        items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
+                            AppRow(app, onLaunch, picking, rowMenu)
+                        }
                     }
                 }
             }
-            LetterRail(
-                initials = initials,
-                highlighted = highlighted,
-                onSelect = { section ->
-                    lastSelected = section
-                    scope.launch { listState.scrollToItem(headerIndices[section]) }
-                },
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
+            if (!searching) {
+                LetterRail(
+                    initials = initials,
+                    highlighted = highlighted,
+                    onSelect = { section ->
+                        lastSelected = section
+                        scope.launch { listState.scrollToItem(headerIndices[section]) }
+                    },
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text("Search apps") },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Clear, contentDescription = "Clear the search") }
+            }
+        },
+        singleLine = true,
+        shape = CircleShape,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .testTag(AppDrawerTags.SEARCH),
+    )
+}
+
+@Composable
+private fun NoMatches() {
+    Text(
+        text = "No apps match",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+    )
 }
 
 private val RAIL_WIDTH = 28.dp

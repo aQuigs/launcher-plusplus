@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -83,11 +84,20 @@ fun LauncherScreen(
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
     val ring = remember(homeApps.ring, apps) { homeApps.ring.resolve(apps.orEmpty()) }
     val dock = remember(homeApps.dock, apps) { homeApps.dock.resolve(apps.orEmpty()) }
-    // Picking is a mode of the drawer, so it ends however the drawer closes: chevron, drag, Back or HOME. It waits for the
-    // drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up open.
+    // Picking and searching are modes of the drawer, so they end however the drawer closes: chevron, drag, Back or HOME.
+    // They wait for the drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up
+    // open. Dropping focus takes the keyboard down with the drawer.
     var picking by rememberSaveable { mutableStateOf<HomePlace?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
     val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen
-    LaunchedEffect(drawerSettledClosed) { if (drawerSettledClosed) picking = null }
+    LaunchedEffect(drawerSettledClosed) {
+        if (drawerSettledClosed) {
+            picking = null
+            query = ""
+            focusManager.clearFocus()
+        }
+    }
     // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
     var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
     var openingMenu by remember { mutableStateOf<Job?>(null) }
@@ -165,6 +175,8 @@ fun LauncherScreen(
                 apps = apps.orEmpty(),
                 onLaunch = actions.launch,
                 menu = drawerMenu,
+                query = query,
+                onQueryChange = { query = it },
                 picking = picking?.let { place ->
                     Picking(
                         header = { PlacePicker(place = place, onPlaceChange = { picking = it }) },

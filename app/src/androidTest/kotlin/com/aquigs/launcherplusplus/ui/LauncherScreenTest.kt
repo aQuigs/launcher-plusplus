@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
@@ -121,6 +122,22 @@ class LauncherScreenTest {
         compose.clockTime().performClick()
         compose.clockDate().performClick()
         assertEquals(listOf("clock", "calendar"), opened)
+    }
+
+    @Test
+    fun closingTheDrawerEndsItsSearch() {
+        show()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        compose.searchField().performTextInput("ma")
+        compose.onNodeWithText("Clock").assertDoesNotExist()
+
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(false)
+        compose.drawerHandle().performClick()
+
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Mail").assertIsDisplayed()
     }
 
     @Test
