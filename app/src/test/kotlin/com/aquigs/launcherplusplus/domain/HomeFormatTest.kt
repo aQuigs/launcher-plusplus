@@ -10,7 +10,7 @@ class HomeFormatTest {
 
     @Test
     fun `a ring of apps and folders comes back as it went`() {
-        val ring = Ring(listOf(RingSlot.App(clock.key), folder("Work", mail, maps), folder("Solo", clock), folder("Empty")))
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder(mail, maps), folder(clock), folder()))
 
         assertEquals(ring, decodeRing(ring.encode()))
     }
@@ -22,18 +22,21 @@ class HomeFormatTest {
     }
 
     @Test
-    fun `a folder line is its name and its keys separated by tabs`() {
-        val ring = ringOf(clock, mail).newFolder(mail, "Work").toggle(1, maps)
+    fun `a folder line is a tab and then its keys, so a folder of one or none is still a folder`() {
+        val ring = ringOf(clock, mail).newFolder(mail).toggle(1, maps)
 
-        assertEquals("pkg.Clock/pkg.Clock.Main\nWork\tpkg.Mail/pkg.Mail.Main\tpkg.Maps/pkg.Maps.Main", ring.encode())
-        assertEquals(Ring(listOf(folder("Work", mail))), decodeRing("Work\tpkg.Mail/pkg.Mail.Main"))
+        assertEquals("pkg.Clock/pkg.Clock.Main\n\tpkg.Mail/pkg.Mail.Main\tpkg.Maps/pkg.Maps.Main", ring.encode())
+        assertEquals("\tpkg.Mail/pkg.Mail.Main", Ring(listOf(folder(mail))).encode())
+        assertEquals("\t", Ring(listOf(folder())).encode())
+        assertEquals(Ring(listOf(folder(mail))), decodeRing("\tpkg.Mail/pkg.Mail.Main"))
+        assertEquals(Ring(listOf(folder())), decodeRing("\t"))
     }
 
     @Test
-    fun `a name cannot break the line it is on`() {
-        val ring = Ring(listOf(folder("Work\tand\nplay", mail), RingSlot.App(clock.key)))
+    fun `a folder line stored with a name loses the name and keeps the apps`() {
+        val named = "Work\tpkg.Mail/pkg.Mail.Main\tpkg.Maps/pkg.Maps.Main\nEmpty\t"
 
-        assertEquals(Ring(listOf(folder("Work and play", mail), RingSlot.App(clock.key))), decodeRing(ring.encode()))
+        assertEquals(Ring(listOf(folder(mail, maps), folder())), decodeRing(named))
     }
 
     @Test

@@ -23,14 +23,11 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()
 
     /**
      * Adds [app] to [place], or takes it off if it is already there. The other places are left as they are, and so is a
-     * folder left with one app or none: see [dissolved].
+     * folder left with one app or none: only "Remove folder" takes a folder off.
      */
     fun toggle(place: HomePlace, app: AppEntry): HomeApps = when (place) {
         HomePlace.Ring -> copy(ring = ring.toggle(app))
         HomePlace.Dock -> copy(dock = dock.toggle(app))
         is HomePlace.Folder -> copy(ring = ring.toggle(place.index, app))
     }
-
-    /** The home apps with the ring's folders settled, as [Ring.dissolved] does. */
-    fun dissolved(): HomeApps = copy(ring = ring.dissolved())
 }

@@ -9,21 +9,22 @@ fun Favourites.encode(): String = keys.joinToString(LINE)
 fun decodeFavourites(text: String): Favourites = Favourites(text.nonEmptyLines())
 
 /**
- * The ring as text, one line per slot: an app is its key, and a folder is its name followed by its keys, tab-separated.
- * No key holds a tab, so a folder is any line with one, and a ring stored before folders is all app lines and still reads.
- * A name is written as [Ring.name] reads it, so it cannot break its line.
+ * The ring as text, one line per slot: an app is its key, and a folder is a tab followed by its keys, tab-separated. No
+ * key holds a tab, so a folder is any line with one, even a folder of one app or none, and a ring stored before folders
+ * is all app lines and still reads.
  */
 fun Ring.encode(): String = slots.joinToString(LINE) { slot ->
     when (slot) {
         is RingSlot.App -> slot.key
-        is RingSlot.Folder -> Ring.name(slot.name).orEmpty() + FIELD + slot.keys.joinToString(FIELD)
+        is RingSlot.Folder -> slot.keys.joinToString(FIELD, prefix = FIELD)
     }
 }
 
 fun decodeRing(text: String): Ring = Ring(
     text.nonEmptyLines().map { line ->
         val fields = line.split(FIELD)
-        if (fields.size == 1) RingSlot.App(line) else RingSlot.Folder(fields.first(), fields.drop(1).filter(String::isNotEmpty))
+        // Whatever stands before a folder's first tab is skipped: folders once had a name there.
+        if (fields.size == 1) RingSlot.App(line) else RingSlot.Folder(fields.drop(1).filter(String::isNotEmpty))
     },
 )
 

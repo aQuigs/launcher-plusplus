@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -43,7 +44,9 @@ private val FULL_ICON_SIZE = 64.dp
 /**
  * The [ring] of favourite apps and folders round a static emblem. Tap an app to launch it or long-press it for its
  * [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap the emblem to choose the favourites on the
- * ring and in the dock. With [showHint] the emblem invites you to add apps instead of showing its mark.
+ * ring and in the dock. With [showHint] the emblem invites you to add apps instead of showing its mark. An [openFolder]
+ * takes the ring over: its apps sit in the slots, each with the [folderAppMenu], and the emblem gives way to a target
+ * that calls [onCloseFolder].
  */
 @Composable
 fun HomeRing(
@@ -52,23 +55,33 @@ fun HomeRing(
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
+    onCloseFolder: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
+    openFolder: RingItem.Folder? = null,
     menu: AppMenu? = null,
     folderMenu: FolderMenu? = null,
+    folderAppMenu: AppMenu? = null,
 ) {
     val track = MaterialTheme.colorScheme.outlineVariant
 
     Layout(
         content = {
-            Emblem(showHint = showHint, onClick = onEdit)
-            ring.forEach { item ->
-                when (item) {
-                    is RingItem.App -> key(item.app.key) {
-                        AppIcon(item.app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(item.app)), menu)
-                    }
-                    is RingItem.Folder -> key(item.index) {
-                        FolderIcon(item, icon, onOpenFolder, Modifier.testTag(HomeRingTags.folder(item.index)), folderMenu)
+            if (openFolder != null) {
+                CloseFolderTarget(onClick = onCloseFolder)
+                openFolder.apps.forEach { app ->
+                    key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(app)), folderAppMenu) }
+                }
+            } else {
+                Emblem(showHint = showHint, onClick = onEdit)
+                ring.forEach { item ->
+                    when (item) {
+                        is RingItem.App -> key(item.app.key) {
+                            AppIcon(item.app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(item.app)), menu)
+                        }
+                        is RingItem.Folder -> key(item.index) {
+                            FolderIcon(item, icon, onOpenFolder, Modifier.testTag(HomeRingTags.folder(item.index)), folderMenu)
+                        }
                     }
                 }
             }
@@ -79,9 +92,9 @@ fun HomeRing(
     ) { measurables, constraints ->
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
         val radius = side * RING_RADIUS_FRACTION
-        val emblemSize = (side * EMBLEM_FRACTION).roundToInt()
-        val iconSize = ringIconSize(FULL_ICON_SIZE.toPx(), side, ring.size).roundToInt()
-        val emblem = measurables.first().measure(Constraints.fixed(emblemSize, emblemSize))
+        val centreSize = (side * EMBLEM_FRACTION).roundToInt()
+        val iconSize = ringIconSize(FULL_ICON_SIZE.toPx(), side, measurables.size - 1).roundToInt()
+        val centre = measurables.first().measure(Constraints.fixed(centreSize, centreSize))
         val icons = measurables.drop(1).map { it.measure(Constraints.fixed(iconSize, iconSize)) }
 
         layout(constraints.maxWidth, constraints.maxHeight) {
@@ -89,7 +102,7 @@ fun HomeRing(
 
             val centreX = constraints.maxWidth / 2f
             val centreY = constraints.maxHeight / 2f
-            emblem.placeCentred(centreX, centreY)
+            centre.placeCentred(centreX, centreY)
             icons.forEachIndexed { index, placeable ->
                 val (dx, dy) = ringSlotOffset(index, icons.size)
                 placeable.placeCentred(centreX + radius * dx, centreY + radius * dy)
@@ -126,4 +139,15 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
             )
         }
     }
+}
+
+/** The emblem's place while a folder is open: nothing to see, as in Arc, but a tap there closes the folder. */
+@Composable
+private fun CloseFolderTarget(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Close folder" },
+    )
 }

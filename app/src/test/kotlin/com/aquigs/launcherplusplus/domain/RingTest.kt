@@ -13,20 +13,31 @@ class RingTest {
 
     @Test
     fun `a new folder takes the app's slot and keeps the order round it`() {
-        val ring = ringOf(clock, mail, maps).newFolder(mail, "Work")
+        val ring = ringOf(clock, mail, maps).newFolder(mail)
 
-        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder("Work", mail), RingSlot.App(maps.key))), ring)
+        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder(mail), RingSlot.App(maps.key))), ring)
         assertEquals(2, ring.indexOf(maps))
         assertEquals(-1, ring.indexOf(mail))
-        assertEquals(ringOf(clock), ringOf(clock).newFolder(mail, "Work"))
+        assertEquals(ringOf(clock), ringOf(clock).newFolder(mail))
     }
 
     @Test
     fun `toggling into a folder adds at the end and toggling again takes out`() {
-        val ring = Ring(listOf(folder("Work", mail))).toggle(0, maps).toggle(0, clock)
-        assertEquals(folder("Work", mail, maps, clock), ring.folder(0))
+        val ring = Ring(listOf(folder(mail))).toggle(0, maps).toggle(0, clock)
+        assertEquals(folder(mail, maps, clock), ring.folder(0))
 
-        assertEquals(folder("Work", mail, clock), ring.toggle(0, maps).folder(0))
+        assertEquals(folder(mail, clock), ring.toggle(0, maps).folder(0))
+    }
+
+    @Test
+    fun `a folder stays with one app or none until it is removed`() {
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder(mail, maps)))
+
+        val one = ring.toggle(1, maps)
+        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder(mail))), one)
+        val empty = one.toggle(1, mail)
+        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder())), empty)
+        assertEquals(ringOf(clock), empty.remove(1))
     }
 
     @Test
@@ -35,66 +46,47 @@ class RingTest {
 
         assertEquals(ring, ring.toggle(0, mail))
         assertEquals(ring, ring.toggle(3, mail))
-        assertEquals(ring, ring.rename(0, "Work"))
     }
 
     @Test
     fun `an app inside a folder is not on the ring itself`() {
-        val ring = Ring(listOf(folder("Work", mail), RingSlot.App(clock.key)))
+        val ring = Ring(listOf(folder(mail), RingSlot.App(clock.key)))
 
         assertTrue(clock in ring.apps)
         assertTrue(mail !in ring.apps)
-        assertEquals(listOf(folder("Work", mail), RingSlot.App(clock.key), RingSlot.App(mail.key)), ring.toggle(mail).slots)
+        assertEquals(listOf(folder(mail), RingSlot.App(clock.key), RingSlot.App(mail.key)), ring.toggle(mail).slots)
     }
 
     @Test
-    fun `renaming and removing act on the one slot`() {
-        val ring = Ring(listOf(RingSlot.App(clock.key), folder("Work", mail, maps)))
+    fun `removing acts on the one slot`() {
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder(mail, maps)))
 
-        assertEquals(folder("Play", mail, maps), ring.rename(1, "Play").folder(1))
         assertEquals(ringOf(clock), ring.remove(1))
-        assertEquals(Ring(listOf(folder("Work", mail, maps))), ring.remove(0))
-    }
-
-    @Test
-    fun `dissolving turns a folder of one into its app and drops an empty one`() {
-        val ring = Ring(listOf(folder("Solo", clock), folder("Work", mail, maps), folder("Empty"), RingSlot.App(music.key)))
-
-        assertEquals(listOf(RingSlot.App(clock.key), folder("Work", mail, maps), RingSlot.App(music.key)), ring.dissolved().slots)
-    }
-
-    @Test
-    fun `dissolving never puts an app on the ring twice`() {
-        val ring = Ring(listOf(RingSlot.App(clock.key), folder("Solo", clock), folder("Again", mail), folder("More", mail)))
-
-        assertEquals(ringOf(clock, mail), ring.dissolved())
-    }
-
-    @Test
-    fun `a name is trimmed, keeps no tabs or line breaks, and may not be empty`() {
-        assertEquals("Work and play", Ring.name("  Work\tand\nplay "))
-        assertEquals(null, Ring.name(" \t\n"))
+        assertEquals(Ring(listOf(folder(mail, maps))), ring.remove(0))
     }
 
     @Test
     fun `a missing app is skipped but kept, in a folder too`() {
-        val ring = Ring(listOf(RingSlot.App(clock.key), folder("Work", mail, maps)))
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder(mail, maps)))
 
-        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(1, "Work", listOf(maps))), ring.resolve(listOf(clock, maps)))
-        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(1, "Work", listOf(mail, maps))), ring.resolve(all))
-        assertEquals(ring, ring.dissolved())
+        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(1, listOf(maps))), ring.resolve(listOf(clock, maps)))
+        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(1, listOf(mail, maps))), ring.resolve(all))
     }
 
     @Test
-    fun `a folder none of whose apps is installed is skipped and keeps its slot number`() {
-        val ring = Ring(listOf(folder("Work", mail, maps), folder("Play", music)))
+    fun `a folder with nothing to show still holds its slot`() {
+        val ring = Ring(listOf(folder(mail, maps), folder(), folder(music)))
 
-        assertEquals(listOf(RingItem.Folder(1, "Play", listOf(music))), ring.resolve(listOf(clock, music)))
+        assertEquals(
+            listOf(RingItem.Folder(0, emptyList()), RingItem.Folder(1, emptyList()), RingItem.Folder(2, listOf(music))),
+            ring.resolve(listOf(clock, music)),
+        )
     }
 
     @Test
     fun `a ring of folders only is not empty`() {
-        assertTrue(Ring(listOf(folder("Work", mail))).isEmpty.not())
+        assertTrue(Ring(listOf(folder(mail))).isEmpty.not())
+        assertTrue(Ring(listOf(folder())).isEmpty.not())
         assertTrue(Ring().isEmpty)
     }
 }

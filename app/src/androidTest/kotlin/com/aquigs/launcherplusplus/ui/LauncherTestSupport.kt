@@ -2,9 +2,7 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -26,7 +24,7 @@ val alphabet: List<AppEntry> = ('A'..'Z').flatMap { letter ->
 
 fun ringOf(vararg apps: AppEntry) = Ring(apps.map { RingSlot.App(it.key) })
 
-fun folderOf(name: String, vararg apps: AppEntry) = RingSlot.Folder(name, apps.map { it.key })
+fun folderOf(vararg apps: AppEntry) = RingSlot.Folder(apps.map { it.key })
 
 fun List<AppEntry>.asRingItems() = map(RingItem::App)
 
@@ -61,16 +59,9 @@ fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(Ho
 
 fun SemanticsNodeInteractionsProvider.folderSlot(index: Int) = onNodeWithTag(HomeRingTags.folder(index))
 
-fun SemanticsNodeInteractionsProvider.folderPopup() = onNodeWithTag(FolderTags.POPUP)
-
-// By text within the popup: the drawer, always composed, lists the same app under the same label.
-fun SemanticsNodeInteractionsProvider.folderApp(app: AppEntry) = onNode(hasText(app.label) and hasAnyAncestor(hasTestTag(FolderTags.POPUP)))
+fun SemanticsNodeInteractionsProvider.closeFolder() = onNodeWithContentDescription("Close folder")
 
 fun SemanticsNodeInteractionsProvider.folderOptionsMenu() = onNodeWithTag(FolderTags.MENU)
-
-fun SemanticsNodeInteractionsProvider.renameDialog() = onNodeWithTag(FolderTags.RENAME)
-
-fun SemanticsNodeInteractionsProvider.folderNameField() = onNodeWithTag(FolderTags.NAME)
 
 fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
 

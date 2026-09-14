@@ -23,7 +23,7 @@ class HomeAppsStoreTest {
 
     @Test
     fun theRingAndTheDockComeBackApart() {
-        val ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.Folder("Work", listOf("b/B", "c/C"))))
+        val ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.Folder(listOf("b/B", "c/C")), RingSlot.Folder(emptyList())))
         val homeApps = HomeApps(ring = ring, dock = Favourites(listOf("c/C")))
 
         store.save(homeApps)

@@ -31,7 +31,7 @@ class HomeAppsTest {
 
     @Test
     fun `a folder is a place of its own on the ring`() {
-        val homeApps = HomeApps(ring = ringOf(clock).newFolder(clock, "Work")).toggle(HomePlace.Folder(0), mail)
+        val homeApps = HomeApps(ring = ringOf(clock).newFolder(clock)).toggle(HomePlace.Folder(0), mail)
 
         assertEquals(Favourites(listOf(clock.key, mail.key)), homeApps[HomePlace.Folder(0)])
         assertTrue(clock !in homeApps[HomePlace.Ring])
@@ -40,9 +40,11 @@ class HomeAppsTest {
     }
 
     @Test
-    fun `dissolving settles the ring's folders and leaves the dock`() {
-        val homeApps = HomeApps(ring = Ring(listOf(folder("Solo", clock))), dock = Favourites(listOf(mail.key)))
+    fun `taking the last app out of a folder leaves the folder`() {
+        val homeApps = HomeApps(ring = Ring(listOf(folder(clock))), dock = Favourites(listOf(mail.key)))
 
-        assertEquals(HomeApps(ring = ringOf(clock), dock = Favourites(listOf(mail.key))), homeApps.dissolved())
+        val emptied = homeApps.toggle(HomePlace.Folder(0), clock)
+
+        assertEquals(HomeApps(ring = Ring(listOf(folder())), dock = Favourites(listOf(mail.key))), emptied)
     }
 }

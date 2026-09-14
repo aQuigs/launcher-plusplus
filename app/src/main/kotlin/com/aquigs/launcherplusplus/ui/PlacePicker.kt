@@ -41,11 +41,11 @@ fun PlacePicker(place: HomePlace, onPlaceChange: (HomePlace) -> Unit, modifier: 
     }
 }
 
-/** Heads the drawer while picking for a folder: which folder a tap fills, and what a tap does. */
+/** Heads the drawer while picking for a folder: that a tap fills the folder, and what a tap does. */
 @Composable
-fun FolderPicker(name: String, modifier: Modifier = Modifier) {
+fun FolderPicker(modifier: Modifier = Modifier) {
     PickingHeader(modifier) {
-        Text(text = "Adding apps to “$name”", style = MaterialTheme.typography.titleMedium)
+        Text(text = "Adding to folder", style = MaterialTheme.typography.titleMedium)
     }
 }
 

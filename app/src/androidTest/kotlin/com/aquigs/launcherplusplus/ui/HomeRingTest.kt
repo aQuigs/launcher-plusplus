@@ -27,6 +27,7 @@ class HomeRingTest {
     val compose = createComposeRule()
 
     private var ring by mutableStateOf(emptyList<RingItem>())
+    private var openFolder by mutableStateOf<RingItem.Folder?>(null)
 
     private fun show(
         favourites: List<AppEntry>,
@@ -41,6 +42,7 @@ class HomeRingTest {
         onLaunch: (AppEntry) -> Unit = {},
         onEdit: () -> Unit = {},
         onOpenFolder: (RingItem.Folder) -> Unit = {},
+        onCloseFolder: () -> Unit = {},
     ) {
         ring = items
         compose.setContent {
@@ -50,7 +52,9 @@ class HomeRingTest {
                 icon = { null },
                 onLaunch = onLaunch,
                 onOpenFolder = onOpenFolder,
+                onCloseFolder = onCloseFolder,
                 onEdit = onEdit,
+                openFolder = openFolder,
             )
         }
     }
@@ -115,12 +119,46 @@ class HomeRingTest {
     @Test
     fun aFolderSlotIsTheSizeOfAnAppSlotAndOpensOnATap() {
         val opened = mutableListOf<RingItem.Folder>()
-        val work = RingItem.Folder(1, "Work", listOf(mail, clock, alphabet[0]))
+        val work = RingItem.Folder(1, listOf(mail, clock, alphabet[0]))
         showItems(listOf(RingItem.App(clock), work), onOpenFolder = opened::add)
 
-        compose.folderSlot(1).assertContentDescriptionEquals("Folder Work, 3 apps").assertWidthIsEqualTo(iconWidth(clock))
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 3 apps").assertWidthIsEqualTo(iconWidth(clock))
         compose.folderSlot(1).performClick()
 
         assertEquals(listOf(work), opened)
+    }
+
+    @Test
+    fun anEmptyFolderIsABadgeThatDoesNotOpen() {
+        val opened = mutableListOf<RingItem.Folder>()
+        showItems(listOf(RingItem.App(clock), RingItem.Folder(1, emptyList())), onOpenFolder = opened::add)
+
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 0 apps").assertWidthIsEqualTo(iconWidth(clock))
+        compose.folderSlot(1).performClick()
+
+        assertEquals(emptyList<RingItem.Folder>(), opened)
+    }
+
+    @Test
+    fun anOpenFolderPutsItsAppsInTheRingSlotsInPlaceOfTheEmblem() {
+        var closes = 0
+        val work = RingItem.Folder(1, listOf(mail, alphabet[0]))
+        showItems(listOf(RingItem.App(clock), work), onCloseFolder = { closes++ })
+        val emblem = compose.emblem().getUnclippedBoundsInRoot()
+        val slotOfClock = compose.ringSlot(clock).getUnclippedBoundsInRoot()
+
+        openFolder = work
+
+        compose.emblem().assertDoesNotExist()
+        compose.ringSlot(clock).assertDoesNotExist()
+        compose.folderSlot(1).assertDoesNotExist()
+        assertEquals("the first app takes the top slot", slotOfClock, compose.ringSlot(mail).getUnclippedBoundsInRoot())
+        val second = compose.ringSlot(alphabet[0]).getUnclippedBoundsInRoot()
+        assertTrue("the second app sits at the bottom", second.top > emblem.bottom)
+        assertEquals("the close target is the emblem's size", emblem, compose.closeFolder().getUnclippedBoundsInRoot())
+
+        compose.closeFolder().performClick()
+
+        assertEquals(1, closes)
     }
 }
