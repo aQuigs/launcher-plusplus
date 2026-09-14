@@ -1,7 +1,7 @@
 package com.aquigs.launcherplusplus.domain
 
-private const val LINE = "\n"
-private const val FIELD = "\t"
+internal const val LINE = "\n"
+internal const val FIELD = "\t"
 
 /** Favourites as text, one key per line, in order. */
 fun Favourites.encode(): String = keys.joinToString(LINE)
@@ -28,4 +28,4 @@ fun decodeRing(text: String): Ring = Ring(
     },
 )
 
-private fun String.nonEmptyLines() = split(LINE).filter(String::isNotEmpty)
+internal fun String.nonEmptyLines() = split(LINE).filter(String::isNotEmpty)

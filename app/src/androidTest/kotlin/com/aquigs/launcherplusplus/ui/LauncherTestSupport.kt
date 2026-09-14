@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.HomePlace
+import com.aquigs.launcherplusplus.domain.HostedWidget
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingItem
@@ -72,3 +73,9 @@ fun SemanticsNodeInteractionsProvider.appOptionsMenu() = onNodeWithTag(AppOption
 fun SemanticsNodeInteractionsProvider.homeAppCard() = onNodeWithTag(HomeAppCardTags.CARD)
 
 fun SemanticsNodeInteractionsProvider.becomeHomeAppButton() = onNodeWithTag(HomeAppCardTags.BUTTON)
+
+fun SemanticsNodeInteractionsProvider.widget(widget: HostedWidget) = onNodeWithTag(WidgetTags.widget(widget.id))
+
+fun SemanticsNodeInteractionsProvider.addWidgetButton() = onNodeWithTag(WidgetTags.ADD)
+
+fun SemanticsNodeInteractionsProvider.widgetOptionsMenu() = onNodeWithTag(WidgetTags.MENU)
