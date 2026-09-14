@@ -19,11 +19,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
 import com.aquigs.launcherplusplus.apps.NotificationBadges
 import com.aquigs.launcherplusplus.apps.RoleManagerHomeRole
+import com.aquigs.launcherplusplus.apps.SharedPreferencesCollectionsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesWidgetPageStore
+import com.aquigs.launcherplusplus.apps.SystemAppUsage
 import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.apps.SystemWidgetHost
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.ForegroundTime
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.ui.AppActions
@@ -50,6 +53,8 @@ class MainActivity : ComponentActivity() {
         val wallClock = SystemWallClock(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
+        val collectionsStore = SharedPreferencesCollectionsStore(this)
+        val appUsage = SystemAppUsage(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = WidgetActions(view = widgetHost::view, add = widgetHost::add, remove = widgetHost::remove)
         val layout = PageLayout()
@@ -90,6 +95,13 @@ class MainActivity : ComponentActivity() {
                 val unread by produceState(UnreadCounts()) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
                 }
+                var collections by remember { mutableStateOf(collectionsStore.load()) }
+                // Usage access is granted in Settings, so each return to the front reads the grant and the week's usage
+                // again. The grant is read before the first frame, so a granted card does not ask for it while the usage
+                // loads.
+                val foregroundTime by produceState(remember { if (appUsage.isUsageAccessGranted()) ForegroundTime() else null }) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { appUsage.foregroundTime().collect { value = it } }
+                }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
@@ -107,6 +119,13 @@ class MainActivity : ComponentActivity() {
                     onBecomeHomeApp = homeRole::request,
                     widgetPage = widgetPage,
                     widgets = widgetActions,
+                    collections = collections,
+                    onCollectionsChange = {
+                        collections = it
+                        collectionsStore.save(it)
+                    },
+                    foregroundTime = foregroundTime,
+                    onOpenUsageSettings = appUsage::openUsageSettings,
                     unread = unread,
                     badgesEnabled = badgesEnabled,
                     onOpenBadgeSettings = badges::openSettings,

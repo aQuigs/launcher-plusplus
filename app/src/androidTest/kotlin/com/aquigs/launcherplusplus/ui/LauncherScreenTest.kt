@@ -13,8 +13,10 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasStateDescription
@@ -37,7 +39,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.ClockFace
+import com.aquigs.launcherplusplus.domain.CollectionCard
+import com.aquigs.launcherplusplus.domain.CollectionKind.MostUsed
+import com.aquigs.launcherplusplus.domain.CollectionKind.NewApps
+import com.aquigs.launcherplusplus.domain.CollectionsPage
 import com.aquigs.launcherplusplus.domain.Favourites
+import com.aquigs.launcherplusplus.domain.ForegroundTime
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.HostedWidget
@@ -82,6 +89,10 @@ class LauncherScreenTest {
     private val widgetsAdded = mutableListOf<Int>()
     private val widgetsRemoved = mutableListOf<Int>()
     private val widgets = WidgetActions(view = { context, _ -> View(context) }, add = widgetsAdded::add, remove = widgetsRemoved::add)
+    // Empty rather than the default page, so the built-in cards do not double the apps the other tests look for.
+    private var collections by mutableStateOf(CollectionsPage(emptyList()))
+    private var foregroundTime by mutableStateOf<ForegroundTime?>(null)
+    private var usageSettingsOpened = 0
     private var unread by mutableStateOf(UnreadCounts())
     private var badgesEnabled by mutableStateOf(false)
     private var badgeSettingsOpened = 0
@@ -116,6 +127,10 @@ class LauncherScreenTest {
             onBecomeHomeApp = { homeRequests++ },
             widgetPage = widgetPage,
             widgets = widgets,
+            collections = collections,
+            onCollectionsChange = { collections = it },
+            foregroundTime = foregroundTime,
+            onOpenUsageSettings = { usageSettingsOpened++ },
             unread = unread,
             badgesEnabled = badgesEnabled,
             onOpenBadgeSettings = { badgeSettingsOpened++ },
@@ -169,6 +184,23 @@ class LauncherScreenTest {
 
     /** Long-presses the home page's top-left corner, where the clock, the card and the ring are not. */
     private fun longPressEmptyHomeSpace() = compose.page(LauncherPage.Home).performTouchInput { longClick(topLeft + Offset(10f, 10f)) }
+
+    private fun goToCollections() {
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(LauncherPage.Collections)
+    }
+
+    /** Long-presses [app] on the Tools card, leaving the finger down: the app lifts at once, as nothing else answers there. */
+    private fun liftFromToolsCard(app: AppEntry) {
+        val icon = centreOf(compose.collectionApp(tools, app))
+        compose.onRoot().performTouchInput {
+            down(icon)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(0f, 1f))
+        }
+        compose.dragGhost().assertIsDisplayed()
+        compose.collectionBin().assertIsDisplayed()
+    }
 
     @Test
     fun startsOnTheHomePageWithTheDrawerClosed() {
@@ -888,6 +920,153 @@ class LauncherScreenTest {
         pressHome(launcherInFront = true)
         compose.launcherMenu().assertDoesNotExist()
         compose.runOnIdle { assertEquals(0, badgeSettingsOpened) }
+    }
+
+    @Test
+    fun addCollectionOpensThePickerWhereATileAddsASeededCardAndAgainRemovesIt() {
+        collections = CollectionsPage()
+        show()
+        goToCollections()
+
+        compose.addCollectionButton().performClick()
+
+        compose.collectionPicker().assertIsDisplayed()
+        compose.collectionTile(NewApps).assertIsSelected()
+        compose.collectionTile(tools).assertIsNotSelected()
+
+        compose.collectionTile(tools).performClick()
+
+        compose.onNodeWithText("Collection Added").assertIsDisplayed()
+        compose.collectionTile(tools).assertIsSelected()
+        // Seeded by the words in the package names: "clock" belongs in Tools, "mail" is nobody's word.
+        compose.runOnIdle {
+            assertEquals(listOf(NewApps, MostUsed, tools), collections.cards.map { it.kind })
+            assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps)
+        }
+
+        compose.collectionTile(tools).performClick()
+
+        compose.onNodeWithText("Collection Removed").assertIsDisplayed()
+        compose.collectionTile(tools).assertIsNotSelected()
+        compose.runOnIdle { assertEquals(CollectionsPage(), collections) }
+
+        Espresso.pressBack()
+        compose.collectionPicker().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Collections)
+        Espresso.pressBack()
+        assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
+    fun thePencilOpensAnEditorThatAddsATappedAppOnceAndBackReturnsToThePage() {
+        collections = CollectionsPage().add(tools)
+        show()
+        goToCollections()
+
+        compose.collectionEditButton(tools).performClick()
+
+        compose.collectionEditor().assertIsDisplayed()
+        compose.editorRow("Mail").assert(hasText("added").not())
+        compose.editorRow("Mail").performClick()
+        compose.editorRow("Mail").assert(hasText("added"))
+        compose.editorRow("Mail").performClick()
+        compose.editorRow("Clock").performClick()
+        compose.runOnIdle {
+            assertEquals(Favourites(listOf(mail.key, clock.key)), collections.card(tools)!!.apps)
+            assertEquals(emptyList<AppEntry>(), launched)
+        }
+
+        Espresso.pressBack()
+
+        compose.collectionEditor().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Collections)
+        compose.collectionApp(tools, mail).assertIsDisplayed()
+        compose.collectionApp(tools, clock).assertIsDisplayed()
+
+        // The dots are for this visit's taps, as in Arc.
+        compose.collectionEditButton(tools).performClick()
+        compose.editorRow("Mail").assert(hasText("added").not())
+    }
+
+    @Test
+    fun anAppLiftedOffACategoryCardLeavesItOnTheBinAndStaysAnywhereElse() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key, clock.key)))))
+        show()
+        goToCollections()
+        compose.collectionBin().assertDoesNotExist()
+
+        liftFromToolsCard(mail)
+        dragTo(centreOf(compose.collectionBin()))
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        compose.collectionBin().assertDoesNotExist()
+        compose.collectionApp(tools, mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps) }
+
+        liftFromToolsCard(clock)
+        dragTo(centreOf(compose.collectionCard(tools)))
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        compose.collectionApp(tools, clock).assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps)
+            assertEquals(emptyList<AppEntry>(), launched)
+        }
+    }
+
+    @Test
+    fun backDuringALiftCancelsItAndStaysOnTheCollectionsPage() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key)))))
+        show()
+        goToCollections()
+        liftFromToolsCard(mail)
+
+        Espresso.pressBack()
+        compose.dragGhost().assertDoesNotExist()
+        compose.collectionBin().assertDoesNotExist()
+        letGo()
+
+        assertSettledOn(LauncherPage.Collections)
+        compose.runOnIdle { assertEquals(Favourites(listOf(mail.key)), collections.card(tools)!!.apps) }
+    }
+
+    @Test
+    fun homeClosesTheEditorAndThePicker() {
+        collections = CollectionsPage().add(tools)
+        show()
+        goToCollections()
+        compose.collectionEditButton(tools).performClick()
+        compose.collectionEditor().assertIsDisplayed()
+
+        pressHome(launcherInFront = true)
+
+        compose.collectionEditor().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Home)
+
+        goToCollections()
+        compose.addCollectionButton().performClick()
+        compose.collectionPicker().assertIsDisplayed()
+        pressHome(launcherInFront = false)
+
+        compose.collectionPicker().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Collections)
+    }
+
+    @Test
+    fun mostUsedAsksForUsageAccessAndOpensItsSettings() {
+        collections = CollectionsPage()
+        show()
+        goToCollections()
+
+        compose.onNodeWithText("Permission Required").performClick()
+        compose.runOnIdle { assertEquals(1, usageSettingsOpened) }
+
+        foregroundTime = ForegroundTime(mapOf(mail.packageName to 1_000L))
+
+        compose.onNodeWithText("Permission Required").assertDoesNotExist()
+        compose.collectionApp(MostUsed, mail).assertIsDisplayed()
     }
 
     @Test

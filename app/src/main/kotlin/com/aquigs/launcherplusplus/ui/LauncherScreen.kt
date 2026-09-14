@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -14,7 +13,6 @@ import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
@@ -34,18 +32,25 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppOption
 import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.Bounds
 import com.aquigs.launcherplusplus.domain.ClockFace
+import com.aquigs.launcherplusplus.domain.CollectionKind
+import com.aquigs.launcherplusplus.domain.CollectionsPage
 import com.aquigs.launcherplusplus.domain.DropZones
+import com.aquigs.launcherplusplus.domain.Favourites
+import com.aquigs.launcherplusplus.domain.ForegroundTime
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
@@ -55,6 +60,7 @@ import com.aquigs.launcherplusplus.domain.RingItem
 import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.WidgetPage
 import com.aquigs.launcherplusplus.domain.appOptions
+import com.aquigs.launcherplusplus.domain.seedCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -77,12 +83,17 @@ data class HomePress(val launcherInFront: Boolean)
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
- * [widgets], and a widget's long-press menu removes it. Apps everywhere wear their [unread] counts; a long press on the
- * home page's empty space opens the launcher's own menu, whose one row shows whether the badges are enabled
+ * [widgets], and a widget's long-press menu removes it. The collections page shows the cards of [collections], the
+ * built-in ones filled from the app list and [foregroundTime] (null until usage access is granted, which
+ * [onOpenUsageSettings] asks for); a category card's pencil opens an editor over the screen that adds apps to it, and
+ * the button under the cards opens the picker that adds and removes cards. An app long-pressed on a category card lifts
+ * off it, and dropping it on the bin takes it off the card. Apps everywhere wear their [unread] counts; a long press on
+ * the home page's empty space opens the launcher's own menu, whose one row shows whether the badges are enabled
  * ([badgesEnabled]) and opens the system screen that decides it ([onOpenBadgeSettings]). [apps] is null until the
- * installed apps have loaded. Every [HomePress] cancels a drag and closes the menu, the drawer and the folder; one made
- * while the launcher was in front also scrolls to the home page. Back undoes what is on top: it cancels a drag, else
- * closes the menu, then the drawer, then returns to the home page, then closes the folder.
+ * installed apps have loaded. Every [HomePress] cancels a drag and closes the menu, the drawer, the editor, the picker
+ * and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
+ * it cancels a drag, else closes the menu, then the drawer, then the editor or the picker, then returns to the home
+ * page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +111,10 @@ fun LauncherScreen(
     onBecomeHomeApp: () -> Unit,
     widgetPage: WidgetPage,
     widgets: WidgetActions,
+    collections: CollectionsPage,
+    onCollectionsChange: (CollectionsPage) -> Unit,
+    foregroundTime: ForegroundTime?,
+    onOpenUsageSettings: () -> Unit,
     unread: UnreadCounts,
     badgesEnabled: Boolean,
     onOpenBadgeSettings: () -> Unit,
@@ -107,12 +122,15 @@ fun LauncherScreen(
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
     val ring = remember(homeApps.ring, apps) { homeApps.ring.resolve(apps.orEmpty()) }
     val dock = remember(homeApps.dock, apps) { homeApps.dock.resolve(apps.orEmpty()) }
     val latestHomeApps by rememberUpdatedState(homeApps)
     val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
+    val latestCollections by rememberUpdatedState(collections)
+    val latestOnCollectionsChange by rememberUpdatedState(onCollectionsChange)
     val latestBadgesEnabled by rememberUpdatedState(badgesEnabled)
     val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
 
@@ -122,16 +140,23 @@ fun LauncherScreen(
         if (changed != latestHomeApps) latestOnHomeAppsChange(changed)
     }
 
+    fun changeCollections(change: CollectionsPage.() -> CollectionsPage) {
+        val changed = latestCollections.change()
+        if (changed != latestCollections) latestOnCollectionsChange(changed)
+    }
+
     // Explicit receiver: the resolved ring above shadows the stored one inside the lambda.
     fun changeRing(change: Ring.() -> Ring) = changeHomeApps { copy(ring = this.ring.change()) }
 
-    // An app on its way out of the drawer, the finger holding it and where it could land, all in root coordinates. The
-    // finger moves every frame, so only the ghost reads it; the place under it is derived, so the ring and the dock
-    // recompose when the finger changes zone, not whenever it moves.
-    var dragged by remember { mutableStateOf<AppEntry?>(null) }
+    // An app on its way out of the drawer or off a collection card, the finger holding it and where it could land, all
+    // in root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are derived,
+    // so the ring, the dock and the bin recompose when the finger changes zone, not whenever it moves.
+    var dragged by remember { mutableStateOf<Drag?>(null) }
     var finger by remember { mutableStateOf(Offset.Zero) }
     var zones by remember { mutableStateOf(DropZones()) }
-    val dropPlace by remember { derivedStateOf { dragged?.let { zones.placeAt(finger.x, finger.y) } } }
+    var binBounds by remember { mutableStateOf<Bounds?>(null) }
+    val dropPlace by remember { derivedStateOf { if (dragged is Drag.FromDrawer) zones.placeAt(finger.x, finger.y) else null } }
+    val overBin by remember { derivedStateOf { dragged is Drag.FromCard && binBounds?.discContains(finger.x, finger.y) == true } }
 
     // Picking and searching are modes of the drawer, so they end however the drawer closes: chevron, drag, Back or HOME.
     // They wait for the drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up
@@ -145,6 +170,19 @@ fun LauncherScreen(
         if (drawerSettledClosed) {
             picking = null
             query = ""
+            focusManager.clearFocus()
+        }
+    }
+    // The editor and the picker each cover the whole screen until Back or HOME. The editor marks the apps tapped while it
+    // was open, and starts clean each time; dropping focus takes its keyboard down with it.
+    var editing by rememberSaveable { mutableStateOf<AppCategory?>(null) }
+    var pickingCollection by rememberSaveable { mutableStateOf(false) }
+    var justPicked by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var editorQuery by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(editing) {
+        if (editing == null) {
+            justPicked = emptySet()
+            editorQuery = ""
             focusManager.clearFocus()
         }
     }
@@ -245,11 +283,11 @@ fun LauncherScreen(
         )
     }
 
-    val dragToHome = remember {
-        DragToHome(
+    val dragFromDrawer = remember {
+        AppDrag(
             onStart = { app, position ->
                 closeMenu()
-                dragged = app
+                dragged = Drag.FromDrawer(app)
                 finger = position
                 // The targets are on the home page, wherever the drawer was opened from.
                 closeDrawer()
@@ -257,9 +295,28 @@ fun LauncherScreen(
             },
             onMove = { finger = it },
             onDrop = {
-                val app = dragged
+                val app = dragged?.app
                 val place = dropPlace
                 if (app != null && place != null) changeHomeApps { add(place, app) }
+                dragged = null
+            },
+            onCancel = { dragged = null },
+        )
+    }
+
+    val cardLift = remember {
+        CardLift(
+            onStart = { category, app, position ->
+                closeMenu()
+                // The lift is the answer to the long press, as the menu is elsewhere, so it gets the same nudge.
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                dragged = Drag.FromCard(app, category)
+                finger = position
+            },
+            onMove = { finger = it },
+            onDrop = {
+                val lifted = dragged as? Drag.FromCard
+                if (lifted != null && overBin) changeCollections { removeApp(CollectionKind.Category(lifted.category), lifted.app) }
                 dragged = null
             },
             onCancel = { dragged = null },
@@ -309,17 +366,23 @@ fun LauncherScreen(
             closeMenu()
             openFolder = null
             closeDrawer()
+            editing = null
+            pickingCollection = false
             // Coming back from an app keeps the page you left, like the stock launcher.
             if (press.launcherInFront) goHome()
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
-    // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search. The open folder
-    // comes last because the drawer and the other pages both hide it, and a press should undo something in view.
-    BackHandler(enabled = dragged != null || drawerOpen || pagerState.currentPage != layout.homeIndex || open != null) {
+    // not a rung of its own: the keyboard takes the first Back, and closing the drawer or the editor ends the search.
+    // The open folder comes last because the drawer and the other pages both hide it, and a press should undo something
+    // in view.
+    val overlayOpen = editing != null || pickingCollection
+    BackHandler(enabled = dragged != null || drawerOpen || overlayOpen || pagerState.currentPage != layout.homeIndex || open != null) {
         when {
             dragged != null -> dragged = null
             drawerOpen -> closeDrawer()
+            editing != null -> editing = null
+            pickingCollection -> pickingCollection = false
             pagerState.currentPage != layout.homeIndex -> goHome()
             else -> openFolder = null
         }
@@ -342,7 +405,7 @@ fun LauncherScreen(
                     apps = apps.orEmpty(),
                     onLaunch = actions.launch,
                     menu = drawerMenu,
-                    dragToHome = dragToHome,
+                    drag = dragFromDrawer,
                     query = query,
                     onQueryChange = { query = it },
                     unread = unread,
@@ -425,14 +488,31 @@ fun LauncherScreen(
                             LauncherPage.Widgets -> {
                                 WidgetColumn(page = widgetPage, view = widgets.view, onAdd = widgets.add, menu = widgetMenu)
                             }
-                            LauncherPage.Collections -> PlaceholderPage(page)
+                            LauncherPage.Collections -> {
+                                CollectionsColumn(
+                                    page = collections,
+                                    apps = apps.orEmpty(),
+                                    foregroundTime = foregroundTime,
+                                    icon = actions.icon,
+                                    onLaunch = actions.launch,
+                                    onToggleExpanded = { kind -> changeCollections { toggleExpanded(kind) } },
+                                    onMove = { from, to -> changeCollections { move(from, to) } },
+                                    onEdit = { editing = it },
+                                    onAdd = { pickingCollection = true },
+                                    onOpenUsageSettings = onOpenUsageSettings,
+                                    lift = cardLift,
+                                    bin = if (dragged is Drag.FromCard) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
+                                    unread = unread,
+                                )
+                            }
                         }
                     }
                 }
                 // Outside the pager, so it stays put while the pages swipe. Stored dock apps hold its row until the app list
                 // loads, so the pages do not move when it arrives. An empty dock shows while an app is dragged, as a place to
                 // drop it, and slides in and out so the ring above moves rather than jumps.
-                AnimatedVisibility(visible = dock.isNotEmpty() || (apps == null && homeApps.dock.keys.isNotEmpty()) || dragged != null) {
+                val dockShown = dock.isNotEmpty() || (apps == null && homeApps.dock.keys.isNotEmpty()) || dragged is Drag.FromDrawer
+                AnimatedVisibility(visible = dockShown) {
                     Dock(
                         apps = dock,
                         icon = actions.icon,
@@ -445,8 +525,50 @@ fun LauncherScreen(
                 }
             }
         }
-        dragged?.let { app -> DragGhost(app, actions.icon, position = { finger - origin }) }
+        // Over the scaffold, drawer strip included: each is a screen of its own until Back or HOME.
+        editing?.let { category ->
+            CollectionEditor(
+                title = "Add to ${category.label}",
+                apps = apps.orEmpty(),
+                isPicked = { it.key in justPicked },
+                onPick = { app ->
+                    // Marked whether or not it was already in the card, so the tap is seen to have counted either way.
+                    justPicked = justPicked + app.key
+                    changeCollections { addApp(CollectionKind.Category(category), app) }
+                },
+                query = editorQuery,
+                onQueryChange = { editorQuery = it },
+            )
+        }
+        if (pickingCollection) {
+            CollectionPicker(
+                page = collections,
+                onToggle = { kind ->
+                    changeCollections {
+                        if (kind in this) {
+                            remove(kind)
+                        } else {
+                            add(kind, (kind as? CollectionKind.Category)?.let { seedCategory(it.category, apps.orEmpty()) } ?: Favourites())
+                        }
+                    }
+                },
+            )
+        }
+        dragged?.let { drag ->
+            DragGhost(drag.app, actions.icon, position = { finger - origin }, label = (drag as? Drag.FromCard)?.app?.label)
+        }
     }
+}
+
+/** An app being dragged, and where from. */
+private sealed interface Drag {
+    val app: AppEntry
+
+    /** Out of the drawer, to the ring or the dock. */
+    data class FromDrawer(override val app: AppEntry) : Drag
+
+    /** Off the card of [category], to the bin. */
+    data class FromCard(override val app: AppEntry, val category: AppCategory) : Drag
 }
 
 /** The long-press menu that is showing. It keeps what it shows while [expanded] turns false, so it animates away whole. */
@@ -485,16 +607,7 @@ private sealed interface OpenMenu {
 }
 
 // Unclipped, so a ring scrolled off the page keeps its true bounds instead of collapsing onto the edge it left by.
-private fun LayoutCoordinates.rootBounds(): Bounds {
+internal fun LayoutCoordinates.rootBounds(): Bounds {
     val topLeft = positionInRoot()
     return Bounds(topLeft.x, topLeft.y, topLeft.x + size.width, topLeft.y + size.height)
-}
-
-@Composable
-private fun PlaceholderPage(page: LauncherPage) {
-    Text(
-        text = page.name,
-        style = MaterialTheme.typography.headlineMedium,
-        modifier = Modifier.fillMaxSize().wrapContentSize(),
-    )
 }

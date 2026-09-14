@@ -7,8 +7,11 @@ data class Favourites(val keys: List<String> = emptyList()) {
     /** Adds [app] at the end, unless it is already there. */
     fun add(app: AppEntry): Favourites = if (app in this) this else Favourites(keys + app.key)
 
+    /** Takes [app] off; an app that is not there changes nothing. */
+    fun remove(app: AppEntry): Favourites = if (app in this) Favourites(keys - app.key) else this
+
     /** Adds [app] at the end, or takes it off if it is already there. */
-    fun toggle(app: AppEntry): Favourites = if (app in this) Favourites(keys - app.key) else add(app)
+    fun toggle(app: AppEntry): Favourites = if (app in this) remove(app) else add(app)
 
     /**
      * The installed favourites in order. A favourite whose app is missing is skipped but kept, so an app that disappears
