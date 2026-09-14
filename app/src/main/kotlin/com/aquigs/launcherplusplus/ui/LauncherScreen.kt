@@ -52,6 +52,7 @@ import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingItem
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.WidgetPage
 import com.aquigs.launcherplusplus.domain.appOptions
 import kotlinx.coroutines.Job
@@ -76,10 +77,12 @@ data class HomePress(val launcherInFront: Boolean)
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
- * [widgets], and a widget's long-press menu removes it. [apps] is null until the installed apps have loaded. Every
- * [HomePress] cancels a drag and closes the menu, the drawer and the folder; one made while the launcher was in front
- * also scrolls to the home page. Back undoes what is on top: it cancels a drag, else closes the menu, then the drawer,
- * then returns to the home page, then closes the folder.
+ * [widgets], and a widget's long-press menu removes it. Apps everywhere wear their [unread] counts; a long press on the
+ * home page's empty space opens the launcher's own menu, whose one row shows whether the badges are enabled
+ * ([badgesEnabled]) and opens the system screen that decides it ([onOpenBadgeSettings]). [apps] is null until the
+ * installed apps have loaded. Every [HomePress] cancels a drag and closes the menu, the drawer and the folder; one made
+ * while the launcher was in front also scrolls to the home page. Back undoes what is on top: it cancels a drag, else
+ * closes the menu, then the drawer, then returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +100,9 @@ fun LauncherScreen(
     onBecomeHomeApp: () -> Unit,
     widgetPage: WidgetPage,
     widgets: WidgetActions,
+    unread: UnreadCounts,
+    badgesEnabled: Boolean,
+    onOpenBadgeSettings: () -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -107,6 +113,8 @@ fun LauncherScreen(
     val dock = remember(homeApps.dock, apps) { homeApps.dock.resolve(apps.orEmpty()) }
     val latestHomeApps by rememberUpdatedState(homeApps)
     val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
+    val latestBadgesEnabled by rememberUpdatedState(badgesEnabled)
+    val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
 
     // Callbacks built once read the home apps through the latest state, so what they change is always the current ring.
     fun changeHomeApps(change: HomeApps.() -> HomeApps) {
@@ -275,6 +283,26 @@ fun LauncherScreen(
         )
     }
 
+    val launcherMenu = remember {
+        LauncherMenu(
+            onOpen = {
+                openingMenu?.cancel()
+                openMenu = OpenMenu.Launcher()
+            },
+            content = {
+                (openMenu as? OpenMenu.Launcher)?.let { shown ->
+                    LauncherOptionsMenu(
+                        expanded = shown.expanded,
+                        rows = listOf(
+                            LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
+                        ),
+                        onDismiss = ::closeMenu,
+                    )
+                }
+            },
+        )
+    }
+
     LaunchedEffect(homePresses, pagerState, drawerState, layout) {
         homePresses.collect { press ->
             dragged = null
@@ -317,6 +345,7 @@ fun LauncherScreen(
                     dragToHome = dragToHome,
                     query = query,
                     onQueryChange = { query = it },
+                    unread = unread,
                     picking = picking?.let { place ->
                         val picked = homeApps[place]
                         Picking(
@@ -356,37 +385,42 @@ fun LauncherScreen(
                     val page = layout.pages[index]
                     Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                         when (page) {
-                            LauncherPage.Home -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                HomeClock(
-                                    face = clock,
-                                    onTimeClick = onOpenClock,
-                                    onDateClick = onOpenCalendar,
-                                    modifier = Modifier.padding(top = 24.dp),
-                                )
-                                // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
-                                if (!isHomeApp) {
-                                    HomeAppCard(
-                                        onBecomeHomeApp = onBecomeHomeApp,
-                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                            LauncherPage.Home -> {
+                                // First, so it lies behind the clock, the card and the ring and gets only the touches they leave.
+                                EmptySpace(menu = launcherMenu)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    HomeClock(
+                                        face = clock,
+                                        onTimeClick = onOpenClock,
+                                        onDateClick = onOpenCalendar,
+                                        modifier = Modifier.padding(top = 24.dp),
+                                    )
+                                    // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
+                                    if (!isHomeApp) {
+                                        HomeAppCard(
+                                            onBecomeHomeApp = onBecomeHomeApp,
+                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                        )
+                                    }
+                                    HomeRing(
+                                        ring = ring,
+                                        // Slots stored for the ring hold the hint back until the app list can say none of their
+                                        // apps is installed, so neither the hint nor the mark flashes while apps load.
+                                        showHint = homeApps.ring.isEmpty || (apps != null && ring.isEmpty()),
+                                        icon = actions.icon,
+                                        onLaunch = actions.launch,
+                                        onOpenFolder = { openFolder = it.index },
+                                        onCloseFolder = { openFolder = null },
+                                        onEdit = { pickFor(HomePlace.Ring) },
+                                        modifier = Modifier.weight(1f).onGloballyPositioned { zones = zones.copy(ring = it.rootBounds()) },
+                                        highlighted = dropPlace == HomePlace.Ring,
+                                        openFolder = open,
+                                        menu = ringMenu,
+                                        folderMenu = folderMenu,
+                                        folderAppMenu = folderAppMenu,
+                                        unread = unread,
                                     )
                                 }
-                                HomeRing(
-                                    ring = ring,
-                                    // Slots stored for the ring hold the hint back until the app list can say none of their apps
-                                    // is installed, so neither the hint nor the mark flashes while apps load.
-                                    showHint = homeApps.ring.isEmpty || (apps != null && ring.isEmpty()),
-                                    icon = actions.icon,
-                                    onLaunch = actions.launch,
-                                    onOpenFolder = { openFolder = it.index },
-                                    onCloseFolder = { openFolder = null },
-                                    onEdit = { pickFor(HomePlace.Ring) },
-                                    modifier = Modifier.weight(1f).onGloballyPositioned { zones = zones.copy(ring = it.rootBounds()) },
-                                    highlighted = dropPlace == HomePlace.Ring,
-                                    openFolder = open,
-                                    menu = ringMenu,
-                                    folderMenu = folderMenu,
-                                    folderAppMenu = folderAppMenu,
-                                )
                             }
                             LauncherPage.Widgets -> {
                                 WidgetColumn(page = widgetPage, view = widgets.view, onAdd = widgets.add, menu = widgetMenu)
@@ -406,6 +440,7 @@ fun LauncherScreen(
                         modifier = Modifier.onGloballyPositioned { zones = zones.copy(dock = it.rootBounds()) },
                         highlighted = dropPlace == HomePlace.Dock,
                         menu = dockMenu,
+                        unread = unread,
                     )
                 }
             }
@@ -440,6 +475,11 @@ private sealed interface OpenMenu {
 
     /** The menu of the widget [id]. */
     data class Widget(val id: Int, override val expanded: Boolean = true) : OpenMenu {
+        override fun closed() = copy(expanded = false)
+    }
+
+    /** The launcher's own menu, from the home page's empty space. */
+    data class Launcher(override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 }

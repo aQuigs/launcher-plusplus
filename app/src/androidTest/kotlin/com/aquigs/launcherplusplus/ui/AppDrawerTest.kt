@@ -30,6 +30,7 @@ import androidx.compose.ui.test.swipe
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.OTHER_INITIAL
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -46,9 +47,14 @@ class AppDrawerTest {
     // Each letter of the alphabet fixture is one header row followed by its apps.
     private val itemsPerLetter = APPS_PER_LETTER + 1
 
-    private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}, picking: Picking? = null) = compose.setContent {
+    private fun show(
+        apps: List<AppEntry>,
+        onLaunch: (AppEntry) -> Unit = {},
+        picking: Picking? = null,
+        unread: UnreadCounts = UnreadCounts(),
+    ) = compose.setContent {
         var query by remember { mutableStateOf("") }
-        AppDrawer(apps, onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it })
+        AppDrawer(apps, onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it }, unread = unread)
     }
 
     @Test
@@ -62,6 +68,14 @@ class AppDrawerTest {
             compose.sectionHeader(it).assertIsDisplayed()
             compose.railLetter(it).assertIsDisplayed()
         }
+    }
+
+    @Test
+    fun anAppWithUnreadNotificationsEndsItsRowWithTheirCount() {
+        show(listOf(clock, mail), unread = UnreadCounts(mapOf(mail.packageName to 250, clock.packageName to 0)))
+
+        compose.onNodeWithText("Mail").assert(hasText("250 unread"))
+        compose.onNodeWithText("Clock").assert(hasText("0 unread").not())
     }
 
     @Test

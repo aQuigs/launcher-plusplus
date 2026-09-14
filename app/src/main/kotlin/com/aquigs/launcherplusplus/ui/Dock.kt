@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.dockIconSize
 import kotlin.math.roundToInt
 
@@ -30,7 +31,7 @@ private val FULL_DOCK_ICON_SIZE = 56.dp
 /**
  * The user's dock [apps] in one row, each in an equal share of the width. The row is as tall as a full-size icon, so a
  * crowded dock shrinks its icons but not the row, and an empty dock still holds its place. While [highlighted], the row
- * glows as the place an app being dragged would land.
+ * glows as the place an app being dragged would land. Each app wears its [unread] count.
  */
 @Composable
 fun Dock(
@@ -40,12 +41,15 @@ fun Dock(
     modifier: Modifier = Modifier,
     highlighted: Boolean = false,
     menu: AppMenu? = null,
+    unread: UnreadCounts = UnreadCounts(),
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
 
     Layout(
-        content = { apps.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(DockTags.slot(app)), menu) } } },
+        content = {
+            apps.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(DockTags.slot(app)), menu, unread[app]) } }
+        },
         modifier = modifier
             .fillMaxWidth()
             .drawBehind { if (glow > 0f) drawRoundRect(primary.copy(alpha = 0.12f * glow), cornerRadius = CornerRadius(size.height / 2)) }

@@ -1,14 +1,13 @@
 package com.aquigs.launcherplusplus.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -17,12 +16,11 @@ import androidx.compose.material.icons.materialPath
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -66,8 +64,9 @@ val FolderGlyph: ImageVector = materialIcon("Folder") {
 private const val PREVIEW_SIDE = 2
 
 /**
- * A ring slot holding [folder]: a circle, the size of an app's, previewing up to four of its icons in a small grid. A tap
- * opens the folder, unless it is empty, and a long press opens its [menu].
+ * A ring slot holding [folder]: a circle, the size of an app's, previewing up to four of its icons in a small grid and
+ * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, and a long
+ * press opens its [menu].
  */
 @Composable
 fun FolderIcon(
@@ -76,33 +75,38 @@ fun FolderIcon(
     onOpen: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,
     menu: FolderMenu? = null,
+    unread: Int = 0,
 ) {
     val count = folder.apps.size
+    val presses = remember { MutableInteractionSource() }
+    val name = "Folder, $count ${if (count == 1) "app" else "apps"}"
 
     Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+        modifier
             .combinedClickable(
+                interactionSource = presses,
+                indication = null,
                 onLongClickLabel = menu?.let { "Folder options" },
                 onLongClick = menu?.let { m -> { m.onOpen(folder) } },
                 onClick = { if (count > 0) onOpen(folder) },
             )
-            .semantics { contentDescription = "Folder, $count ${if (count == 1) "app" else "apps"}" },
+            .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxSize(0.62f)) {
-            repeat(PREVIEW_SIDE) { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                    repeat(PREVIEW_SIDE) { column ->
-                        Box(Modifier.weight(1f).fillMaxHeight()) {
-                            folder.apps.getOrNull(row * PREVIEW_SIDE + column)?.let { AppImage(it, icon, Modifier.fillMaxSize()) }
+        IconDisc(presses, Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxSize(0.62f)) {
+                repeat(PREVIEW_SIDE) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                        repeat(PREVIEW_SIDE) { column ->
+                            Box(Modifier.weight(1f).fillMaxHeight()) {
+                                folder.apps.getOrNull(row * PREVIEW_SIDE + column)?.let { AppImage(it, icon, Modifier.fillMaxSize()) }
+                            }
                         }
                     }
                 }
             }
         }
         menu?.content?.invoke(folder)
+        UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
     }
 }
 

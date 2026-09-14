@@ -48,13 +48,17 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.matching
 import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.launch
@@ -98,7 +102,8 @@ class Picking(val header: @Composable () -> Unit, val isPicked: (AppEntry) -> Bo
  * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
  * launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that moves on
  * becomes a [dragToHome]. A search field heads the list: with a [query] the list holds only the matching apps, without
- * sections or rail, and the keyboard's search key acts on the first of them as a tap would.
+ * sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with [unread]
+ * notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
  */
 @Composable
 fun AppDrawer(
@@ -111,6 +116,7 @@ fun AppDrawer(
     dragToHome: DragToHome? = null,
     query: String,
     onQueryChange: (String) -> Unit,
+    unread: UnreadCounts = UnreadCounts(),
 ) {
     val scope = rememberCoroutineScope()
     val rowMenu = menu.takeIf { picking == null }
@@ -155,13 +161,15 @@ fun AppDrawer(
                     sections.forEach { section ->
                         item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                         items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                            AppRow(app, onLaunch, picking, rowMenu, rowDrag)
+                            AppRow(app, onLaunch, picking, rowMenu, rowDrag, unread[app])
                         }
                     }
                 } else if (matches.isEmpty()) {
                     item(contentType = "empty") { NoMatches() }
                 } else {
-                    items(matches, key = { it.key }, contentType = { "app" }) { app -> AppRow(app, onLaunch, picking, rowMenu, rowDrag) }
+                    items(matches, key = { it.key }, contentType = { "app" }) { app ->
+                        AppRow(app, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                    }
                 }
             }
             if (!searching) {
@@ -230,7 +238,7 @@ private fun SectionHeader(initial: Char) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?, drag: DragToHome?) {
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?, drag: DragToHome?, unread: Int) {
     val picked = picking?.isPicked(app) == true
     val action = if (picking == null) {
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
@@ -247,6 +255,15 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking
             .padding(horizontal = 24.dp, vertical = 14.dp),
     ) {
         Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (unread > 0) {
+            // Read as part of the row: a description here would speak for the whole row and silence its name.
+            Text(
+                text = unread.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 16.dp).clearAndSetSemantics { text = AnnotatedString("$unread unread") },
+            )
+        }
         if (picked) {
             Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }

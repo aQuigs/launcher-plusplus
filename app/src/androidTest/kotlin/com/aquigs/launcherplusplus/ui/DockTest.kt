@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -14,6 +16,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -26,11 +29,14 @@ class DockTest {
     val compose = createComposeRule()
 
     private var docked by mutableStateOf(emptyList<AppEntry>())
+    private var unread by mutableStateOf(UnreadCounts())
 
     private fun show(apps: List<AppEntry>, onLaunch: (AppEntry) -> Unit = {}, direction: LayoutDirection = LayoutDirection.Ltr) {
         docked = apps
         compose.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides direction) { Dock(apps = docked, icon = { null }, onLaunch = onLaunch) }
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                Dock(apps = docked, icon = { null }, onLaunch = onLaunch, unread = unread)
+            }
         }
     }
 
@@ -71,5 +77,16 @@ class DockTest {
 
         assertTrue("20 icons are smaller than 4", compose.dockSlot(alphabet[0]).getUnclippedBoundsInRoot().width < roomy)
         assertEquals(row, compose.dock().getUnclippedBoundsInRoot().height)
+    }
+
+    @Test
+    fun anAppWithUnreadNotificationsWearsTheirCount() {
+        unread = UnreadCounts(mapOf(mail.packageName to 12))
+        show(listOf(clock, mail))
+
+        compose.dockSlot(mail).assertContentDescriptionEquals("Mail, 12 unread")
+        compose.badgeOn(DockTags.slot(mail)).assertTextEquals("12")
+        compose.dockSlot(clock).assertContentDescriptionEquals("Clock")
+        compose.badgeOn(DockTags.slot(clock)).assertDoesNotExist()
     }
 }

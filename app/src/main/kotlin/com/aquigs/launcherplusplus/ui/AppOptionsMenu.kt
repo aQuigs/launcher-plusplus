@@ -2,6 +2,7 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -35,13 +36,26 @@ class LongPressMenu<T>(val onOpen: (T) -> Unit, val content: @Composable (T) -> 
 
 typealias AppMenu = LongPressMenu<AppEntry>
 
-/** A tap launches [app]; with a [menu], a long press opens it. */
-fun Modifier.launchable(app: AppEntry, onLaunch: (AppEntry) -> Unit, menu: AppMenu?): Modifier =
-    combinedClickable(
-        onLongClickLabel = menu?.let { "App options" },
-        onLongClick = menu?.let { m -> { m.onOpen(app) } },
-        onClick = { onLaunch(app) },
-    )
+/**
+ * A tap launches [app]; with a [menu], a long press opens it. Given [presses], the presses are only recorded there, for
+ * a ripple drawn on another node, rather than shown on this one.
+ */
+fun Modifier.launchable(app: AppEntry, onLaunch: (AppEntry) -> Unit, menu: AppMenu?, presses: MutableInteractionSource? = null): Modifier {
+    val onLongClickLabel = menu?.let { "App options" }
+    val onLongClick = menu?.let { m -> { m.onOpen(app) } }
+    val onClick = { onLaunch(app) }
+    return if (presses == null) {
+        combinedClickable(onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)
+    } else {
+        combinedClickable(
+            interactionSource = presses,
+            indication = null,
+            onLongClickLabel = onLongClickLabel,
+            onLongClick = onLongClick,
+            onClick = onClick,
+        )
+    }
+}
 
 /**
  * An app's long-press menu: its [shortcuts] first, then the [options] for where it was pressed. Choosing an item dismisses

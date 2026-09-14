@@ -29,6 +29,7 @@ import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.EMBLEM_FRACTION
 import com.aquigs.launcherplusplus.domain.RING_RADIUS_FRACTION
 import com.aquigs.launcherplusplus.domain.RingItem
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.ringIconSize
 import com.aquigs.launcherplusplus.domain.ringSlotOffset
 import kotlin.math.min
@@ -51,7 +52,7 @@ internal val RING_ICON_SIZE = 64.dp
  * ring and in the dock. With [showHint] the emblem invites you to add apps instead of showing its mark. While
  * [highlighted], the disc the ring fills glows as the place an app being dragged would land. An [openFolder] takes the
  * ring over: its apps sit in the slots, each with the [folderAppMenu], and the emblem gives way to a target that calls
- * [onCloseFolder].
+ * [onCloseFolder]. Each app wears its [unread] count, and a folder the sum of its apps'.
  */
 @Composable
 fun HomeRing(
@@ -68,6 +69,7 @@ fun HomeRing(
     menu: AppMenu? = null,
     folderMenu: FolderMenu? = null,
     folderAppMenu: AppMenu? = null,
+    unread: UnreadCounts = UnreadCounts(),
 ) {
     val track = MaterialTheme.colorScheme.outlineVariant
     val primary = MaterialTheme.colorScheme.primary
@@ -78,17 +80,22 @@ fun HomeRing(
             if (openFolder != null) {
                 CloseFolderTarget(onClick = onCloseFolder)
                 openFolder.apps.forEach { app ->
-                    key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(app)), folderAppMenu) }
+                    key(app.key) {
+                        val tag = Modifier.testTag(HomeRingTags.slot(app))
+                        AppIcon(app, icon, onLaunch, tag, folderAppMenu, unread[app])
+                    }
                 }
             } else {
                 Emblem(showHint = showHint, onClick = onEdit)
                 ring.forEach { item ->
                     when (item) {
                         is RingItem.App -> key(item.app.key) {
-                            AppIcon(item.app, icon, onLaunch, Modifier.testTag(HomeRingTags.slot(item.app)), menu)
+                            val tag = Modifier.testTag(HomeRingTags.slot(item.app))
+                            AppIcon(item.app, icon, onLaunch, tag, menu, unread[item.app])
                         }
                         is RingItem.Folder -> key(item.index) {
-                            FolderIcon(item, icon, onOpenFolder, Modifier.testTag(HomeRingTags.folder(item.index)), folderMenu)
+                            val tag = Modifier.testTag(HomeRingTags.folder(item.index))
+                            FolderIcon(item, icon, onOpenFolder, tag, folderMenu, unread.sum(item.apps))
                         }
                     }
                 }

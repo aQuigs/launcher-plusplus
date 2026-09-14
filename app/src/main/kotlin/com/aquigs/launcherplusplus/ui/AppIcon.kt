@@ -2,13 +2,20 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
@@ -17,8 +24,8 @@ import androidx.compose.ui.semantics.semantics
 import com.aquigs.launcherplusplus.domain.AppEntry
 
 /**
- * One app as a round icon, named by its label for screen readers. A tap launches it and a long press opens its [menu];
- * its parent decides the size.
+ * One app as a round icon, named by its label for screen readers, with a badge for its [unread] notifications. A tap
+ * launches it and a long press opens its [menu]; its parent decides the size.
  */
 @Composable
 fun AppIcon(
@@ -27,17 +34,41 @@ fun AppIcon(
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     menu: AppMenu? = null,
+    unread: Int = 0,
+) {
+    val presses = remember { MutableInteractionSource() }
+
+    Box(
+        modifier
+            .launchable(app, onLaunch, menu, presses)
+            .semantics { contentDescription = app.label.withUnread(unread) },
+    ) {
+        IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
+        menu?.content?.invoke(app)
+        UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+    }
+}
+
+/**
+ * The round face of an icon: [content] on a tinted disc, clipped to it, rippling for the presses in [presses]. The press
+ * handling, the badge and the name stay on the icon's own node outside, so the badge can overhang the disc while a
+ * screen reader still meets one icon, and the ripple keeps to the disc all the same.
+ */
+@Composable
+fun IconDisc(
+    presses: InteractionSource,
+    modifier: Modifier = Modifier,
+    contentAlignment: Alignment = Alignment.TopStart,
+    content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
         modifier
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .launchable(app, onLaunch, menu)
-            .semantics { contentDescription = app.label },
-    ) {
-        AppImage(app, icon, Modifier.fillMaxSize())
-        menu?.content?.invoke(app)
-    }
+            .indication(presses, ripple()),
+        contentAlignment = contentAlignment,
+        content = content,
+    )
 }
 
 /** An app's icon alone, with no name and nothing to tap; blank until it has loaded. */

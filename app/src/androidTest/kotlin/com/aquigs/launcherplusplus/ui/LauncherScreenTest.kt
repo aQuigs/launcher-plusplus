@@ -9,12 +9,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -41,6 +45,7 @@ import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingSlot
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.WidgetPage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -77,6 +82,9 @@ class LauncherScreenTest {
     private val widgetsAdded = mutableListOf<Int>()
     private val widgetsRemoved = mutableListOf<Int>()
     private val widgets = WidgetActions(view = { context, _ -> View(context) }, add = widgetsAdded::add, remove = widgetsRemoved::add)
+    private var unread by mutableStateOf(UnreadCounts())
+    private var badgesEnabled by mutableStateOf(false)
+    private var badgeSettingsOpened = 0
     private val actions = AppActions(
         icon = { null },
         launch = launched::add,
@@ -108,6 +116,9 @@ class LauncherScreenTest {
             onBecomeHomeApp = { homeRequests++ },
             widgetPage = widgetPage,
             widgets = widgets,
+            unread = unread,
+            badgesEnabled = badgesEnabled,
+            onOpenBadgeSettings = { badgeSettingsOpened++ },
             modifier = modifier,
             pagerState = pager,
         )
@@ -155,6 +166,9 @@ class LauncherScreenTest {
         compose.onRoot().performTouchInput { up() }
         compose.waitForIdle()
     }
+
+    /** Long-presses the home page's top-left corner, where the clock, the card and the ring are not. */
+    private fun longPressEmptyHomeSpace() = compose.page(LauncherPage.Home).performTouchInput { longClick(topLeft + Offset(10f, 10f)) }
 
     @Test
     fun startsOnTheHomePageWithTheDrawerClosed() {
@@ -796,6 +810,83 @@ class LauncherScreenTest {
         compose.mainClock.autoAdvance = true
 
         compose.runOnIdle { assertEquals(listOf(mail), uninstalled) }
+    }
+
+    @Test
+    fun unreadCountsReachTheRingTheDockTheDrawerAndAnOpenFolder() {
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(clock.key), work)), dock = Favourites(listOf(mail.key)))
+        unread = UnreadCounts(mapOf(clock.packageName to 3, mail.packageName to 7))
+        show()
+
+        compose.ringSlot(clock).assertContentDescriptionEquals("Clock, 3 unread")
+        compose.badgeOn(HomeRingTags.slot(clock)).assertTextEquals("3")
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder Work, 2 apps, 10 unread")
+        compose.dockSlot(mail).assertContentDescriptionEquals("Mail, 7 unread")
+        compose.badgeOn(DockTags.slot(mail)).assertTextEquals("7")
+
+        compose.folderSlot(1).performClick()
+        compose.folderApp(mail).assert(hasContentDescription("Mail, 7 unread"))
+        pressBackInDialog()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Clock").assert(hasText("3 unread"))
+
+        unread = UnreadCounts()
+
+        compose.onNodeWithText("Clock").assert(hasText("3 unread").not())
+        compose.ringSlot(clock).assertContentDescriptionEquals("Clock")
+        compose.badgeOn(HomeRingTags.slot(clock)).assertDoesNotExist()
+    }
+
+    @Test
+    fun aLongPressOnEmptyHomeSpaceOpensTheLauncherMenuWhoseRowShowsAndOpensBadgeAccess() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        show()
+
+        longPressEmptyHomeSpace()
+
+        compose.launcherMenu().assertIsDisplayed()
+        compose.onNodeWithText("Unread badges").assertIsOff()
+        badgesEnabled = true
+        compose.onNodeWithText("Unread badges").assertIsOn()
+
+        compose.onNodeWithText("Unread badges").performClick()
+
+        compose.launcherMenu().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, badgeSettingsOpened) }
+        assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
+    fun aLongPressOnTheRingOrTheClockOpensNoLauncherMenu() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        show()
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.appOptionsMenu().assertIsDisplayed()
+        compose.launcherMenu().assertDoesNotExist()
+        Espresso.pressBack()
+
+        compose.clockTime().performTouchInput { longClick() }
+        compose.launcherMenu().assertDoesNotExist()
+        compose.appOptionsMenu().assertDoesNotExist()
+    }
+
+    @Test
+    fun backAndHomeCloseTheLauncherMenu() {
+        show()
+        longPressEmptyHomeSpace()
+        compose.launcherMenu().assertIsDisplayed()
+
+        Espresso.pressBack()
+        compose.launcherMenu().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Home)
+
+        longPressEmptyHomeSpace()
+        compose.launcherMenu().assertIsDisplayed()
+        pressHome(launcherInFront = true)
+        compose.launcherMenu().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, badgeSettingsOpened) }
     }
 
     @Test
