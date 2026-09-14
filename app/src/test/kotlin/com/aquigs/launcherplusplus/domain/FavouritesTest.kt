@@ -26,6 +26,14 @@ class FavouritesTest {
     }
 
     @Test
+    fun `adding an app already there changes nothing`() {
+        val favourites = Favourites().add(mail).add(clock)
+
+        assertEquals(listOf(mail, clock), favourites.resolve(listOf(clock, mail)))
+        assertEquals(favourites, favourites.add(mail))
+    }
+
+    @Test
     fun `a missing app is skipped but keeps its place`() {
         val favourites = Favourites().toggle(mail).toggle(clock).toggle(maps)
 

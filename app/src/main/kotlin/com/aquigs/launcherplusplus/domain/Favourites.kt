@@ -4,8 +4,11 @@ package com.aquigs.launcherplusplus.domain
 data class Favourites(val keys: List<String> = emptyList()) {
     operator fun contains(app: AppEntry): Boolean = app.key in keys
 
+    /** Adds [app] at the end, unless it is already there. */
+    fun add(app: AppEntry): Favourites = if (app in this) this else Favourites(keys + app.key)
+
     /** Adds [app] at the end, or takes it off if it is already there. */
-    fun toggle(app: AppEntry): Favourites = Favourites(if (app in this) keys - app.key else keys + app.key)
+    fun toggle(app: AppEntry): Favourites = if (app in this) Favourites(keys - app.key) else add(app)
 
     /**
      * The installed favourites in order. A favourite whose app is missing is skipped but kept, so an app that disappears

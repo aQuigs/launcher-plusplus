@@ -21,6 +21,13 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()
         is HomePlace.Folder -> Favourites(ring.folder(place.index)?.keys.orEmpty())
     }
 
+    /** Adds [app] to [place], unless it is already there. The other places are left as they are. */
+    fun add(place: HomePlace, app: AppEntry): HomeApps = when (place) {
+        HomePlace.Ring -> copy(ring = ring.add(app))
+        HomePlace.Dock -> copy(dock = dock.add(app))
+        is HomePlace.Folder -> copy(ring = ring.add(place.index, app))
+    }
+
     /**
      * Adds [app] to [place], or takes it off if it is already there. The other places are left as they are, and so is a
      * folder left with one app or none: only "Remove folder" takes a folder off.

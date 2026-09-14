@@ -96,9 +96,9 @@ class Picking(val header: @Composable () -> Unit, val isPicked: (AppEntry) -> Bo
 
 /**
  * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
- * launches the app and a long press opens its [menu], unless the drawer is [picking]. A search field heads the list:
- * with a [query] the list holds only the matching apps, without sections or rail, and the keyboard's search key acts
- * on the first of them as a tap would.
+ * launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that moves on
+ * becomes a [dragToHome]. A search field heads the list: with a [query] the list holds only the matching apps, without
+ * sections or rail, and the keyboard's search key acts on the first of them as a tap would.
  */
 @Composable
 fun AppDrawer(
@@ -108,11 +108,13 @@ fun AppDrawer(
     picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
     menu: AppMenu? = null,
+    dragToHome: DragToHome? = null,
     query: String,
     onQueryChange: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val rowMenu = menu.takeIf { picking == null }
+    val rowDrag = dragToHome.takeIf { picking == null }
     val searching = query.isNotBlank()
     val matches = remember(apps, query) { if (searching) apps.matching(query) else emptyList() }
     // The matches scroll on their own, so the sections come back where they were and a match does not become the top of
@@ -153,13 +155,13 @@ fun AppDrawer(
                     sections.forEach { section ->
                         item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                         items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                            AppRow(app, onLaunch, picking, rowMenu)
+                            AppRow(app, onLaunch, picking, rowMenu, rowDrag)
                         }
                     }
                 } else if (matches.isEmpty()) {
                     item(contentType = "empty") { NoMatches() }
                 } else {
-                    items(matches, key = { it.key }, contentType = { "app" }) { app -> AppRow(app, onLaunch, picking, rowMenu) }
+                    items(matches, key = { it.key }, contentType = { "app" }) { app -> AppRow(app, onLaunch, picking, rowMenu, rowDrag) }
                 }
             }
             if (!searching) {
@@ -228,10 +230,11 @@ private fun SectionHeader(initial: Char) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?) {
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?, drag: DragToHome?) {
     val picked = picking?.isPicked(app) == true
     val action = if (picking == null) {
-        Modifier.launchable(app, onLaunch, menu)
+        // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
+        Modifier.launchable(app, onLaunch, menu).dragToHome(app, drag)
     } else {
         Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
     }

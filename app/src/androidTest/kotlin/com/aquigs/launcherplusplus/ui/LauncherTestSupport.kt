@@ -70,6 +70,8 @@ fun SemanticsNodeInteractionsProvider.dockSlot(app: AppEntry) = onNodeWithTag(Do
 
 fun SemanticsNodeInteractionsProvider.appOptionsMenu() = onNodeWithTag(AppOptionsTags.MENU)
 
+fun SemanticsNodeInteractionsProvider.dragGhost() = onNodeWithTag(DragTags.GHOST)
+
 fun SemanticsNodeInteractionsProvider.homeAppCard() = onNodeWithTag(HomeAppCardTags.CARD)
 
 fun SemanticsNodeInteractionsProvider.becomeHomeAppButton() = onNodeWithTag(HomeAppCardTags.BUTTON)
