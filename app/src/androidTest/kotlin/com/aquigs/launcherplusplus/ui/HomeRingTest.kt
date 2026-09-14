@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.RingItem
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -27,6 +29,7 @@ class HomeRingTest {
     val compose = createComposeRule()
 
     private var ring by mutableStateOf(emptyList<RingItem>())
+    private var unread by mutableStateOf(UnreadCounts())
     private var openFolder by mutableStateOf<RingItem.Folder?>(null)
 
     private fun show(
@@ -55,6 +58,7 @@ class HomeRingTest {
                 onCloseFolder = onCloseFolder,
                 onEdit = onEdit,
                 openFolder = openFolder,
+                unread = unread,
             )
         }
     }
@@ -126,6 +130,32 @@ class HomeRingTest {
         compose.folderSlot(1).performClick()
 
         assertEquals(listOf(work), opened)
+    }
+
+    @Test
+    fun unreadCountsBadgeAppsAddUpOnFoldersAndReachAnOpenFoldersApps() {
+        val work = RingItem.Folder(1, listOf(mail, alphabet[0]))
+        unread = UnreadCounts(mapOf(clock.packageName to 3, mail.packageName to 98, alphabet[0].packageName to 4))
+        showItems(listOf(RingItem.App(clock), work, RingItem.App(alphabet[1])))
+
+        compose.ringSlot(clock).assertContentDescriptionEquals("Clock, 3 unread")
+        compose.badgeOn(HomeRingTags.slot(clock)).assertIsDisplayed().assertTextEquals("3")
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps, 102 unread")
+        compose.badgeOn(HomeRingTags.folder(1)).assertTextEquals("99+")
+        compose.ringSlot(alphabet[1]).assertContentDescriptionEquals(alphabet[1].label)
+        compose.badgeOn(HomeRingTags.slot(alphabet[1])).assertDoesNotExist()
+
+        openFolder = work
+
+        compose.ringSlot(mail).assertContentDescriptionEquals("Mail, 98 unread")
+        compose.badgeOn(HomeRingTags.slot(mail)).assertIsDisplayed().assertTextEquals("98")
+
+        openFolder = null
+        unread = UnreadCounts(mapOf(clock.packageName to 0))
+
+        compose.ringSlot(clock).assertContentDescriptionEquals("Clock")
+        compose.badgeOn(HomeRingTags.slot(clock)).assertDoesNotExist()
+        compose.badgeOn(HomeRingTags.folder(1)).assertDoesNotExist()
     }
 
     @Test

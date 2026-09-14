@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.aquigs.launcherplusplus.apps.LauncherAppsRepository
+import com.aquigs.launcherplusplus.apps.NotificationBadges
 import com.aquigs.launcherplusplus.apps.RoleManagerHomeRole
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesWidgetPageStore
@@ -24,6 +25,7 @@ import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.apps.SystemWidgetHost
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.ui.AppActions
 import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
@@ -47,6 +49,7 @@ class MainActivity : ComponentActivity() {
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
+        val badges = NotificationBadges(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = WidgetActions(view = widgetHost::view, add = widgetHost::add, remove = widgetHost::remove)
         val layout = PageLayout()
@@ -79,6 +82,14 @@ class MainActivity : ComponentActivity() {
                 val widgetPage by produceState(remember { widgetHost.page() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { widgetHost.updates().collect { value = it } }
                 }
+                // Notification access is granted and revoked in Settings, so each return reads it again; the counts follow
+                // the notifications only while the launcher is visible, like the clock.
+                val badgesEnabled by produceState(remember { badges.isEnabled() }) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { badges.enabled().collect { value = it } }
+                }
+                val unread by produceState(UnreadCounts()) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
+                }
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
@@ -96,6 +107,9 @@ class MainActivity : ComponentActivity() {
                     onBecomeHomeApp = homeRole::request,
                     widgetPage = widgetPage,
                     widgets = widgetActions,
+                    unread = unread,
+                    badgesEnabled = badgesEnabled,
+                    onOpenBadgeSettings = badges::openSettings,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }

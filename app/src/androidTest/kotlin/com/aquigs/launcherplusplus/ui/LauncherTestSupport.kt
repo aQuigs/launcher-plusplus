@@ -2,6 +2,9 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -81,3 +84,9 @@ fun SemanticsNodeInteractionsProvider.widget(widget: HostedWidget) = onNodeWithT
 fun SemanticsNodeInteractionsProvider.addWidgetButton() = onNodeWithTag(WidgetTags.ADD)
 
 fun SemanticsNodeInteractionsProvider.widgetOptionsMenu() = onNodeWithTag(WidgetTags.MENU)
+
+fun SemanticsNodeInteractionsProvider.launcherMenu() = onNodeWithTag(LauncherMenuTags.MENU)
+
+// The badge is merged into its icon's node, so it is found in the unmerged tree, under the icon tagged [tag].
+fun SemanticsNodeInteractionsProvider.badgeOn(tag: String) =
+    onNodeWithTag(tag, useUnmergedTree = true).onChildren().filterToOne(hasTestTag(BadgeTags.BUBBLE))
