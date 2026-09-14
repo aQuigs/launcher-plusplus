@@ -66,8 +66,8 @@ data class HomePress(val launcherInFront: Boolean)
  * options; a ring app's menu can start a folder in its slot. A folder opens in place, as in Arc: its apps take the ring's
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. [apps]
  * is null until the installed apps have loaded. Every [HomePress] closes the menu, the drawer and the folder; one made
- * while the launcher was in front also scrolls to the home page. Back closes the menu, then the drawer, then the folder,
- * then returns to the home page.
+ * while the launcher was in front also scrolls to the home page. Back undoes what is on top: it closes the menu, then the
+ * drawer, then returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,6 +120,8 @@ fun LauncherScreen(
     var openingMenu by remember { mutableStateOf<Job?>(null) }
     var openFolder by remember { mutableStateOf<Int?>(null) }
     val open = ring.filterIsInstance<RingItem.Folder>().find { it.index == openFolder }
+    // A slot number outliving its folder would open a folder made later in that slot by itself.
+    LaunchedEffect(open == null) { if (open == null) openFolder = null }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
@@ -195,7 +197,11 @@ fun LauncherScreen(
                         onOption = { option ->
                             when (option) {
                                 FolderOption.AddApps -> pickFor(HomePlace.Folder(folder.index))
-                                FolderOption.Remove -> changeRing { remove(folder.index) }
+                                FolderOption.Remove -> {
+                                    // The next folder along inherits this slot's number, and would inherit the fading menu too.
+                                    openMenu = null
+                                    changeRing { remove(folder.index) }
+                                }
                             }
                         },
                         onDismiss = ::closeMenu,
@@ -215,13 +221,13 @@ fun LauncherScreen(
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
-    // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search. The drawer comes
-    // before the folder because it covers it.
-    BackHandler(enabled = drawerOpen || open != null || pagerState.currentPage != layout.homeIndex) {
+    // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search. The open folder
+    // comes last because the drawer and the other pages both hide it, and a press should undo something in view.
+    BackHandler(enabled = drawerOpen || pagerState.currentPage != layout.homeIndex || open != null) {
         when {
             drawerOpen -> closeDrawer()
-            open != null -> openFolder = null
-            else -> goHome()
+            pagerState.currentPage != layout.homeIndex -> goHome()
+            else -> openFolder = null
         }
     }
 

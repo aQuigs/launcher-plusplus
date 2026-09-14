@@ -384,6 +384,22 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun backReturnsToTheHomePageBeforeClosingTheFolder() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(LauncherPage.Collections)
+
+        Espresso.pressBack()
+        assertSettledOn(LauncherPage.Home)
+        compose.emblem().assertDoesNotExist()
+
+        Espresso.pressBack()
+        compose.emblem().assertIsDisplayed()
+    }
+
+    @Test
     fun newFolderFromARingAppStartsOneInItsSlotAndFillsItFromTheDrawer() {
         homeApps = HomeApps(ring = ringOf(clock, mail))
         show()

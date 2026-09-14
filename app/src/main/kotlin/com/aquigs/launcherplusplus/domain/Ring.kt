@@ -32,13 +32,16 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
         return Ring(if (slot in slots) slots - slot else slots + slot)
     }
 
-    /** Adds [app] to the folder at [index], or takes it out if it is already there. The folder stays, whatever is left in it. */
+    /**
+     * Adds [app] to the folder at [index], or takes it out if it is already there. The folder stays, whatever is left in
+     * it; a slot that is not a folder is left alone.
+     */
     fun toggle(index: Int, app: AppEntry): Ring {
         val folder = folder(index) ?: return this
         return replace(index, RingSlot.Folder(Favourites(folder.keys).toggle(app).keys))
     }
 
-    /** Turns [app]'s slot into a folder holding just [app]. */
+    /** Turns [app]'s slot into a folder holding just [app]; an app without a slot changes nothing. */
     fun newFolder(app: AppEntry): Ring {
         val index = indexOf(app)
         return if (index < 0) this else replace(index, RingSlot.Folder(listOf(app.key)))

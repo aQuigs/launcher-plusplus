@@ -43,7 +43,11 @@ fun AppIcon(
 /** An app's icon alone, with no name and nothing to tap; blank until it has loaded. */
 @Composable
 fun AppImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier = Modifier) {
-    val bitmap by produceState<ImageBitmap?>(null, app.key) { value = icon(app) }
+    val bitmap by produceState<ImageBitmap?>(null, app.key) {
+        // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one.
+        value = null
+        value = icon(app)
+    }
 
     Box(modifier) {
         bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
