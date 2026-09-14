@@ -17,6 +17,7 @@ import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
+import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.sortedByLabel
@@ -57,6 +58,8 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
                     activityName = info.componentName.className,
                     // An app built into the system can only lose its updates, which its App info page offers.
                     canUninstall = info.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0,
+                    installedAt = info.firstInstallTime,
+                    category = categoryHint(info.applicationInfo.category),
                 )
             }
             .sortedByLabel()
@@ -122,6 +125,20 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         ShortcutQuery().setPackage(packageName).setQueryFlags(ShortcutQuery.FLAG_MATCH_MANIFEST or ShortcutQuery.FLAG_MATCH_DYNAMIC)
 
     private val AppEntry.component get() = ComponentName(packageName, activityName)
+
+    // Only the system categories with a card of the same meaning; the rest, undefined included, say nothing.
+    private fun categoryHint(category: Int): AppCategory? = when (category) {
+        ApplicationInfo.CATEGORY_GAME -> AppCategory.Games
+        ApplicationInfo.CATEGORY_AUDIO -> AppCategory.Music
+        ApplicationInfo.CATEGORY_VIDEO -> AppCategory.Video
+        ApplicationInfo.CATEGORY_IMAGE -> AppCategory.Photos
+        ApplicationInfo.CATEGORY_SOCIAL -> AppCategory.Social
+        ApplicationInfo.CATEGORY_NEWS -> AppCategory.Media
+        ApplicationInfo.CATEGORY_MAPS -> AppCategory.Transport
+        ApplicationInfo.CATEGORY_PRODUCTIVITY -> AppCategory.Productivity
+        ApplicationInfo.CATEGORY_ACCESSIBILITY -> AppCategory.Tools
+        else -> null
+    }
 
     private val AppShortcut.logName get() = "$packageName shortcut $id"
 

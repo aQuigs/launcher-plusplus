@@ -1,6 +1,8 @@
 package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -92,16 +94,24 @@ fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
     )
 }
 
+/** How a picked row is marked: a check on a row a tap takes off again, or a dot on one a tap only ever adds. */
+enum class PickMark { Check, Dot }
+
 /**
- * Picking apps instead of launching them: the drawer shows [header] above the list, checks the rows [isPicked] says, and a
- * tap calls [onToggle].
+ * Picking apps instead of launching them: the drawer shows [header] above the list, puts a [mark] on the rows [isPicked]
+ * says, and a tap calls [onToggle].
  */
-class Picking(val header: @Composable () -> Unit, val isPicked: (AppEntry) -> Boolean, val onToggle: (AppEntry) -> Unit)
+class Picking(
+    val header: @Composable () -> Unit,
+    val isPicked: (AppEntry) -> Boolean,
+    val onToggle: (AppEntry) -> Unit,
+    val mark: PickMark = PickMark.Check,
+)
 
 /**
  * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
  * launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that moves on
- * becomes a [dragToHome]. A search field heads the list: with a [query] the list holds only the matching apps, without
+ * becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching apps, without
  * sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with [unread]
  * notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
  */
@@ -113,14 +123,14 @@ fun AppDrawer(
     picking: Picking? = null,
     listState: LazyListState = rememberLazyListState(),
     menu: AppMenu? = null,
-    dragToHome: DragToHome? = null,
+    drag: AppDrag? = null,
     query: String,
     onQueryChange: (String) -> Unit,
     unread: UnreadCounts = UnreadCounts(),
 ) {
     val scope = rememberCoroutineScope()
     val rowMenu = menu.takeIf { picking == null }
-    val rowDrag = dragToHome.takeIf { picking == null }
+    val rowDrag = drag.takeIf { picking == null }
     val searching = query.isNotBlank()
     val matches = remember(apps, query) { if (searching) apps.matching(query) else emptyList() }
     // The matches scroll on their own, so the sections come back where they were and a match does not become the top of
@@ -238,13 +248,15 @@ private fun SectionHeader(initial: Char) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?, drag: DragToHome?, unread: Int) {
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?, drag: AppDrag?, unread: Int) {
     val picked = picking?.isPicked(app) == true
-    val action = if (picking == null) {
+    val action = when {
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
-        Modifier.launchable(app, onLaunch, menu).dragToHome(app, drag)
-    } else {
-        Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
+        picking == null -> Modifier.launchable(app, onLaunch, menu).appDrag(app, drag)
+        picking.mark == PickMark.Check -> {
+            Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
+        }
+        else -> Modifier.clickable { picking.onToggle(app) }
     }
 
     Row(
@@ -265,10 +277,25 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking
             )
         }
         if (picked) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            when (picking?.mark) {
+                PickMark.Dot -> Dot()
+                else -> Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
         }
         menu?.content?.invoke(app)
     }
+}
+
+/** Marks a row whose app was just added: read as part of the row, like the unread count. */
+@Composable
+private fun Dot() {
+    Box(
+        Modifier
+            .padding(start = 12.dp)
+            .size(8.dp)
+            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .clearAndSetSemantics { text = AnnotatedString("added") },
+    )
 }
 
 /**

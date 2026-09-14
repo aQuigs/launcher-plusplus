@@ -3,12 +3,16 @@ package com.aquigs.launcherplusplus.ui
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
+import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.CollectionKind
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.HostedWidget
 import com.aquigs.launcherplusplus.domain.LauncherPage
@@ -18,6 +22,8 @@ import com.aquigs.launcherplusplus.domain.RingSlot
 
 val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
 val mail = AppEntry("Mail", "com.example.mail", "com.example.mail.Main")
+
+val tools = CollectionKind.Category(AppCategory.Tools)
 
 const val APPS_PER_LETTER = 3
 
@@ -90,3 +96,27 @@ fun SemanticsNodeInteractionsProvider.launcherMenu() = onNodeWithTag(LauncherMen
 // The badge is merged into its icon's node, so it is found in the unmerged tree, under the icon tagged [tag].
 fun SemanticsNodeInteractionsProvider.badgeOn(tag: String) =
     onNodeWithTag(tag, useUnmergedTree = true).onChildren().filterToOne(hasTestTag(BadgeTags.BUBBLE))
+
+fun SemanticsNodeInteractionsProvider.collectionCard(kind: CollectionKind) = onNodeWithTag(CollectionTags.card(kind))
+
+fun SemanticsNodeInteractionsProvider.collectionApp(kind: CollectionKind, app: AppEntry) = onNodeWithTag(CollectionTags.app(kind, app))
+
+fun SemanticsNodeInteractionsProvider.collectionChevron(kind: CollectionKind) = onNodeWithTag(CollectionTags.chevron(kind))
+
+fun SemanticsNodeInteractionsProvider.collectionEditButton(kind: CollectionKind) = onNodeWithTag(CollectionTags.edit(kind))
+
+fun SemanticsNodeInteractionsProvider.collectionHandle(kind: CollectionKind) = onNodeWithTag(CollectionTags.handle(kind))
+
+fun SemanticsNodeInteractionsProvider.collectionTile(kind: CollectionKind) = onNodeWithTag(CollectionTags.tile(kind))
+
+fun SemanticsNodeInteractionsProvider.addCollectionButton() = onNodeWithTag(CollectionTags.ADD)
+
+fun SemanticsNodeInteractionsProvider.collectionBin() = onNodeWithTag(CollectionTags.BIN)
+
+fun SemanticsNodeInteractionsProvider.collectionPicker() = onNodeWithTag(CollectionTags.PICKER)
+
+fun SemanticsNodeInteractionsProvider.collectionEditor() = onNodeWithTag(CollectionTags.EDITOR)
+
+// The drawer's list is composed under the editor too, so a row is told apart by the screen it is on.
+fun SemanticsNodeInteractionsProvider.editorRow(label: String) =
+    onNode(hasText(label) and hasAnyAncestor(hasTestTag(CollectionTags.EDITOR)))
