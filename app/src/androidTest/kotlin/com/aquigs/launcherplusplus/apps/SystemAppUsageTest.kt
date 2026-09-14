@@ -37,6 +37,7 @@ class SystemAppUsageTest {
         val time = usage.foregroundTime().first()
 
         assertNotNull(time)
-        assertTrue("only packages that were in front: ${time!!.byPackage}", time.byPackage.values.all { it > 0L })
+        assertTrue("something has been in front this week", time!!.byPackage.isNotEmpty())
+        assertTrue("only packages that were in front: ${time.byPackage}", time.byPackage.values.all { it > 0L })
     }
 }

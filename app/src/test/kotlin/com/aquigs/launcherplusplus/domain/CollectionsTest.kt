@@ -98,6 +98,7 @@ class CollectionsTest {
         )
         byPackage.forEach { (packageName, category) -> assertEquals(packageName, category, app("X", packageName).suggestedCategory) }
         assertNull(app("Arc Launcher", "apptech.arc").suggestedCategory)
+        assertNull(app("Sigma", "com.sigma.app").suggestedCategory)
     }
 
     @Test

@@ -55,7 +55,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -136,6 +138,14 @@ val CollectionKind.title: String
         is CollectionKind.Category -> category.label
     }
 
+/** What a card says instead of apps when it has none: a category is filled by hand, the built-in ones by the system. */
+private val CollectionKind.emptyText: String
+    get() = when (this) {
+        CollectionKind.NewApps -> "No apps yet"
+        CollectionKind.MostUsed -> "Nothing used this week"
+        is CollectionKind.Category -> "Tap the pencil to add apps"
+    }
+
 private const val APPS_PER_ROW = 5
 private val PAGE_PADDING = 16.dp
 private val CARD_GAP = 12.dp
@@ -172,7 +182,7 @@ fun CollectionsColumn(
     val mostUsed = remember(apps, foregroundTime) { foregroundTime?.let { mostUsed(apps, it) } }
     val gap = with(LocalDensity.current) { CARD_GAP.toPx() }
     val reorder = remember(gap) { Reorder(gap) }
-    reorder.count = page.cards.size
+    SideEffect { reorder.count = page.cards.size }
 
     Box(modifier.fillMaxSize()) {
         Column(
@@ -228,10 +238,10 @@ fun CollectionsColumn(
 
 /**
  * A card taken by its handle: which, how far the finger has moved it, and where every card rests, so the others can
- * make way. Positions are in the column's coordinates, so the column may scroll under a drag.
+ * make way. Positions are in the column's own coordinates, which its scroll offset does not touch.
  */
 private class Reorder(private val gap: Float) {
-    var count = 0
+    var count by mutableIntStateOf(0)
     var dragging by mutableStateOf<Int?>(null)
     var offset by mutableFloatStateOf(0f)
     private val tops = mutableStateMapOf<Int, Float>()
@@ -250,9 +260,10 @@ private class Reorder(private val gap: Float) {
         }
     }
 
+    // Only a change is written: a state map tells its readers about every put, and every layout pass places every card.
     fun place(index: Int, top: Float, height: Float) {
-        tops[index] = top
-        heights[index] = height
+        if (tops[index] != top) tops[index] = top
+        if (heights[index] != height) heights[index] = height
     }
 
     /** How far the card at [index] moves aside, in pixels, to leave the dragged card its place. */
@@ -345,9 +356,19 @@ private fun CardHeader(
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
     Box(Modifier.fillMaxWidth().height(48.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.align(Alignment.CenterStart)) {
+        // Kept clear of the handle in the middle, which a long title on a narrow screen would otherwise run under.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.5f).padding(end = 28.dp),
+        ) {
             Icon(kind.glyph, contentDescription = null, modifier = Modifier.size(22.dp))
-            Text(kind.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 10.dp))
+            Text(
+                text = kind.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 10.dp),
+            )
         }
         // A drag straight from the touch, with no long press: a vertical one, so a swipe across the handle still pages.
         Box(
@@ -405,6 +426,14 @@ private fun AppGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE),
     ) {
+        if (shown.isEmpty()) {
+            Text(
+                text = kind.emptyText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+        }
         shown.chunked(APPS_PER_ROW).forEach { row ->
             Row(Modifier.fillMaxWidth()) {
                 row.forEach { app ->
@@ -560,11 +589,12 @@ private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Adding apps to a category card: the drawer's list of every app, with its search and rail, where a tap calls [onPick]
- * and the rows [isPicked] says wear a dot, without check marks, since a tap only ever adds.
+ * Adding apps to a category card, named by [title]: the drawer's list of every app, with its search and rail, where a
+ * tap calls [onPick] and the rows [isPicked] says wear a dot, without check marks, since a tap only ever adds.
  */
 @Composable
 fun CollectionEditor(
+    title: String,
     apps: List<AppEntry>,
     isPicked: (AppEntry) -> Boolean,
     onPick: (AppEntry) -> Unit,
@@ -576,7 +606,18 @@ fun CollectionEditor(
         AppDrawer(
             apps = apps,
             onLaunch = {},
-            picking = Picking(header = {}, isPicked = isPicked, onToggle = onPick, mark = PickMark.Dot),
+            picking = Picking(
+                header = {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp),
+                    )
+                },
+                isPicked = isPicked,
+                onToggle = onPick,
+                mark = PickMark.Dot,
+            ),
             query = query,
             onQueryChange = onQueryChange,
         )

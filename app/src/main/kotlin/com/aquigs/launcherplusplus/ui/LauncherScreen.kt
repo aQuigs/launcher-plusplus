@@ -177,7 +177,7 @@ fun LauncherScreen(
     // was open, and starts clean each time; dropping focus takes its keyboard down with it.
     var editing by rememberSaveable { mutableStateOf<AppCategory?>(null) }
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
-    var justPicked by remember { mutableStateOf(emptySet<String>()) }
+    var justPicked by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var editorQuery by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(editing) {
         if (editing == null) {
@@ -528,6 +528,7 @@ fun LauncherScreen(
         // Over the scaffold, drawer strip included: each is a screen of its own until Back or HOME.
         editing?.let { category ->
             CollectionEditor(
+                title = "Add to ${category.label}",
                 apps = apps.orEmpty(),
                 isPicked = { it.key in justPicked },
                 onPick = { app ->

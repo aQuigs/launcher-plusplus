@@ -14,6 +14,7 @@ import android.os.Looper
 import android.os.Process
 import android.os.UserHandle
 import android.util.Log
+import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
@@ -32,15 +33,25 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "LauncherAppsRepository"
 private const val MAX_SHORTCUTS = 4
+private const val ICON_CACHE_BYTES = 8 shl 20
 
 class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
     private val activityManager = context.getSystemService(ActivityManager::class.java)
     private val user = Process.myUserHandle()
 
+    // An icon is asked for again each time its app comes back into view, and a collection card brings dozens back at a
+    // tap; a drawn one is kept until the package list changes, as an update may bring a new icon.
+    private val icons = object : LruCache<String, ImageBitmap>(ICON_CACHE_BYTES) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
+    }
+
     override fun installedApps(): Flow<List<AppEntry>> =
         callbackFlow {
-            val callback = PackageChanges { trySend(Unit) }
+            val callback = PackageChanges {
+                icons.evictAll()
+                trySend(Unit)
+            }
             launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
             send(Unit)
             awaitClose { launcherApps.unregisterCallback(callback) }
@@ -64,9 +75,9 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             }
             .sortedByLabel()
 
-    override suspend fun icon(app: AppEntry): ImageBitmap? = draw(app.key) { density ->
-        launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
-    }
+    override suspend fun icon(app: AppEntry): ImageBitmap? = icons.get(app.key)
+        ?: draw(app.key) { density -> launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density) }
+            ?.also { icons.put(app.key, it) }
 
     override fun launch(app: AppEntry) = startOrLog(TAG, app.key) { launcherApps.startMainActivity(app.component, user, null, null) }
 

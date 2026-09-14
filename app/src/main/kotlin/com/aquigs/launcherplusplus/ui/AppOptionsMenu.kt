@@ -42,7 +42,8 @@ typealias AppMenu = LongPressMenu<AppEntry>
  */
 fun Modifier.launchable(app: AppEntry, onLaunch: (AppEntry) -> Unit, menu: AppMenu?, presses: MutableInteractionSource? = null): Modifier {
     val onLongClickLabel = menu?.let { "App options" }
-    val onLongClick = menu?.let { m -> { m.onOpen(app) } }
+    // A hold is never a tap: with no menu to open it does nothing, rather than launching the app on release.
+    val onLongClick = menu?.let { m -> { m.onOpen(app) } } ?: {}
     val onClick = { onLaunch(app) }
     return if (presses == null) {
         combinedClickable(onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)

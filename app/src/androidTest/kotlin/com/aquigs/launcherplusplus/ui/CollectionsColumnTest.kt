@@ -8,6 +8,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -16,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
+import com.aquigs.launcherplusplus.domain.CollectionKind
 import com.aquigs.launcherplusplus.domain.CollectionKind.MostUsed
 import com.aquigs.launcherplusplus.domain.CollectionKind.NewApps
 import com.aquigs.launcherplusplus.domain.CollectionsPage
@@ -72,6 +74,24 @@ class CollectionsColumnTest {
         compose.onNodeWithText("R12").assertDoesNotExist()
         compose.collectionEditButton(NewApps).assertDoesNotExist()
         compose.onNodeWithText("Permission Required").assertIsDisplayed()
+    }
+
+    @Test
+    fun aLongPressOnABuiltInCardsAppDoesNothing() {
+        show()
+
+        compose.collectionApp(NewApps, recent[11]).performTouchInput { longClick() }
+        compose.waitForIdle()
+
+        assertTrue(launched.toString(), launched.isEmpty())
+    }
+
+    @Test
+    fun aCategoryCardWithNoAppsSaysHowToFillIt() {
+        page = CollectionsPage().add(CollectionKind.Category(AppCategory.Kids))
+        show()
+
+        compose.onNodeWithText("Tap the pencil to add apps").assertIsDisplayed()
     }
 
     @Test

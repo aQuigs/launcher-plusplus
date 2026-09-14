@@ -86,7 +86,8 @@ fun mostUsed(apps: List<AppEntry>, time: ForegroundTime, limit: Int = BUILT_IN_C
         .take(limit)
 
 // Words that give a package's category away, matched inside each part of its name: "deskclock" holds "clock". Only the
-// obvious ones, since a wrong guess puts an app in a card the user did not expect.
+// obvious ones, since a wrong guess puts an app in a card the user did not expect; for the same reason a word of two or
+// three letters must be a whole part, as "gm" is Gmail's last part but also sits inside "sigma".
 private val categoryWords: Map<String, AppCategory> = mapOf(
     "clock" to AppCategory.Tools,
     "calculator" to AppCategory.Tools,
@@ -120,7 +121,7 @@ private val categoryWords: Map<String, AppCategory> = mapOf(
 val AppEntry.suggestedCategory: AppCategory?
     get() = category ?: packageName.split('.').asReversed().firstNotNullOfOrNull { part ->
         val lower = part.lowercase()
-        categoryWords.entries.firstOrNull { (word, _) -> word in lower }?.value
+        categoryWords.entries.firstOrNull { (word, _) -> if (word.length < 4) lower == word else word in lower }?.value
     }
 
 /**
