@@ -28,7 +28,7 @@ class UnreadListener : NotificationListenerService() {
         // Null, or a refusal, when the listener has lost its connection with a callback still on its way.
         val active = try {
             activeNotifications
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             null
         }
         counts.value = unreadCounts(active.orEmpty().map { it.asPosted() })

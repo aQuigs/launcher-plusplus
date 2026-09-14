@@ -39,9 +39,12 @@ class NotificationBadgesTest {
         notificationManager.createNotificationChannel(NotificationChannel(CHANNEL, "Badge test", NotificationManager.IMPORTANCE_LOW))
     }
 
+    // The permission stays granted: revoking a runtime permission kills the process, this test runner included, and the
+    // uninstall after the run takes it away regardless.
     @After
     fun cleanUp() {
         notificationManager.cancel(NOTIFICATION_ID)
+        notificationManager.deleteNotificationChannel(CHANNEL)
         shell("cmd notification ${if (wasEnabled) "allow_listener" else "disallow_listener"} $listener")
     }
 
@@ -76,7 +79,7 @@ class NotificationBadgesTest {
             assertEquals(1, badges.counts().first { it[self] > 0 }[self])
 
             post(number = 5)
-            assertEquals(5, badges.counts().first { it[self] != 1 }[self])
+            badges.counts().first { it[self] == 5 }
 
             notificationManager.cancel(NOTIFICATION_ID)
             badges.counts().first { it[self] == 0 }

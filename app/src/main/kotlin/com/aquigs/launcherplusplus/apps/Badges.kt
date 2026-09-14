@@ -8,8 +8,8 @@ import android.content.Intent
 import android.provider.Settings
 import com.aquigs.launcherplusplus.domain.UnreadCounts
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 
 interface Badges {
     /** Whether the user has granted the launcher notification access, which the badges need. */
@@ -36,21 +36,20 @@ class NotificationBadges(private val context: Context) : Badges {
 
     override fun enabled(): Flow<Boolean> = flow { emit(isEnabled()) }
 
-    // Checked on each value rather than once: what the listener last published may outlive its access when the system
-    // takes the access away without telling it.
-    override fun counts(): Flow<UnreadCounts> = UnreadListener.counts.map { if (isEnabled()) it else UnreadCounts() }
+    // Gated on the same read as [enabled], so a value the listener published before losing its access never shows, and
+    // the badges and the menu's switch agree on each return to the front.
+    override fun counts(): Flow<UnreadCounts> =
+        enabled().combine(UnreadListener.counts) { on, counts -> if (on) counts else UnreadCounts() }
 
-    override fun openSettings() {
+    override fun openSettings() = startOrLog(TAG, "the notification access settings") {
         val forThisListener = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
             .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, listener.flattenToString())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             context.startActivity(forThisListener)
-        } catch (e: ActivityNotFoundException) {
+        } catch (_: ActivityNotFoundException) {
             // Some builds only have the list of every listener, where the user finds the launcher by name.
-            startOrLog(TAG, "the notification access settings") {
-                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
 }

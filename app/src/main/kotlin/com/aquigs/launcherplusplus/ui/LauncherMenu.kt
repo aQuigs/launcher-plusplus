@@ -22,8 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.round
 
 object LauncherMenuTags {
@@ -38,32 +37,26 @@ class LauncherMenuRow(val label: String, val on: Boolean, val onClick: () -> Uni
 
 /**
  * The empty space of a page. Laid behind the page's content, it only gets the touches nothing on the page claims, since
- * hit testing stops at the first sibling under the finger. A long press opens [menu] where the finger is.
+ * hit testing stops at the first sibling that claims the finger. A long press opens [menu] where the finger is.
  */
 @Composable
-fun EmptySpace(menu: LauncherMenu?, modifier: Modifier = Modifier) {
+fun EmptySpace(menu: LauncherMenu, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     var pressedAt by remember { mutableStateOf(Offset.Zero) }
 
     Box(
-        modifier.fillMaxSize().then(
-            if (menu == null) {
-                Modifier
-            } else {
-                Modifier.pointerInput(menu) {
-                    detectTapGestures(
-                        onLongPress = { position ->
-                            pressedAt = position
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menu.onOpen(position)
-                        },
-                    )
-                }
-            },
-        ),
+        modifier.fillMaxSize().pointerInput(menu) {
+            detectTapGestures(
+                onLongPress = { position ->
+                    pressedAt = position
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menu.onOpen(position)
+                },
+            )
+        },
     ) {
         // A point-sized anchor at the spot pressed, so the popup opens under the finger rather than under the page.
-        Box(Modifier.offset { pressedAt.round() }) { menu?.content?.invoke(pressedAt) }
+        Box(Modifier.offset { pressedAt.round() }) { menu.content(pressedAt) }
     }
 }
 
@@ -74,12 +67,13 @@ fun LauncherOptionsMenu(expanded: Boolean, rows: List<LauncherMenuRow>, onDismis
         rows.forEach { row ->
             DropdownMenuItem(
                 text = { Text(row.label) },
-                // The switch only shows the state: the row is the control, and says so to screen readers.
+                // The switch only shows the state: the row is the control, and a tap goes elsewhere to change it, so screen
+                // readers hear a button with a state rather than a switch that would not flip.
                 trailingIcon = { Switch(checked = row.on, onCheckedChange = null) },
                 onClick = { chooseFrom(expanded, onDismiss, row.onClick) },
                 modifier = Modifier.semantics {
-                    role = Role.Switch
-                    toggleableState = ToggleableState(row.on)
+                    role = Role.Button
+                    stateDescription = if (row.on) "On" else "Off"
                 },
             )
         }

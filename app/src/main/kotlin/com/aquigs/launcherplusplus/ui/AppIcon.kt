@@ -52,7 +52,8 @@ fun AppIcon(
 /**
  * The round face of an icon: [content] on a tinted disc, clipped to it, rippling for the presses in [presses]. The press
  * handling, the badge and the name stay on the icon's own node outside, so the badge can overhang the disc while a
- * screen reader still meets one icon, and the ripple keeps to the disc all the same.
+ * screen reader still meets one icon, and the ripple keeps to the disc all the same. The whole square is the target,
+ * badge included, as on other launchers.
  */
 @Composable
 fun IconDisc(

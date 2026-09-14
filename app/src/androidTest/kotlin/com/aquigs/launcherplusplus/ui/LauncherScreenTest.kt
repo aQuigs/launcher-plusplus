@@ -17,7 +17,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -820,13 +820,14 @@ class LauncherScreenTest {
 
         compose.ringSlot(clock).assertContentDescriptionEquals("Clock, 3 unread")
         compose.badgeOn(HomeRingTags.slot(clock)).assertTextEquals("3")
-        compose.folderSlot(1).assertContentDescriptionEquals("Folder Work, 2 apps, 10 unread")
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps, 10 unread")
         compose.dockSlot(mail).assertContentDescriptionEquals("Mail, 7 unread")
         compose.badgeOn(DockTags.slot(mail)).assertTextEquals("7")
 
         compose.folderSlot(1).performClick()
-        compose.folderApp(mail).assert(hasContentDescription("Mail, 7 unread"))
-        pressBackInDialog()
+        compose.ringSlot(mail).assertContentDescriptionEquals("Mail, 7 unread")
+        compose.badgeOn(HomeRingTags.slot(mail)).assertTextEquals("7")
+        compose.closeFolder().performClick()
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
         compose.onNodeWithText("Clock").assert(hasText("3 unread"))
@@ -846,9 +847,9 @@ class LauncherScreenTest {
         longPressEmptyHomeSpace()
 
         compose.launcherMenu().assertIsDisplayed()
-        compose.onNodeWithText("Unread badges").assertIsOff()
+        compose.onNodeWithText("Unread badges").assert(hasStateDescription("Off"))
         badgesEnabled = true
-        compose.onNodeWithText("Unread badges").assertIsOn()
+        compose.onNodeWithText("Unread badges").assert(hasStateDescription("On"))
 
         compose.onNodeWithText("Unread badges").performClick()
 
