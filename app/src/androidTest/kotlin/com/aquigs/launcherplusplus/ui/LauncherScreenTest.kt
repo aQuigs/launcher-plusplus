@@ -33,6 +33,8 @@ import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
+import com.aquigs.launcherplusplus.domain.Ring
+import com.aquigs.launcherplusplus.domain.RingSlot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
@@ -51,6 +53,7 @@ class LauncherScreenTest {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var homeApps by mutableStateOf(HomeApps())
+    private val work = folderOf(clock, mail)
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September"))
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
@@ -172,7 +175,7 @@ class LauncherScreenTest {
         compose.onNodeWithText("Mail").performClick()
         compose.onNodeWithText("Mail").assertIsOn()
         compose.runOnIdle {
-            assertTrue(mail in homeApps.ring)
+            assertTrue(mail in homeApps.ring.apps)
             assertEquals(emptyList<AppEntry>(), launched)
         }
 
@@ -191,7 +194,7 @@ class LauncherScreenTest {
 
     @Test
     fun storedFavouritesHoldBackTheHintUntilTheAppsLoadWithoutThem() {
-        homeApps = HomeApps(ring = Favourites(listOf(clock.key)))
+        homeApps = HomeApps(ring = ringOf(clock))
         apps = null
         show()
         compose.onNodeWithText("Add apps").assertDoesNotExist()
@@ -256,7 +259,7 @@ class LauncherScreenTest {
 
     @Test
     fun eachPlaceChecksTheAppsAlreadyThere() {
-        homeApps = HomeApps(ring = Favourites(listOf(clock.key)), dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(clock), dock = Favourites(listOf(mail.key)))
         show()
         compose.emblem().performClick()
         assertDrawerOpen(true)
@@ -309,16 +312,192 @@ class LauncherScreenTest {
 
     @Test
     fun longPressingARingAppShowsItsShortcutsThenItsOptions() {
-        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail))
         show()
 
         compose.ringSlot(mail).performTouchInput { longClick() }
 
-        val tops = listOf("Compose", "Remove from the ring", "App info", "Uninstall").map {
+        val tops = listOf("Compose", "Remove from the ring", "New folder", "App info", "Uninstall").map {
             compose.onNodeWithText(it).assertIsDisplayed().getUnclippedBoundsInRoot().top
         }
         assertEquals(tops.sorted(), tops)
         compose.onNodeWithText("Remove from the dock").assertDoesNotExist()
+    }
+
+    @Test
+    fun aFolderOpensInPlaceOnTheRingAndLaunchesItsAppsWithoutClosing() {
+        val other = alphabet[0]
+        apps = listOf(clock, mail, other)
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(other.key), work)))
+        show()
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps").performClick()
+
+        compose.emblem().assertDoesNotExist()
+        compose.folderSlot(1).assertDoesNotExist()
+        compose.ringSlot(other).assertDoesNotExist()
+        compose.ringSlot(clock).assertIsDisplayed()
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.clockTime().assertIsDisplayed()
+
+        compose.ringSlot(mail).performClick()
+
+        compose.runOnIdle { assertEquals(listOf(mail), launched) }
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.closeFolder().performClick()
+        compose.emblem().assertIsDisplayed()
+        compose.folderSlot(1).assertIsDisplayed()
+        compose.ringSlot(other).assertIsDisplayed()
+    }
+
+    @Test
+    fun backAndHomeCloseTheFolderAndStayOnTheHomePage() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+        compose.emblem().assertDoesNotExist()
+
+        Espresso.pressBack()
+        compose.emblem().assertIsDisplayed()
+        assertSettledOn(LauncherPage.Home)
+
+        compose.folderSlot(0).performClick()
+        compose.emblem().assertDoesNotExist()
+        pressHome(launcherInFront = true)
+
+        compose.emblem().assertIsDisplayed()
+    }
+
+    @Test
+    fun backClosesTheDrawerOverAnOpenFolderFirst() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+        compose.emblem().assertDoesNotExist()
+
+        Espresso.pressBack()
+        compose.emblem().assertIsDisplayed()
+    }
+
+    @Test
+    fun backReturnsToTheHomePageBeforeClosingTheFolder() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(LauncherPage.Collections)
+
+        Espresso.pressBack()
+        assertSettledOn(LauncherPage.Home)
+        compose.emblem().assertDoesNotExist()
+
+        Espresso.pressBack()
+        compose.emblem().assertIsDisplayed()
+    }
+
+    @Test
+    fun newFolderFromARingAppStartsOneInItsSlotAndFillsItFromTheDrawer() {
+        homeApps = HomeApps(ring = ringOf(clock, mail))
+        show()
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("New folder").performClick()
+
+        assertDrawerOpen(true)
+        compose.placePicker().assertIsDisplayed()
+        compose.onNodeWithText("Adding to folder").assertIsDisplayed()
+        compose.placeOption(HomePlace.Dock).assertDoesNotExist()
+        compose.onNodeWithText("Mail").assertIsOn()
+        compose.onNodeWithText("Clock").performClick()
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(clock.key), folderOf(mail, clock))), homeApps.ring) }
+
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps").assertIsDisplayed()
+        compose.ringSlot(mail).assertDoesNotExist()
+    }
+
+    @Test
+    fun aFolderLeftWithOneAppWhenPickingEndsStaysAFolder() {
+        homeApps = HomeApps(ring = ringOf(clock, mail))
+        show()
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("New folder").performClick()
+        assertDrawerOpen(true)
+
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 1 app").assertIsDisplayed()
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(clock.key), folderOf(mail))), homeApps.ring) }
+    }
+
+    @Test
+    fun removingAppsFromAnOpenFolderLeavesItOpenDownToAnEmptyBadge() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("New folder").assertDoesNotExist()
+        compose.onNodeWithText("Add apps").assertDoesNotExist()
+        compose.onNodeWithText("Remove from folder").performClick()
+
+        compose.emblem().assertDoesNotExist()
+        compose.ringSlot(clock).assertIsDisplayed()
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Ring(listOf(folderOf(clock))), homeApps.ring) }
+
+        compose.ringSlot(clock).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from folder").performClick()
+
+        compose.ringSlot(clock).assertDoesNotExist()
+        compose.closeFolder().performClick()
+        compose.folderSlot(0).assertContentDescriptionEquals("Folder, 0 apps").performClick()
+        compose.emblem().assertIsDisplayed()
+        compose.folderSlot(0).performTouchInput { longClick() }
+        compose.onNodeWithText("Add apps").assertIsDisplayed()
+        compose.onNodeWithText("Remove folder").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(Ring(listOf(folderOf())), homeApps.ring) }
+    }
+
+    @Test
+    fun theFolderMenuAddsAppsAndRemovesTheFolder() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performTouchInput { longClick() }
+        compose.folderOptionsMenu().assertIsDisplayed()
+        compose.onNodeWithText("Add apps").performClick()
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Adding to folder").assertIsDisplayed()
+        compose.onNodeWithText("Clock").assertIsOn()
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+
+        compose.folderSlot(0).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove folder").performClick()
+
+        compose.folderSlot(0).assertDoesNotExist()
+        compose.onNodeWithText("Add apps").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+    }
+
+    @Test
+    fun aRingOfFoldersOnlyShowsNoHint() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        apps = null
+        show()
+        compose.onNodeWithText("Add apps").assertDoesNotExist()
+
+        apps = listOf(clock, mail)
+
+        compose.onNodeWithText("Add apps").assertDoesNotExist()
+        compose.folderSlot(0).assertIsDisplayed()
     }
 
     @Test
@@ -343,7 +522,7 @@ class LauncherScreenTest {
 
     @Test
     fun removingAnAppFromTheDockKeepsItOnTheRing() {
-        homeApps = HomeApps(ring = Favourites(listOf(mail.key)), dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail), dock = Favourites(listOf(mail.key)))
         show()
 
         compose.dockSlot(mail).performTouchInput { longClick() }
@@ -351,12 +530,12 @@ class LauncherScreenTest {
 
         compose.dockSlot(mail).assertDoesNotExist()
         compose.ringSlot(mail).assertIsDisplayed()
-        compose.runOnIdle { assertEquals(HomeApps(ring = Favourites(listOf(mail.key))), homeApps) }
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
     }
 
     @Test
     fun homeClosesTheMenu() {
-        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail))
         show()
         compose.ringSlot(mail).performTouchInput { longClick() }
         compose.onNodeWithText("App info").assertIsDisplayed()
@@ -389,12 +568,12 @@ class LauncherScreenTest {
         compose.onNodeWithText("Mail").performTouchInput { longClick() }
 
         compose.appOptionsMenu().assertDoesNotExist()
-        compose.runOnIdle { assertEquals(HomeApps(ring = Favourites(listOf(mail.key))), homeApps) }
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
     }
 
     @Test
     fun homeWhileTheShortcutsLoadOpensNoMenu() {
-        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail))
         shortcutsLoaded = CompletableDeferred()
         show()
 
@@ -407,7 +586,7 @@ class LauncherScreenTest {
 
     @Test
     fun anAppThatGoesWithItsMenuOpenComesBackWithoutIt() {
-        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail))
         show()
         compose.ringSlot(mail).performTouchInput { longClick() }
         compose.onNodeWithText("App info").assertIsDisplayed()
@@ -422,7 +601,7 @@ class LauncherScreenTest {
 
     @Test
     fun aSecondTapWhileTheMenuClosesStartsNothingAgain() {
-        homeApps = HomeApps(ring = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail))
         show()
         compose.ringSlot(mail).performTouchInput { longClick() }
         compose.onNodeWithText("Uninstall").assertIsDisplayed()

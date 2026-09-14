@@ -6,6 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aquigs.launcherplusplus.domain.Favourites
 import com.aquigs.launcherplusplus.domain.HomeApps
+import com.aquigs.launcherplusplus.domain.Ring
+import com.aquigs.launcherplusplus.domain.RingSlot
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -21,7 +23,8 @@ class HomeAppsStoreTest {
 
     @Test
     fun theRingAndTheDockComeBackApart() {
-        val homeApps = HomeApps(ring = Favourites(listOf("a/A", "b/B")), dock = Favourites(listOf("c/C")))
+        val ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.Folder(listOf("b/B", "c/C")), RingSlot.Folder(emptyList())))
+        val homeApps = HomeApps(ring = ring, dock = Favourites(listOf("c/C")))
 
         store.save(homeApps)
 
@@ -36,6 +39,6 @@ class HomeAppsStoreTest {
             putString("favourites", "a/A\nb/B")
         }
 
-        assertEquals(HomeApps(ring = Favourites(listOf("a/A", "b/B"))), store.load())
+        assertEquals(HomeApps(ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.App("b/B")))), store.load())
     }
 }

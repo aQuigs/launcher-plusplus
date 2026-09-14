@@ -2,11 +2,15 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
+import com.aquigs.launcherplusplus.domain.Ring
+import com.aquigs.launcherplusplus.domain.RingItem
+import com.aquigs.launcherplusplus.domain.RingSlot
 
 val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
 val mail = AppEntry("Mail", "com.example.mail", "com.example.mail.Main")
@@ -17,6 +21,12 @@ const val APPS_PER_LETTER = 3
 val alphabet: List<AppEntry> = ('A'..'Z').flatMap { letter ->
     (1..APPS_PER_LETTER).map { n -> AppEntry("$letter$n", "com.example.${letter.lowercase()}$n", "Main") }
 }
+
+fun ringOf(vararg apps: AppEntry) = Ring(apps.map { RingSlot.App(it.key) })
+
+fun folderOf(vararg apps: AppEntry) = RingSlot.Folder(apps.map { it.key })
+
+fun List<AppEntry>.asRingItems() = map(RingItem::App)
 
 fun SemanticsNodeInteractionsProvider.pager() = onNodeWithTag(LauncherTags.PAGER)
 
@@ -46,6 +56,12 @@ fun SemanticsNodeInteractionsProvider.clockDate() = onNodeWithTag(HomeClockTags.
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
+
+fun SemanticsNodeInteractionsProvider.folderSlot(index: Int) = onNodeWithTag(HomeRingTags.folder(index))
+
+fun SemanticsNodeInteractionsProvider.closeFolder() = onNodeWithContentDescription("Close folder")
+
+fun SemanticsNodeInteractionsProvider.folderOptionsMenu() = onNodeWithTag(FolderTags.MENU)
 
 fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
 
