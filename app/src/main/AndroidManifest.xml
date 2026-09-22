@@ -30,10 +30,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LauncherPlusPlus">
 
+        <!-- The ring, the dock and the pages are laid out for a tall screen, as Arc's are; sideways, the ring shrinks to a
+             thumbnail and the dock stretches across the screen. Android 16 ignores the lock on screens 600dp and wider,
+             so a tablet still turns; a phone does not. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            tools:ignore="DiscouragedApi"
             android:stateNotNeeded="true"
             android:excludeFromRecents="true">
             <intent-filter>
