@@ -1,6 +1,5 @@
 package com.aquigs.launcherplusplus
 
-import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,15 +14,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.swipeLeft
-import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
+import com.aquigs.launcherplusplus.apps.SystemRelauncher
 import com.aquigs.launcherplusplus.apps.SystemWallClock
-import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.ui.DockTags
@@ -48,7 +45,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val homeAppsStore = SharedPreferencesHomeAppsStore(context)
 
     // On a dark system the default bar styles draw light icons too, so the tests run on a light system, where the default
     // went wrong. The user's setting comes back afterwards.
@@ -69,19 +65,13 @@ class MainActivityTest {
     @get:Rule(order = 0)
     val restoreHourStyle = RestoreHourStyle()
 
-    // The activity reads the home screen apps and the clock's hour style in onCreate, so the ring, the dock and the
-    // clock's choice are emptied before the compose rule starts the activity, whatever an earlier run or by-hand use left
-    // there, and emptied again afterwards.
+    // The activity reads what the launcher stores in onCreate, so it is all erased before the compose rule starts the
+    // activity, whatever an earlier run or by-hand use left there, and erased again afterwards.
     @get:Rule(order = 1)
     val emptyStores = object : ExternalResource() {
-        override fun before() = empty()
+        override fun before() = SystemRelauncher(context).erase()
 
-        override fun after() = empty()
-
-        private fun empty() {
-            homeAppsStore.save(HomeApps())
-            context.getSharedPreferences("clock", Context.MODE_PRIVATE).edit(commit = true) { clear() }
-        }
+        override fun after() = SystemRelauncher(context).erase()
     }
 
     @get:Rule(order = 2)

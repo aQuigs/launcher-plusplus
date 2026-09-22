@@ -92,11 +92,12 @@ data class HomePress(val launcherInFront: Boolean)
  * the button under the cards opens the picker that adds and removes cards. An app long-pressed on a category card lifts
  * off it, and dropping it on the bin takes it off the card. Apps everywhere wear their [unread] counts; a long press on
  * the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
- * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), and show whether the clock is in
- * 24 hours and flip it ([onTwentyFourHourChange]). [apps] is null until the installed apps have loaded. Every
- * [HomePress] cancels a drag and closes the menu, the drawer, the editor, the picker and the folder; one made while the
- * launcher was in front also scrolls to the home page. Back undoes what is on top: it cancels a drag, else closes the
- * menu, then the drawer, then the editor or the picker, then returns to the home page, then closes the folder.
+ * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
+ * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
+ * dialog has asked. [apps] is null until the installed apps have loaded. Every [HomePress] cancels a drag and closes the
+ * menu, the dialog, the drawer, the editor, the picker and the folder; one made while the launcher was in front also
+ * scrolls to the home page. Back undoes what is on top: it cancels a drag, else closes the menu or the dialog, then the
+ * drawer, then the editor or the picker, then returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,6 +126,8 @@ fun LauncherScreen(
     badgesEnabled: Boolean,
     onOpenBadgeSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
+    onRestart: () -> Unit,
+    onReset: () -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -142,6 +145,7 @@ fun LauncherScreen(
     val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
     val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
+    val latestOnRestart by rememberUpdatedState(onRestart)
 
     // Callbacks built once read the home apps through the latest state, so what they change is always the current ring.
     fun changeHomeApps(change: HomeApps.() -> HomeApps) {
@@ -203,6 +207,8 @@ fun LauncherScreen(
     val open = ring.filterIsInstance<RingItem.Folder>().find { it.index == openFolder }
     // A slot number outliving its folder would open a folder made later in that slot by itself.
     LaunchedEffect(open == null) { if (open == null) openFolder = null }
+    // The reset dialog is a window of its own too, so like the menu it takes Back before this screen's BackHandler.
+    var confirmingReset by rememberSaveable { mutableStateOf(false) }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
@@ -367,6 +373,8 @@ fun LauncherScreen(
                                 flips = true,
                                 onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
                             ),
+                            LauncherMenuRow("Restart launcher") { latestOnRestart() },
+                            LauncherMenuRow("Reset launcher") { confirmingReset = true },
                         ),
                         onDismiss = ::closeMenu,
                     )
@@ -383,6 +391,7 @@ fun LauncherScreen(
             closeDrawer()
             editing = null
             pickingCollection = false
+            confirmingReset = false
             // Coming back from an app keeps the page you left, like the stock launcher.
             if (press.launcherInFront) goHome()
         }
@@ -568,6 +577,15 @@ fun LauncherScreen(
                         }
                     }
                 },
+            )
+        }
+        if (confirmingReset) {
+            ResetDialog(
+                onReset = {
+                    confirmingReset = false
+                    onReset()
+                },
+                onDismiss = { confirmingReset = false },
             )
         }
         dragged?.let { drag ->

@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
@@ -101,6 +103,8 @@ class LauncherScreenTest {
     private var badgesEnabled by mutableStateOf(false)
     private var badgeSettingsOpened = 0
     private var notificationsOpened = 0
+    private var restarts = 0
+    private var resets = 0
     private val actions = AppActions(
         icon = { null },
         launch = launched::add,
@@ -146,6 +150,8 @@ class LauncherScreenTest {
             badgesEnabled = badgesEnabled,
             onOpenBadgeSettings = { badgeSettingsOpened++ },
             onOpenNotifications = { notificationsOpened++ },
+            onRestart = { restarts++ },
+            onReset = { resets++ },
             modifier = modifier,
             pagerState = pager,
         )
@@ -200,6 +206,13 @@ class LauncherScreenTest {
      */
     private fun swipeDownFrom(start: Offset) =
         compose.onRoot().performTouchInput { swipe(start, start + Offset(0f, viewConfiguration.touchSlop * 3)) }
+
+    private fun openResetDialog() {
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Reset launcher").performClick()
+        compose.launcherMenu().assertDoesNotExist()
+        compose.resetDialog().assertIsDisplayed()
+    }
 
     private fun goToCollections() {
         compose.swipePager { swipeLeft() }
@@ -933,6 +946,54 @@ class LauncherScreenTest {
         compose.onNodeWithText("24-hour clock").assertIsOff()
         compose.onNodeWithText("24-hour clock").performClick()
         compose.runOnIdle { assertEquals(listOf(false, true), hourStylesChosen) }
+    }
+
+    @Test
+    fun theLauncherMenusRestartRowIsAPlainButtonThatRestartsAtOnce() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        for (action in listOf("Restart launcher", "Reset launcher")) {
+            compose.onNodeWithText(action).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        }
+
+        compose.onNodeWithText("Restart launcher").performClick()
+
+        compose.launcherMenu().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(1, restarts)
+            assertEquals(0, resets)
+        }
+    }
+
+    @Test
+    fun theLauncherMenusResetRowAsksFirstAndOnlyTheDialogsResetResets() {
+        show()
+        openResetDialog()
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        compose.resetDialog().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, resets) }
+        openResetDialog()
+
+        compose.onNodeWithText("Reset").performClick()
+
+        compose.resetDialog().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(1, resets)
+            assertEquals(0, restarts)
+        }
+    }
+
+    @Test
+    fun homeClosesTheResetDialogWithoutResetting() {
+        show()
+        openResetDialog()
+
+        pressHome(launcherInFront = true)
+
+        compose.resetDialog().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, resets) }
     }
 
     @Test
