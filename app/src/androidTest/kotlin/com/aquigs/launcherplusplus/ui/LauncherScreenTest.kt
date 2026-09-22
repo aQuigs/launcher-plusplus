@@ -75,7 +75,8 @@ class LauncherScreenTest {
     private var homeApps by mutableStateOf(HomeApps())
     private var homeAppsChanges = 0
     private val work = folderOf(clock, mail)
-    private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September"))
+    private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
+    private val hourStylesChosen = mutableListOf<Boolean>()
     private var ringerMode by mutableStateOf(RingerMode.Normal)
     private var ringerTaps = 0
     private var isHomeApp by mutableStateOf(true)
@@ -125,6 +126,10 @@ class LauncherScreenTest {
             },
             actions = actions,
             clock = face,
+            onTwentyFourHourChange = {
+                hourStylesChosen += it
+                face = face.copy(twentyFourHour = it)
+            },
             onOpenClock = { opened += "clock" },
             onOpenCalendar = { opened += "calendar" },
             ringerMode = ringerMode,
@@ -189,11 +194,6 @@ class LauncherScreenTest {
         compose.waitForIdle()
     }
 
-    /** The home page's top-left corner in root coordinates, where the clock, the card and the ring are not. */
-    private fun emptyHomeSpace() = compose.page(LauncherPage.Home).fetchSemanticsNode().boundsInRoot.topLeft + Offset(10f, 10f)
-
-    private fun longPressEmptyHomeSpace() = compose.onRoot().performTouchInput { longClick(emptyHomeSpace()) }
-
     /**
      * Swipes down from [start], in root coordinates, only just past the touch slop: a finger that ends the swipe still on
      * what it started on would tap that too, unless the swipe cancels the tap.
@@ -250,7 +250,7 @@ class LauncherScreenTest {
         show()
         compose.onNodeWithText("10:19").assertIsDisplayed()
 
-        compose.runOnIdle { face = ClockFace("10:20", "Saturday 13 September") }
+        compose.runOnIdle { face = face.copy(time = "10:20") }
 
         compose.onNodeWithText("10:20").assertIsDisplayed()
         compose.clockTime().performClick()
@@ -905,7 +905,7 @@ class LauncherScreenTest {
         homeApps = HomeApps(ring = ringOf(mail))
         show()
 
-        longPressEmptyHomeSpace()
+        compose.longPressEmptyHomeSpace()
 
         compose.launcherMenu().assertIsDisplayed()
         compose.onNodeWithText("Unread badges").assert(hasStateDescription("Off"))
@@ -917,6 +917,22 @@ class LauncherScreenTest {
         compose.launcherMenu().assertDoesNotExist()
         compose.runOnIdle { assertEquals(1, badgeSettingsOpened) }
         assertSettledOn(LauncherPage.Home)
+    }
+
+    // Flipped twice, so a row that kept the style it first showed would ask for the same one again.
+    @Test
+    fun theLauncherMenusClockRowShowsTheClocksHourStyleAndATapFlipsIt() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("24-hour clock").assertIsOn()
+
+        compose.onNodeWithText("24-hour clock").performClick()
+
+        compose.launcherMenu().assertDoesNotExist()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("24-hour clock").assertIsOff()
+        compose.onNodeWithText("24-hour clock").performClick()
+        compose.runOnIdle { assertEquals(listOf(false, true), hourStylesChosen) }
     }
 
     @Test
@@ -937,14 +953,14 @@ class LauncherScreenTest {
     @Test
     fun backAndHomeCloseTheLauncherMenu() {
         show()
-        longPressEmptyHomeSpace()
+        compose.longPressEmptyHomeSpace()
         compose.launcherMenu().assertIsDisplayed()
 
         Espresso.pressBack()
         compose.launcherMenu().assertDoesNotExist()
         assertSettledOn(LauncherPage.Home)
 
-        longPressEmptyHomeSpace()
+        compose.longPressEmptyHomeSpace()
         compose.launcherMenu().assertIsDisplayed()
         pressHome(launcherInFront = true)
         compose.launcherMenu().assertDoesNotExist()
@@ -1117,7 +1133,7 @@ class LauncherScreenTest {
         homeApps = HomeApps(ring = ringOf(mail))
         show()
 
-        listOf(emptyHomeSpace(), centreOf(compose.clockTime()), centreOf(compose.ringSlot(mail)), centreOf(compose.emblem()))
+        listOf(compose.emptyHomeSpace(), centreOf(compose.clockTime()), centreOf(compose.ringSlot(mail)), centreOf(compose.emblem()))
             .forEach(::swipeDownFrom)
 
         compose.runOnIdle {

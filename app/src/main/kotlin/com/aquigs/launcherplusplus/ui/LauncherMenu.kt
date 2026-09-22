@@ -23,6 +23,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.round
 
 object LauncherMenuTags {
@@ -32,8 +34,11 @@ object LauncherMenuTags {
 /** The launcher's own long-press menu, opened at the spot pressed on a page's empty space and shown there. */
 typealias LauncherMenu = LongPressMenu<Offset>
 
-/** One row of the launcher's menu: [label] beside a switch showing [on]. The row is the target; a tap calls [onClick]. */
-class LauncherMenuRow(val label: String, val on: Boolean, val onClick: () -> Unit)
+/**
+ * One row of the launcher's menu: [label] beside a switch showing [on]. The row is the target; a tap calls [onClick], which
+ * flips [on] in place if [flips], or else goes elsewhere to change it.
+ */
+class LauncherMenuRow(val label: String, val on: Boolean, val flips: Boolean = false, val onClick: () -> Unit)
 
 /**
  * The empty space of a page. Laid behind the page's content, it only gets the touches nothing on the page claims, since
@@ -67,13 +72,18 @@ fun LauncherOptionsMenu(expanded: Boolean, rows: List<LauncherMenuRow>, onDismis
         rows.forEach { row ->
             DropdownMenuItem(
                 text = { Text(row.label) },
-                // The switch only shows the state: the row is the control, and a tap goes elsewhere to change it, so screen
-                // readers hear a button with a state rather than a switch that would not flip.
+                // The switch only shows the state: the row is the control. A row whose tap goes elsewhere to change the
+                // state is a button with a state to screen readers, not a switch that would not flip.
                 trailingIcon = { Switch(checked = row.on, onCheckedChange = null) },
                 onClick = { chooseFrom(expanded, onDismiss, row.onClick) },
                 modifier = Modifier.semantics {
-                    role = Role.Button
-                    stateDescription = if (row.on) "On" else "Off"
+                    if (row.flips) {
+                        role = Role.Switch
+                        toggleableState = ToggleableState(row.on)
+                    } else {
+                        role = Role.Button
+                        stateDescription = if (row.on) "On" else "Off"
+                    }
                 },
             )
         }

@@ -1,5 +1,6 @@
 package com.aquigs.launcherplusplus
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -14,21 +15,25 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.swipeLeft
+import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
+import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.domain.HomeApps
 import com.aquigs.launcherplusplus.domain.HomePlace
 import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.ui.DockTags
+import com.aquigs.launcherplusplus.ui.HomeClockTags
 import com.aquigs.launcherplusplus.ui.LauncherTags
 import com.aquigs.launcherplusplus.ui.appList
 import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
 import com.aquigs.launcherplusplus.ui.homeAppCard
+import com.aquigs.launcherplusplus.ui.longPressEmptyHomeSpace
 import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.placeOption
 import com.aquigs.launcherplusplus.ui.swipePager
@@ -42,7 +47,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
-    private val homeAppsStore = SharedPreferencesHomeAppsStore(InstrumentationRegistry.getInstrumentation().targetContext)
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val homeAppsStore = SharedPreferencesHomeAppsStore(context)
 
     // On a dark system the default bar styles draw light icons too, so the tests run on a light system, where the default
     // went wrong. The user's setting comes back afterwards.
@@ -60,13 +66,22 @@ class MainActivityTest {
         }
     }
 
-    // The activity reads the home screen apps in onCreate, so the ring and the dock are emptied before the compose rule
-    // starts the activity, whatever an earlier run or by-hand use left there, and emptied again afterwards.
-    @get:Rule(order = 1)
-    val emptyHome = object : ExternalResource() {
-        override fun before() = homeAppsStore.save(HomeApps())
+    @get:Rule(order = 0)
+    val restoreHourStyle = RestoreHourStyle()
 
-        override fun after() = homeAppsStore.save(HomeApps())
+    // The activity reads the home screen apps and the clock's hour style in onCreate, so the ring, the dock and the
+    // clock's choice are emptied before the compose rule starts the activity, whatever an earlier run or by-hand use left
+    // there, and emptied again afterwards.
+    @get:Rule(order = 1)
+    val emptyStores = object : ExternalResource() {
+        override fun before() = empty()
+
+        override fun after() = empty()
+
+        private fun empty() {
+            homeAppsStore.save(HomeApps())
+            context.getSharedPreferences("clock", Context.MODE_PRIVATE).edit(commit = true) { clear() }
+        }
     }
 
     @get:Rule(order = 2)
@@ -114,6 +129,15 @@ class MainActivityTest {
 
     private fun dockIcon(label: String) = hasContentDescription(label) and hasAnyAncestor(hasTestTag(DockTags.DOCK))
 
+    // Against the face the clock would draw in that style, read afresh in case the minute turns meanwhile.
+    private fun assertClockIn(twentyFourHour: Boolean) {
+        val wallClock = SystemWallClock(context)
+        compose.waitUntil(timeoutMillis = 5_000) {
+            val clockIn = hasTestTag(HomeClockTags.TIME) and hasText(wallClock.face(twentyFourHour).time)
+            compose.onAllNodes(clockIn).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun assertSettingsOnTheRingAndInTheDock() {
         compose.onNode(ringIcon("Settings")).assertIsDisplayed()
         compose.onNode(dockIcon("Settings")).assertIsDisplayed()
@@ -135,6 +159,20 @@ class MainActivityTest {
         // The app list loads again after recreation, and the ring and the dock only show installed apps.
         compose.waitUntilAtLeastOneExists(dockIcon("Settings"), timeoutMillis = 10_000)
         assertSettingsOnTheRingAndInTheDock()
+    }
+
+    // The system is set to 24 hours, where a clock that fell to 12 without a stored choice would show it.
+    @Test
+    fun theClockFollowsTheSystemUntilTheMenuFlipsItAndKeepsTheChoice() {
+        setSystemHourStyle(twentyFourHour = true)
+        assertClockIn(twentyFourHour = true)
+
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("24-hour clock").performClick()
+
+        assertClockIn(twentyFourHour = false)
+        compose.activityRule.scenario.recreate()
+        assertClockIn(twentyFourHour = false)
     }
 
     @Test

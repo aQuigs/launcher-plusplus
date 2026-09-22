@@ -23,11 +23,11 @@ import kotlinx.coroutines.flow.map
 import java.util.Date
 
 interface WallClock {
-    /** The time and date to show now. */
-    fun face(): ClockFace
+    /** The time and date to show now, the time in 24 hours if [twentyFourHour], in 12 if not, and in the system's style if null. */
+    fun face(twentyFourHour: Boolean?): ClockFace
 
-    /** [face] now, then again each minute and whenever the time, the time zone or the hour style changes. */
-    fun faces(): Flow<ClockFace>
+    /** [face] now, then again each minute and whenever the time, the time zone or the system's hour style changes. */
+    fun faces(twentyFourHour: Boolean?): Flow<ClockFace>
 
     /** Opens the clock app, on its alarms. */
     fun openClock()
@@ -38,19 +38,20 @@ interface WallClock {
 
 private const val TAG = "SystemWallClock"
 
-/** The system clock, with the date in the order the locale puts it and the hours in the user's 12- or 24-hour style. */
+/** The system clock, with the date in the order the locale puts it and the hours in the 12- or 24-hour style asked for. */
 class SystemWallClock(private val context: Context) : WallClock {
-    override fun face(): ClockFace {
+    override fun face(twentyFourHour: Boolean?): ClockFace {
         val locale = context.resources.configuration.locales[0]
         val now = Date()
-        val hours = if (is24HourFormat(context)) "Hm" else "hm"
+        val inTwentyFour = twentyFourHour ?: is24HourFormat(context)
         return ClockFace(
-            time = DateFormat.getInstanceForSkeleton(hours, locale).format(now),
+            time = DateFormat.getInstanceForSkeleton(if (inTwentyFour) "Hm" else "hm", locale).format(now),
             date = DateFormat.getInstanceForSkeleton("EEEEMMMMd", locale).format(now),
+            twentyFourHour = inTwentyFour,
         )
     }
 
-    override fun faces(): Flow<ClockFace> =
+    override fun faces(twentyFourHour: Boolean?): Flow<ClockFace> =
         callbackFlow {
             val ticks = object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent) {
@@ -77,7 +78,7 @@ class SystemWallClock(private val context: Context) : WallClock {
             }
         }
             .conflate()
-            .map { face() }
+            .map { face(twentyFourHour) }
 
     override fun openClock() = startOrLog(TAG, "the clock") {
         context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
