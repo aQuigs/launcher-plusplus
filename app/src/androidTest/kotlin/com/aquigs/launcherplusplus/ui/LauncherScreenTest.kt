@@ -52,6 +52,7 @@ import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.PageLayout
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingSlot
+import com.aquigs.launcherplusplus.domain.RingerMode
 import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.WidgetPage
 import kotlinx.coroutines.CompletableDeferred
@@ -75,6 +76,8 @@ class LauncherScreenTest {
     private var homeAppsChanges = 0
     private val work = folderOf(clock, mail)
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September"))
+    private var ringerMode by mutableStateOf(RingerMode.Normal)
+    private var ringerTaps = 0
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -124,6 +127,8 @@ class LauncherScreenTest {
             clock = face,
             onOpenClock = { opened += "clock" },
             onOpenCalendar = { opened += "calendar" },
+            ringerMode = ringerMode,
+            onRingerTap = { ringerTaps++ },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPage = widgetPage,
@@ -251,6 +256,19 @@ class LauncherScreenTest {
         compose.clockTime().performClick()
         compose.clockDate().performClick()
         assertEquals(listOf("clock", "calendar"), opened)
+    }
+
+    @Test
+    fun theRingerShowsItsModeBetweenTheDateAndTheRingAndHandsOnATap() {
+        ringerMode = RingerMode.Vibrate
+        show()
+        val row = compose.ringer().assert(hasStateDescription("Vibrate")).getUnclippedBoundsInRoot()
+        assertTrue("the ringer sits under the date", compose.clockDate().getUnclippedBoundsInRoot().bottom <= row.top)
+        assertTrue("the ringer sits over the ring", row.bottom <= compose.emblem().getUnclippedBoundsInRoot().top)
+
+        compose.ringer().performClick()
+
+        compose.runOnIdle { assertEquals(1, ringerTaps) }
     }
 
     @Test
