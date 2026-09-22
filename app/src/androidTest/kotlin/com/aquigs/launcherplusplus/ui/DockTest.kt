@@ -50,6 +50,17 @@ class DockTest {
     }
 
     @Test
+    fun aFewAppsSitTogetherInTheMiddleOfTheRow() {
+        show(listOf(clock, mail))
+        val row = compose.dock().getUnclippedBoundsInRoot()
+        val first = compose.dockSlot(clock).getUnclippedBoundsInRoot()
+        val second = compose.dockSlot(mail).getUnclippedBoundsInRoot()
+
+        assertEquals((first.left - row.left).value, (row.right - second.right).value, 1f)
+        assertTrue("the gap ${second.left - first.right} is within an icon's width", second.left - first.right < first.width)
+    }
+
+    @Test
     fun tappingADockAppLaunchesIt() {
         val launched = mutableListOf<AppEntry>()
         show(listOf(clock, mail), onLaunch = launched::add)
