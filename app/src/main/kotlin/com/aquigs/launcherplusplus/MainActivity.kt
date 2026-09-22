@@ -21,6 +21,7 @@ import com.aquigs.launcherplusplus.apps.NotificationBadges
 import com.aquigs.launcherplusplus.apps.RoleManagerHomeRole
 import com.aquigs.launcherplusplus.apps.SharedPreferencesCollectionsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
+import com.aquigs.launcherplusplus.apps.SharedPreferencesHourStyleStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesWidgetPageStore
 import com.aquigs.launcherplusplus.apps.StatusBarNotificationShade
 import com.aquigs.launcherplusplus.apps.SystemAppUsage
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
         val repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
+        val hourStyleStore = SharedPreferencesHourStyleStore(this)
         val ringer = SystemRinger(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
@@ -78,10 +80,11 @@ class MainActivity : ComponentActivity() {
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys.
                 var homeApps by remember { mutableStateOf(homeAppsStore.load()) }
+                var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
-                val clock by produceState(remember { wallClock.face() }) {
-                    repeatOnLifecycle(Lifecycle.State.STARTED) { wallClock.faces().collect { value = it } }
+                val clock by produceState(remember { wallClock.face(twentyFourHour) }, twentyFourHour) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { wallClock.faces(twentyFourHour).collect { value = it } }
                 }
                 // Read before the first frame too, so the switch never shows another mode first. It follows the ringer while
                 // the launcher is visible, like the clock.
@@ -122,6 +125,10 @@ class MainActivity : ComponentActivity() {
                     },
                     actions = actions,
                     clock = clock,
+                    onTwentyFourHourChange = {
+                        twentyFourHour = it
+                        hourStyleStore.save(it)
+                    },
                     onOpenClock = wallClock::openClock,
                     onOpenCalendar = wallClock::openCalendar,
                     ringerMode = ringerMode,

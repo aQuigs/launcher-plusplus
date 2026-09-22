@@ -91,12 +91,12 @@ data class HomePress(val launcherInFront: Boolean)
  * [onOpenUsageSettings] asks for); a category card's pencil opens an editor over the screen that adds apps to it, and
  * the button under the cards opens the picker that adds and removes cards. An app long-pressed on a category card lifts
  * off it, and dropping it on the bin takes it off the card. Apps everywhere wear their [unread] counts; a long press on
- * the home page's empty space opens the launcher's own menu, whose one row shows whether the badges are enabled
- * ([badgesEnabled]) and opens the system screen that decides it ([onOpenBadgeSettings]). [apps] is null until the
- * installed apps have loaded. Every [HomePress] cancels a drag and closes the menu, the drawer, the editor, the picker
- * and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
- * it cancels a drag, else closes the menu, then the drawer, then the editor or the picker, then returns to the home
- * page, then closes the folder.
+ * the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
+ * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), and show whether the clock is in
+ * 24 hours and flip it ([onTwentyFourHourChange]). [apps] is null until the installed apps have loaded. Every
+ * [HomePress] cancels a drag and closes the menu, the drawer, the editor, the picker and the folder; one made while the
+ * launcher was in front also scrolls to the home page. Back undoes what is on top: it cancels a drag, else closes the
+ * menu, then the drawer, then the editor or the picker, then returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,6 +108,7 @@ fun LauncherScreen(
     onHomeAppsChange: (HomeApps) -> Unit,
     actions: AppActions,
     clock: ClockFace,
+    onTwentyFourHourChange: (Boolean) -> Unit,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
     ringerMode: RingerMode,
@@ -139,6 +140,8 @@ fun LauncherScreen(
     val latestOnCollectionsChange by rememberUpdatedState(onCollectionsChange)
     val latestBadgesEnabled by rememberUpdatedState(badgesEnabled)
     val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
+    val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
+    val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
 
     // Callbacks built once read the home apps through the latest state, so what they change is always the current ring.
     fun changeHomeApps(change: HomeApps.() -> HomeApps) {
@@ -358,6 +361,12 @@ fun LauncherScreen(
                         expanded = shown.expanded,
                         rows = listOf(
                             LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
+                            LauncherMenuRow(
+                                "24-hour clock",
+                                on = latestTwentyFourHour,
+                                flips = true,
+                                onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
+                            ),
                         ),
                         onDismiss = ::closeMenu,
                     )

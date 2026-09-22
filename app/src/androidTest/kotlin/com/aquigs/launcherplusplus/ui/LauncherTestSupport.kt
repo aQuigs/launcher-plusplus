@@ -1,14 +1,17 @@
 package com.aquigs.launcherplusplus.ui
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -94,6 +97,12 @@ fun SemanticsNodeInteractionsProvider.addWidgetButton() = onNodeWithTag(WidgetTa
 fun SemanticsNodeInteractionsProvider.widgetOptionsMenu() = onNodeWithTag(WidgetTags.MENU)
 
 fun SemanticsNodeInteractionsProvider.launcherMenu() = onNodeWithTag(LauncherMenuTags.MENU)
+
+/** The home page's top-left corner in root coordinates, where the clock, the card and the ring are not. */
+fun SemanticsNodeInteractionsProvider.emptyHomeSpace() =
+    page(LauncherPage.Home).fetchSemanticsNode().boundsInRoot.topLeft + Offset(10f, 10f)
+
+fun SemanticsNodeInteractionsProvider.longPressEmptyHomeSpace() = onRoot().performTouchInput { longClick(emptyHomeSpace()) }
 
 // The badge is merged into its icon's node, so it is found in the unmerged tree, under the icon tagged [tag].
 fun SemanticsNodeInteractionsProvider.badgeOn(tag: String) =
