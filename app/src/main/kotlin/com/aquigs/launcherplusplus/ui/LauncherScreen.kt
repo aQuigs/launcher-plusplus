@@ -78,7 +78,8 @@ data class HomePress(val launcherInFront: Boolean)
  * The whole launcher: a horizontal pager over [layout] with the dock under it and the app drawer peeking below as a
  * chevron. The home page shows the [clock] over the ring from [homeApps]: the time and the date open the clock app and
  * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Until [isHomeApp], a card
- * between them says so and offers [onBecomeHomeApp]. Long-pressing an app anywhere opens its menu of shortcuts and
+ * between them says so and offers [onBecomeHomeApp]. A swipe down from anywhere on the home page above the dock pulls
+ * down the notification shade ([onOpenNotifications]). Long-pressing an app anywhere opens its menu of shortcuts and
  * options; a ring app's menu can start a folder in its slot. A folder opens in place, as in Arc: its apps take the ring's
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
@@ -118,6 +119,7 @@ fun LauncherScreen(
     unread: UnreadCounts,
     badgesEnabled: Boolean,
     onOpenBadgeSettings: () -> Unit,
+    onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
@@ -448,7 +450,7 @@ fun LauncherScreen(
                     val page = layout.pages[index]
                     Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                         when (page) {
-                            LauncherPage.Home -> {
+                            LauncherPage.Home -> Box(Modifier.fillMaxSize().swipeDown(onOpenNotifications)) {
                                 // First, so it lies behind the clock, the card and the ring and gets only the touches they leave.
                                 EmptySpace(menu = launcherMenu)
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

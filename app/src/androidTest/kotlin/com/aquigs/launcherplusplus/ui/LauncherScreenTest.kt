@@ -96,6 +96,7 @@ class LauncherScreenTest {
     private var unread by mutableStateOf(UnreadCounts())
     private var badgesEnabled by mutableStateOf(false)
     private var badgeSettingsOpened = 0
+    private var notificationsOpened = 0
     private val actions = AppActions(
         icon = { null },
         launch = launched::add,
@@ -134,6 +135,7 @@ class LauncherScreenTest {
             unread = unread,
             badgesEnabled = badgesEnabled,
             onOpenBadgeSettings = { badgeSettingsOpened++ },
+            onOpenNotifications = { notificationsOpened++ },
             modifier = modifier,
             pagerState = pager,
         )
@@ -182,8 +184,17 @@ class LauncherScreenTest {
         compose.waitForIdle()
     }
 
-    /** Long-presses the home page's top-left corner, where the clock, the card and the ring are not. */
-    private fun longPressEmptyHomeSpace() = compose.page(LauncherPage.Home).performTouchInput { longClick(topLeft + Offset(10f, 10f)) }
+    /** The home page's top-left corner in root coordinates, where the clock, the card and the ring are not. */
+    private fun emptyHomeSpace() = compose.page(LauncherPage.Home).fetchSemanticsNode().boundsInRoot.topLeft + Offset(10f, 10f)
+
+    private fun longPressEmptyHomeSpace() = compose.onRoot().performTouchInput { longClick(emptyHomeSpace()) }
+
+    /**
+     * Swipes down from [start], in root coordinates, only just past the touch slop: a finger that ends the swipe still on
+     * what it started on would tap that too, unless the swipe cancels the tap.
+     */
+    private fun swipeDownFrom(start: Offset) =
+        compose.onRoot().performTouchInput { swipe(start, start + Offset(0f, viewConfiguration.touchSlop * 3)) }
 
     private fun goToCollections() {
         compose.swipePager { swipeLeft() }
@@ -1081,6 +1092,49 @@ class LauncherScreenTest {
 
         compose.swipePager { swipeRight() }
         assertSettledOn(LauncherPage.Widgets)
+    }
+
+    @Test
+    fun aSwipeDownAnywhereOnTheHomePageOpensTheNotificationsAndNothingElse() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        show()
+
+        listOf(emptyHomeSpace(), centreOf(compose.clockTime()), centreOf(compose.ringSlot(mail)), centreOf(compose.emblem()))
+            .forEach(::swipeDownFrom)
+
+        compose.runOnIdle {
+            assertEquals(4, notificationsOpened)
+            assertEquals(emptyList<AppEntry>(), launched)
+            assertEquals(emptyList<String>(), opened)
+        }
+        assertDrawerOpen(false)
+    }
+
+    @Test
+    fun aPageSwipeThatDriftsDownChangesThePageWithoutOpeningTheNotifications() {
+        show()
+
+        compose.swipePager { swipe(center, center + Offset(-width / 2f, height / 10f)) }
+
+        assertSettledOn(LauncherPage.Collections)
+        compose.runOnIdle { assertEquals(0, notificationsOpened) }
+    }
+
+    @Test
+    fun aLongPressThatMovesDownOpensTheMenuRatherThanTheNotifications() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        show()
+        val icon = centreOf(compose.ringSlot(mail))
+
+        compose.onRoot().performTouchInput {
+            down(icon)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(0f, height / 4f))
+            up()
+        }
+
+        compose.appOptionsMenu().assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, notificationsOpened) }
     }
 
     @Test
