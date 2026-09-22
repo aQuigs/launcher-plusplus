@@ -54,7 +54,7 @@ class AppDrawerTest {
         unread: UnreadCounts = UnreadCounts(),
     ) = compose.setContent {
         var query by remember { mutableStateOf("") }
-        AppDrawer(apps, onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it }, unread = unread)
+        AppDrawer(apps, icon = { null }, onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it }, unread = unread)
     }
 
     @Test

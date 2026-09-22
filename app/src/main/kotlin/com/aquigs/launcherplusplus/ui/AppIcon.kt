@@ -53,14 +53,14 @@ fun AppIcon(
 }
 
 /**
- * The round face of an icon: [content] on a tinted disc, clipped to it, rippling for the presses in [presses]. The press
- * handling, the badge and the name stay on the icon's own node outside, so the badge can overhang the disc while a
- * screen reader still meets one icon, and the ripple keeps to the disc all the same. The whole square is the target,
- * badge included, as on other launchers.
+ * The round face of an icon: [content] on a tinted disc, clipped to it, rippling for the presses in [presses] when it
+ * has any. The press handling, the badge and the name stay on the icon's own node outside, so the badge can overhang the
+ * disc while a screen reader still meets one icon, and the ripple keeps to the disc all the same. The whole square is
+ * the target, badge included, as on other launchers.
  */
 @Composable
 fun IconDisc(
-    presses: InteractionSource,
+    presses: InteractionSource? = null,
     modifier: Modifier = Modifier,
     contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable BoxScope.() -> Unit,
@@ -69,7 +69,7 @@ fun IconDisc(
         modifier
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .indication(presses, ripple()),
+            .then(if (presses != null) Modifier.indication(presses, ripple()) else Modifier),
         contentAlignment = contentAlignment,
         content = content,
     )

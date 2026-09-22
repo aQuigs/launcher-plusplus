@@ -431,6 +431,7 @@ fun LauncherScreen(
             sheetContent = {
                 AppDrawer(
                     apps = apps.orEmpty(),
+                    icon = actions.icon,
                     onLaunch = actions.launch,
                     menu = drawerMenu,
                     drag = dragFromDrawer,
@@ -559,6 +560,7 @@ fun LauncherScreen(
             CollectionEditor(
                 title = "Add to ${category.label}",
                 apps = apps.orEmpty(),
+                icon = actions.icon,
                 isPicked = { it.key in justPicked },
                 onPick = { app ->
                     // Marked whether or not it was already in the card, so the tap is seen to have counted either way.

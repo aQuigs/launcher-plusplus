@@ -46,6 +46,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -109,15 +110,16 @@ class Picking(
 )
 
 /**
- * Every app in sections headed by their initial, with a rail of those initials down the end edge to jump by. A tap
- * launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that moves on
- * becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching apps, without
- * sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with [unread]
- * notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
+ * Every app, as its [icon] and its name, in sections headed by their initial, with a rail of those initials down the end
+ * edge to jump by. A tap launches the app and a long press opens its [menu], unless the drawer is [picking]; a long
+ * press that moves on becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching
+ * apps, without sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with
+ * [unread] notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
  */
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
+    icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     picking: Picking? = null,
@@ -171,14 +173,14 @@ fun AppDrawer(
                     sections.forEach { section ->
                         item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                         items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                            AppRow(app, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                            AppRow(app, icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
                         }
                     }
                 } else if (matches.isEmpty()) {
                     item(contentType = "empty") { NoMatches() }
                 } else {
                     items(matches, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                        AppRow(app, icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
                     }
                 }
             }
@@ -233,6 +235,7 @@ private fun NoMatches() {
 }
 
 private val RAIL_WIDTH = 28.dp
+private val ROW_ICON_SIZE = 40.dp
 
 @Composable
 private fun SectionHeader(initial: Char) {
@@ -248,7 +251,15 @@ private fun SectionHeader(initial: Char) {
 }
 
 @Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking?, menu: AppMenu?, drag: AppDrag?, unread: Int) {
+private fun AppRow(
+    app: AppEntry,
+    icon: suspend (AppEntry) -> ImageBitmap?,
+    onLaunch: (AppEntry) -> Unit,
+    picking: Picking?,
+    menu: AppMenu?,
+    drag: AppDrag?,
+    unread: Int,
+) {
     val picked = picking?.isPicked(app) == true
     val action = when {
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
@@ -264,9 +275,10 @@ private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, picking: Picking
         modifier = Modifier
             .fillMaxWidth()
             .then(action)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
+            .padding(horizontal = 24.dp, vertical = 8.dp),
     ) {
-        Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        IconDisc(modifier = Modifier.size(ROW_ICON_SIZE)) { AppImage(app, icon, Modifier.fillMaxSize()) }
+        Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(start = 16.dp))
         if (unread > 0) {
             // Read as part of the row: a description here would speak for the whole row and silence its name.
             Text(

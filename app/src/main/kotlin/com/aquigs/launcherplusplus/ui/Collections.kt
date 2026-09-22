@@ -596,6 +596,7 @@ private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
 fun CollectionEditor(
     title: String,
     apps: List<AppEntry>,
+    icon: suspend (AppEntry) -> ImageBitmap?,
     isPicked: (AppEntry) -> Boolean,
     onPick: (AppEntry) -> Unit,
     query: String,
@@ -605,6 +606,7 @@ fun CollectionEditor(
     Surface(modifier.fillMaxSize().testTag(CollectionTags.EDITOR), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)) {
         AppDrawer(
             apps = apps,
+            icon = icon,
             onLaunch = {},
             picking = Picking(
                 header = {
