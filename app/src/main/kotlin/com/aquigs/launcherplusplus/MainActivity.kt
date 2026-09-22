@@ -24,6 +24,7 @@ import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesWidgetPageStore
 import com.aquigs.launcherplusplus.apps.StatusBarNotificationShade
 import com.aquigs.launcherplusplus.apps.SystemAppUsage
+import com.aquigs.launcherplusplus.apps.SystemRinger
 import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.apps.SystemWidgetHost
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
         val repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
+        val ringer = SystemRinger(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
         val collectionsStore = SharedPreferencesCollectionsStore(this)
@@ -80,6 +82,11 @@ class MainActivity : ComponentActivity() {
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
                 val clock by produceState(remember { wallClock.face() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { wallClock.faces().collect { value = it } }
+                }
+                // Read before the first frame too, so the switch never shows another mode first. It follows the ringer while
+                // the launcher is visible, like the clock.
+                val ringerMode by produceState(remember { ringer.mode() }) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { ringer.modes().collect { value = it } }
                 }
                 // Read again on each return to the front, since the user may have picked another home app in Settings.
                 val isHomeApp by produceState(remember { homeRole.isHeld() }) {
@@ -117,6 +124,8 @@ class MainActivity : ComponentActivity() {
                     clock = clock,
                     onOpenClock = wallClock::openClock,
                     onOpenCalendar = wallClock::openCalendar,
+                    ringerMode = ringerMode,
+                    onRingerTap = ringer::cycle,
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPage = widgetPage,

@@ -63,6 +63,8 @@ fun SemanticsNodeInteractionsProvider.clockTime() = onNodeWithTag(HomeClockTags.
 
 fun SemanticsNodeInteractionsProvider.clockDate() = onNodeWithTag(HomeClockTags.DATE)
 
+fun SemanticsNodeInteractionsProvider.ringer() = onNodeWithTag(HomeClockTags.RINGER)
+
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
