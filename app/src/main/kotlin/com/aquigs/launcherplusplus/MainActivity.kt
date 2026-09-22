@@ -22,6 +22,7 @@ import com.aquigs.launcherplusplus.apps.RoleManagerHomeRole
 import com.aquigs.launcherplusplus.apps.SharedPreferencesCollectionsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesHomeAppsStore
 import com.aquigs.launcherplusplus.apps.SharedPreferencesWidgetPageStore
+import com.aquigs.launcherplusplus.apps.StatusBarNotificationShade
 import com.aquigs.launcherplusplus.apps.SystemAppUsage
 import com.aquigs.launcherplusplus.apps.SystemWallClock
 import com.aquigs.launcherplusplus.apps.SystemWidgetHost
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
         val badges = NotificationBadges(this)
         val collectionsStore = SharedPreferencesCollectionsStore(this)
         val appUsage = SystemAppUsage(this)
+        val shade = StatusBarNotificationShade(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = WidgetActions(view = widgetHost::view, add = widgetHost::add, remove = widgetHost::remove)
         val layout = PageLayout()
@@ -129,6 +131,7 @@ class MainActivity : ComponentActivity() {
                     unread = unread,
                     badgesEnabled = badgesEnabled,
                     onOpenBadgeSettings = badges::openSettings,
+                    onOpenNotifications = shade::open,
                     modifier = Modifier.safeDrawingPadding(),
                 )
             }
