@@ -4,9 +4,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -26,7 +24,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.RingItem
 
@@ -61,12 +58,17 @@ val FolderGlyph: ImageVector = materialIcon("Folder") {
     }
 }
 
-private const val PREVIEW_SIDE = 2
+private const val PREVIEWS = 4
+private const val PREVIEWS_PER_ROW = 2
+
+/** The square of the disc the previews fill, and the share of it each preview takes; the rest spaces them out. */
+private const val PREVIEWS_FRACTION = 0.64f
+private const val PREVIEW_FRACTION = 0.45f
 
 /**
- * A ring slot holding [folder]: a circle, the size of an app's, previewing up to four of its icons in a small grid and
- * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, and a long
- * press opens its [menu].
+ * A ring slot holding [folder]: a circle, the size of an app's, previewing up to four of its icons together in the
+ * middle and wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty,
+ * and a long press opens its [menu].
  */
 @Composable
 fun FolderIcon(
@@ -93,16 +95,15 @@ fun FolderIcon(
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
         IconDisc(presses, Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxSize(0.62f)) {
-                repeat(PREVIEW_SIDE) { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                        repeat(PREVIEW_SIDE) { column ->
-                            Box(Modifier.weight(1f).fillMaxHeight()) {
-                                folder.apps.getOrNull(row * PREVIEW_SIDE + column)?.let { AppImage(it, icon, Modifier.fillMaxSize()) }
-                            }
-                        }
-                    }
-                }
+            // Rows of two, spaced out in the middle: one preview alone, two side by side, three as a triangle, four as a
+            // grid. Spaced by shares of the square rather than fixed gaps, so a shrunken ring's small discs fit them too.
+            FlowRow(
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalArrangement = Arrangement.SpaceAround,
+                maxItemsInEachRow = PREVIEWS_PER_ROW,
+                modifier = Modifier.fillMaxSize(PREVIEWS_FRACTION),
+            ) {
+                folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION)) }
             }
         }
         menu?.content?.invoke(folder)
