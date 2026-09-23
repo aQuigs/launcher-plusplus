@@ -218,7 +218,7 @@ class MainActivityTest {
             val bars = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
             assertFalse("status bar icons are dark", bars.isAppearanceLightStatusBars)
             assertFalse("navigation bar icons are dark", bars.isAppearanceLightNavigationBars)
-            assertTrue("three-button navigation lost its backing", activity.window.isNavigationBarContrastEnforced)
+            assertFalse("the system draws its own backing again", activity.window.isNavigationBarContrastEnforced)
         }
     }
 

@@ -4,7 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -33,6 +36,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -79,6 +83,9 @@ object LauncherTags {
 }
 
 private val DRAWER_PEEK = 48.dp
+
+/** How far above the drawer's strip the shade along the bottom edge starts to darken the wallpaper. */
+private val BOTTOM_SHADE_FADE = 32.dp
 
 /** A HOME press. [launcherInFront] is false when the press brought the launcher back from another app. */
 data class HomePress(val launcherInFront: Boolean)
@@ -456,7 +463,31 @@ fun LauncherScreen(
     // the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
     val panel = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-    Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
+    // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
+    // edge lines up with nothing of ours. It is only there to lift the light navigation icons off a bright wallpaper, so
+    // it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
+    // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it.
+    val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Box(
+        modifier
+            .onGloballyPositioned { origin = it.positionInRoot() }
+            .drawBehind {
+                val top = size.height - (DRAWER_PEEK + BOTTOM_SHADE_FADE).toPx()
+                val bottom = size.height + navigationBar.toPx()
+                val shade = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.45f to Color.Black.copy(alpha = 0.06f),
+                    1f to Color.Black.copy(alpha = 0.22f),
+                    startY = top,
+                    endY = bottom,
+                )
+                drawRect(shade, Offset(0f, top), Size(size.width, bottom - top))
+
+                val travel = size.height - DRAWER_PEEK.toPx()
+                val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
+                drawRect(panel.copy(alpha = panel.alpha * open), Offset(0f, size.height), Size(size.width, bottom - size.height))
+            },
+    ) {
         BottomSheetScaffold(
             scaffoldState = rememberBottomSheetScaffoldState(drawerState),
             sheetPeekHeight = DRAWER_PEEK,
