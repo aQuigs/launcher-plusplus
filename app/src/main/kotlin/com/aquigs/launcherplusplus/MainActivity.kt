@@ -73,7 +73,13 @@ class MainActivity : ComponentActivity() {
         val shade = StatusBarNotificationShade(this)
         val relauncher = SystemRelauncher(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
-        val widgetActions = WidgetActions(view = widgetHost::view, add = widgetHost::add, remove = widgetHost::remove)
+        val widgetActions = WidgetActions(
+            view = widgetHost::view,
+            add = widgetHost::add,
+            remove = widgetHost::remove,
+            resize = widgetHost::resize,
+            sizing = widgetHost::sizing,
+        )
         val layout = PageLayout()
         val actions = AppActions(
             icon = repository::icon,

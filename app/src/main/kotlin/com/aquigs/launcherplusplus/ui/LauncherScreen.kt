@@ -94,22 +94,22 @@ data class HomePress(val launcherInFront: Boolean)
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
- * [widgets], and a widget's long-press menu removes it. The collections page shows the cards of [collections], the
- * built-in ones filled from the app list and [foregroundTime] (null until usage access is granted, which
- * [onOpenUsageSettings] asks for); a hand-picked card's pencil opens an editor over the screen that adds apps to it, and
- * the button under the cards opens the picker that adds and removes cards, whose last tile opens a dialog naming a new
- * custom collection. An app long-pressed on a hand-picked card lifts off it, and dropping it on the bin takes it off the
- * card. Apps everywhere wear their [unread] counts; a long press on
- * the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
+ * [widgets]; a long press puts a widget in edit mode, to resize or remove it, until a tap elsewhere or the page goes
+ * out of view. The collections page shows the cards of [collections], the built-in ones filled from the app list and
+ * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
+ * pencil opens an editor over the screen that adds apps to it, and the button under the cards opens the picker that adds
+ * and removes cards, whose last tile opens a dialog naming a new custom collection. An app long-pressed on a hand-picked
+ * card lifts off it, and dropping it on the bin takes it off the card. Apps everywhere wear their [unread] counts; a long
+ * press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
  * dialog has asked. The ring, the dock and folders hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all
  * that is open, as HOME in front does, and asks on the home page whether to add its shortcut, which goes at the end of
  * the ring once the system has pinned it. [apps] and [pinnedShortcuts] are null until they have loaded. Every
- * [HomePress] cancels a drag and closes the menu, the dialogs, the drawer, the editor, the picker and the folder; one
- * made while the launcher was in front also scrolls to the home page. Back undoes what is on top: it cancels a drag, else
- * closes the menu or a dialog, then the drawer, then the editor or the picker, then returns to the home page, then
- * closes the folder.
+ * [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the drawer, the editor, the picker
+ * and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
+ * it cancels a drag, else closes the menu or a dialog, then the drawer, then the editor or the picker, then ends widget
+ * editing, then returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -241,6 +241,13 @@ fun LauncherScreen(
     // The dialogs are windows of their own too, so like the menu they take Back before this screen's BackHandler.
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
+    // The widget in edit mode counts only while it is on the page and the page is in view: one gone with its provider, or
+    // a long press that fired as the page left, must not leave an unseen mode taking taps and Back, nor come back with
+    // the page. So whatever does not count is let go, as the mode ends when the page goes out of view.
+    var editingWidget by remember { mutableStateOf<Int?>(null) }
+    val onWidgetPage = layout.pages[pagerState.currentPage] == LauncherPage.Widgets
+    val editedWidget = editingWidget?.takeIf { id -> onWidgetPage && widgetPage.widgets.any { it.id == id } }
+    LaunchedEffect(editingWidget, editedWidget) { if (editedWidget == null) editingWidget = null }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
@@ -370,23 +377,6 @@ fun LauncherScreen(
         )
     }
 
-    val widgetMenu = remember(widgets) {
-        WidgetMenu(
-            onOpen = { widget ->
-                openingMenu?.cancel()
-                openMenu = OpenMenu.Widget(widget.id)
-            },
-            content = { widget ->
-                (openMenu as? OpenMenu.Widget)?.takeIf { it.id == widget.id }?.let { shown ->
-                    DisposableEffect(Unit) {
-                        onDispose { if ((openMenu as? OpenMenu.Widget)?.id == widget.id) closeMenu() }
-                    }
-                    WidgetOptionsMenu(expanded = shown.expanded, onRemove = { widgets.remove(widget.id) }, onDismiss = ::closeMenu)
-                }
-            },
-        )
-    }
-
     val launcherMenu = remember {
         LauncherMenu(
             onOpen = {
@@ -419,6 +409,7 @@ fun LauncherScreen(
         dragged = null
         closeMenu()
         openFolder = null
+        editingWidget = null
         closeDrawer()
         editing = null
         pickingCollection = false
@@ -445,12 +436,16 @@ fun LauncherScreen(
     // not a rung of its own: the keyboard takes the first Back, and closing the drawer or the editor ends the search.
     // The open folder comes last because the drawer and the other pages both hide it, and a press should undo something
     // in view.
-    BackHandler(enabled = dragged != null || drawerOpen || overlayOpen || pagerState.currentPage != layout.homeIndex || open != null) {
+    BackHandler(
+        enabled = dragged != null || drawerOpen || overlayOpen || editedWidget != null ||
+            pagerState.currentPage != layout.homeIndex || open != null,
+    ) {
         when {
             dragged != null -> dragged = null
             drawerOpen -> closeDrawer()
             editing != null -> editing = null
             pickingCollection -> pickingCollection = false
+            editedWidget != null -> editingWidget = null
             pagerState.currentPage != layout.homeIndex -> goHome()
             else -> openFolder = null
         }
@@ -594,7 +589,7 @@ fun LauncherScreen(
                             }
                         }
                         LauncherPage.Widgets -> {
-                            WidgetColumn(page = widgetPage, view = widgets.view, onAdd = widgets.add, menu = widgetMenu)
+                            WidgetColumn(page = widgetPage, actions = widgets, editing = editedWidget, onEditingChange = { editingWidget = it })
                         }
                         LauncherPage.Collections -> {
                             CollectionsColumn(
@@ -723,11 +718,6 @@ private sealed interface OpenMenu {
 
     /** The menu of the folder in the ring's slot [index]. */
     data class Folder(val index: Int, override val expanded: Boolean = true) : OpenMenu {
-        override fun closed() = copy(expanded = false)
-    }
-
-    /** The menu of the widget [id]. */
-    data class Widget(val id: Int, override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 
