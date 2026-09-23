@@ -66,9 +66,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.UnreadCounts
+import com.aquigs.launcherplusplus.domain.keysWithSharedLabels
 import com.aquigs.launcherplusplus.domain.matching
 import com.aquigs.launcherplusplus.domain.sectionsByInitial
-import com.aquigs.launcherplusplus.domain.sharedLabels
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
@@ -122,8 +122,9 @@ class Picking(
 
 /**
  * Every app, as its [icon] and its name, in sections headed by their initial, with a rail of those initials down the end
- * edge to jump by. An app whose name an app from another package shares also shows its package name, to tell them apart. A tap launches the app and a long press opens its [menu], unless the drawer is [picking]; a long
- * press that moves on becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching
+ * edge to jump by. An app whose name an app from another package shares also shows its package name, to tell them
+ * apart. A tap launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that
+ * moves on becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching
  * apps, without sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with
  * [unread] notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
  */
@@ -151,8 +152,8 @@ fun AppDrawer(
     val matchesState = rememberLazyListState()
     LaunchedEffect(matches) { matchesState.scrollToItem(0) }
     val sections = remember(apps) { apps.sectionsByInitial() }
-    val sharedLabels = remember(apps) { apps.sharedLabels() }
-    val detail = { app: AppEntry -> app.packageName.takeIf { app.searchableLabel in sharedLabels } }
+    val sharingALabel = remember(apps) { apps.keysWithSharedLabels() }
+    val detail = { app: AppEntry -> app.packageName.takeIf { app.key in sharingALabel } }
     val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
     val headerIndices = remember(sections) {
@@ -300,7 +301,8 @@ private fun AppRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    // Packages that share a name usually part at the end, so the start gives way.
+                    overflow = TextOverflow.StartEllipsis,
                 )
             }
         }
