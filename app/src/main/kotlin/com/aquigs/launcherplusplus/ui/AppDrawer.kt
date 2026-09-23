@@ -46,6 +46,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -77,17 +80,23 @@ object AppDrawerTags {
 }
 
 /**
- * The chevron on the strip that peeks above the pages, pointing the way the drawer will move. It only draws: the sheet's
- * drag-handle slot already makes the strip one clickable control that toggles the drawer.
+ * The chevron that peeks above the pages, pointing the way the drawer will move, on a soft shadow so it reads on a bright
+ * wallpaper too. A tap calls [onClick].
  */
 @Composable
-fun DrawerHandle(open: Boolean, modifier: Modifier = Modifier) {
+fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
 
     Icon(
         imageVector = Icons.Default.KeyboardArrowUp,
         contentDescription = if (open) "Close the app drawer" else "Open the app drawer",
         modifier = modifier
+            .clickable(onClick = onClick)
+            .drawWithCache {
+                val radius = size.height / 2
+                val shadow = Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.4f), Color.Transparent), radius = radius)
+                onDrawBehind { drawCircle(shadow, radius) }
+            }
             .padding(vertical = 8.dp)
             .size(32.dp)
             .graphicsLayer { rotationZ = rotation }
