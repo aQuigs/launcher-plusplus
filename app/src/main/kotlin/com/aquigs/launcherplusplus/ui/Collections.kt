@@ -733,7 +733,7 @@ private val AppCategory.glyph: ImageVector
     }
 
 // Material glyphs the core icon set leaves out, from their published path data.
-private fun materialGlyph(name: String, pathData: String): ImageVector =
+internal fun materialGlyph(name: String, pathData: String): ImageVector =
     materialIcon(name) { addPath(addPathNodes(pathData), fill = SolidColor(Color.Black)) }
 
 private val DragHandleGlyph = materialGlyph("DragHandle", "M20 9H4v2h16V9zM4 15h16v-2H4v2z")

@@ -17,8 +17,11 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.CollectionKind
@@ -28,6 +31,7 @@ import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.domain.Ring
 import com.aquigs.launcherplusplus.domain.RingItem
 import com.aquigs.launcherplusplus.domain.RingSlot
+import com.aquigs.launcherplusplus.domain.WIDGET_ROW_HEIGHT_DP
 
 val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
 val mail = AppEntry("Mail", "com.example.mail", "com.example.mail.Main")
@@ -100,12 +104,20 @@ fun SemanticsNodeInteractionsProvider.widget(widget: HostedWidget) = onNodeWithT
 
 fun SemanticsNodeInteractionsProvider.addWidgetButton() = onNodeWithTag(WidgetTags.ADD)
 
-fun SemanticsNodeInteractionsProvider.widgetOptionsMenu() = onNodeWithTag(WidgetTags.MENU)
+fun SemanticsNodeInteractionsProvider.widgetEditFrame() = onNodeWithTag(WidgetTags.EDIT)
 
-/** Holds a finger on [widget] until its menu opens: the widget's view times the press on the looper, which the test clock does not drive. */
+fun SemanticsNodeInteractionsProvider.widgetRemoveButton() = onNodeWithTag(WidgetTags.REMOVE)
+
+fun SemanticsNodeInteractionsProvider.widgetResizeHandle() = onNodeWithTag(WidgetTags.RESIZE)
+
+val WIDGET_ROW = WIDGET_ROW_HEIGHT_DP.dp
+
+fun SemanticsNodeInteractionsProvider.widgetHeight(widget: HostedWidget) = widget(widget).getUnclippedBoundsInRoot().height
+
+/** Holds a finger on [widget] until it is in edit mode: the widget's view times the press on the looper, which the test clock does not drive. */
 fun ComposeTestRule.longPressWidget(widget: HostedWidget) {
     widget(widget).performTouchInput { down(center) }
-    waitUntil(timeoutMillis = longPressMillis() * 4) { onAllNodesWithTag(WidgetTags.MENU).fetchSemanticsNodes().isNotEmpty() }
+    waitUntil(timeoutMillis = longPressMillis() * 4) { onAllNodesWithTag(WidgetTags.EDIT).fetchSemanticsNodes().isNotEmpty() }
     widget(widget).performTouchInput { up() }
 }
 

@@ -15,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import com.aquigs.launcherplusplus.domain.HostedWidget
 import com.aquigs.launcherplusplus.domain.WidgetPage
+import com.aquigs.launcherplusplus.domain.WidgetSizing
 import com.aquigs.launcherplusplus.domain.widgetRows
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,7 @@ interface WidgetHost {
     fun page(): WidgetPage
 
     /**
-     * [page] now, then again each time a widget is added, removed or lost with its provider. The widgets draw their
+     * [page] now, then again each time a widget is added, removed, resized or lost with its provider. The widgets draw their
      * updates only while this is collected, so collect it while the launcher is visible.
      */
     fun updates(): Flow<WidgetPage>
@@ -37,6 +38,12 @@ interface WidgetHost {
 
     /** Takes the widget [id] off the page and gives its id back to the system. */
     fun remove(id: Int)
+
+    /** Makes the widget [id] [rows] tall. */
+    fun resize(id: Int, rows: Int)
+
+    /** How the provider of the widget [id] lets it be resized. */
+    fun sizing(id: Int): WidgetSizing
 
     /** The system's view of the widget [id], which draws the widget and tells it the size it is laid out at. */
     fun view(context: Context, id: Int): View
@@ -115,6 +122,20 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         set(page.value.remove(id))
     }
 
+    override fun resize(id: Int, rows: Int) = set(page.value.resize(id, rows))
+
+    override fun sizing(id: Int): WidgetSizing {
+        val info = manager.getAppWidgetInfo(id) ?: return WidgetSizing(vertical = false)
+        val maxResizeHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) info.maxResizeHeight.takeIf { it > 0 } else null
+        return WidgetSizing(
+            vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0,
+            minHeightDp = info.minHeight.toDp(),
+            minResizeHeightDp = info.minResizeHeight.toDp(),
+            // Rounded down, so the rows it allows fit under it.
+            maxResizeHeightDp = maxResizeHeight?.let { (it / activity.resources.displayMetrics.density).toInt() },
+        )
+    }
+
     override fun view(context: Context, id: Int): View = host.createView(context, id, manager.getAppWidgetInfo(id))
 
     /** The answer of a configuration the host started; other requests are not the host's. */
@@ -134,9 +155,11 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
 
     private fun place(pick: WidgetPick, info: AppWidgetProviderInfo) {
         pending = null
-        val minHeightDp = ceil(info.minHeight / activity.resources.displayMetrics.density).toInt()
-        set(page.value.add(HostedWidget(pick.id, widgetRows(minHeightDp, pick.pageRows))))
+        set(page.value.add(HostedWidget(pick.id, widgetRows(info.minHeight.toDp(), pick.pageRows))))
     }
+
+    // Rounded up, so the rows made of it hold the widget.
+    private fun Int.toDp() = ceil(this / activity.resources.displayMetrics.density).toInt()
 
     private fun discard(pick: WidgetPick) {
         pending = null

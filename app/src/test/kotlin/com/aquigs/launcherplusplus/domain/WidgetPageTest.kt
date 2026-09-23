@@ -15,6 +15,12 @@ class WidgetPageTest {
     }
 
     @Test
+    fun `a resize changes only that widget's rows and keeps its place`() {
+        assertEquals(WidgetPage(listOf(HostedWidget(7, 4), HostedWidget(12, 3))), page.resize(7, 4))
+        assertEquals(page, page.resize(99, 4))
+    }
+
+    @Test
     fun `a page comes back as it went`() {
         assertEquals("7\t1\n12\t3", page.encode())
         assertEquals(page, decodeWidgetPage(page.encode()))
@@ -50,5 +56,43 @@ class WidgetPageTest {
         assertEquals(1, widgetRows(minHeightDp = 0, pageRows = 9))
         assertEquals(9, widgetRows(minHeightDp = 2000, pageRows = 9))
         assertEquals(1, widgetRows(minHeightDp = 2000, pageRows = 0))
+    }
+
+    @Test
+    fun `a dragged edge snaps to the nearest whole row`() {
+        assertEquals(3, resizedRows(rows = 3, dragDp = 39f))
+        assertEquals(4, resizedRows(rows = 3, dragDp = 41f))
+        assertEquals(2, resizedRows(rows = 3, dragDp = -41f))
+    }
+
+    @Test
+    fun `a widget resizes from one row to the page when its provider sets no limits`() {
+        assertEquals(1..9, WidgetSizing().rowRange(rows = 3, pageRows = 9))
+    }
+
+    @Test
+    fun `a widget resizes within the rows its provider allows`() {
+        assertEquals(2..4, WidgetSizing(minHeightDp = 81, maxResizeHeightDp = 330).rowRange(rows = 3, pageRows = 9))
+        assertEquals(2..9, WidgetSizing(minHeightDp = 81, maxResizeHeightDp = 2000).rowRange(rows = 3, pageRows = 9))
+        assertEquals(3..3, WidgetSizing(minHeightDp = 200, maxResizeHeightDp = 100).rowRange(rows = 3, pageRows = 9))
+    }
+
+    @Test
+    fun `a widget keeps its own rows in reach when they are outside the limits`() {
+        assertEquals(1..12, WidgetSizing().rowRange(rows = 12, pageRows = 9))
+        assertEquals(1..4, WidgetSizing(minHeightDp = 200).rowRange(rows = 1, pageRows = 4))
+    }
+
+    @Test
+    fun `a minimum resize height only lowers the minimum`() {
+        assertEquals(1..9, WidgetSizing(minHeightDp = 200, minResizeHeightDp = 50).rowRange(rows = 3, pageRows = 9))
+        assertEquals(3..9, WidgetSizing(minHeightDp = 200, minResizeHeightDp = 300).rowRange(rows = 3, pageRows = 9))
+    }
+
+    @Test
+    fun `a drag past either end of the range is held there`() {
+        assertEquals(-160f, heldDrag(rows = 3, dragDp = -1000f, range = 1..9))
+        assertEquals(480f, heldDrag(rows = 3, dragDp = 1000f, range = 1..9))
+        assertEquals(50f, heldDrag(rows = 3, dragDp = 50f, range = 1..9))
     }
 }

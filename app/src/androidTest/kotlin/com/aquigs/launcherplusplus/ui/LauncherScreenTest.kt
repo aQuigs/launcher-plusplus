@@ -64,6 +64,7 @@ import com.aquigs.launcherplusplus.domain.RingSlot
 import com.aquigs.launcherplusplus.domain.RingerMode
 import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.WidgetPage
+import com.aquigs.launcherplusplus.domain.WidgetSizing
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
@@ -104,8 +105,13 @@ class LauncherScreenTest {
     private val search = HostedWidget(id = 3, rows = 1)
     private var widgetPage by mutableStateOf(WidgetPage())
     private val widgetsAdded = mutableListOf<Int>()
-    private val widgetsRemoved = mutableListOf<Int>()
-    private val widgets = WidgetActions(view = { context, _ -> View(context) }, add = widgetsAdded::add, remove = widgetsRemoved::add)
+    private val widgets = WidgetActions(
+        view = { context, _ -> View(context) },
+        add = widgetsAdded::add,
+        remove = {},
+        resize = { _, _ -> },
+        sizing = { WidgetSizing() },
+    )
     // Empty rather than the default page, so the built-in cards do not double the apps the other tests look for.
     private var collections by mutableStateOf(CollectionsPage(emptyList()))
     private var foregroundTime by mutableStateOf<ForegroundTime?>(null)
@@ -1425,7 +1431,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theWidgetPageAddsAndRemovesWidgetsAndBackClosesItsMenuFirst() {
+    fun theWidgetPageAddsWidgetsAndBackHomeOrLeavingThePageEndsEditing() {
         widgetPage = WidgetPage(listOf(search))
         show()
         compose.swipePager { swipeRight() }
@@ -1436,20 +1442,42 @@ class LauncherScreenTest {
         assertTrue("the page holds ${widgetsAdded.single()} rows", widgetsAdded.single() >= 4)
 
         compose.longPressWidget(search)
-        compose.widgetOptionsMenu().assertIsDisplayed()
+        compose.widgetEditFrame().assertIsDisplayed()
         Espresso.pressBack()
-        compose.widgetOptionsMenu().assertDoesNotExist()
+        compose.widgetEditFrame().assertDoesNotExist()
         assertSettledOn(LauncherPage.Widgets)
 
         compose.longPressWidget(search)
-        compose.onNodeWithText("Remove").performClick()
-        compose.runOnIdle { assertEquals(listOf(search.id), widgetsRemoved) }
-        widgetPage = WidgetPage()
-
-        compose.widget(search).assertDoesNotExist()
-        compose.onNodeWithText("No widgets yet").assertIsDisplayed()
-        pressHome(launcherInFront = true)
+        compose.swipePager { swipeLeft() }
         assertSettledOn(LauncherPage.Home)
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Widgets)
+        compose.widgetEditFrame().assertDoesNotExist()
+
+        compose.longPressWidget(search)
+        pressHome(launcherInFront = false)
+        compose.widgetEditFrame().assertDoesNotExist()
+        assertSettledOn(LauncherPage.Widgets)
+    }
+
+    @Test
+    fun backInTheMiddleOfAResizePutsTheWidgetBack() {
+        widgetPage = WidgetPage(listOf(search))
+        show()
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Widgets)
+        compose.longPressWidget(search)
+
+        compose.widgetResizeHandle().performTouchInput {
+            down(center)
+            moveBy(Offset(0f, WIDGET_ROW.toPx() * 1.7f))
+        }
+        assertEquals(WIDGET_ROW * 3, compose.widgetHeight(search))
+        Espresso.pressBack()
+
+        compose.widgetEditFrame().assertDoesNotExist()
+        assertEquals(WIDGET_ROW, compose.widgetHeight(search))
+        assertSettledOn(LauncherPage.Widgets)
     }
 
     @Test
@@ -1469,7 +1497,7 @@ class LauncherScreenTest {
         }
 
         compose.waitOutWidgetLongPress()
-        compose.widgetOptionsMenu().assertDoesNotExist()
+        compose.widgetEditFrame().assertDoesNotExist()
         assertSettledOn(LauncherPage.Home)
     }
 
