@@ -1354,6 +1354,7 @@ class LauncherScreenTest {
             up()
         }
 
+        compose.waitOutWidgetLongPress()
         compose.widgetOptionsMenu().assertDoesNotExist()
         assertSettledOn(LauncherPage.Home)
     }

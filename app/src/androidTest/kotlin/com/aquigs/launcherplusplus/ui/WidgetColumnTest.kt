@@ -30,6 +30,7 @@ class WidgetColumnTest {
 
     private val search = HostedWidget(id = 3, rows = 1)
     private val game = HostedWidget(id = 8, rows = 2)
+    private val inert = HostedWidget(id = 5, rows = 1)
     private var page by mutableStateOf(WidgetPage())
     private val added = mutableListOf<Int>()
     private val removed = mutableListOf<Int>()
@@ -44,7 +45,7 @@ class WidgetColumnTest {
                 shown += id
                 View(context).apply {
                     setBackgroundColor(Color.RED)
-                    setOnClickListener { tapped += id }
+                    if (id != inert.id) setOnClickListener { tapped += id }
                 }
             },
             onAdd = added::add,
@@ -112,5 +113,18 @@ class WidgetColumnTest {
             assertEquals(listOf(game.id), removed)
             assertEquals("the long press was not also a tap", listOf(game.id), tapped)
         }
+    }
+
+    @Test
+    fun aWidgetThatIgnoresTouchesOpensItsMenuOnALongPressButNotOnATap() {
+        page = WidgetPage(listOf(inert))
+        show()
+
+        compose.widget(inert).performClick()
+        compose.waitOutWidgetLongPress()
+        compose.widgetOptionsMenu().assertDoesNotExist()
+
+        compose.longPressWidget(inert)
+        compose.widgetOptionsMenu().assertIsDisplayed()
     }
 }

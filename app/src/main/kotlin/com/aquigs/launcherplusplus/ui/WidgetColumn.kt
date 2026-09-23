@@ -1,5 +1,6 @@
 package com.aquigs.launcherplusplus.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.MotionEvent
 import android.view.View
@@ -112,8 +113,10 @@ private fun Widget(widget: HostedWidget, view: (Context, Int) -> View, menu: Wid
 /**
  * Calls [onLongPress] when a finger rests on the widget. Compose cannot take a press back from a view whose buttons
  * already hold it, so this watches from the view side, as the platform launcher does: it sees each event ahead of its
- * children and, once the press fires, intercepts the rest, so the widget gets a cancel rather than a tap. A finger that
- * moves, a child that starts to scroll, or the pager taking the drag ends the wait.
+ * children and, once the press fires, intercepts the rest, so the widget gets a cancel rather than a tap, and keeps the
+ * page and the pager from following the finger. A finger that lifts or moves, a child that starts to scroll, or the
+ * pager taking the drag ends the wait. Where no child takes the press, the frame takes it itself, since a view that
+ * turns down the down hears nothing more of the gesture and could not cancel the wait.
  */
 private class LongPressFrame(context: Context) : FrameLayout(context) {
     var onLongPress: (() -> Unit)? = null
@@ -123,12 +126,26 @@ private class LongPressFrame(context: Context) : FrameLayout(context) {
     private var downY = 0f
     private val fire = Runnable {
         pressed = true
+        parent?.requestDisallowInterceptTouchEvent(true)
         onLongPress?.invoke()
     }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        track(event)
+        return pressed
+    }
+
+    // The frame never clicks; it holds the gesture only to time the press, and the widget inside keeps its own clicks.
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked != MotionEvent.ACTION_DOWN) track(event)
+        return onLongPress != null
+    }
+
+    private fun track(event: MotionEvent) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                removeCallbacks(fire)
                 pressed = false
                 downX = event.x
                 downY = event.y
@@ -137,10 +154,7 @@ private class LongPressFrame(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_MOVE -> if (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop) removeCallbacks(fire)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> removeCallbacks(fire)
         }
-        return pressed
     }
-
-    override fun onTouchEvent(event: MotionEvent) = pressed
 
     override fun requestDisallowInterceptTouchEvent(disallow: Boolean) {
         if (disallow) removeCallbacks(fire)
