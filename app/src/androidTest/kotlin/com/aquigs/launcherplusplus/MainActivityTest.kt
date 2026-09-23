@@ -121,8 +121,8 @@ class MainActivityTest {
         list.performScrollToNode(hasText(label))
     }
 
-    private fun ringIcon(label: String) =
-        hasContentDescription(label) and hasAnyAncestor(hasTestTag(LauncherTags.page(LauncherPage.Home)))
+    private fun ringIcon(label: String) = hasContentDescription(label) and
+        hasAnyAncestor(hasTestTag(LauncherTags.page(LauncherPage.Home))) and !hasAnyAncestor(hasTestTag(DockTags.DOCK))
 
     private fun dockIcon(label: String) = hasContentDescription(label) and hasAnyAncestor(hasTestTag(DockTags.DOCK))
 

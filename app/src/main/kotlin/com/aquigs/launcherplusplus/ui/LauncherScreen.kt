@@ -30,12 +30,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -73,15 +77,17 @@ object LauncherTags {
     fun page(page: LauncherPage) = "page_${page.name}"
 }
 
+private val DRAWER_PEEK = 48.dp
+
 /** A HOME press. [launcherInFront] is false when the press brought the launcher back from another app. */
 data class HomePress(val launcherInFront: Boolean)
 
 /**
- * The whole launcher: a horizontal pager over [layout] with the dock under it and the app drawer peeking below as a
- * chevron. The home page shows the [clock] over the ring from [homeApps]: the time and the date open the clock app and
- * the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
+ * The whole launcher: a horizontal pager over [layout] and the app drawer peeking below as a chevron. The home page
+ * shows the [clock] over the ring from [homeApps], with the dock at its foot: the time and the date open the clock app
+ * and the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs. Until [isHomeApp],
- * a card over the ring says so and offers [onBecomeHomeApp]. A swipe down from anywhere on the home page above the dock
+ * a strip over the dock says so and offers [onBecomeHomeApp]. A swipe down from anywhere on the home page above the dock
  * pulls down the notification shade ([onOpenNotifications]). Long-pressing an app anywhere opens its menu of shortcuts and
  * options; a ring app's menu can start a folder in its slot. A folder opens in place, as in Arc: its apps take the ring's
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
@@ -170,14 +176,23 @@ fun LauncherScreen(
     // Explicit receiver: the resolved ring above shadows the stored one inside the lambda.
     fun changeRing(change: Ring.() -> Ring) = changeHomeApps { copy(ring = this.ring.change()) }
 
-    // An app on its way out of the drawer or off a collection card, the finger holding it and where it could land, all
-    // in root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are derived,
-    // so the ring, the dock and the bin recompose when the finger changes zone, not whenever it moves.
+    // An app on its way out of the drawer or off a collection card, the finger holding it and where it could land, in
+    // root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are derived, so the
+    // ring, the dock and the bin recompose when the finger changes zone, not whenever it moves. The ring and the dock are
+    // measured on the home page and judged where it settles, at the pager's origin: a drag from another page goes home
+    // under the finger, and a drop must not miss because the page has not arrived yet.
     var dragged by remember { mutableStateOf<Drag?>(null) }
     var finger by remember { mutableStateOf(Offset.Zero) }
+    var homePage by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var pagerOrigin by remember { mutableStateOf(Offset.Zero) }
     var zones by remember { mutableStateOf(DropZones()) }
     var binBounds by remember { mutableStateOf<Bounds?>(null) }
-    val dropPlace by remember { derivedStateOf { if (dragged is Drag.FromDrawer) zones.placeAt(finger.x, finger.y) else null } }
+    val dropPlace by remember {
+        derivedStateOf { if (dragged is Drag.FromDrawer) (finger - pagerOrigin).let { zones.placeAt(it.x, it.y) } else null }
+    }
+
+    fun Modifier.dropZone(place: DropZones.(Bounds) -> DropZones) =
+        onGloballyPositioned { target -> homePage?.let { zones = zones.place(target.boundsIn(it)) } }
     val overBin by remember { derivedStateOf { dragged is Drag.FromCard && binBounds?.discContains(finger.x, finger.y) == true } }
 
     // Picking and searching are modes of the drawer, so they end however the drawer closes: chevron, drag, Back or HOME.
@@ -201,8 +216,8 @@ fun LauncherScreen(
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
     var justPicked by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var editorQuery by rememberSaveable { mutableStateOf("") }
-    // Their surfaces are translucent so the wallpaper shows through, as it does through the drawer; the pages, the dock
-    // and the drawer strip must not, so they go while either is up. Not animated: the overlays come and go in a frame,
+    // Their surfaces are translucent so the wallpaper shows through, as it does through the drawer; the pages and the
+    // drawer's chevron must not, so they go while either is up. Not animated: the overlays come and go in a frame,
     // and pages fading back in would be tappable before they could be seen.
     val overlayOpen = editing != null || pickingCollection
     LaunchedEffect(editing) {
@@ -442,65 +457,85 @@ fun LauncherScreen(
     // finger in root coordinates, which this box may not start at: the origin is measured after [modifier], so it is
     // the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
+    val panel = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
     Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
         BottomSheetScaffold(
             scaffoldState = rememberBottomSheetScaffoldState(drawerState),
-            sheetPeekHeight = 48.dp,
-            sheetDragHandle = { DrawerHandle(open = drawerOpen) },
-            // Translucent so the wallpaper still shows through the open drawer.
-            sheetContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            sheetPeekHeight = DRAWER_PEEK,
+            // The handle is the drawer's own, not the sheet's, so the panel can fill in the strip behind it: clear while the
+            // drawer is down, so only the chevron shows over the wallpaper, and solid once it is open, so the open drawer
+            // reaches the top as Arc's does. The panel is translucent so the wallpaper still shows through.
+            sheetDragHandle = null,
+            sheetContainerColor = Color.Transparent,
+            sheetShadowElevation = 0.dp,
             containerColor = Color.Transparent,
             sheetContent = {
-                AppDrawer(
-                    apps = apps.orEmpty(),
-                    icon = actions.icon,
-                    onLaunch = actions.launch,
-                    menu = drawerMenu,
-                    drag = dragFromDrawer,
-                    query = query,
-                    onQueryChange = { query = it },
-                    unread = unread,
-                    picking = picking?.let { place ->
-                        val picked = homeApps[place]
-                        Picking(
-                            header = {
-                                when (place) {
-                                    is HomePlace.Folder -> FolderPicker()
-                                    HomePlace.Ring, HomePlace.Dock -> PlacePicker(place = place, onPlaceChange = { picking = it })
-                                }
-                            },
-                            isPicked = { it in picked },
-                            onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
-                        )
+                Column(
+                    Modifier.drawBehind {
+                        val strip = DRAWER_PEEK.toPx()
+                        // The drawer under the strip is as tall as it travels, like the pages.
+                        val travel = size.height - strip
+                        val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
+                        drawRect(panel.copy(alpha = panel.alpha * open), size = Size(size.width, strip))
+                        drawRect(panel, Offset(0f, strip))
                     },
-                )
+                ) {
+                    DrawerHandle(
+                        open = drawerOpen,
+                        onClick = { if (drawerOpen) closeDrawer() else openDrawer() },
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    AppDrawer(
+                        apps = apps.orEmpty(),
+                        icon = actions.icon,
+                        onLaunch = actions.launch,
+                        menu = drawerMenu,
+                        drag = dragFromDrawer,
+                        query = query,
+                        onQueryChange = { query = it },
+                        unread = unread,
+                        picking = picking?.let { place ->
+                            val picked = homeApps[place]
+                            Picking(
+                                header = {
+                                    when (place) {
+                                        is HomePlace.Folder -> FolderPicker()
+                                        HomePlace.Ring, HomePlace.Dock -> PlacePicker(place = place, onPlaceChange = { picking = it })
+                                    }
+                                },
+                                isPicked = { it in picked },
+                                onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
+                            )
+                        },
+                    )
+                }
             },
             // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
             // navigation-bar inset.
             modifier = Modifier.clipToBounds().alpha(if (overlayOpen) 0f else 1f),
         ) { padding ->
-            Column(
-                Modifier
+            HorizontalPager(
+                state = pagerState,
+                key = { layout.pages[it].name },
+                // Every page stays composed, so swiping back does not rebuild the ring and reload its icons.
+                beyondViewportPageCount = layout.pages.size - 1,
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    // The pages and the dock fade as the drawer rises, so only the wallpaper shows through the translucent
-                    // drawer. Together they are exactly as tall as the drawer travels.
+                    // The pages fade as the drawer rises, so only the wallpaper shows through the translucent drawer. They
+                    // are exactly as tall as the drawer travels.
                     .graphicsLayer {
                         if (size.height > 0f) alpha = (drawerState.requireOffset() / size.height).coerceIn(0f, 1f)
-                    },
-            ) {
-                HorizontalPager(
-                    state = pagerState,
-                    key = { layout.pages[it].name },
-                    // Every page stays composed, so swiping back does not rebuild the ring and reload its icons.
-                    beyondViewportPageCount = layout.pages.size - 1,
-                    modifier = Modifier.weight(1f).testTag(LauncherTags.PAGER),
-                ) { index ->
-                    val page = layout.pages[index]
-                    Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
-                        when (page) {
-                            LauncherPage.Home -> Box(Modifier.fillMaxSize().swipeDown(onOpenNotifications)) {
-                                // First, so it lies behind the clock, the card and the ring and gets only the touches they leave.
+                    }
+                    .onGloballyPositioned { pagerOrigin = it.positionInRoot() }
+                    .testTag(LauncherTags.PAGER),
+            ) { index ->
+                val page = layout.pages[index]
+                Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
+                    when (page) {
+                        LauncherPage.Home -> Column(Modifier.fillMaxSize().onPlaced { homePage = it }) {
+                            Box(Modifier.weight(1f).swipeDown(onOpenNotifications)) {
+                                // First, so it lies behind the clock, the ring and the card and gets only the touches they leave.
                                 EmptySpace(menu = launcherMenu)
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     HomeClock(
@@ -510,13 +545,6 @@ fun LauncherScreen(
                                         modifier = Modifier.padding(top = 24.dp),
                                     )
                                     RingerSwitch(mode = ringerMode, onClick = onRingerTap)
-                                    // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
-                                    if (!isHomeApp) {
-                                        HomeAppCard(
-                                            onBecomeHomeApp = onBecomeHomeApp,
-                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                                        )
-                                    }
                                     HomeRing(
                                         ring = ring,
                                         // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
@@ -527,7 +555,7 @@ fun LauncherScreen(
                                         onOpenFolder = { openFolder = it.index },
                                         onCloseFolder = { openFolder = null },
                                         onEdit = { pickFor(HomePlace.Ring) },
-                                        modifier = Modifier.weight(1f).onGloballyPositioned { zones = zones.copy(ring = it.rootBounds()) },
+                                        modifier = Modifier.weight(1f).dropZone { copy(ring = it) },
                                         highlighted = dropPlace == HomePlace.Ring,
                                         openFolder = open,
                                         menu = ringMenu,
@@ -535,45 +563,54 @@ fun LauncherScreen(
                                         folderAppMenu = folderAppMenu,
                                         unread = unread,
                                     )
+                                    // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
+                                    // the ring, which sizes itself to the room left, so the two can never overlap.
+                                    if (!isHomeApp) {
+                                        HomeAppCard(
+                                            onBecomeHomeApp = onBecomeHomeApp,
+                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                        )
+                                    }
                                 }
                             }
-                            LauncherPage.Widgets -> {
-                                WidgetColumn(page = widgetPage, view = widgets.view, onAdd = widgets.add, menu = widgetMenu)
-                            }
-                            LauncherPage.Collections -> {
-                                CollectionsColumn(
-                                    page = collections,
-                                    apps = apps.orEmpty(),
-                                    foregroundTime = foregroundTime,
+                            // Only on the home page, as in Arc, so it slides away with the page and the others reach down to
+                            // the drawer handle. Stored dock apps hold its row until the apps and shortcuts load, so the ring
+                            // does not move when they arrive. An empty dock shows while an app is dragged, as a place to
+                            // drop it, and slides in and out so the ring above moves rather than jumps.
+                            val dockShown = dock.isNotEmpty() || (onHome == null && homeApps.dock.keys.isNotEmpty()) || dragged is Drag.FromDrawer
+                            AnimatedVisibility(visible = dockShown) {
+                                Dock(
+                                    apps = dock,
                                     icon = actions.icon,
                                     onLaunch = actions.launch,
-                                    onToggleExpanded = { kind -> changeCollections { toggleExpanded(kind) } },
-                                    onMove = { from, to -> changeCollections { move(from, to) } },
-                                    onEdit = { editing = it },
-                                    onAdd = { pickingCollection = true },
-                                    onOpenUsageSettings = onOpenUsageSettings,
-                                    lift = cardLift,
-                                    bin = if (dragged is Drag.FromCard) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
+                                    modifier = Modifier.dropZone { copy(dock = it) },
+                                    highlighted = dropPlace == HomePlace.Dock,
+                                    menu = dockMenu,
                                     unread = unread,
                                 )
                             }
                         }
+                        LauncherPage.Widgets -> {
+                            WidgetColumn(page = widgetPage, view = widgets.view, onAdd = widgets.add, menu = widgetMenu)
+                        }
+                        LauncherPage.Collections -> {
+                            CollectionsColumn(
+                                page = collections,
+                                apps = apps.orEmpty(),
+                                foregroundTime = foregroundTime,
+                                icon = actions.icon,
+                                onLaunch = actions.launch,
+                                onToggleExpanded = { kind -> changeCollections { toggleExpanded(kind) } },
+                                onMove = { from, to -> changeCollections { move(from, to) } },
+                                onEdit = { editing = it },
+                                onAdd = { pickingCollection = true },
+                                onOpenUsageSettings = onOpenUsageSettings,
+                                lift = cardLift,
+                                bin = if (dragged is Drag.FromCard) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
+                                unread = unread,
+                            )
+                        }
                     }
-                }
-                // Outside the pager, so it stays put while the pages swipe. Stored dock apps hold its row until the apps and
-                // shortcuts load, so the pages do not move when they arrive. An empty dock shows while an app is dragged, as a
-                // place to drop it, and slides in and out so the ring above moves rather than jumps.
-                val dockShown = dock.isNotEmpty() || (onHome == null && homeApps.dock.keys.isNotEmpty()) || dragged is Drag.FromDrawer
-                AnimatedVisibility(visible = dockShown) {
-                    Dock(
-                        apps = dock,
-                        icon = actions.icon,
-                        onLaunch = actions.launch,
-                        modifier = Modifier.onGloballyPositioned { zones = zones.copy(dock = it.rootBounds()) },
-                        highlighted = dropPlace == HomePlace.Dock,
-                        menu = dockMenu,
-                        unread = unread,
-                    )
                 }
             }
         }
@@ -679,8 +716,10 @@ private sealed interface OpenMenu {
     }
 }
 
-// Unclipped, so a ring scrolled off the page keeps its true bounds instead of collapsing onto the edge it left by.
-internal fun LayoutCoordinates.rootBounds(): Bounds {
-    val topLeft = positionInRoot()
-    return Bounds(topLeft.x, topLeft.y, topLeft.x + size.width, topLeft.y + size.height)
+internal fun LayoutCoordinates.rootBounds(): Bounds = boundsIn(findRootCoordinates())
+
+// Unclipped, so a target scrolled off the page keeps its true bounds instead of collapsing onto the edge it left by.
+private fun LayoutCoordinates.boundsIn(ancestor: LayoutCoordinates): Bounds {
+    val box = ancestor.localBoundingBoxOf(this, clipBounds = false)
+    return Bounds(box.left, box.top, box.right, box.bottom)
 }

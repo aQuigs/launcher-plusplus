@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -194,12 +195,14 @@ class LauncherScreenTest {
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
         val row = centreOf(compose.onNodeWithText(app.label))
-        compose.onRoot().performTouchInput {
-            down(row)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            moveTo(row + Offset(0f, -viewConfiguration.touchSlop * 2))
-        }
+        compose.onRoot().performTouchInput { liftOut(row) }
         compose.dragGhost().assertIsDisplayed()
+    }
+
+    private fun TouchInjectionScope.liftOut(row: Offset) {
+        down(row)
+        advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+        moveTo(row + Offset(0f, -viewConfiguration.touchSlop * 2))
     }
 
     /** Continues a drag to [target], in root coordinates. */
@@ -261,10 +264,11 @@ class LauncherScreenTest {
     @Test
     fun theHomePageAsksToBeTheHomeAppUntilItIs() {
         isHomeApp = false
+        homeApps = HomeApps(ring = ringOf(clock), dock = Favourites(listOf(mail.key)))
         show()
         val card = compose.homeAppCard().assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertTrue("the card sits under the clock", compose.clockDate().getUnclippedBoundsInRoot().bottom <= card.top)
-        assertTrue("the card sits over the ring", card.bottom <= compose.emblem().getUnclippedBoundsInRoot().top)
+        assertTrue("the card sits under the ring", compose.ringSlot(clock).getUnclippedBoundsInRoot().bottom <= card.top)
+        assertTrue("the card sits over the dock", card.bottom <= compose.dock().getUnclippedBoundsInRoot().top)
 
         compose.becomeHomeAppButton().performClick()
         compose.runOnIdle { assertEquals(1, homeRequests) }
@@ -428,12 +432,12 @@ class LauncherScreenTest {
     fun anEmptyDockTakesNoSpace() {
         show()
         compose.dock().assertDoesNotExist()
-        val undocked = compose.pager().getUnclippedBoundsInRoot().height
+        val undocked = compose.emblem().getUnclippedBoundsInRoot().bottom
 
         homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
 
         compose.dockSlot(mail).assertIsDisplayed()
-        assertTrue("the dock takes space", compose.pager().getUnclippedBoundsInRoot().height < undocked)
+        assertTrue("the dock takes space", compose.emblem().getUnclippedBoundsInRoot().bottom < undocked)
     }
 
     @Test
@@ -441,25 +445,29 @@ class LauncherScreenTest {
         homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
         apps = null
         show()
-        val loading = compose.pager().getUnclippedBoundsInRoot()
+        val loading = compose.emblem().getUnclippedBoundsInRoot()
 
         apps = listOf(clock, mail)
 
         compose.dockSlot(mail).assertIsDisplayed()
-        assertEquals(loading, compose.pager().getUnclippedBoundsInRoot())
+        assertEquals(loading, compose.emblem().getUnclippedBoundsInRoot())
     }
 
     @Test
-    fun theDockStaysPutWhileThePagesSwipe() {
+    fun theDockLeavesWithTheHomePageAndTheOtherPagesReachTheDrawerHandle() {
         homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
         show()
-        val docked = compose.dockSlot(mail).getUnclippedBoundsInRoot()
+        compose.dockSlot(mail).assertIsDisplayed()
 
-        compose.swipePager { swipeLeft() }
-        assertSettledOn(LauncherPage.Collections)
+        goToCollections()
+        compose.dockSlot(mail).assertIsNotDisplayed()
+        val pageBottom = compose.page(LauncherPage.Collections).getUnclippedBoundsInRoot().bottom
+        val handleTop = compose.drawerHandle().getUnclippedBoundsInRoot().top
+        assertTrue("nothing lies between the page and the drawer handle", pageBottom <= handleTop && handleTop - pageBottom < 16.dp)
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Home)
 
         compose.dockSlot(mail).assertIsDisplayed()
-        assertEquals(docked, compose.dockSlot(mail).getUnclippedBoundsInRoot())
     }
 
     @Test
@@ -764,6 +772,26 @@ class LauncherScreenTest {
             assertEquals(HomeApps(ring = ringOf(mail)), homeApps)
             assertEquals(emptyList<AppEntry>(), launched)
         }
+    }
+
+    @Test
+    fun aDropOnTheDockCountsBeforeTheHomePageHasComeBack() {
+        homeApps = HomeApps(dock = Favourites(listOf(clock.key)))
+        show()
+        val dock = centreOf(compose.dock())
+        goToCollections()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        val row = centreOf(compose.onNodeWithText(mail.label))
+
+        // One gesture, so the finger lets go over where the dock will be while the home page is still on its way.
+        compose.onRoot().performTouchInput {
+            liftOut(row)
+            moveTo(dock)
+            up()
+        }
+
+        compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(clock.key, mail.key))), homeApps) }
     }
 
     @Test
@@ -1270,15 +1298,17 @@ class LauncherScreenTest {
     @Test
     fun aSwipeDownAnywhereOnTheHomePageOpensTheNotificationsAndNothingElse() {
         homeApps = HomeApps(ring = ringOf(mail))
+        isHomeApp = false
         show()
 
-        listOf(compose.emptyHomeSpace(), centreOf(compose.clockTime()), centreOf(compose.ringSlot(mail)), centreOf(compose.emblem()))
-            .forEach(::swipeDownFrom)
+        val onContent = listOf(compose.clockTime(), compose.ringSlot(mail), compose.emblem(), compose.homeAppCard()).map(::centreOf)
+        (listOf(compose.emptyHomeSpace()) + onContent).forEach(::swipeDownFrom)
 
         compose.runOnIdle {
-            assertEquals(4, notificationsOpened)
+            assertEquals(5, notificationsOpened)
             assertEquals(emptyList<AppEntry>(), launched)
             assertEquals(emptyList<String>(), opened)
+            assertEquals(0, homeRequests)
         }
         assertDrawerOpen(false)
     }

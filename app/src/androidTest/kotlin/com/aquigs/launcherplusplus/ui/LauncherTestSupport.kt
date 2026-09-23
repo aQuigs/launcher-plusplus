@@ -50,7 +50,7 @@ fun SemanticsNodeInteractionsProvider.page(page: LauncherPage) = onNodeWithTag(L
 
 fun SemanticsNodeInteractionsProvider.swipePager(swipe: TouchInjectionScope.() -> Unit) = pager().performTouchInput(swipe)
 
-// The sheet merges the chevron into its own clickable drag-handle node, so the tag sits in the unmerged tree.
+// The handle merges the chevron into its clickable node, so the tag sits in the unmerged tree.
 fun SemanticsNodeInteractionsProvider.drawerHandle() = onNodeWithTag(AppDrawerTags.HANDLE, useUnmergedTree = true)
 
 fun SemanticsNodeInteractionsProvider.appList() = onNodeWithTag(AppDrawerTags.LIST)

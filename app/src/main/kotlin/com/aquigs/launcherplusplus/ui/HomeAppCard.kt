@@ -2,8 +2,9 @@ package com.aquigs.launcherplusplus.ui
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,18 +18,20 @@ object HomeAppCardTags {
     const val BUTTON = "home_app_button"
 }
 
-/** Says the launcher is not the home app yet; its one button asks the user to make it so. */
+/** A slim strip that says the launcher is not the home app yet; its one button asks the user to make it so. */
 @Composable
 fun HomeAppCard(onBecomeHomeApp: () -> Unit, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.testTag(HomeAppCardTags.CARD)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-        ) {
+    Surface(
+        // Not a circle shape: its corners would grow with a line that wraps at a large font and clip the text.
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+        modifier = modifier.testTag(HomeAppCardTags.CARD),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 4.dp)) {
             Text(
                 text = "Launcher++ is not your home app yet",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f, fill = false),
             )
             TextButton(onClick = onBecomeHomeApp, modifier = Modifier.testTag(HomeAppCardTags.BUTTON)) {
                 Text("Set as home")

@@ -12,7 +12,7 @@ sealed interface HomePlace : Serializable {
     data class Folder(val index: Int) : HomePlace
 }
 
-/** The apps the user keeps on the home screen: on the ring round the emblem, and in the dock under the pages. */
+/** The apps the user keeps on the home screen: on the ring round the emblem, and in the dock at the foot of the page. */
 data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()) {
     /** The apps at [place]: those in slots of their own for the ring, and none for a folder that is not there. */
     operator fun get(place: HomePlace): Favourites = when (place) {
