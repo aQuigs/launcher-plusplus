@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# Installs the debug build on the connected device, makes it the default home app, and shows it.
+# Installs the debug build (VARIANT=Release for the minified one), makes it the default home app, and shows it.
 
 set -e
 
@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 APP_ID=com.aquigs.launcherplusplus
 
-./gradlew installDebug -q
+./gradlew "install${VARIANT:-Debug}" -q
 adb shell cmd package set-home-activity "$APP_ID/.MainActivity"
 adb shell input keyevent KEYCODE_HOME
 

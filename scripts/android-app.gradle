@@ -1,0 +1,26 @@
+// Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
+
+// Groovy because a Kotlin script applied with apply(from=) cannot see the android extension.
+
+android {
+    buildTypes {
+        // Debug-signed so it installs over the debug build and keeps the app's data
+        release {
+            minifyEnabled = true
+            signingConfig = signingConfigs.debug
+        }
+    }
+}
+
+// isFile rather than canExecute, because the configuration cache only notices isFile changing
+def syncCommon = System.getenv('PATH')?.tokenize(File.pathSeparator)
+    ?.collect { new File(it, 'sync-common') }
+    ?.find { it.isFile() && it.canExecute() }
+def syncShared = [syncSharedDotfiles: '.', syncSharedScripts: 'scripts', syncSharedWorkflows: '.github/workflows'].collect { name, dir ->
+    tasks.register(name, Exec) {
+        enabled = syncCommon != null
+        workingDir = rootDir
+        commandLine(syncCommon?.path ?: 'sync-common', dir)
+    }
+}
+tasks.named('preBuild') { dependsOn(syncShared) }
