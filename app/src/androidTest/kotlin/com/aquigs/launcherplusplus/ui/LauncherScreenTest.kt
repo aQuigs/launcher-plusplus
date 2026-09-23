@@ -1321,13 +1321,13 @@ class LauncherScreenTest {
         compose.runOnIdle { assertEquals(1, widgetsAdded.size) }
         assertTrue("the page holds ${widgetsAdded.single()} rows", widgetsAdded.single() >= 4)
 
-        compose.widget(search).performTouchInput { longClick() }
+        compose.longPressWidget(search)
         compose.widgetOptionsMenu().assertIsDisplayed()
         Espresso.pressBack()
         compose.widgetOptionsMenu().assertDoesNotExist()
         assertSettledOn(LauncherPage.Widgets)
 
-        compose.widget(search).performTouchInput { longClick() }
+        compose.longPressWidget(search)
         compose.onNodeWithText("Remove").performClick()
         compose.runOnIdle { assertEquals(listOf(search.id), widgetsRemoved) }
         widgetPage = WidgetPage()

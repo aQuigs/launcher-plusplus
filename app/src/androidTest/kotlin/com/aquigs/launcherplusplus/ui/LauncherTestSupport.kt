@@ -7,7 +7,9 @@ import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -95,6 +97,13 @@ fun SemanticsNodeInteractionsProvider.widget(widget: HostedWidget) = onNodeWithT
 fun SemanticsNodeInteractionsProvider.addWidgetButton() = onNodeWithTag(WidgetTags.ADD)
 
 fun SemanticsNodeInteractionsProvider.widgetOptionsMenu() = onNodeWithTag(WidgetTags.MENU)
+
+/** Holds a finger on [widget] until its menu opens: the widget's view times the press on the looper, which the test clock does not drive. */
+fun ComposeTestRule.longPressWidget(widget: HostedWidget) {
+    widget(widget).performTouchInput { down(center) }
+    waitUntil { onAllNodesWithTag(WidgetTags.MENU).fetchSemanticsNodes().isNotEmpty() }
+    widget(widget).performTouchInput { up() }
+}
 
 fun SemanticsNodeInteractionsProvider.launcherMenu() = onNodeWithTag(LauncherMenuTags.MENU)
 
