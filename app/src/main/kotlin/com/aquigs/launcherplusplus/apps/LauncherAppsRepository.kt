@@ -33,7 +33,9 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "LauncherAppsRepository"
 private const val MAX_SHORTCUTS = 4
-private const val ICON_CACHE_BYTES = 8 shl 20
+// Room for a few hundred icons at the largest launcher size: every drawer row asks for its app's, and a cache the drawer
+// churns through would evict the ring's and the dock's, which would then come back blank on the way home.
+private const val ICON_CACHE_BYTES = 32 shl 20
 
 class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
