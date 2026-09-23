@@ -27,5 +27,12 @@ data class AppEntry(
  */
 fun shortcutKey(packageName: String, id: String) = "$packageName#$id"
 
+/**
+ * The labels, as a search sees them, that apps from more than one package go by, like Google's and Microsoft's
+ * Authenticator, so a list can tell them apart.
+ */
+fun List<AppEntry>.sharedLabels(): Set<String> =
+    groupBy(AppEntry::searchableLabel).filterValues { entries -> entries.distinctBy(AppEntry::packageName).size > 1 }.keys
+
 fun List<AppEntry>.sortedByLabel(): List<AppEntry> =
     sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, AppEntry::label).thenBy(AppEntry::packageName))
