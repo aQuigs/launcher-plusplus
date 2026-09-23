@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.UnreadCounts
-import com.aquigs.launcherplusplus.domain.dockIconSize
+import com.aquigs.launcherplusplus.domain.dockRow
 import kotlin.math.roundToInt
 
 object DockTags {
@@ -29,9 +29,9 @@ object DockTags {
 private val FULL_DOCK_ICON_SIZE = 56.dp
 
 /**
- * The user's dock [apps] in one row, each in an equal share of the width. The row is as tall as a full-size icon, so a
- * crowded dock shrinks its icons but not the row, and an empty dock still holds its place. While [highlighted], the row
- * glows as the place an app being dragged would land. Each app wears its [unread] count.
+ * The user's dock [apps] in one row of equal slots, together in the middle of the width. The row is as tall as a
+ * full-size icon, so a crowded dock shrinks its icons but not the row, and an empty dock still holds its place. While
+ * [highlighted], the row glows as the place an app being dragged would land. Each app wears its [unread] count.
  */
 @Composable
 fun Dock(
@@ -60,14 +60,12 @@ fun Dock(
         val height = FULL_DOCK_ICON_SIZE.roundToPx()
         if (measurables.isEmpty()) return@Layout layout(width, height) {}
 
-        val slot = width.toFloat() / measurables.size
-        val size = dockIconSize(FULL_DOCK_ICON_SIZE.toPx(), width.toFloat(), measurables.size).roundToInt()
+        val row = dockRow(FULL_DOCK_ICON_SIZE.toPx(), width.toFloat(), measurables.size)
+        val size = row.iconSize.roundToInt()
         val icons = measurables.map { it.measure(Constraints.fixed(size, size)) }
 
         layout(width, height) {
-            icons.forEachIndexed { index, placeable ->
-                placeable.placeRelative((slot * index + (slot - size) / 2f).roundToInt(), (height - size) / 2)
-            }
+            icons.forEachIndexed { index, placeable -> placeable.placeRelative(row.starts[index].roundToInt(), (height - size) / 2) }
         }
     }
 }
