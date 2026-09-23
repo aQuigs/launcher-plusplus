@@ -6,8 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
+import android.content.pm.LauncherApps.PinItemRequest
 import android.content.pm.LauncherApps.ShortcutQuery
+import android.content.pm.PackageManager
+import android.content.pm.ShortcutInfo
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.InsetDrawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +26,8 @@ import androidx.core.graphics.drawable.toBitmap
 import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppShortcut
+import com.aquigs.launcherplusplus.domain.HomeApps
+import com.aquigs.launcherplusplus.domain.isStorable
 import com.aquigs.launcherplusplus.domain.sortedByLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -30,12 +37,17 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.math.sqrt
 
 private const val TAG = "LauncherAppsRepository"
 private const val MAX_SHORTCUTS = 4
 // Room for a few hundred icons at the largest launcher size: every drawer row asks for its app's, and a cache the drawer
 // churns through would evict the ring's and the dock's, which would then come back blank on the way home.
 private const val ICON_CACHE_BYTES = 32 shl 20
+private const val SHOWN_SHORTCUTS = ShortcutQuery.FLAG_MATCH_MANIFEST or ShortcutQuery.FLAG_MATCH_DYNAMIC
+
+// What a square leaves free on each side when its corners touch a circle as wide: (1 - 1/√2) / 2.
+private val SQUARE_IN_CIRCLE = ((1 - 1 / sqrt(2.0)) / 2).toFloat()
 
 class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
@@ -48,19 +60,30 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
     }
 
+    // One at a time and in order, so unpinning for an older home screen never lands after a newer one's.
+    private val pinWork = Dispatchers.IO.limitedParallelism(1)
+
     override fun installedApps(): Flow<List<AppEntry>> =
+        changes(withShortcuts = false) { icons.evictAll() }
+            .map { loadApps() }
+            .flowOn(Dispatchers.IO)
+
+    override fun pinnedShortcuts(): Flow<List<AppEntry>> =
+        changes(withShortcuts = true)
+            .map { pinned().filter { it.isEnabled }.mapNotNull { it.toEntry() } }
+            .flowOn(Dispatchers.IO)
+
+    // Once at first, then again after each change the callback reports; changes while a load runs make one more load.
+    private fun changes(withShortcuts: Boolean, onChange: () -> Unit = {}): Flow<Unit> =
         callbackFlow {
-            val callback = PackageChanges {
-                icons.evictAll()
+            val callback = PackageChanges(withShortcuts) {
+                onChange()
                 trySend(Unit)
             }
             launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
             send(Unit)
             awaitClose { launcherApps.unregisterCallback(callback) }
-        }
-            .conflate()
-            .map { loadApps() }
-            .flowOn(Dispatchers.IO)
+        }.conflate()
 
     private fun loadApps(): List<AppEntry> =
         launcherApps.getActivityList(null, user)
@@ -78,35 +101,46 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             .sortedByLabel()
 
     override suspend fun icon(app: AppEntry): ImageBitmap? = icons.get(app.key)
-        ?: draw(app.key) { density -> launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density) }
-            ?.also { icons.put(app.key, it) }
-
-    override fun launch(app: AppEntry) = startOrLog(TAG, app.key) { launcherApps.startMainActivity(app.component, user, null, null) }
-
-    override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
-        try {
-            if (launcherApps.hasShortcutHostPermission()) {
-                launcherApps.getShortcuts(shortcutQuery(app.packageName).setActivity(app.component), user).orEmpty()
-                    .filter { it.isEnabled }
-                    .sortedWith(compareBy({ !it.isDeclaredInManifest }, { it.rank }))
-                    .take(MAX_SHORTCUTS)
-                    .map { AppShortcut(packageName = it.`package`, id = it.id, label = (it.shortLabel ?: it.longLabel ?: it.id).toString()) }
-            } else {
-                // Only the default home app may read other apps' shortcuts; until then the menu offers the options alone.
-                emptyList()
+        ?: draw(app.key) { density ->
+            when (val id = app.shortcutId) {
+                null -> activityIcon(app, density)
+                else -> pinnedIcon(shortcutInfo(app.packageName, id, ShortcutQuery.FLAG_MATCH_PINNED), app, density)
             }
-        } catch (e: RuntimeException) {
-            // A locked user, or an app removed since the list loaded.
-            Log.w(TAG, "No shortcuts for ${app.key}", e)
-            emptyList()
+        }?.also { icons.put(app.key, it) }
+
+    private fun activityIcon(app: AppEntry, density: Int): Drawable? =
+        launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
+
+    // The ring and the dialog that asks share it through the cache. A square icon, as a web page's is, would lose its
+    // corners to the disc, so it shrinks to fit whole on the disc's tint; an adaptive one is made for the cut. A shortcut
+    // without an icon of its own wears its app's, as on other launchers.
+    private fun pinnedIcon(info: ShortcutInfo?, shortcut: AppEntry, density: Int): Drawable? =
+        info?.let { launcherApps.getShortcutIconDrawable(it, density) }
+            ?.let { if (it is AdaptiveIconDrawable) it else InsetDrawable(it, SQUARE_IN_CIRCLE) }
+            ?: activityIcon(shortcut, density)
+
+    override fun launch(app: AppEntry) = startOrLog(TAG, app.key) {
+        when (val id = app.shortcutId) {
+            null -> launcherApps.startMainActivity(app.component, user, null, null)
+            else -> launcherApps.startShortcut(app.packageName, id, null, null, user)
         }
     }
 
-    override suspend fun shortcutIcon(shortcut: AppShortcut): ImageBitmap? = draw(shortcut.logName) { density ->
-        launcherApps.getShortcuts(shortcutQuery(shortcut.packageName).setShortcutIds(listOf(shortcut.id)), user)
-            ?.firstOrNull()
-            ?.let { launcherApps.getShortcutIconDrawable(it, density) }
+    override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
+        if (app.shortcutId != null) return@withContext emptyList()
+        query(shortcutQuery(app.packageName).setActivity(app.component), app.key)
+            .filter { it.isEnabled }
+            .sortedWith(compareBy({ !it.isDeclaredInManifest }, { it.rank }))
+            .take(MAX_SHORTCUTS)
+            .map { AppShortcut(packageName = it.`package`, id = it.id, label = it.label) }
     }
+
+    override suspend fun shortcutIcon(shortcut: AppShortcut): ImageBitmap? = draw(shortcut.logName) { density ->
+        shortcutInfo(shortcut.packageName, shortcut.id, SHOWN_SHORTCUTS)?.let { launcherApps.getShortcutIconDrawable(it, density) }
+    }
+
+    private fun shortcutInfo(packageName: String, id: String, flags: Int): ShortcutInfo? =
+        launcherApps.getShortcuts(shortcutQuery(packageName, flags).setShortcutIds(listOf(id)), user)?.firstOrNull()
 
     override fun startShortcut(shortcut: AppShortcut) = startOrLog(TAG, shortcut.logName) {
         launcherApps.startShortcut(shortcut.packageName, shortcut.id, null, null, user)
@@ -123,6 +157,72 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS))
     }
 
+    override fun pinRequest(intent: Intent): PinItem? {
+        val request = launcherApps.getPinItemRequest(intent) ?: return null
+        val info = request.shortcutInfo
+        if (request.requestType != PinItemRequest.REQUEST_TYPE_SHORTCUT || info?.userHandle != user || !request.isValid) return null
+        val shortcut = info.toEntry() ?: return null
+        return object : PinItem {
+            override val shortcut = shortcut
+            override val appLabel by lazy { labelOf(info.`package`) }
+
+            // Until it is pinned, a lookup by id finds nothing, since the app may only have made it for the request. Kept,
+            // so the ring shows it at once if the user adds it.
+            override suspend fun icon() = draw(shortcut.key) { density -> pinnedIcon(info, shortcut, density) }
+                ?.also { icons.put(shortcut.key, it) }
+
+            override fun accept() = try {
+                request.accept()
+            } catch (e: RuntimeException) {
+                // Accepted already, or the launcher is no longer the home app the request was made to.
+                Log.w(TAG, "Cannot pin ${shortcut.key}", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun unpinAllBut(homeApps: HomeApps) = withContext(pinWork) {
+        val pinned = pinned(ShortcutQuery.FLAG_GET_KEY_FIELDS_ONLY).groupBy({ it.`package` }, { it.id })
+        homeApps.keptPins(pinned).forEach { (packageName, ids) ->
+            try {
+                launcherApps.pinShortcuts(packageName, ids, user)
+            } catch (e: RuntimeException) {
+                // The app went meanwhile, or the launcher stopped being the home app.
+                Log.w(TAG, "Cannot unpin the shortcuts of $packageName", e)
+            }
+        }
+    }
+
+    // The launcher's own pins, disabled ones too.
+    private fun pinned(extraFlags: Int = 0) = query(ShortcutQuery().setQueryFlags(ShortcutQuery.FLAG_MATCH_PINNED or extraFlags), "pins")
+
+    // Only the default home app may read other apps' shortcuts; until then there are none, and a menu offers the options
+    // alone.
+    private fun query(query: ShortcutQuery, what: String): List<ShortcutInfo> = try {
+        if (launcherApps.hasShortcutHostPermission()) launcherApps.getShortcuts(query, user).orEmpty() else emptyList()
+    } catch (e: RuntimeException) {
+        // A locked user, or an app removed since the list loaded.
+        Log.w(TAG, "No shortcuts for $what", e)
+        emptyList()
+    }
+
+    private val ShortcutInfo.label get() = (shortLabel ?: longLabel ?: id).toString()
+
+    private fun ShortcutInfo.toEntry(): AppEntry? = AppEntry(
+        label = label,
+        packageName = `package`,
+        activityName = activity?.className.orEmpty(),
+        canUninstall = false,
+        shortcutId = id,
+    ).takeIf { isStorable(it.key) }
+
+    private fun labelOf(packageName: String): String = try {
+        context.packageManager.run { getApplicationInfo(packageName, 0).loadLabel(this).toString() }
+    } catch (_: PackageManager.NameNotFoundException) {
+        // An app the launcher cannot see, having no launchable activity.
+        packageName
+    }
+
     private suspend fun draw(what: String, drawable: (density: Int) -> Drawable?): ImageBitmap? = withContext(Dispatchers.IO) {
         try {
             val size = activityManager.launcherLargeIconSize
@@ -134,8 +234,8 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         }
     }
 
-    private fun shortcutQuery(packageName: String) =
-        ShortcutQuery().setPackage(packageName).setQueryFlags(ShortcutQuery.FLAG_MATCH_MANIFEST or ShortcutQuery.FLAG_MATCH_DYNAMIC)
+    private fun shortcutQuery(packageName: String, flags: Int = SHOWN_SHORTCUTS) =
+        ShortcutQuery().setPackage(packageName).setQueryFlags(flags)
 
     private val AppEntry.component get() = ComponentName(packageName, activityName)
 
@@ -155,8 +255,13 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     private val AppShortcut.logName get() = "$packageName shortcut $id"
 
-    // Any of these can add, remove or relabel launchable activities, so each reloads the whole list.
-    private class PackageChanges(private val onChange: () -> Unit) : LauncherApps.Callback() {
+    // Any of these can add, remove or relabel launchable activities, so each reloads the whole list. Apps change their
+    // shortcuts often, so only a list of shortcuts hears of that too.
+    private class PackageChanges(private val withShortcuts: Boolean, private val onChange: () -> Unit) : LauncherApps.Callback() {
+        override fun onShortcutsChanged(packageName: String, shortcuts: List<ShortcutInfo>, user: UserHandle) {
+            if (withShortcuts) onChange()
+        }
+
         override fun onPackageAdded(packageName: String, user: UserHandle) = onChange()
 
         override fun onPackageRemoved(packageName: String, user: UserHandle) = onChange()

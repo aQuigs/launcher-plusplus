@@ -95,17 +95,22 @@ data class HomePress(val launcherInFront: Boolean)
  * the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
- * dialog has asked. [apps] is null until the installed apps have loaded. Every [HomePress] cancels a drag and closes the
- * menu, the dialog, the drawer, the editor, the picker and the folder; one made while the launcher was in front also
- * scrolls to the home page. Back undoes what is on top: it cancels a drag, else closes the menu or the dialog, then the
- * drawer, then the editor or the picker, then returns to the home page, then closes the folder.
+ * dialog has asked. The ring, the dock and folders hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all
+ * that is open, as HOME in front does, and asks on the home page whether to add its shortcut, which goes at the end of
+ * the ring once the system has pinned it. [apps] and [pinnedShortcuts] are null until they have loaded. Every
+ * [HomePress] cancels a drag and closes the menu, the dialogs, the drawer, the editor, the picker and the folder; one
+ * made while the launcher was in front also scrolls to the home page. Back undoes what is on top: it cancels a drag, else
+ * closes the menu or a dialog, then the drawer, then the editor or the picker, then returns to the home page, then
+ * closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LauncherScreen(
     layout: PageLayout,
     homePresses: Flow<HomePress>,
+    pinRequests: Flow<PinRequest>,
     apps: List<AppEntry>?,
+    pinnedShortcuts: List<AppEntry>?,
     homeApps: HomeApps,
     onHomeAppsChange: (HomeApps) -> Unit,
     actions: AppActions,
@@ -136,8 +141,11 @@ fun LauncherScreen(
     val haptics = LocalHapticFeedback.current
     val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
-    val ring = remember(homeApps.ring, apps) { homeApps.ring.resolve(apps.orEmpty()) }
-    val dock = remember(homeApps.dock, apps) { homeApps.dock.resolve(apps.orEmpty()) }
+    // The drawer, search and the collections list the installed apps alone; home keeps shortcuts too. It waits for both,
+    // so the ring does not space itself out again when the shortcuts join.
+    val onHome = remember(apps, pinnedShortcuts) { if (apps != null && pinnedShortcuts != null) apps + pinnedShortcuts else null }
+    val ring = remember(homeApps.ring, onHome) { homeApps.ring.resolve(onHome.orEmpty()) }
+    val dock = remember(homeApps.dock, onHome) { homeApps.dock.resolve(onHome.orEmpty()) }
     val latestHomeApps by rememberUpdatedState(homeApps)
     val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
     val latestCollections by rememberUpdatedState(collections)
@@ -212,8 +220,9 @@ fun LauncherScreen(
     val open = ring.filterIsInstance<RingItem.Folder>().find { it.index == openFolder }
     // A slot number outliving its folder would open a folder made later in that slot by itself.
     LaunchedEffect(open == null) { if (open == null) openFolder = null }
-    // The reset dialog is a window of its own too, so like the menu it takes Back before this screen's BackHandler.
+    // The dialogs are windows of their own too, so like the menu they take Back before this screen's BackHandler.
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
+    var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
@@ -388,17 +397,30 @@ fun LauncherScreen(
         )
     }
 
+    fun closeAll() {
+        dragged = null
+        closeMenu()
+        openFolder = null
+        closeDrawer()
+        editing = null
+        pickingCollection = false
+        confirmingReset = false
+        confirmingPin = null
+    }
+
     LaunchedEffect(homePresses, pagerState, drawerState, layout) {
         homePresses.collect { press ->
-            dragged = null
-            closeMenu()
-            openFolder = null
-            closeDrawer()
-            editing = null
-            pickingCollection = false
-            confirmingReset = false
+            closeAll()
             // Coming back from an app keeps the page you left, like the stock launcher.
             if (press.launcherInFront) goHome()
+        }
+    }
+    // On the home page, so the shortcut is seen landing on the ring.
+    LaunchedEffect(pinRequests, pagerState, drawerState, layout) {
+        pinRequests.collect { request ->
+            closeAll()
+            goHome()
+            confirmingPin = request
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
@@ -497,9 +519,9 @@ fun LauncherScreen(
                                     }
                                     HomeRing(
                                         ring = ring,
-                                        // Slots stored for the ring hold the hint back until the app list can say none of their
-                                        // apps is installed, so neither the hint nor the mark flashes while apps load.
-                                        showHint = homeApps.ring.isEmpty || (apps != null && ring.isEmpty()),
+                                        // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
+                                        // theirs is there, so neither the hint nor the mark flashes while they load.
+                                        showHint = homeApps.ring.isEmpty || (onHome != null && ring.isEmpty()),
                                         icon = actions.icon,
                                         onLaunch = actions.launch,
                                         onOpenFolder = { openFolder = it.index },
@@ -538,10 +560,10 @@ fun LauncherScreen(
                         }
                     }
                 }
-                // Outside the pager, so it stays put while the pages swipe. Stored dock apps hold its row until the app list
-                // loads, so the pages do not move when it arrives. An empty dock shows while an app is dragged, as a place to
-                // drop it, and slides in and out so the ring above moves rather than jumps.
-                val dockShown = dock.isNotEmpty() || (apps == null && homeApps.dock.keys.isNotEmpty()) || dragged is Drag.FromDrawer
+                // Outside the pager, so it stays put while the pages swipe. Stored dock apps hold its row until the apps and
+                // shortcuts load, so the pages do not move when they arrive. An empty dock shows while an app is dragged, as a
+                // place to drop it, and slides in and out so the ring above moves rather than jumps.
+                val dockShown = dock.isNotEmpty() || (onHome == null && homeApps.dock.keys.isNotEmpty()) || dragged is Drag.FromDrawer
                 AnimatedVisibility(visible = dockShown) {
                     Dock(
                         apps = dock,
@@ -592,6 +614,17 @@ fun LauncherScreen(
                     onReset()
                 },
                 onDismiss = { confirmingReset = false },
+            )
+        }
+        confirmingPin?.let { request ->
+            PinDialog(
+                request = request,
+                onAdd = {
+                    confirmingPin = null
+                    // Only once it is pinned, and in the same handler: whatever runs next sees it pinned and on the ring.
+                    if (request.accept()) changeHomeApps { add(HomePlace.Ring, request.shortcut) }
+                },
+                onDismiss = { confirmingPin = null },
             )
         }
         dragged?.let { drag ->

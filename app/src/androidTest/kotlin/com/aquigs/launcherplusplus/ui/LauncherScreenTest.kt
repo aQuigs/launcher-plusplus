@@ -73,7 +73,11 @@ class LauncherScreenTest {
     private val layout = PageLayout()
     private val pager = PagerState(currentPage = layout.homeIndex) { layout.pages.size }
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
+    private val pinRequests = MutableSharedFlow<PinRequest>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
+    private var pinnedShortcuts by mutableStateOf<List<AppEntry>?>(emptyList())
+    private val squoosh = AppEntry("Squoosh", "com.example.browser", "com.example.browser.Main", canUninstall = false, shortcutId = "squoosh")
+    private var accepts = 0
     private var homeApps by mutableStateOf(HomeApps())
     private var homeAppsChanges = 0
     private val work = folderOf(clock, mail)
@@ -122,7 +126,9 @@ class LauncherScreenTest {
         LauncherScreen(
             layout = layout,
             homePresses = homePresses,
+            pinRequests = pinRequests,
             apps = apps,
+            pinnedShortcuts = pinnedShortcuts,
             homeApps = homeApps,
             onHomeAppsChange = {
                 homeApps = it
@@ -158,6 +164,16 @@ class LauncherScreenTest {
     }
 
     private fun pressHome(launcherInFront: Boolean) = compose.runOnIdle { assertTrue(homePresses.tryEmit(HomePress(launcherInFront))) }
+
+    /** Asks to pin [squoosh], as the browser would; the system pins it on accept unless [refused]. */
+    private fun requestPin(refused: Boolean = false) = compose.runOnIdle {
+        val request = PinRequest(squoosh, appLabel = "Browser", icon = { null }) {
+            accepts++
+            if (!refused) pinnedShortcuts = listOf(squoosh)
+            !refused
+        }
+        assertTrue(pinRequests.tryEmit(request))
+    }
 
     private fun assertSettledOn(page: LauncherPage) {
         compose.waitForIdle()
@@ -994,6 +1010,68 @@ class LauncherScreenTest {
 
         compose.resetDialog().assertDoesNotExist()
         compose.runOnIdle { assertEquals(0, resets) }
+    }
+
+    @Test
+    fun aPinRequestClosesWhatIsOpenOnTheHomePageAndAddPutsTheShortcutAtTheEndOfTheRing() {
+        homeApps = HomeApps(ring = ringOf(clock))
+        show()
+        goToCollections()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        requestPin()
+
+        assertSettledOn(LauncherPage.Home)
+        assertDrawerOpen(false)
+        compose.pinDialog().assertIsDisplayed()
+        compose.onNodeWithText("Squoosh").assertIsDisplayed()
+        compose.onNodeWithText("Shortcut from Browser").assertIsDisplayed()
+
+        compose.onNodeWithText("Add").performClick()
+
+        compose.pinDialog().assertDoesNotExist()
+        compose.ringSlot(squoosh).assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(1, accepts)
+            assertEquals(HomeApps(ring = ringOf(clock, squoosh)), homeApps)
+        }
+    }
+
+    @Test
+    fun cancelAndARefusedPinLeaveTheRingAlone() {
+        homeApps = HomeApps(ring = ringOf(clock))
+        show()
+        requestPin()
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        compose.pinDialog().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, accepts) }
+        requestPin(refused = true)
+
+        compose.onNodeWithText("Add").performClick()
+
+        compose.pinDialog().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(1, accepts)
+            assertEquals(0, homeAppsChanges)
+        }
+    }
+
+    @Test
+    fun homeClosesThePinDialogWithoutAdding() {
+        show()
+        requestPin()
+        compose.pinDialog().assertIsDisplayed()
+
+        pressHome(launcherInFront = false)
+
+        compose.pinDialog().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(0, accepts)
+            assertEquals(0, homeAppsChanges)
+        }
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.aquigs.launcherplusplus.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeFormatTest {
@@ -46,5 +48,12 @@ class HomeFormatTest {
         assertEquals("pkg.Clock/pkg.Clock.Main\npkg.Mail/pkg.Mail.Main", favourites.encode())
         assertEquals(favourites, decodeFavourites(favourites.encode()))
         assertEquals(Favourites(), decodeFavourites(""))
+    }
+
+    @Test
+    fun `a shortcut whose id holds a line break or a tab cannot be stored`() {
+        assertTrue(isStorable(shortcutKey("web", "da8ed822-1ea0")))
+        assertFalse(isStorable(shortcutKey("web", "two\nlines")))
+        assertFalse(isStorable(shortcutKey("web", "tab\tbed")))
     }
 }

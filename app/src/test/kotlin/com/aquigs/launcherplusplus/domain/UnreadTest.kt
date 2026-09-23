@@ -54,6 +54,16 @@ class UnreadTest {
     }
 
     @Test
+    fun `a pinned shortcut counts none, alone or in a folder`() {
+        val counts = UnreadCounts(mapOf(chat.packageName to 4))
+        val pinnedChat = chat.copy(label = "Sam", shortcutId = "sam")
+
+        assertEquals(0, counts[pinnedChat])
+        assertEquals(0, counts.sum(listOf(pinnedChat)))
+        assertEquals(4, counts.sum(listOf(pinnedChat, chat)))
+    }
+
+    @Test
     fun `a badge shows the count up to two digits`() {
         assertEquals("1", badgeText(1))
         assertEquals("99", badgeText(99))

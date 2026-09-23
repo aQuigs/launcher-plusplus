@@ -106,6 +106,8 @@ fun SemanticsNodeInteractionsProvider.longPressEmptyHomeSpace() = onRoot().perfo
 
 fun SemanticsNodeInteractionsProvider.resetDialog() = onNodeWithTag(LauncherMenuTags.RESET_DIALOG)
 
+fun SemanticsNodeInteractionsProvider.pinDialog() = onNodeWithTag(PinDialogTags.DIALOG)
+
 // The badge is merged into its icon's node, so it is found in the unmerged tree, under the icon tagged [tag].
 fun SemanticsNodeInteractionsProvider.badgeOn(tag: String) =
     onNodeWithTag(tag, useUnmergedTree = true).onChildren().filterToOne(hasTestTag(BadgeTags.BUBBLE))

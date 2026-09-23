@@ -49,6 +49,26 @@
             </intent-filter>
         </activity>
 
+        <!-- Not exported: MainActivity takes a pin request only through it, so no other app can hand the home screen one. -->
+        <activity-alias
+            android:name=".PinRequests"
+            android:exported="false"
+            android:targetActivity=".MainActivity" />
+
+        <!-- The system starts it, and it alone may, whenever another app asks to pin a shortcut to the home screen, so
+             that apps, Chrome's install among them, offer to. It has no window, task or place in recents of its own. -->
+        <activity
+            android:name=".PinShortcutActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+            </intent-filter>
+        </activity>
+
         <!-- The system binds it only after the user grants notification access, and only the system may. -->
         <service
             android:name=".apps.UnreadListener"
