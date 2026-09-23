@@ -1,6 +1,7 @@
 #!/bin/zsh
 
-# Installs the debug build on the connected device, makes it the default home app, and shows it.
+# Installs a build on the connected device, makes it the default home app, and shows it: the debug build, or with
+# VARIANT=Release the store-speed one, installed through Gradle so its startup profile goes on too.
 
 set -e
 
@@ -8,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 APP_ID=com.aquigs.launcherplusplus
 
-./gradlew installDebug -q
+./gradlew "install${VARIANT:-Debug}" -q
 adb shell cmd package set-home-activity "$APP_ID/.MainActivity"
 adb shell input keyevent KEYCODE_HOME
 

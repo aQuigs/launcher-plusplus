@@ -1,22 +1,24 @@
 #!/bin/zsh
 # Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
-# Uploads screenshots or recordings as GitHub attachments and prints markdown for the PR body.
+# Uploads screenshots or recordings as GitHub attachments and prints the media block for the PR body.
 # This is the same upload the web editor does on paste; the endpoint is undocumented but accepts the gh token.
-# Progress goes to stderr, the markdown to stdout.
-# Usage: scripts/pr-media.sh <file>...   (IMG_WIDTH sets the image width, default 300)
+# Images go two per row in an HTML table with a fixed <td width>, so a long caption wraps instead of widening its column.
+# Usage: scripts/pr-media.sh <file> <caption> [<file> <caption>]...   (IMG_WIDTH sets the image width, default 300)
 
 set -e
 
-if (( $# == 0 )); then
-  echo "Usage: scripts/pr-media.sh <file>..."
+if (( $# == 0 || $# % 2 )); then
+  echo "Usage: scripts/pr-media.sh <file> <caption> [<file> <caption>]..."
   exit 1
 fi
-FILES=("$@")
 IMG_WIDTH=${IMG_WIDTH:-300}
-UPLOAD_URL=https://uploads.github.com/user-attachments/assets
+TOKEN=$(gh auth token)
+REPO_ID=$(gh api 'repos/{owner}/{repo}' --jq .id)
 
-for FILE in "${FILES[@]}"; do
+CELLS=()
+VIDEOS=()
+for FILE CAPTION in "$@"; do
   if [[ ! -f $FILE ]]; then
     echo "No such file: $FILE"
     exit 1
@@ -26,13 +28,6 @@ for FILE in "${FILES[@]}"; do
     echo "File name '$NAME' may only contain letters, digits, dots, underscores, and dashes"
     exit 1
   fi
-done
-
-TOKEN=$(gh auth token)
-REPO_ID=$(gh api 'repos/{owner}/{repo}' --jq .id)
-
-for FILE in "${FILES[@]}"; do
-  NAME=$(basename "$FILE")
   MIME_TYPE=$(file -b --mime-type "$FILE")
   echo "Uploading $NAME ($MIME_TYPE)" >&2
 
@@ -41,7 +36,7 @@ for FILE in "${FILES[@]}"; do
     -H "Authorization: Bearer $TOKEN" \
     -H "Accept: application/json" \
     --data-binary "@$FILE" \
-    "$UPLOAD_URL?name=$NAME&content_type=$MIME_TYPE&repository_id=$REPO_ID")
+    "https://uploads.github.com/user-attachments/assets?name=$NAME&content_type=$MIME_TYPE&repository_id=$REPO_ID")
   URL=$(echo "$RESPONSE" | jq -r '.url // empty' 2>/dev/null || true)
   if [[ -z $URL ]]; then
     echo "Upload of $NAME failed, response was:"
@@ -50,7 +45,21 @@ for FILE in "${FILES[@]}"; do
   fi
 
   case $NAME in
-    *.png|*.jpg|*.jpeg|*.gif) echo "<img src=\"$URL\" alt=\"${NAME%.*}\" width=\"$IMG_WIDTH\">" ;;
-    *) echo "$URL" ;;
+    *.png|*.jpg|*.jpeg|*.gif) CELLS+=("<td width=\"$IMG_WIDTH\" valign=\"top\"><img src=\"$URL\" alt=\"${NAME%.*}\" width=\"$IMG_WIDTH\"><br>$CAPTION</td>") ;;
+    *) VIDEOS+=("$URL") ;;
   esac
+done
+
+if (( ${#CELLS} )); then
+  echo "<table>"
+  for LEFT RIGHT in "${CELLS[@]}"; do
+    echo "<tr>$LEFT$RIGHT</tr>"
+  done
+  echo "</table>"
+fi
+
+# GitHub embeds a video only when its URL stands alone, after a blank line
+for URL in "${VIDEOS[@]}"; do
+  echo
+  echo "$URL"
 done

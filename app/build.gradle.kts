@@ -25,19 +25,8 @@ android {
     }
 }
 
-// Refreshes the shared copies described in CLAUDE.md when sync-common is on PATH. The configuration cache records isFile
-// but not canExecute, so isFile is what makes installing or removing the command re-run this lookup.
-val syncCommon = System.getenv("PATH").orEmpty().split(File.pathSeparator)
-    .map { File(it, "sync-common") }
-    .firstOrNull { it.isFile && it.canExecute() }
-val syncShared = mapOf("syncSharedScripts" to "scripts", "syncSharedWorkflows" to ".github/workflows").map { (name, dir) ->
-    tasks.register<Exec>(name) {
-        enabled = syncCommon != null
-        workingDir = rootDir
-        commandLine(syncCommon?.path ?: "sync-common", dir)
-    }
-}
-tasks.named("preBuild") { dependsOn(syncShared) }
+// The release build type and the shared-copy refresh, common to every app repo
+apply(from = "../scripts/android-app.gradle")
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))

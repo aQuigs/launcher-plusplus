@@ -1,0 +1,31 @@
+// Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
+
+// Build configuration every Android app shares. app/build.gradle.kts applies it after its android block:
+//   apply(from = "../scripts/android-app.gradle")
+// Groovy rather than Kotlin: a script applied that way is compiled without the app's plugin classes, so a Kotlin script
+// cannot name the android extension, while Groovy resolves it at run time.
+
+android {
+    buildTypes {
+        // Store-build speed: Compose runs several times slower when debuggable, and R8 speeds it up further. Debug-signed,
+        // so VARIANT=Release scripts/run.sh installs it over the debug build and the app keeps its data.
+        release {
+            minifyEnabled = true
+            signingConfig = signingConfigs.debug
+        }
+    }
+}
+
+// Refreshes the shared copies described in CLAUDE.md, this file included, when sync-common is on PATH. The configuration
+// cache records isFile but not canExecute, so isFile is what makes installing or removing the command re-run this lookup.
+def syncCommon = System.getenv('PATH')?.tokenize(File.pathSeparator)
+    ?.collect { new File(it, 'sync-common') }
+    ?.find { it.isFile() && it.canExecute() }
+def syncShared = [syncSharedDotfiles: '.', syncSharedScripts: 'scripts', syncSharedWorkflows: '.github/workflows'].collect { name, dir ->
+    tasks.register(name, Exec) {
+        enabled = syncCommon != null
+        workingDir = rootDir
+        commandLine(syncCommon?.path ?: 'sync-common', dir)
+    }
+}
+tasks.named('preBuild') { dependsOn(syncShared) }

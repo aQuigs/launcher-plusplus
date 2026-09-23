@@ -35,5 +35,5 @@ repos:
         entry: ./gradlew lintDebug testDebugUnitTest -q
         language: system
         pass_filenames: false
-        files: \.(kt|kts|toml|xml|properties)$
+        files: \.(kt|kts|gradle|toml|xml|properties)$
         stages: [pre-commit]
