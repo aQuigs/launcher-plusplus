@@ -8,11 +8,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -32,10 +30,12 @@ class WidgetColumnTest {
 
     private val search = HostedWidget(id = 3, rows = 1)
     private val game = HostedWidget(id = 8, rows = 2)
+    private val inert = HostedWidget(id = 5, rows = 1)
     private var page by mutableStateOf(WidgetPage())
     private val added = mutableListOf<Int>()
     private val removed = mutableListOf<Int>()
     private val shown = mutableListOf<Int>()
+    private val tapped = mutableListOf<Int>()
     private var openMenu by mutableStateOf<Int?>(null)
 
     private fun show() = compose.setContent {
@@ -43,7 +43,10 @@ class WidgetColumnTest {
             page = page,
             view = { context, id ->
                 shown += id
-                View(context).apply { setBackgroundColor(Color.RED) }
+                View(context).apply {
+                    setBackgroundColor(Color.RED)
+                    if (id != inert.id) setOnClickListener { tapped += id }
+                }
             },
             onAdd = added::add,
             menu = WidgetMenu(
@@ -95,14 +98,33 @@ class WidgetColumnTest {
     }
 
     @Test
-    fun aLongPressOpensTheMenuAndRemoveRemovesTheWidget() {
+    fun aTapReachesTheWidgetButALongPressOpensTheMenuInstead() {
         page = WidgetPage(listOf(search, game))
         show()
 
-        compose.widget(game).performTouchInput { longClick() }
+        compose.widget(game).performClick()
+        compose.runOnIdle { assertEquals(listOf(game.id), tapped) }
+
+        compose.longPressWidget(game)
         compose.widgetOptionsMenu().assertIsDisplayed()
         compose.onNodeWithText("Remove").performClick()
 
-        compose.runOnIdle { assertEquals(listOf(game.id), removed) }
+        compose.runOnIdle {
+            assertEquals(listOf(game.id), removed)
+            assertEquals("the long press was not also a tap", listOf(game.id), tapped)
+        }
+    }
+
+    @Test
+    fun aWidgetThatIgnoresTouchesOpensItsMenuOnALongPressButNotOnATap() {
+        page = WidgetPage(listOf(inert))
+        show()
+
+        compose.widget(inert).performClick()
+        compose.waitOutWidgetLongPress()
+        compose.widgetOptionsMenu().assertDoesNotExist()
+
+        compose.longPressWidget(inert)
+        compose.widgetOptionsMenu().assertIsDisplayed()
     }
 }

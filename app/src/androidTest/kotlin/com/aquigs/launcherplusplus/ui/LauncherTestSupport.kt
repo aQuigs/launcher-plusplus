@@ -1,5 +1,6 @@
 package com.aquigs.launcherplusplus.ui
 
+import android.view.ViewConfiguration
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
@@ -7,7 +8,9 @@ import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -95,6 +98,21 @@ fun SemanticsNodeInteractionsProvider.widget(widget: HostedWidget) = onNodeWithT
 fun SemanticsNodeInteractionsProvider.addWidgetButton() = onNodeWithTag(WidgetTags.ADD)
 
 fun SemanticsNodeInteractionsProvider.widgetOptionsMenu() = onNodeWithTag(WidgetTags.MENU)
+
+/** Holds a finger on [widget] until its menu opens: the widget's view times the press on the looper, which the test clock does not drive. */
+fun ComposeTestRule.longPressWidget(widget: HostedWidget) {
+    widget(widget).performTouchInput { down(center) }
+    waitUntil(timeoutMillis = longPressMillis() * 4) { onAllNodesWithTag(WidgetTags.MENU).fetchSemanticsNodes().isNotEmpty() }
+    widget(widget).performTouchInput { up() }
+}
+
+/** Lets a widget's long press come due in real time, so a wait the gesture failed to cancel would open its menu. */
+fun ComposeTestRule.waitOutWidgetLongPress() {
+    Thread.sleep(longPressMillis() * 2)
+    waitForIdle()
+}
+
+private fun longPressMillis() = ViewConfiguration.getLongPressTimeout().toLong()
 
 fun SemanticsNodeInteractionsProvider.launcherMenu() = onNodeWithTag(LauncherMenuTags.MENU)
 

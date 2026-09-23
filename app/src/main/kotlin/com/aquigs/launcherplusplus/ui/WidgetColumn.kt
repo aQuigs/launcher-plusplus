@@ -1,10 +1,11 @@
 package com.aquigs.launcherplusplus.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.view.MotionEvent
 import android.view.View
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import android.view.ViewConfiguration
+import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,8 +30,6 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -40,6 +39,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.aquigs.launcherplusplus.domain.HostedWidget
 import com.aquigs.launcherplusplus.domain.WIDGET_ROW_HEIGHT_DP
 import com.aquigs.launcherplusplus.domain.WidgetPage
+import kotlin.math.abs
 
 object WidgetTags {
     const val ADD = "widget_add"
@@ -92,43 +92,78 @@ fun WidgetColumn(
 @Composable
 private fun Widget(widget: HostedWidget, view: (Context, Int) -> View, menu: WidgetMenu?, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
+    val onLongPress = menu?.let { m ->
+        {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            m.onOpen(widget)
+        }
+    }
 
-    Box(
-        modifier
-            .longPressOverChildren(
-                menu?.let { m ->
-                    {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        m.onOpen(widget)
-                    }
-                },
-            )
-            .semantics { contentDescription = "Widget" }
-            .testTag(WidgetTags.widget(widget.id)),
-    ) {
+    Box(modifier.semantics { contentDescription = "Widget" }.testTag(WidgetTags.widget(widget.id))) {
         // Made afresh from the id each time the widget is composed; the system keeps what it shows.
-        AndroidView(factory = { context -> view(context, widget.id) }, modifier = Modifier.fillMaxSize())
+        AndroidView(
+            factory = { context -> LongPressFrame(context).apply { addView(view(context, widget.id)) } },
+            update = { it.onLongPress = onLongPress },
+            modifier = Modifier.fillMaxSize(),
+        )
         menu?.content?.invoke(widget)
     }
 }
 
 /**
- * Calls [onLongPress] when a finger rests on this node. The press is taken in the initial pass, ahead of the widget's
- * own buttons, which would otherwise keep it; a finger that lifts, or that the page or the pager starts to follow, ends
- * the wait. Once it fires, the rest of the gesture is consumed, so the widget sees a cancel rather than a tap.
+ * Calls [onLongPress] when a finger rests on the widget. Compose cannot take a press back from a view whose buttons
+ * already hold it, so this watches from the view side, as the platform launcher does: it sees each event ahead of its
+ * children and, once the press fires, intercepts the rest, so the widget gets a cancel rather than a tap, and keeps the
+ * page and the pager from following the finger. A finger that lifts or moves, a child that starts to scroll, or the
+ * pager taking the drag ends the wait. Where no child takes the press, the frame takes it itself, since a view that
+ * turns down the down hears nothing more of the gesture and could not cancel the wait.
  */
-private fun Modifier.longPressOverChildren(onLongPress: (() -> Unit)?): Modifier {
-    onLongPress ?: return this
-    return pointerInput(onLongPress) {
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-            onLongPress()
-            do {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                event.changes.forEach { it.consume() }
-            } while (event.changes.any { it.pressed })
+private class LongPressFrame(context: Context) : FrameLayout(context) {
+    var onLongPress: (() -> Unit)? = null
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var pressed = false
+    private var downX = 0f
+    private var downY = 0f
+    private val fire = Runnable {
+        pressed = true
+        parent?.requestDisallowInterceptTouchEvent(true)
+        onLongPress?.invoke()
+    }
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        track(event)
+        return pressed
+    }
+
+    // The frame never clicks; it holds the gesture only to time the press, and the widget inside keeps its own clicks.
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked != MotionEvent.ACTION_DOWN) track(event)
+        return onLongPress != null
+    }
+
+    private fun track(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                removeCallbacks(fire)
+                pressed = false
+                downX = event.x
+                downY = event.y
+                if (onLongPress != null) postDelayed(fire, ViewConfiguration.getLongPressTimeout().toLong())
+            }
+            MotionEvent.ACTION_MOVE -> if (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop) removeCallbacks(fire)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> removeCallbacks(fire)
         }
+    }
+
+    override fun requestDisallowInterceptTouchEvent(disallow: Boolean) {
+        if (disallow) removeCallbacks(fire)
+        super.requestDisallowInterceptTouchEvent(disallow)
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(fire)
+        super.onDetachedFromWindow()
     }
 }
 
