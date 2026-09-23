@@ -45,12 +45,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppOption
 import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.Bounds
 import com.aquigs.launcherplusplus.domain.ClockFace
+import com.aquigs.launcherplusplus.domain.CollectionCard
 import com.aquigs.launcherplusplus.domain.CollectionKind
 import com.aquigs.launcherplusplus.domain.CollectionsPage
 import com.aquigs.launcherplusplus.domain.DropZones
@@ -67,6 +67,7 @@ import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.WidgetPage
 import com.aquigs.launcherplusplus.domain.appOptions
 import com.aquigs.launcherplusplus.domain.seedCategory
+import com.aquigs.launcherplusplus.domain.title
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -95,9 +96,10 @@ data class HomePress(val launcherInFront: Boolean)
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
  * [widgets], and a widget's long-press menu removes it. The collections page shows the cards of [collections], the
  * built-in ones filled from the app list and [foregroundTime] (null until usage access is granted, which
- * [onOpenUsageSettings] asks for); a category card's pencil opens an editor over the screen that adds apps to it, and
- * the button under the cards opens the picker that adds and removes cards. An app long-pressed on a category card lifts
- * off it, and dropping it on the bin takes it off the card. Apps everywhere wear their [unread] counts; a long press on
+ * [onOpenUsageSettings] asks for); a hand-picked card's pencil opens an editor over the screen that adds apps to it, and
+ * the button under the cards opens the picker that adds and removes cards, whose last tile opens a dialog naming a new
+ * custom collection. An app long-pressed on a hand-picked card lifts off it, and dropping it on the bin takes it off the
+ * card. Apps everywhere wear their [unread] counts; a long press on
  * the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -211,8 +213,9 @@ fun LauncherScreen(
         }
     }
     // The editor and the picker each cover the whole screen until Back or HOME. The editor marks the apps tapped while it
-    // was open, and starts clean each time; dropping focus takes its keyboard down with it.
-    var editing by rememberSaveable { mutableStateOf<AppCategory?>(null) }
+    // was open, and starts clean each time; dropping focus takes its keyboard down with it. The card being edited is held
+    // by its stored name, which survives the activity being recreated.
+    var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
     var justPicked by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var editorQuery by rememberSaveable { mutableStateOf("") }
@@ -350,17 +353,17 @@ fun LauncherScreen(
 
     val cardLift = remember {
         CardLift(
-            onStart = { category, app, position ->
+            onStart = { kind, app, position ->
                 closeMenu()
                 // The lift is the answer to the long press, as the menu is elsewhere, so it gets the same nudge.
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                dragged = Drag.FromCard(app, category)
+                dragged = Drag.FromCard(app, kind)
                 finger = position
             },
             onMove = { finger = it },
             onDrop = {
                 val lifted = dragged as? Drag.FromCard
-                if (lifted != null && overBin) changeCollections { removeApp(CollectionKind.Category(lifted.category), lifted.app) }
+                if (lifted != null && overBin) changeCollections { removeApp(lifted.kind, lifted.app) }
                 dragged = null
             },
             onCancel = { dragged = null },
@@ -602,7 +605,7 @@ fun LauncherScreen(
                                 onLaunch = actions.launch,
                                 onToggleExpanded = { kind -> changeCollections { toggleExpanded(kind) } },
                                 onMove = { from, to -> changeCollections { move(from, to) } },
-                                onEdit = { editing = it },
+                                onEdit = { editing = it.name },
                                 onAdd = { pickingCollection = true },
                                 onOpenUsageSettings = onOpenUsageSettings,
                                 lift = cardLift,
@@ -615,34 +618,52 @@ fun LauncherScreen(
             }
         }
         // Over the hidden scaffold, drawer strip included: each is a screen of its own until Back or HOME.
-        editing?.let { category ->
+        remember(editing) { editing?.let(CollectionKind::named) }?.let { kind ->
             CollectionEditor(
-                title = "Add to ${category.label}",
+                title = "Add to ${kind.title}",
                 apps = apps.orEmpty(),
                 icon = actions.icon,
                 isPicked = { it.key in justPicked },
                 onPick = { app ->
                     // Marked whether or not it was already in the card, so the tap is seen to have counted either way.
                     justPicked = justPicked + app.key
-                    changeCollections { addApp(CollectionKind.Category(category), app) }
+                    changeCollections { addApp(kind, app) }
                 },
                 query = editorQuery,
                 onQueryChange = { editorQuery = it },
             )
         }
         if (pickingCollection) {
+            // Both last as long as this visit to the picker. The custom cards it has listed keep a tile tapped off where
+            // it was, with its apps, so a second tap cannot land on its neighbour and puts it back whole.
+            var listedCustoms by remember { mutableStateOf(emptyList<CollectionCard>()) }
+            var creatingCollection by rememberSaveable { mutableStateOf(false) }
+            val customs = collections.customTiles(listedCustoms)
             CollectionPicker(
                 page = collections,
+                customs = customs.map { it.kind },
                 onToggle = { kind ->
+                    listedCustoms = customs
                     changeCollections {
-                        if (kind in this) {
-                            remove(kind)
-                        } else {
-                            add(kind, (kind as? CollectionKind.Category)?.let { seedCategory(it.category, apps.orEmpty()) } ?: Favourites())
+                        when {
+                            kind in this -> remove(kind)
+                            kind is CollectionKind.Category -> add(kind, seedCategory(kind.category, apps.orEmpty()))
+                            else -> add(kind, customs.find { it.kind == kind }?.apps ?: Favourites())
                         }
                     }
                 },
+                onCreate = { creatingCollection = true },
             )
+            if (creatingCollection) {
+                CreateCollectionDialog(
+                    page = collections,
+                    onCreate = { kind ->
+                        creatingCollection = false
+                        changeCollections { add(kind) }
+                    },
+                    onDismiss = { creatingCollection = false },
+                )
+            }
         }
         if (confirmingReset) {
             ResetDialog(
@@ -677,8 +698,8 @@ private sealed interface Drag {
     /** Out of the drawer, to the ring or the dock. */
     data class FromDrawer(override val app: AppEntry) : Drag
 
-    /** Off the card of [category], to the bin. */
-    data class FromCard(override val app: AppEntry, val category: AppCategory) : Drag
+    /** Off the card of [kind], to the bin. */
+    data class FromCard(override val app: AppEntry, val kind: CollectionKind) : Drag
 }
 
 /** The long-press menu that is showing. It keeps what it shows while [expanded] turns false, so it animates away whole. */

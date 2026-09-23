@@ -3,6 +3,7 @@ package com.aquigs.launcherplusplus.ui
 import android.view.View
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,10 +13,12 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -30,7 +33,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
@@ -43,6 +48,7 @@ import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.AppShortcut
 import com.aquigs.launcherplusplus.domain.ClockFace
 import com.aquigs.launcherplusplus.domain.CollectionCard
+import com.aquigs.launcherplusplus.domain.CollectionKind
 import com.aquigs.launcherplusplus.domain.CollectionKind.MostUsed
 import com.aquigs.launcherplusplus.domain.CollectionKind.NewApps
 import com.aquigs.launcherplusplus.domain.CollectionsPage
@@ -123,7 +129,12 @@ class LauncherScreenTest {
         uninstall = uninstalled::add,
     )
 
-    private fun show(modifier: Modifier = Modifier) = compose.setContent {
+    private fun show(modifier: Modifier = Modifier, restoration: StateRestorationTester? = null) {
+        if (restoration != null) restoration.setContent { Screen(modifier) } else compose.setContent { Screen(modifier) }
+    }
+
+    @Composable
+    private fun Screen(modifier: Modifier) {
         LauncherScreen(
             layout = layout,
             homePresses = homePresses,
@@ -1170,6 +1181,77 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun createYourOwnNamesAnEmptyCardWhoseTileTakesItAwayForGoodOnceThePickerCloses() {
+        collections = CollectionsPage()
+        val finance = CollectionKind.Custom("Finance")
+        show()
+        goToCollections()
+        compose.addCollectionButton().performClick()
+
+        compose.createCollectionTile().performClick()
+        compose.createCollectionName().performTextInput("tools")
+        compose.onNodeWithText("Ok").assertIsNotEnabled()
+        compose.createCollectionName().performTextReplacement(" Finance ")
+        compose.onNodeWithText("Ok").performClick()
+
+        compose.createCollectionDialog().assertDoesNotExist()
+        compose.pickerTile(finance).assertIsSelected()
+        compose.runOnIdle { assertEquals(listOf(NewApps, MostUsed, finance), collections.cards.map { it.kind }) }
+
+        compose.collectionTile(finance).performClick()
+        compose.runOnIdle { assertEquals(CollectionsPage(), collections) }
+        Espresso.pressBack()
+        compose.addCollectionButton().performScrollTo().performClick()
+
+        // Scrolled to the end of the grid, where the tile would be.
+        compose.createCollectionTile()
+        compose.collectionTile(finance).assertDoesNotExist()
+    }
+
+    @Test
+    fun aCustomTileTappedOffStaysInPlaceUnlitAndASecondTapPutsItsCardBackWithItsApps() {
+        val bills = CollectionKind.Custom("Bills")
+        val trips = CollectionKind.Custom("Trips")
+        collections = CollectionsPage(listOf(CollectionCard(bills, Favourites(listOf(mail.key))), CollectionCard(trips, Favourites(listOf(clock.key)))))
+        show()
+        goToCollections()
+        compose.addCollectionButton().performClick()
+        val place = compose.pickerTile(bills).getUnclippedBoundsInRoot()
+
+        compose.collectionTile(bills).performClick()
+
+        compose.collectionTile(bills).assertIsNotSelected()
+        assertEquals(place, compose.collectionTile(bills).getUnclippedBoundsInRoot())
+        compose.collectionTile(trips).assertIsSelected()
+        compose.runOnIdle { assertEquals(listOf(trips), collections.cards.map { it.kind }) }
+
+        compose.collectionTile(bills).performClick()
+
+        compose.collectionTile(bills).assertIsSelected()
+        compose.runOnIdle {
+            assertEquals(listOf(trips, bills), collections.cards.map { it.kind })
+            assertEquals(Favourites(listOf(mail.key)), collections.card(bills)!!.apps)
+            assertEquals(Favourites(listOf(clock.key)), collections.card(trips)!!.apps)
+        }
+    }
+
+    @Test
+    fun anEditorOpenOnACustomCardSurvivesTheScreenBeingRecreated() {
+        val bills = CollectionKind.Custom("Bills")
+        collections = CollectionsPage(listOf(CollectionCard(bills)))
+        val restoration = StateRestorationTester(compose)
+        show(restoration = restoration)
+        goToCollections()
+        compose.collectionEditButton(bills).performClick()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        compose.onNodeWithText("Add to Bills").assertIsDisplayed()
+        compose.editorRow("Mail").performClick()
+        compose.runOnIdle { assertEquals(Favourites(listOf(mail.key)), collections.card(bills)!!.apps) }
+    }
+
+    @Test
     fun thePencilOpensAnEditorThatAddsATappedAppOnceAndBackReturnsToThePage() {
         collections = CollectionsPage().add(tools)
         show()
@@ -1259,9 +1341,11 @@ class LauncherScreenTest {
 
         goToCollections()
         compose.addCollectionButton().performClick()
-        compose.collectionPicker().assertIsDisplayed()
+        compose.createCollectionTile().performClick()
+        compose.createCollectionDialog().assertIsDisplayed()
         pressHome(launcherInFront = false)
 
+        compose.createCollectionDialog().assertDoesNotExist()
         compose.collectionPicker().assertDoesNotExist()
         assertSettledOn(LauncherPage.Collections)
     }

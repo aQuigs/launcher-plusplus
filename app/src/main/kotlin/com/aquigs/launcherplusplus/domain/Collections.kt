@@ -7,8 +7,8 @@ enum class AppCategory {
 }
 
 /**
- * What a collection card shows. The built-in kinds work their apps out from the system; a category's apps are the
- * user's. [name] is how a kind is stored, and how a card is told from the others.
+ * What a collection card shows. The built-in kinds work their apps out from the system; the apps of a category or a
+ * custom collection are the user's. [name] is how a kind is stored, and how a card is told from the others.
  */
 sealed interface CollectionKind {
     val name: String
@@ -21,19 +21,76 @@ sealed interface CollectionKind {
         override val name = "MostUsed"
     }
 
-    data class Category(val category: AppCategory) : CollectionKind {
+    /** A kind whose card keeps apps the user picked, rather than ones the system works out. */
+    sealed interface HandPicked : CollectionKind
+
+    data class Category(val category: AppCategory) : HandPicked {
         override val name: String get() = category.name
     }
 
+    /** A collection the user made and named, Arc's [CREATE_YOUR_OWN]. [CollectionsPage.custom] vets the [label]. */
+    data class Custom(val label: String) : HandPicked {
+        // Prefixed, so a label cannot pass for a built-in kind's stored name.
+        override val name: String = CUSTOM_PREFIX + label
+    }
+
     companion object {
-        /** Every kind, in the picker's order: the categories, then the built-in two. */
+        /** Every built-in kind, in the picker's order: the categories, then New Apps and Most Used. */
         val all: List<CollectionKind> = AppCategory.entries.map(::Category) + listOf(NewApps, MostUsed)
 
+        /** The kind stored as [name]; a custom one only if its label is still one [CollectionsPage.custom] would take. */
         fun named(name: String): CollectionKind? = all.find { it.name == name }
+            ?: if (name.startsWith(CUSTOM_PREFIX)) customNamed(name.removePrefix(CUSTOM_PREFIX)) else null
     }
 }
 
-/** One card: its [kind], the apps a category keeps (none for a built-in kind), and whether it shows them all with labels. */
+private const val CUSTOM_PREFIX = "Custom:"
+
+/** What the picker's tile for making a custom collection says; no collection may take it as a name. */
+const val CREATE_YOUR_OWN = "Create Your Own"
+
+/** The longest name a custom collection keeps. */
+const val MAX_COLLECTION_NAME = 30
+
+/**
+ * [raw] as a custom collection's name: every run of whitespace (a tab or line break, which would split the stored text,
+ * or a no-break space) made one space, invisible formatting and control characters dropped, trimmed, and cut to
+ * [MAX_COLLECTION_NAME].
+ */
+private fun cleanName(raw: String): String {
+    val spaced = buildString {
+        raw.forEach { c ->
+            when {
+                c.isWhitespace() -> append(' ')
+                c.category != CharCategory.FORMAT && c.category != CharCategory.CONTROL -> append(c)
+            }
+        }
+    }
+    val cut = spaced.split(' ').filter(String::isNotEmpty).joinToString(" ").take(MAX_COLLECTION_NAME)
+    return (if (cut.lastOrNull()?.isHighSurrogate() == true) cut.dropLast(1) else cut).trimEnd()
+}
+
+// Case and spaces aside, so "lifestyle" and "Most Used" are taken as well as "Life Style" and "Most Used Apps".
+private fun nameKey(name: String) = name.lowercase().filterNot { it == ' ' }
+
+private val reservedNames: Set<String> =
+    (CollectionKind.all.flatMap { listOf(it.name, it.title) } + CREATE_YOUR_OWN).map(::nameKey).toSet()
+
+private fun customNamed(raw: String): CollectionKind.Custom? =
+    cleanName(raw).takeIf { it.isNotEmpty() && nameKey(it) !in reservedNames }?.let(CollectionKind::Custom)
+
+val AppCategory.label: String
+    get() = if (this == AppCategory.LifeStyle) "Life Style" else name
+
+val CollectionKind.title: String
+    get() = when (this) {
+        CollectionKind.NewApps -> "New Apps"
+        CollectionKind.MostUsed -> "Most Used Apps"
+        is CollectionKind.Category -> category.label
+        is CollectionKind.Custom -> label
+    }
+
+/** One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], and whether it shows them all with labels. */
 data class CollectionCard(val kind: CollectionKind, val apps: Favourites = Favourites(), val expanded: Boolean = false)
 
 /** The cards on the collections page, top to bottom. A page never touched holds the two built-in cards, as Arc's does. */
@@ -44,11 +101,26 @@ data class CollectionsPage(
 
     fun card(kind: CollectionKind): CollectionCard? = cards.find { it.kind == kind }
 
+    /**
+     * The custom collection [label] names once cleaned up, or null when it names none: blank, or taken, whatever the case
+     * or spacing, by a built-in kind, by [CREATE_YOUR_OWN], or by a custom card on the page.
+     */
+    fun custom(label: String): CollectionKind.Custom? =
+        customNamed(label)?.takeIf { new -> cards.none { it.kind is CollectionKind.Custom && nameKey(it.kind.label) == nameKey(new.label) } }
+
+    /**
+     * The custom cards a visit to the picker lists, given those it [listed] so far: each of those as the page now has it,
+     * or as it last was if it has been taken off, then any the page has that were not listed. A card taken off keeps its
+     * place and its apps, so the tiles do not move under the finger and a second tap puts it back whole.
+     */
+    fun customTiles(listed: List<CollectionCard>): List<CollectionCard> =
+        listed.map { card(it.kind) ?: it } + cards.filter { it.kind is CollectionKind.Custom && listed.none { l -> l.kind == it.kind } }
+
     /** Adds a card of [kind] at the bottom, holding [apps], unless the page has one. */
     fun add(kind: CollectionKind, apps: Favourites = Favourites()): CollectionsPage =
         if (kind in this) this else CollectionsPage(cards + CollectionCard(kind, apps))
 
-    /** Drops the card of [kind], and a category's apps with it. */
+    /** Drops the card of [kind], and the apps it kept with it. */
     fun remove(kind: CollectionKind): CollectionsPage = CollectionsPage(cards.filterNot { it.kind == kind })
 
     /** Adds [app] at the end of the card of [kind], unless it is already there or there is no such card. */
@@ -131,14 +203,15 @@ val AppEntry.suggestedCategory: AppCategory?
 fun seedCategory(category: AppCategory, apps: List<AppEntry>): Favourites =
     Favourites(apps.filter { it.suggestedCategory == category }.map { it.key })
 
-/** The page as text, one line per card: its kind, 1 or 0 for expanded, then a category's keys, all tab-separated. */
+/** The page as text, one line per card: its kind, 1 or 0 for expanded, then the keys it keeps, all tab-separated. */
 fun CollectionsPage.encode(): String = cards.joinToString(LINE) { card ->
     (listOf(card.kind.name, if (card.expanded) "1" else "0") + card.apps.keys).joinToString(FIELD)
 }
 
 /**
- * A line whose kind is unknown or whose expanded flag is not 0 or 1 is skipped, and so is a second line for a kind, so a
- * damaged file loses that card and keeps the rest. Empty text is an empty page: the defaults are for a page never stored.
+ * A line whose kind is unknown (a custom name included that cleans to nothing or to a built-in's) or whose expanded flag
+ * is not 0 or 1 is skipped, and so is a second line for a kind, so a damaged file loses that card and keeps the rest.
+ * Empty text is an empty page: the defaults are for a page never stored.
  */
 fun decodeCollectionsPage(text: String): CollectionsPage = CollectionsPage(
     text.nonEmptyLines()
@@ -150,7 +223,7 @@ fun decodeCollectionsPage(text: String): CollectionsPage = CollectionsPage(
                 "0" -> false
                 else -> return@mapNotNull null
             }
-            val keys = if (kind is CollectionKind.Category) fields.drop(2).filter(String::isNotEmpty) else emptyList()
+            val keys = if (kind is CollectionKind.HandPicked) fields.drop(2).filter(String::isNotEmpty) else emptyList()
             CollectionCard(kind, Favourites(keys), expanded)
         }
         .distinctBy { it.kind },

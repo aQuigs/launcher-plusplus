@@ -143,6 +143,58 @@ class CollectionsTest {
     }
 
     @Test
+    fun `a custom name keeps one space for any run of whitespace, loses invisible characters, and stops at 30`() {
+        val page = CollectionsPage()
+
+        assertEquals(CollectionKind.Custom("Utilities"), page.custom("  Utilities "))
+        assertEquals(CollectionKind.Custom("Bills and tax"), page.custom("Bills\tand\r\n  tax"))
+        assertEquals(CollectionKind.Custom("Finance"), page.custom("Fin​ance\u0000"))
+        assertEquals(CollectionKind.Custom("a".repeat(30)), page.custom("a".repeat(40)))
+        assertEquals(CollectionKind.Custom("a".repeat(29)), page.custom("a".repeat(29) + " b"))
+    }
+
+    @Test
+    fun `a custom name must be new, whatever its case or spacing, and not blank`() {
+        val page = CollectionsPage().add(CollectionKind.Custom("Finance"))
+
+        listOf("", " \t\n​", "finance", "FIN ANCE", "TOOLS", "lifestyle", "new apps", "NewApps", "Most Used", "create your own")
+            .forEach { assertNull(it, page.custom(it)) }
+    }
+
+    @Test
+    fun `a custom card keeps its name and apps through the text`() {
+        val finance = CollectionKind.Custom("Money: in & out")
+        val page = CollectionsPage().add(tools).add(finance, Favourites(listOf(mail.key)))
+
+        assertEquals("NewApps\t0\nMostUsed\t0\nTools\t0\nCustom:Money: in & out\t0\t${mail.key}", page.encode())
+        assertEquals(page, decodeCollectionsPage(page.encode()))
+    }
+
+    @Test
+    fun `a stored custom name is cleaned, and skipped if that leaves it blank or a built-in's`() {
+        val text = "Custom:\t0\nCustom: \t0\nCustom:NewApps\t0\nCustom:Tools\t0\nCustom: Bills​ \t1\ta/A"
+
+        assertEquals(
+            listOf(CollectionCard(CollectionKind.Custom("Bills"), Favourites(listOf("a/A")), expanded = true)),
+            decodeCollectionsPage(text).cards,
+        )
+    }
+
+    @Test
+    fun `a custom card taken off in the picker keeps its tile, its place and its apps, and a new one joins the end`() {
+        val bills = CollectionCard(CollectionKind.Custom("Bills"), Favourites(listOf(mail.key)))
+        val trips = CollectionCard(CollectionKind.Custom("Trips"))
+        val page = CollectionsPage(listOf(CollectionCard(NewApps), bills, trips))
+        val listed = page.customTiles(emptyList())
+        val home = CollectionKind.Custom("Home")
+
+        assertEquals(listOf(bills, trips), listed)
+        assertEquals(listOf(bills, trips), page.remove(bills.kind).customTiles(listed))
+        assertEquals(listOf(bills, trips, CollectionCard(home)), page.remove(bills.kind).add(home).customTiles(listed))
+        assertEquals(listOf(bills), page.remove(trips.kind).customTiles(emptyList()))
+    }
+
+    @Test
     fun `an empty page is empty text, and empty text an empty page`() {
         assertEquals("", CollectionsPage(emptyList()).encode())
         assertEquals(CollectionsPage(emptyList()), decodeCollectionsPage(""))

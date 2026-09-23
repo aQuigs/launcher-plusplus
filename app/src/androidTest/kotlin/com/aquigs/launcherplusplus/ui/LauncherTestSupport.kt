@@ -2,10 +2,12 @@ package com.aquigs.launcherplusplus.ui
 
 import android.view.ViewConfiguration
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
@@ -149,6 +152,20 @@ fun SemanticsNodeInteractionsProvider.collectionBin() = onNodeWithTag(Collection
 fun SemanticsNodeInteractionsProvider.collectionPicker() = onNodeWithTag(CollectionTags.PICKER)
 
 fun SemanticsNodeInteractionsProvider.collectionEditor() = onNodeWithTag(CollectionTags.EDITOR)
+
+// The picker's grid is lazy: a tile far down is not composed, so not found, until the grid has scrolled to it.
+fun SemanticsNodeInteractionsProvider.pickerTile(tag: String): SemanticsNodeInteraction {
+    onNode(hasScrollToNodeAction() and hasAnyAncestor(hasTestTag(CollectionTags.PICKER))).performScrollToNode(hasTestTag(tag))
+    return onNodeWithTag(tag)
+}
+
+fun SemanticsNodeInteractionsProvider.pickerTile(kind: CollectionKind) = pickerTile(CollectionTags.tile(kind))
+
+fun SemanticsNodeInteractionsProvider.createCollectionTile() = pickerTile(CollectionTags.CREATE)
+
+fun SemanticsNodeInteractionsProvider.createCollectionDialog() = onNodeWithTag(CollectionTags.CREATE_DIALOG)
+
+fun SemanticsNodeInteractionsProvider.createCollectionName() = onNodeWithTag(CollectionTags.CREATE_NAME)
 
 // The drawer's list is composed under the editor too, so a row is told apart by the screen it is on.
 fun SemanticsNodeInteractionsProvider.editorRow(label: String) =

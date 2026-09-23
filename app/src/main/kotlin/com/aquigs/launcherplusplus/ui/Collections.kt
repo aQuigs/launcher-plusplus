@@ -26,10 +26,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -42,14 +43,17 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -62,10 +66,14 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -77,10 +85,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,14 +99,18 @@ import androidx.compose.ui.zIndex
 import com.aquigs.launcherplusplus.domain.AppCategory
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.Bounds
+import com.aquigs.launcherplusplus.domain.CREATE_YOUR_OWN
 import com.aquigs.launcherplusplus.domain.CollectionCard
 import com.aquigs.launcherplusplus.domain.CollectionKind
 import com.aquigs.launcherplusplus.domain.CollectionsPage
 import com.aquigs.launcherplusplus.domain.ForegroundTime
+import com.aquigs.launcherplusplus.domain.MAX_COLLECTION_NAME
 import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.domain.mostUsed
 import com.aquigs.launcherplusplus.domain.newApps
+import com.aquigs.launcherplusplus.domain.title
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 object CollectionTags {
     const val ADD = "collection_add"
@@ -103,6 +118,9 @@ object CollectionTags {
     const val PICKER = "collection_picker"
     const val EDITOR = "collection_editor"
     const val NOTICE = "collection_notice"
+    const val CREATE = "collection_create"
+    const val CREATE_DIALOG = "collection_create_dialog"
+    const val CREATE_NAME = "collection_create_name"
 
     fun card(kind: CollectionKind) = "collection_${kind.name}"
 
@@ -117,9 +135,9 @@ object CollectionTags {
     fun app(kind: CollectionKind, app: AppEntry) = "collection_${kind.name}_${app.key}"
 }
 
-/** Lifting an app off a category card to drop it on the bin: [onStart] names the card too, then it goes as an [AppDrag]. */
+/** Lifting an app off a hand-picked card to drop it on the bin: [onStart] names the card too, then it goes as an [AppDrag]. */
 class CardLift(
-    val onStart: (AppCategory, AppEntry, Offset) -> Unit,
+    val onStart: (CollectionKind, AppEntry, Offset) -> Unit,
     val onMove: (Offset) -> Unit,
     val onDrop: () -> Unit,
     val onCancel: () -> Unit,
@@ -128,22 +146,12 @@ class CardLift(
 /** The bin a lifted app can be dropped on: whether the finger is over it, and where it lies, in root coordinates. */
 class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
 
-val AppCategory.label: String
-    get() = if (this == AppCategory.LifeStyle) "Life Style" else name
-
-val CollectionKind.title: String
-    get() = when (this) {
-        CollectionKind.NewApps -> "New Apps"
-        CollectionKind.MostUsed -> "Most Used Apps"
-        is CollectionKind.Category -> category.label
-    }
-
-/** What a card says instead of apps when it has none: a category is filled by hand, the built-in ones by the system. */
+/** What a card says instead of apps when it has none: some are filled by hand, the built-in ones by the system. */
 private val CollectionKind.emptyText: String
     get() = when (this) {
         CollectionKind.NewApps -> "No apps yet"
         CollectionKind.MostUsed -> "Nothing used this week"
-        is CollectionKind.Category -> "Tap the pencil to add apps"
+        is CollectionKind.HandPicked -> "Tap the pencil to add apps"
     }
 
 private const val APPS_PER_ROW = 5
@@ -155,10 +163,10 @@ private const val NOTICE_MILLIS = 2_000L
 
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
- * carries a handle to drag it above or below the others, a pencil on a category card that calls [onEdit], and a chevron
- * that calls [onToggleExpanded]: a compact card shows one row of its first apps, an expanded one every app with its
- * label. The built-in cards work their apps out from [apps] and [foregroundTime], and Most Used asks for the usage
- * access it lacks with a body that calls [onOpenUsageSettings]. A tap launches an app; a long press on a category
+ * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
+ * chevron that calls [onToggleExpanded]: a compact card shows one row of its first apps, an expanded one every app with
+ * its label. The built-in cards work their apps out from [apps] and [foregroundTime], and Most Used asks for the usage
+ * access it lacks with a body that calls [onOpenUsageSettings]. A tap launches an app; a long press on a hand-picked
  * card's app starts a [lift], during which the [bin] sits at the bottom of the page. Apps wear their [unread] counts.
  */
 @Composable
@@ -170,7 +178,7 @@ fun CollectionsColumn(
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: (CollectionKind) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
-    onEdit: (AppCategory) -> Unit,
+    onEdit: (CollectionKind) -> Unit,
     onAdd: () -> Unit,
     onOpenUsageSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -191,17 +199,17 @@ fun CollectionsColumn(
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
-                    val category = (card.kind as? CollectionKind.Category)?.category
+                    val handPicked = card.kind is CollectionKind.HandPicked
                     val cardApps = when (card.kind) {
                         CollectionKind.NewApps -> newApps
                         CollectionKind.MostUsed -> mostUsed
-                        is CollectionKind.Category -> remember(card.apps, apps) { card.apps.resolve(apps) }
+                        is CollectionKind.HandPicked -> remember(card.apps, apps) { card.apps.resolve(apps) }
                     }
-                    // Each category card lifts its own apps, so the drop knows which card to take the app off.
-                    val drag = if (category != null && lift != null) {
-                        remember(lift, category) {
+                    // Each hand-picked card lifts its own apps, so the drop knows which card to take the app off.
+                    val drag = if (handPicked && lift != null) {
+                        remember(lift, card.kind) {
                             AppDrag(
-                                onStart = { app, at -> lift.onStart(category, app, at) },
+                                onStart = { app, at -> lift.onStart(card.kind, app, at) },
                                 onMove = lift.onMove,
                                 onDrop = lift.onDrop,
                                 onCancel = lift.onCancel,
@@ -220,7 +228,7 @@ fun CollectionsColumn(
                         onLaunch = onLaunch,
                         onToggleExpanded = { onToggleExpanded(card.kind) },
                         onMove = onMove,
-                        onEdit = category?.let { { onEdit(it) } },
+                        onEdit = if (handPicked) ({ onEdit(card.kind) }) else null,
                         drag = drag,
                         onOpenUsageSettings = onOpenUsageSettings,
                         unread = unread,
@@ -466,18 +474,27 @@ private fun AppGrid(
     }
 }
 
+// The whole body opens the settings, as Arc's does; the button is there so it is plain what to do.
 @Composable
 private fun PermissionRequired(onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxWidth()
             .padding(end = 8.dp)
-            .height(112.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClickLabel = "Open the usage access settings", onClick = onClick),
+            .clickable(onClickLabel = "Open the usage access settings", onClick = onClick)
+            .padding(vertical = 12.dp),
     ) {
         Text("Permission Required", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Lets Launcher++ see which apps you use most.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        FilledTonalButton(onClick = onClick) { Text("Allow usage access") }
     }
 }
 
@@ -505,11 +522,18 @@ private fun Bin(bin: BinTarget, modifier: Modifier = Modifier) {
 }
 
 /**
- * Select Collection: every kind as a tile, lit when its card is on [page]. A tap calls [onToggle] and says what it did
- * in a label that fades after a moment; the grid stays until Back.
+ * Select Collection: every built-in kind as a tile, then the [customs], then Create Your Own, which calls [onCreate]; a
+ * tile is lit when its card is on [page]. A tap on any other tile calls [onToggle] and says what it did in a label that
+ * fades after a moment; the grid stays until Back.
  */
 @Composable
-fun CollectionPicker(page: CollectionsPage, onToggle: (CollectionKind) -> Unit, modifier: Modifier = Modifier) {
+fun CollectionPicker(
+    page: CollectionsPage,
+    customs: List<CollectionKind>,
+    onToggle: (CollectionKind) -> Unit,
+    onCreate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var notice by remember { mutableStateOf<Notice?>(null) }
     LaunchedEffect(notice) {
         if (notice != null) {
@@ -529,16 +553,28 @@ fun CollectionPicker(page: CollectionsPage, onToggle: (CollectionKind) -> Unit, 
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text("Select Collection", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
                 }
-                items(CollectionKind.all, key = { it.name }) { kind ->
+                items(CollectionKind.all + customs, key = { it.name }) { kind ->
                     val onPage = kind in page
                     Tile(
-                        kind = kind,
+                        // As in Arc Pro: a person on a custom collection's tile, the grid on its card.
+                        glyph = if (kind is CollectionKind.Custom) Icons.Default.Person else kind.glyph,
+                        title = kind.title,
                         selected = onPage,
                         onClick = {
                             // Numbered so a second tap restarts the fade instead of sharing the first one's.
                             notice = Notice(if (onPage) "Collection Removed" else "Collection Added", (notice?.serial ?: 0) + 1)
                             onToggle(kind)
                         },
+                        modifier = Modifier.testTag(CollectionTags.tile(kind)),
+                    )
+                }
+                item(key = CollectionTags.CREATE) {
+                    Tile(
+                        glyph = GridGlyph,
+                        title = CREATE_YOUR_OWN,
+                        selected = false,
+                        onClick = onCreate,
+                        modifier = Modifier.testTag(CollectionTags.CREATE),
                     )
                 }
             }
@@ -549,25 +585,65 @@ fun CollectionPicker(page: CollectionsPage, onToggle: (CollectionKind) -> Unit, 
 
 private data class Notice(val text: String, val serial: Int)
 
+/**
+ * Create Your Own: names a custom collection. Ok waits for a name [page] would take (see [CollectionsPage.custom]) and
+ * calls [onCreate] with it; Back and a tap outside call [onDismiss]. Like Arc's, it has no Cancel.
+ */
 @Composable
-private fun Tile(kind: CollectionKind, selected: Boolean, onClick: () -> Unit) {
+fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Custom) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    val kind = page.custom(name)
+    val taken = kind == null && name.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
+        title = { Text(CREATE_YOUR_OWN) },
+        text = {
+            // In the dialog's own window, and only once that window has focus: a text field focused before then gets no
+            // keyboard.
+            val focus = remember { FocusRequester() }
+            val window = LocalWindowInfo.current
+            LaunchedEffect(window) {
+                snapshotFlow { window.isWindowFocused }.first { it }
+                focus.requestFocus()
+            }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(MAX_COLLECTION_NAME) },
+                label = { Text("Collection Name") },
+                singleLine = true,
+                isError = taken,
+                supportingText = if (taken) ({ Text("That name is taken") }) else null,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { kind?.let(onCreate) }),
+                modifier = Modifier.focusRequester(focus).testTag(CollectionTags.CREATE_NAME),
+            )
+        },
+        modifier = Modifier.testTag(CollectionTags.CREATE_DIALOG),
+    )
+}
+
+@Composable
+private fun Tile(glyph: ImageVector, title: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colours = MaterialTheme.colorScheme
 
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = if (selected) colours.primaryContainer else colours.surfaceVariant,
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1f)
-            .semantics { this.selected = selected }
-            .testTag(CollectionTags.tile(kind)),
+            .semantics { this.selected = selected },
     ) {
         Column(verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(kind.glyph, contentDescription = null, modifier = Modifier.size(36.dp))
+            Icon(glyph, contentDescription = null, modifier = Modifier.size(36.dp))
             Text(
-                text = kind.title,
+                text = title,
                 style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
             )
         }
@@ -589,7 +665,7 @@ private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Adding apps to a category card, named by [title]: the drawer's list of every app, with its search and rail, where a
+ * Adding apps to a hand-picked card, named by [title]: the drawer's list of every app, with its search and rail, where a
  * tap calls [onPick] and the rows [isPicked] says wear a dot, without check marks, since a tap only ever adds.
  */
 @Composable
@@ -613,6 +689,8 @@ fun CollectionEditor(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp),
                     )
                 },
@@ -628,9 +706,10 @@ fun CollectionEditor(
 
 val CollectionKind.glyph: ImageVector
     get() = when (this) {
-        CollectionKind.NewApps -> Icons.Default.AddCircle
+        CollectionKind.NewApps -> SparkleGlyph
         CollectionKind.MostUsed -> BarChartGlyph
         is CollectionKind.Category -> category.glyph
+        is CollectionKind.Custom -> GridGlyph
     }
 
 private val AppCategory.glyph: ImageVector
@@ -659,6 +738,16 @@ private fun materialGlyph(name: String, pathData: String): ImageVector =
 
 private val DragHandleGlyph = materialGlyph("DragHandle", "M20 9H4v2h16V9zM4 15h16v-2H4v2z")
 private val BarChartGlyph = materialGlyph("BarChart", "M4 9h4v11H4zM10 4h4v16h-4zM16 13h4v7h-4z")
+private val SparkleGlyph = materialGlyph(
+    "AutoAwesome",
+    "M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12" +
+        "l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z",
+)
+private val GridGlyph = materialGlyph(
+    "Apps",
+    "M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4z" +
+        "m0 6h4v-4h-4v4z",
+)
 private val WorkGlyph = materialGlyph(
     "Work",
     "M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8" +
