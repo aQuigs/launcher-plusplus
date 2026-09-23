@@ -465,7 +465,8 @@ fun LauncherScreen(
     val panel = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
     // edge lines up with nothing of ours. It is only there to lift the light navigation icons off a bright wallpaper, so
-    // it carries on below this box, which stops at the navigation bar.
+    // it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
+    // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it.
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(
         modifier
@@ -481,6 +482,10 @@ fun LauncherScreen(
                     endY = bottom,
                 )
                 drawRect(shade, Offset(0f, top), Size(size.width, bottom - top))
+
+                val travel = size.height - DRAWER_PEEK.toPx()
+                val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
+                drawRect(panel.copy(alpha = panel.alpha * open), Offset(0f, size.height), Size(size.width, bottom - size.height))
             },
     ) {
         BottomSheetScaffold(
