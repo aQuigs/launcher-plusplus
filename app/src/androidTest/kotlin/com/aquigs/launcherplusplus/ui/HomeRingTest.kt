@@ -11,17 +11,21 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.RingItem
 import com.aquigs.launcherplusplus.domain.UnreadCounts
+import com.aquigs.launcherplusplus.domain.ringLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.min
 
 @RunWith(AndroidJUnit4::class)
 class HomeRingTest {
@@ -89,7 +93,7 @@ class HomeRingTest {
         var edits = 0
         show(listOf(clock), onEdit = { edits++ })
 
-        compose.emblem().performClick()
+        compose.emblem().assertContentDescriptionEquals("Favourites").performClick()
 
         assertEquals(1, edits)
     }
@@ -107,17 +111,20 @@ class HomeRingTest {
     }
 
     @Test
-    fun iconsKeepFullSizeUpToSixThenShrink() {
+    fun iconsTakeTheSizeAndRadiusOfTheRingLayout() {
         show(alphabet.take(1))
-        val alone = iconWidth(alphabet[0])
+        val page = compose.onRoot().getUnclippedBoundsInRoot()
+        val side = min(page.width.value, page.height.value)
 
-        ring = alphabet.take(6).asRingItems()
-        compose.waitForIdle()
-        compose.ringSlot(alphabet[0]).assertWidthIsEqualTo(alone)
+        listOf(1, 8, 12).forEach { count ->
+            ring = alphabet.take(count).asRingItems()
+            compose.waitForIdle()
 
-        ring = alphabet.take(12).asRingItems()
-        compose.waitForIdle()
-        assertTrue("12 icons are smaller than 6", iconWidth(alphabet[0]) < alone)
+            val expected = ringLayout(RING_ICON_SIZE.value, side, count, RING_EDGE_MARGIN.value)
+            val top = compose.ringSlot(alphabet[0]).getUnclippedBoundsInRoot()
+            assertEquals("the size of $count icons", expected.iconSize, top.width.value, 1f)
+            assertEquals("the radius of $count icons", expected.radius, (page.top + page.bottom - top.top - top.bottom).value / 2, 1f)
+        }
     }
 
     @Test

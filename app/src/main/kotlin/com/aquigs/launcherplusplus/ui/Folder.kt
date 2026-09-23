@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -61,14 +63,17 @@ val FolderGlyph: ImageVector = materialIcon("Folder") {
 private const val PREVIEWS = 4
 private const val PREVIEWS_PER_ROW = 2
 
-/** The square of the disc the previews fill, and the share of it each preview takes; the rest spaces them out. */
-private const val PREVIEWS_FRACTION = 0.64f
+/**
+ * The square of the disc the previews fill, and the share of it each preview takes; the rest spaces them out. Four fill
+ * the disc as in Arc, their outer corners just inside its edge.
+ */
+private const val PREVIEWS_FRACTION = 0.86f
 private const val PREVIEW_FRACTION = 0.45f
 
 /**
- * A ring slot holding [folder]: a circle, the size of an app's, previewing up to four of its icons together in the
- * middle and wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty,
- * and a long press opens its [menu].
+ * A ring slot holding [folder]: a circle, the size of an app's, filled with previews of up to four of its icons and
+ * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, and a long
+ * press opens its [menu].
  */
 @Composable
 fun FolderIcon(
@@ -103,7 +108,8 @@ fun FolderIcon(
                 maxItemsInEachRow = PREVIEWS_PER_ROW,
                 modifier = Modifier.fillMaxSize(PREVIEWS_FRACTION),
             ) {
-                folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION)) }
+                // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
+                folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
             }
         }
         menu?.content?.invoke(folder)
