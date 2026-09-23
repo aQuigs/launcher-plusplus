@@ -62,9 +62,11 @@ import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.UnreadCounts
+import com.aquigs.launcherplusplus.domain.keysWithSharedLabels
 import com.aquigs.launcherplusplus.domain.matching
 import com.aquigs.launcherplusplus.domain.sectionsByInitial
 import kotlinx.coroutines.launch
@@ -120,8 +122,9 @@ class Picking(
 
 /**
  * Every app, as its [icon] and its name, in sections headed by their initial, with a rail of those initials down the end
- * edge to jump by. A tap launches the app and a long press opens its [menu], unless the drawer is [picking]; a long
- * press that moves on becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching
+ * edge to jump by. An app whose name an app from another package shares also shows its package name, to tell them
+ * apart. A tap launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that
+ * moves on becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching
  * apps, without sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with
  * [unread] notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
  */
@@ -149,6 +152,8 @@ fun AppDrawer(
     val matchesState = rememberLazyListState()
     LaunchedEffect(matches) { matchesState.scrollToItem(0) }
     val sections = remember(apps) { apps.sectionsByInitial() }
+    val sharingALabel = remember(apps) { apps.keysWithSharedLabels() }
+    val detail = { app: AppEntry -> app.packageName.takeIf { app.key in sharingALabel } }
     val initials = remember(sections) { sections.map { it.initial } }
     // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
     val headerIndices = remember(sections) {
@@ -182,14 +187,14 @@ fun AppDrawer(
                     sections.forEach { section ->
                         item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                         items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                            AppRow(app, icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                            AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
                         }
                     }
                 } else if (matches.isEmpty()) {
                     item(contentType = "empty") { NoMatches() }
                 } else {
                     items(matches, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                        AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
                     }
                 }
             }
@@ -262,6 +267,7 @@ private fun SectionHeader(initial: Char) {
 @Composable
 private fun AppRow(
     app: AppEntry,
+    detail: String?,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     picking: Picking?,
@@ -287,7 +293,19 @@ private fun AppRow(
             .padding(horizontal = 24.dp, vertical = 8.dp),
     ) {
         IconDisc(modifier = Modifier.size(ROW_ICON_SIZE)) { AppImage(app, icon, Modifier.fillMaxSize()) }
-        Text(text = app.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).padding(start = 16.dp))
+        Column(Modifier.weight(1f).padding(start = 16.dp)) {
+            Text(text = app.label, style = MaterialTheme.typography.titleMedium)
+            if (detail != null) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    // Packages that share a name usually part at the end, so the start gives way.
+                    overflow = TextOverflow.StartEllipsis,
+                )
+            }
+        }
         if (unread > 0) {
             // Read as part of the row: a description here would speak for the whole row and silence its name.
             Text(

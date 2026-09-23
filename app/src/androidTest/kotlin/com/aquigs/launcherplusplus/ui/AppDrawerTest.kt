@@ -79,6 +79,17 @@ class AppDrawerTest {
     }
 
     @Test
+    fun appsThatShareANameShowTheirPackages() {
+        val google = AppEntry("Authenticator", "com.google.authenticator", "Main")
+        val microsoft = AppEntry("Authenticator", "com.azure.authenticator", "Main")
+        show(listOf(google, microsoft, clock))
+
+        compose.onNodeWithText(google.packageName).assertIsDisplayed()
+        compose.onNodeWithText(microsoft.packageName).assertIsDisplayed()
+        compose.onNodeWithText("Clock").assert(hasText(clock.packageName).not())
+    }
+
+    @Test
     fun tappingAnAppLaunchesIt() {
         val launched = mutableListOf<AppEntry>()
         show(listOf(clock, mail), onLaunch = launched::add)
