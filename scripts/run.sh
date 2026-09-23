@@ -1,7 +1,6 @@
 #!/bin/zsh
 
-# Installs a build on the connected device, makes it the default home app, and shows it: the debug build, or with
-# VARIANT=Release the store-speed one, installed through Gradle so its startup profile goes on too.
+# Installs the debug build (VARIANT=Release for the minified one), makes it the default home app, and shows it.
 
 set -e
 

@@ -25,7 +25,6 @@ android {
     }
 }
 
-// The release build type and the shared-copy refresh, common to every app repo
 apply(from = "../scripts/android-app.gradle")
 
 dependencies {

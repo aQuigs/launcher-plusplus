@@ -18,14 +18,14 @@ Custom Android home screen (launcher). Native Kotlin + Jetpack Compose, built an
 ./gradlew lintDebug                  # Android lint → app/build/reports/lint-results-debug.html (pre-commit runs it too)
 scripts/emulator.sh                  # AVD from the installed Play Store image, boot, wait (IMAGE_TAG=google_apis for adb root, HEADLESS=1 for no window)
 ./gradlew connectedDebugAndroidTest  # Compose UI + activity tests on the running emulator
-scripts/run.sh                       # install debug build, make it the home app, go home (VARIANT=Release: the minified, store-speed build, over the debug one)
+scripts/run.sh                       # install debug build, make it the home app, go home (VARIANT=Release for the minified build)
 scripts/screenshot.sh [name]         # adb screencap → screenshots/<name>.png (gitignored)
 scripts/record.sh [name] [seconds]   # adb screenrecord → screenshots/<name>.mp4 (gitignored)
 scripts/pr-media.sh <files>          # upload shots as GitHub attachments, print markdown for the PR body
 scrcpy                               # mirror the emulator interactively
 ```
 
-Files whose first comment starts with `Shared script:`, `Shared workflow:` or `Shared config:` are copies of files in a separate tooling checkout. When its `sync-common` is on PATH, every build overwrites them, matched by name. Edit them at the source, never here, and do not name a repo-owned file after a shared one. To adopt another shared file, create it once under the same name and let the build fill it. `scripts/android-app.gradle` is the shared Gradle config `app/build.gradle.kts` applies: the release build type and the copy refresh itself; build config every app would carry belongs there, not in `app/build.gradle.kts`.
+Files headed `Shared script:`, `Shared workflow:` or `Shared config:` are copies of files in a separate tooling checkout. When its `sync-common` is on PATH, every build overwrites them, matched by name. Edit them at the source, never here, and do not name a repo-owned file after a shared one. To adopt another shared file, create it once under the same name and let the build fill it. Build config every app needs goes in the shared `scripts/android-app.gradle`.
 
 ## Layout
 
