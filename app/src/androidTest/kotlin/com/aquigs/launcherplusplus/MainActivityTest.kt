@@ -1,6 +1,9 @@
 package com.aquigs.launcherplusplus
 
 import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.provider.Settings
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -9,10 +12,12 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
@@ -26,6 +31,7 @@ import com.aquigs.launcherplusplus.domain.LauncherPage
 import com.aquigs.launcherplusplus.ui.DockTags
 import com.aquigs.launcherplusplus.ui.HomeClockTags
 import com.aquigs.launcherplusplus.ui.LauncherTags
+import com.aquigs.launcherplusplus.ui.PinDialogTags
 import com.aquigs.launcherplusplus.ui.appList
 import com.aquigs.launcherplusplus.ui.drawerHandle
 import com.aquigs.launcherplusplus.ui.emblem
@@ -35,6 +41,7 @@ import com.aquigs.launcherplusplus.ui.page
 import com.aquigs.launcherplusplus.ui.placeOption
 import com.aquigs.launcherplusplus.ui.swipePager
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -119,6 +126,8 @@ class MainActivityTest {
 
     private fun dockIcon(label: String) = hasContentDescription(label) and hasAnyAncestor(hasTestTag(DockTags.DOCK))
 
+    private fun settingsInFront() = shell("dumpsys activity activities").lines().any { "ResumedActivity" in it && "com.android.settings" in it }
+
     // Against the face the clock would draw in that style, read afresh in case the minute turns meanwhile.
     private fun assertClockIn(twentyFourHour: Boolean) {
         val wallClock = SystemWallClock(context)
@@ -163,6 +172,35 @@ class MainActivityTest {
         assertClockIn(twentyFourHour = false)
         compose.activityRule.scenario.recreate()
         assertClockIn(twentyFourHour = false)
+    }
+
+    // The test runs as the launcher's own package, so it can ask for a shortcut of its own, as an app would.
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun aShortcutAnAppAsksToPinGoesOnTheRingStartsAndIsUnpinnedOnceRemoved() {
+        makeLauncherHome()
+        leaveAndComeBack()
+        val shortcuts = context.getSystemService(ShortcutManager::class.java)
+        val settings = ShortcutInfo.Builder(context, "pin-test").setShortLabel("Pinned settings").setIntent(Intent(Settings.ACTION_SETTINGS)).build()
+        assertTrue("apps are not offered to pin", shortcuts.isRequestPinShortcutSupported)
+
+        assertTrue(shortcuts.requestPinShortcut(settings, null))
+        compose.waitUntilAtLeastOneExists(hasTestTag(PinDialogTags.DIALOG), timeoutMillis = 10_000)
+        compose.onNodeWithText("Add").performClick()
+
+        compose.waitUntilAtLeastOneExists(ringIcon("Pinned settings"), timeoutMillis = 10_000)
+        assertEquals(listOf("pin-test"), shortcuts.pinnedShortcuts.map { it.id })
+        compose.onNode(ringIcon("Pinned settings")).performClick()
+        compose.waitUntil(timeoutMillis = 10_000) { settingsInFront() }
+        // Neither the scenario nor HOME brings back the scenario's own task from under another app's: HOME starts a second
+        // launcher in the home task. singleTask does.
+        context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        compose.waitUntil(timeoutMillis = 10_000) { !settingsInFront() }
+
+        compose.onNode(ringIcon("Pinned settings")).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from the ring").performClick()
+
+        compose.waitUntil(timeoutMillis = 10_000) { shortcuts.pinnedShortcuts.isEmpty() }
     }
 
     @Test

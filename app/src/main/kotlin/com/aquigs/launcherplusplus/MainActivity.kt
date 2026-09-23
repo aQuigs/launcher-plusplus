@@ -8,6 +8,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -36,12 +37,20 @@ import com.aquigs.launcherplusplus.domain.UnreadCounts
 import com.aquigs.launcherplusplus.ui.AppActions
 import com.aquigs.launcherplusplus.ui.HomePress
 import com.aquigs.launcherplusplus.ui.LauncherScreen
+import com.aquigs.launcherplusplus.ui.PinRequest
 import com.aquigs.launcherplusplus.ui.WidgetActions
 import com.aquigs.launcherplusplus.ui.theme.LauncherTheme
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
+
+    // A channel, unlike the presses, keeps a request that starts the activity until the screen is there to collect it.
+    private val pinRequestChannel = Channel<PinRequest>(Channel.CONFLATED)
+    private val pinRequests = pinRequestChannel.receiveAsFlow()
+    private lateinit var repository: LauncherAppsRepository
     private lateinit var widgetHost: SystemWidgetHost
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,7 +61,7 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { true },
         )
-        val repository = LauncherAppsRepository(this)
+        repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
@@ -76,6 +85,9 @@ class MainActivity : ComponentActivity() {
             uninstall = repository::uninstall,
         )
 
+        // A rotation must not ask again.
+        if (savedInstanceState == null) askToPin(intent)
+
         setContent {
             LauncherTheme {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
@@ -97,6 +109,12 @@ class MainActivity : ComponentActivity() {
                 val isHomeApp by produceState(remember { homeRole.isHeld() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { homeRole.held().collect { value = it } }
                 }
+                // Only the home app may read its pins, and hears of their changes, so each return to the front and each
+                // change of role reads them again.
+                val pinnedShortcuts by produceState<List<AppEntry>?>(null, isHomeApp) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { repository.pinnedShortcuts().collect { value = it } }
+                }
+                LaunchedEffect(homeApps, isHomeApp) { repository.unpinAllBut(homeApps) }
                 // The widgets only draw their updates while the launcher is visible, like the clock.
                 val widgetPage by produceState(remember { widgetHost.page() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { widgetHost.updates().collect { value = it } }
@@ -119,7 +137,9 @@ class MainActivity : ComponentActivity() {
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
+                    pinRequests = pinRequests,
                     apps = apps,
+                    pinnedShortcuts = pinnedShortcuts,
                     homeApps = homeApps,
                     onHomeAppsChange = {
                         homeApps = it
@@ -175,6 +195,15 @@ class MainActivity : ComponentActivity() {
         if (intent.hasCategory(Intent.CATEGORY_HOME)) {
             val broughtToFront = intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0
             homePresses.tryEmit(HomePress(launcherInFront = !broughtToFront))
+        } else {
+            askToPin(intent)
         }
+    }
+
+    // PinShortcutActivity hands on what the system asks it to confirm.
+    private fun askToPin(intent: Intent) {
+        if (intent.component?.className != PIN_REQUESTS) return
+        val pin = repository.pinRequest(intent) ?: return
+        pinRequestChannel.trySend(PinRequest(pin.shortcut, pin.appLabel, pin::icon, pin::accept))
     }
 }

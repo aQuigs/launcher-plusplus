@@ -28,4 +28,7 @@ fun decodeRing(text: String): Ring = Ring(
     },
 )
 
+/** Whether [key] can be stored: an activity's key never holds a line break or a tab, but a shortcut's id may. */
+fun isStorable(key: String) = LINE !in key && FIELD !in key
+
 internal fun String.nonEmptyLines() = split(LINE).filter(String::isNotEmpty)

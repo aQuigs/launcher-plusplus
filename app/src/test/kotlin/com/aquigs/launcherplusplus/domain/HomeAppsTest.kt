@@ -1,6 +1,7 @@
 package com.aquigs.launcherplusplus.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -64,4 +65,23 @@ class HomeAppsTest {
 
         assertEquals(HomeApps(ring = Ring(listOf(folder())), dock = Favourites(listOf(mail.key))), emptied)
     }
+
+    @Test
+    fun `a pin stays while its shortcut is anywhere on home, and an activity of the same name keeps none`() {
+        val onRing = shortcut("web", "a")
+        val inFolder = shortcut("web", "b")
+        val docked = shortcut("maps", "c")
+        val activity = AppEntry("Main", "chat", "Main")
+        assertNotEquals(activity.key, shortcut("chat", "Main").key)
+        val homeApps = HomeApps(
+            ring = Ring(listOf(RingSlot.App(onRing.key), folder(inFolder), RingSlot.App(activity.key))),
+            dock = Favourites(listOf(docked.key)),
+        )
+
+        val kept = homeApps.keptPins(mapOf("web" to listOf("a", "b", "gone"), "maps" to listOf("c"), "chat" to listOf("Main")))
+
+        assertEquals(mapOf("web" to listOf("a", "b"), "chat" to emptyList<String>()), kept)
+    }
+
+    private fun shortcut(packageName: String, id: String) = AppEntry(id, packageName, "Main", shortcutId = id)
 }

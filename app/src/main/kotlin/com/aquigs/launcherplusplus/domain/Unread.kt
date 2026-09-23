@@ -3,12 +3,15 @@ package com.aquigs.launcherplusplus.domain
 /** One notification as the badges see it. [number] is the count the app put on it, or 0. */
 data class PostedNotification(val packageName: String, val isGroupSummary: Boolean, val isOngoing: Boolean, val number: Int)
 
-/** How many unread notifications each package has. A package with none is absent. */
+/**
+ * How many unread notifications each package has. A package with none is absent. A pinned shortcut counts none: its own
+ * notifications are not told apart from the rest of its app's, which would overstate them.
+ */
 data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap()) {
-    operator fun get(app: AppEntry): Int = byPackage[app.packageName] ?: 0
+    operator fun get(app: AppEntry): Int = sum(listOf(app))
 
     /** The count for a folder of [apps]: each package counted once, however many of its activities are in there. */
-    fun sum(apps: List<AppEntry>): Int = apps.map { it.packageName }.distinct().sumOf { byPackage[it] ?: 0 }
+    fun sum(apps: List<AppEntry>): Int = apps.filter { it.shortcutId == null }.map { it.packageName }.distinct().sumOf { byPackage[it] ?: 0 }
 }
 
 /**
