@@ -19,6 +19,9 @@ object BadgeTags {
     const val BUBBLE = "badge"
 }
 
+/** How far a badge reaches past its icon's top-end corner, both across and up. */
+internal val BADGE_OVERHANG = 4.dp
+
 /** A bubble saying how many [unread] notifications an icon has, meant for its top-end corner, or nothing for none. */
 @Composable
 fun UnreadBadge(unread: Int, modifier: Modifier = Modifier) {
@@ -32,7 +35,7 @@ fun UnreadBadge(unread: Int, modifier: Modifier = Modifier) {
         textAlign = TextAlign.Center,
         modifier = modifier
             // Over the corner rather than inside it: a round icon has no room there.
-            .offset(x = 4.dp, y = (-4).dp)
+            .offset(x = BADGE_OVERHANG, y = -BADGE_OVERHANG)
             .background(MaterialTheme.colorScheme.error, CircleShape)
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
             .padding(horizontal = 5.dp)
