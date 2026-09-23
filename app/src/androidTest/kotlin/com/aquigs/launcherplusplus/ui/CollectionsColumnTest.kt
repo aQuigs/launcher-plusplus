@@ -39,7 +39,7 @@ class CollectionsColumnTest {
     private var page by mutableStateOf(CollectionsPage())
     private var foregroundTime by mutableStateOf<ForegroundTime?>(null)
     private val launched = mutableListOf<AppEntry>()
-    private val edited = mutableListOf<AppCategory>()
+    private val edited = mutableListOf<CollectionKind>()
     private var adds = 0
     private var usageSettingsOpened = 0
 
@@ -99,7 +99,8 @@ class CollectionsColumnTest {
         show()
 
         compose.onNodeWithText("Permission Required").performClick()
-        compose.runOnIdle { assertEquals(1, usageSettingsOpened) }
+        compose.onNodeWithText("Allow usage access").performClick()
+        compose.runOnIdle { assertEquals(2, usageSettingsOpened) }
 
         foregroundTime = ForegroundTime(mapOf(mail.packageName to 5_000L, clock.packageName to 100L))
 
@@ -128,15 +129,17 @@ class CollectionsColumnTest {
     }
 
     @Test
-    fun anAppLaunchesOnATapAndACategoryCardHasAPencil() {
-        page = CollectionsPage().add(tools, Favourites(listOf(clock.key)))
+    fun anAppLaunchesOnATapAndACategoryOrCustomCardHasAPencil() {
+        val custom = CollectionKind.Custom("Utilities")
+        page = CollectionsPage(emptyList()).add(tools, Favourites(listOf(clock.key))).add(custom)
         show()
 
         compose.collectionApp(tools, clock).performClick()
         compose.runOnIdle { assertEquals(listOf(clock), launched) }
 
         compose.collectionEditButton(tools).performClick()
-        compose.runOnIdle { assertEquals(listOf(AppCategory.Tools), edited) }
+        compose.collectionEditButton(custom).performClick()
+        compose.runOnIdle { assertEquals(listOf(tools, custom), edited) }
 
         compose.addCollectionButton().performClick()
         compose.runOnIdle { assertEquals(1, adds) }
