@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Seven stars joined into a ring, one of them gold, around a four-point spark: the home ring as a constellation,
+    all within the 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:strokeColor="#B39FB2E6"
+        android:strokeWidth="1"
+        android:strokeLineJoin="round"
+        android:pathData="M49.01,30.52L69.24,35.46L78,54.36L68.68,72.99L48.31,77.32L32.22,64.09L32.53,43.26z" />
+    <path
+        android:fillColor="#FFE8ECFF"
+        android:pathData="M46.91,30.52a2.1,2.1 0,1 0,4.2,0a2.1,2.1 0,1 0,-4.2,0zM67.14,35.46a2.1,2.1 0,1 0,4.2,0a2.1,2.1 0,1 0,-4.2,0zM66.58,72.99a2.1,2.1 0,1 0,4.2,0a2.1,2.1 0,1 0,-4.2,0zM46.21,77.32a2.1,2.1 0,1 0,4.2,0a2.1,2.1 0,1 0,-4.2,0zM30.12,64.09a2.1,2.1 0,1 0,4.2,0a2.1,2.1 0,1 0,-4.2,0zM30.43,43.26a2.1,2.1 0,1 0,4.2,0a2.1,2.1 0,1 0,-4.2,0z" />
+    <path
+        android:fillColor="#FFFFD27A"
+        android:pathData="M74.6,54.36a3.4,3.4 0,1 0,6.8,0a3.4,3.4 0,1 0,-6.8,0z" />
+    <path
+        android:fillColor="#FFF4EFE6"
+        android:pathData="M54,45Q55.98,52.02 63,54Q55.98,55.98 54,63Q52.02,55.98 45,54Q52.02,52.02 54,45z" />
+</vector>
