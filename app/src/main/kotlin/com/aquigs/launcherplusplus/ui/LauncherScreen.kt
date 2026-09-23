@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -192,6 +193,10 @@ fun LauncherScreen(
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
     var justPicked by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var editorQuery by rememberSaveable { mutableStateOf("") }
+    // Their surfaces are translucent so the wallpaper shows through, as it does through the drawer; the pages, the dock
+    // and the drawer strip must not, so they go while either is up. Not animated: the overlays come and go in a frame,
+    // and pages fading back in would be tappable before they could be seen.
+    val overlayOpen = editing != null || pickingCollection
     LaunchedEffect(editing) {
         if (editing == null) {
             justPicked = emptySet()
@@ -400,7 +405,6 @@ fun LauncherScreen(
     // not a rung of its own: the keyboard takes the first Back, and closing the drawer or the editor ends the search.
     // The open folder comes last because the drawer and the other pages both hide it, and a press should undo something
     // in view.
-    val overlayOpen = editing != null || pickingCollection
     BackHandler(enabled = dragged != null || drawerOpen || overlayOpen || pagerState.currentPage != layout.homeIndex || open != null) {
         when {
             dragged != null -> dragged = null
@@ -450,7 +454,7 @@ fun LauncherScreen(
             },
             // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
             // navigation-bar inset.
-            modifier = Modifier.clipToBounds(),
+            modifier = Modifier.clipToBounds().alpha(if (overlayOpen) 0f else 1f),
         ) { padding ->
             Column(
                 Modifier
@@ -550,7 +554,7 @@ fun LauncherScreen(
                 }
             }
         }
-        // Over the scaffold, drawer strip included: each is a screen of its own until Back or HOME.
+        // Over the hidden scaffold, drawer strip included: each is a screen of its own until Back or HOME.
         editing?.let { category ->
             CollectionEditor(
                 title = "Add to ${category.label}",
