@@ -65,4 +65,7 @@ until [[ $(adb -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') == 
   sleep 2
 done
 
+# Taps show up in screen recordings; it's a persisted system setting, so re-applying each boot also covers fresh AVDs
+adb -e shell settings put system show_touches 1
+
 echo "Emulator $AVD_NAME is ready"
