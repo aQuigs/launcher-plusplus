@@ -14,17 +14,23 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.aquigs.launcherplusplus.R
 import com.aquigs.launcherplusplus.domain.AppEntry
 import com.aquigs.launcherplusplus.domain.EMBLEM_FRACTION
 import com.aquigs.launcherplusplus.domain.RingItem
@@ -55,14 +62,14 @@ internal val RING_ICON_SIZE = 64.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
-/** The ring's lines and the emblem's mark: neutral, so they sit on any wallpaper without a hue of their own. */
+/** The ring's lines and the emblem's edge: neutral, so they sit on any wallpaper without a hue of their own. */
 private val Mark = Color.White
 
-/** The emblem's "++" or its hint: the mark at its most present. */
+/** The emblem's hint: the mark at its most present. */
 private val Ink = Mark.copy(alpha = 0.9f)
 
-private const val EMBLEM_TICKS = 60
-private const val EMBLEM_MAJOR_TICK_EVERY = 5
+/** The launcher icon's art (108 wide, its ring of stars 24 in radius) scaled to the emblem so the stars span 0.55 of it. */
+private const val EMBLEM_ART_PER_RADIUS = 0.55f * 108f / 24f
 
 /**
  * The [ring] of favourite apps and folders round a static emblem. Tap an app to launch it or long-press it for its
@@ -154,34 +161,32 @@ fun HomeRing(
 }
 
 /**
- * The ring's centre: a translucent dark disc, so it holds on bright wallpapers, edged by a hairline and a bezel of fine
- * ticks round a crisp "++", or the hint to add apps in its place. Quiet, so the icons stay the eye's first stop.
+ * The ring's centre: the launcher icon in miniature. Its night sky, half see-through so it darkens a bright wallpaper
+ * without hiding it, fills a disc edged by a hairline, and its constellation of seven stars round a spark sits in the
+ * middle, or the hint to add apps in its place. Quiet, so the icons stay the eye's first stop.
  */
 @Composable
 private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
+    val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
+    val constellation = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_foreground))
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(CircleShape)
             .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
-            .drawBehind {
-                val hairline = 1.dp.toPx()
+            .drawWithCache {
                 val outer = size.minDimension / 2 * 0.96f
-                drawCircle(Color.Black.copy(alpha = 0.4f), radius = outer)
-                drawCircle(Mark.copy(alpha = 0.35f), radius = outer, style = Stroke(hairline))
-                repeat(EMBLEM_TICKS) { tick ->
-                    val major = tick % EMBLEM_MAJOR_TICK_EVERY == 0
-                    rotate(360f * tick / EMBLEM_TICKS) {
-                        drawLine(
-                            color = Mark.copy(alpha = if (major) 0.55f else 0.22f),
-                            start = center.copy(y = center.y - outer * if (major) 0.8f else 0.84f),
-                            end = center.copy(y = center.y - outer * 0.89f),
-                            strokeWidth = hairline,
-                        )
-                    }
+                val disc = Path().apply { addOval(Rect(size.center, outer)) }
+                val edge = Stroke(1.dp.toPx())
+                val side = outer * EMBLEM_ART_PER_RADIUS
+                val art = Size(side, side)
+                val inset = (size.minDimension - side) / 2
+                onDrawBehind {
+                    clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
+                    drawCircle(Mark.copy(alpha = 0.35f), radius = outer, style = edge)
+                    if (!showHint) translate(inset, inset) { with(constellation) { draw(art) } }
                 }
-                drawCircle(Mark.copy(alpha = 0.14f), radius = outer * 0.72f, style = Stroke(hairline))
-                if (!showHint) drawPlusPlus(outer)
             }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (!showHint) contentDescription = "Favourites" },
@@ -195,21 +200,10 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                // Inside the inner hairline, clear of the ticks, however large the font.
+                // Inside the disc, clear of the sky's dust, however large the font.
                 modifier = Modifier.fillMaxWidth(0.55f),
             )
         }
-    }
-}
-
-/** The "++" drawn as strokes rather than text, so it stays sharp and truly centred whatever the font. */
-private fun DrawScope.drawPlusPlus(outer: Float) {
-    val arm = outer * 0.11f
-    val stroke = outer * 0.035f
-    listOf(-1, 1).forEach { side ->
-        val middle = center.copy(x = center.x + side * outer * 0.15f)
-        drawLine(Ink, middle.copy(x = middle.x - arm), middle.copy(x = middle.x + arm), stroke)
-        drawLine(Ink, middle.copy(y = middle.y - arm), middle.copy(y = middle.y + arm), stroke)
     }
 }
 
