@@ -88,6 +88,7 @@ object AppDrawerTags {
 @Composable
 fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
+    val scrim = MaterialTheme.colorScheme.scrim
 
     Icon(
         imageVector = Icons.Default.KeyboardArrowUp,
@@ -96,7 +97,7 @@ fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifi
             .clickable(onClick = onClick)
             .drawWithCache {
                 val radius = size.height / 2
-                val shadow = Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.4f), Color.Transparent), radius = radius)
+                val shadow = Brush.radialGradient(listOf(scrim.copy(alpha = 0.4f), Color.Transparent), radius = radius)
                 onDrawBehind { drawCircle(shadow, radius) }
             }
             .padding(vertical = 8.dp)

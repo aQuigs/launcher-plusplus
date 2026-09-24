@@ -20,7 +20,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -48,6 +47,9 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
+import com.sqftware.orbitlauncher.ui.theme.RingMark
+import com.sqftware.orbitlauncher.ui.theme.RingSpark
+import com.sqftware.orbitlauncher.ui.theme.RingStarLine
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -65,15 +67,8 @@ internal val RING_ICON_SIZE = 64.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
-/** The emblem's edge and a sparse ring's circle: neutral, so they sit on any wallpaper without a hue of their own. */
-private val Mark = Color.White
-
 /** The emblem's hint: the mark at its most present. */
-private val Ink = Mark.copy(alpha = 0.9f)
-
-/** The launcher icon's constellation lines and spark, so the ring and its emblem read as the icon writ large. */
-private val StarLine = Color(0xFF9FB2E6).copy(alpha = 0.7f)
-private val Spark = Color(0xFFF4EFE6)
+private val Ink = RingMark.copy(alpha = 0.9f)
 
 /** The launcher icon's sky, 108 wide, at 2.475 times the emblem's radius, which puts its dust between spark and edge. */
 private const val EMBLEM_ART_PER_RADIUS = 2.475f
@@ -156,12 +151,12 @@ fun HomeRing(
                 // An icon's disc can be glass the wallpaper shows through, a folder's always is, so the lines stop at its edge.
                 val discs = Path().apply { stars.forEach { addOval(Rect(it, iconSize / 2)) } }
                 onDrawBehind {
-                    if (glow > 0f) drawCircle(Mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
+                    if (glow > 0f) drawCircle(RingMark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     clipPath(discs, ClipOp.Difference) {
                         if (slots >= MIN_CONSTELLATION) {
-                            drawPath(constellation, StarLine.copy(alpha = StarLine.alpha + 0.3f * glow), style = lines)
+                            drawPath(constellation, RingStarLine.copy(alpha = RingStarLine.alpha + 0.3f * glow), style = lines)
                         } else {
-                            drawCircle(Mark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
+                            drawCircle(RingMark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
                         }
                     }
                 }
@@ -212,8 +207,8 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
                 val spark = sparkPath(size.center, outer * EMBLEM_SPARK)
                 onDrawBehind {
                     clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
-                    drawCircle(Mark.copy(alpha = 0.35f), radius = outer, style = edge)
-                    if (!showHint) drawPath(spark, Spark)
+                    drawCircle(RingMark.copy(alpha = 0.35f), radius = outer, style = edge)
+                    if (!showHint) drawPath(spark, RingSpark)
                 }
             }
             .testTag(HomeRingTags.EMBLEM)
@@ -223,7 +218,7 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
             Text(
                 text = "Add apps",
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
-                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(Color.Black, blurRadius = 6f)),
+                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(MaterialTheme.colorScheme.scrim, blurRadius = 6f)),
                 color = Ink,
                 textAlign = TextAlign.Center,
                 maxLines = 2,

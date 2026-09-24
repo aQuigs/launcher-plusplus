@@ -25,6 +25,12 @@ repos:
       - id: check-added-large-files
   - repo: local
     hooks:
+      - id: theme-colours-only
+        name: Colours come from the theme
+        language: pygrep
+        entry: '\bColor\s*\(|\bColor\.(Black|White|Gray|DarkGray|LightGray|Red|Green|Blue|Yellow|Cyan|Magenta|hsv|hsl|parseColor|rgb|argb|valueOf|BLACK|WHITE|GRAY|DKGRAY|LTGRAY|RED|GREEN|BLUE|YELLOW|CYAN|MAGENTA)\b|\.(surface\w*|background)\.copy\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude
