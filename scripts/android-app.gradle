@@ -3,8 +3,18 @@
 // Groovy because a Kotlin script applied with apply(from=) cannot see the android extension.
 
 android {
+    defaultConfig {
+        // Only Play needs rising codes; a fixed code elsewhere lets any worktree's build install over another's.
+        // Squash merges raise the commit count on every merge to main; a shallow clone gives 1.
+        // Set here because AGP ignores -Pandroid.injected.version.code.
+        versionCode = providers.gradleProperty('android.injected.signing.store.file').present
+            ? providers.exec { commandLine('git', 'rev-list', '--count', 'HEAD') }
+                .standardOutput.asText.get().trim().toInteger()
+            : 1
+    }
+
     buildTypes {
-        // Debug-signed so it installs over the debug build and keeps the app's data
+        // Debug-signed so it installs over the debug build and keeps the app's data; play_internal.yaml injects the upload key
         release {
             minifyEnabled = true
             signingConfig = signingConfigs.debug
