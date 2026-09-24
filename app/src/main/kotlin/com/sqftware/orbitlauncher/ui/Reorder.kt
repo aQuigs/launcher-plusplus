@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.toOffset
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.reordered
+import com.sqftware.orbitlauncher.domain.reorderedFrom
 
 object ReorderTags {
     const val SWITCH = "reorder_switch"
@@ -78,18 +79,16 @@ class Rearrange(
         if (placed[index] === coordinates) placed.remove(index)
     }
 
-    /**
-     * The position nearest [finger], in root coordinates, if the finger is within that position's size of its centre.
-     * Asked on every move of the finger, so it makes nothing on the way.
-     */
-    fun at(finger: Offset): Int? = nearest(finger, within = 1f)
+    /** The finger over position [index] of the place, [onMiddle] when near enough its centre that an app dropped folds in. */
+    data class Hit(val index: Int, val onMiddle: Boolean)
 
-    /** The position whose middle [finger] is on, found as [at] finds one but nearer its centre. */
-    fun middleAt(finger: Offset): Int? = nearest(finger, within = MIDDLE)
+    /** The position nearest [finger], in root coordinates, if the finger is within that position's size of its centre. */
+    fun at(finger: Offset): Int? = hit(finger)?.index
 
-    private fun nearest(finger: Offset, within: Float): Int? {
-        var nearest: Int? = null
-        var nearestDistance = within
+    /** The position [at] finds, and whether the finger is on its middle. Asked on every move of the finger, in one pass. */
+    fun hit(finger: Offset): Hit? {
+        var nearest = -1
+        var nearestDistance = 1f
         placed.forEach { (index, coordinates) ->
             val centre = coordinates.localToRoot(coordinates.size.center.toOffset())
             val distance = (centre - finger).getDistance() / maxOf(coordinates.size.width, coordinates.size.height)
@@ -98,7 +97,7 @@ class Rearrange(
                 nearestDistance = distance
             }
         }
-        return nearest
+        return if (nearest < 0) null else Hit(nearest, onMiddle = nearestDistance <= MIDDLE)
     }
 
     /** Names the item at [index] as that position of its place, however its node was last placed. */
@@ -152,6 +151,9 @@ data class Moving(val from: Int, val to: Int?, val mode: ReorderMode) {
 
     /** [items] as they would be if the item were dropped now, so the place can show it before the finger lets go. */
     fun <T> preview(items: List<T>): List<T> = if (to == null) items else items.reordered(from, to, mode)
+
+    /** Where in [items] the one that would show at [position] if the item were dropped now is, without reordering them. */
+    fun <T> sourceOf(items: List<T>, position: Int): Int = if (to == null) position else items.reorderedFrom(position, from, to, mode)
 }
 
 /** How long the item on the move rests on the switch's other half before it flips, so passing over it does not. */

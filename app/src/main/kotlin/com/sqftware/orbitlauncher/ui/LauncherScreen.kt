@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -79,6 +80,7 @@ import com.sqftware.orbitlauncher.domain.title
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 object LauncherTags {
@@ -176,9 +178,10 @@ fun LauncherScreen(
     val onHome = remember(apps, pinnedShortcuts) { if (apps != null && pinnedShortcuts != null) apps + pinnedShortcuts else null }
     val ring = remember(homeApps.ring, onHome) { homeApps.ring.resolve(onHome.orEmpty()) }
     val dock = remember(homeApps.dock, onHome) { homeApps.dock.resolve(onHome.orEmpty()) }
+    val shown = remember(onHome) { onHome?.mapTo(HashSet()) { it.key } }
     val latestHomeApps by rememberUpdatedState(homeApps)
     val latestApps by rememberUpdatedState(apps)
-    val latestOnHome by rememberUpdatedState(onHome)
+    val latestShown by rememberUpdatedState(shown)
     val latestRing by rememberUpdatedState(ring)
     val latestDock by rememberUpdatedState(dock)
     val latestReorderMode by rememberUpdatedState(reorderMode)
@@ -267,7 +270,7 @@ fun LauncherScreen(
             // A folder left empty goes once its pick is over, not while toggling apps off and on again. Not before the apps
             // load, as until then it shows none of them.
             (picking as? HomePlace.Folder)?.let { folder ->
-                latestOnHome?.let { shown -> changeRing { removeIfEmpty(folder.index, shown) } }
+                latestShown?.let { shown -> changeRing { removeIfEmpty(folder.index, shown) } }
             }
             picking = null
             query = ""
@@ -299,8 +302,8 @@ fun LauncherScreen(
     // A slot number outliving its folder would open a folder made later in that slot by itself.
     LaunchedEffect(open == null) { if (open == null) openFolder = null }
 
-    // Each home place's positions, so an app can be dragged from one to another. A place registers itself as it is built,
-    // below, with the drag handling that needs these.
+    // The ring's and the dock's positions, so an app can be dragged from one home place to another. Each is registered as
+    // it is built, below, with the drag handling that needs these.
     val homePlaces = remember { mutableMapOf<HomePlace, Rearrange>() }
     // What resting the finger has done. A pause off the middle of anything the dragged app could fold into makes its own
     // place make way for it there, and over the middle of an open folder closes the folder; a longer one on such a middle
@@ -308,36 +311,35 @@ fun LauncherScreen(
     var makingWay by remember { mutableStateOf<Int?>(null) }
     var lit by remember { mutableStateOf<Over.Slot?>(null) }
 
-    // The ring item at [index] an app dragged onto its middle would fold into: never the app itself, where it would land
-    // or a copy of it, nor the folder it came out of, and nothing for a folder dragged, as folders do not nest.
-    fun foldInto(drag: Drag, ringPlace: Rearrange, index: Int): RingItem? {
+    // The ring item an app dragged onto the middle of the ring's position [hit], where it shows as the ring makes way,
+    // would fold into, if the app lands there; nothing for a folder dragged, as folders do not nest.
+    fun foldInto(drag: Drag, ringPlace: Rearrange, hit: Rearrange.Hit): RingItem? {
+        if (!hit.onMiddle) return null
         val app = drag.app ?: return null
-        val item = ringPlace.moving.shown(latestRing).getOrNull(index)
-        val itself = item is RingItem.App && item.app.key == app.key
-        val cameFrom = item is RingItem.Folder && HomePlace.Folder(item.index) == drag.home
-        return item?.takeIf { !itself && !cameFrom && ringPlace.middleAt(finger) == index }
+        val item = latestRing.getOrNull(ringPlace.moving?.sourceOf(latestRing, hit.index) ?: hit.index) ?: return null
+        return item.takeIf { latestHomeApps.lands(app, drag.home, Landing.Into(it)) }
     }
 
     fun overFor(drag: Drag): Over? {
         val own = (drag as? Drag.Within)?.place
-        val onHome = finger - pagerOrigin
         if (overBin || overSwitch != null) return null
         // A card's apps move only on their card.
         if (drag.home == null && own != null) return own.at(finger)?.let { Over.Slot(own, it) }
+        val onHome = finger - pagerOrigin
         if (drag.home is HomePlace.Folder && own != null && zones.ring?.discContains(onHome.x, onHome.y, EMBLEM_FRACTION) == true) {
             return Over.FolderCentre
         }
+        val place = zones.placeAt(onHome.x, onHome.y)
         // The dock's row first: the ring's lowest slot reaches down towards it.
         val dockPlace = homePlaces[HomePlace.Dock]
-        if (drag.app != null && dockPlace != null && zones.dock?.contains(onHome.x, onHome.y) == true) {
+        if (drag.app != null && dockPlace != null && place == HomePlace.Dock) {
             return dockPlace.at(finger)?.let { Over.Slot(dockPlace, it) } ?: Over.DockEnd
         }
-        homePlaces[HomePlace.Ring]?.let { ringPlace ->
-            ringPlace.at(finger)?.let { return Over.Slot(ringPlace, it, foldInto(drag, ringPlace, it)) }
-        }
-        own?.at(finger)?.let { return Over.Slot(own, it) }
+        val ringPlace = homePlaces[HomePlace.Ring]
+        ringPlace?.hit(finger)?.let { return Over.Slot(ringPlace, it.index, foldInto(drag, ringPlace, it)) }
+        if (own !== ringPlace) own?.at(finger)?.let { return Over.Slot(own, it) }
         // Off every slot, as all of an empty ring is.
-        return Over.RingEnd.takeIf { drag.app != null && zones.ring?.discContains(onHome.x, onHome.y) == true }
+        return Over.RingEnd.takeIf { drag.app != null && place == HomePlace.Ring }
     }
 
     val over by remember { derivedStateOf { dragged?.let(::overFor) } }
@@ -354,27 +356,26 @@ fun LauncherScreen(
         openFolder = null
     }
 
-    LaunchedEffect(over) {
-        val now = over
-        if (now is Over.Slot && now.foldInto != null) {
-            delay(FOLD_MILLIS)
-            lit = now
-        } else {
-            delay(MAKE_WAY_MILLIS)
-            if (now == Over.FolderCentre) {
-                leaveFolder()
+    // Collected rather than read here, so the screen does not recompose each time the finger crosses into another slot.
+    LaunchedEffect(Unit) {
+        snapshotFlow { over }.collectLatest { now ->
+            // One the finger leaves must be rested on again, not just swept back to.
+            lit = null
+            if (now is Over.Slot && now.foldInto != null) {
+                delay(FOLD_MILLIS)
+                lit = now
             } else {
-                makingWay = (now as? Over.Slot)?.takeIf { it.place === (dragged as? Drag.Within)?.place }?.index
+                delay(MAKE_WAY_MILLIS)
+                if (now == Over.FolderCentre) {
+                    leaveFolder()
+                } else {
+                    makingWay = (now as? Over.Slot)?.takeIf { it.place === (dragged as? Drag.Within)?.place }?.index
+                }
             }
         }
     }
-    // Lit only while the finger is still where it rested: one it leaves must be rested on again, not just swept back to.
+    // Lit only while the finger is still where it rested, as it may have left before the collector hears of it.
     val litSlot by remember { derivedStateOf { lit?.takeIf { it == over } } }
-
-    fun moveFinger(to: Offset) {
-        finger = to
-        if (lit != null && lit != over) lit = null
-    }
 
     // The dialogs are windows of their own too, so like the menu they take Back before this screen's BackHandler.
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
@@ -423,7 +424,7 @@ fun LauncherScreen(
                     onShortcut = actions.startShortcut,
                     onOption = { option ->
                         when (option) {
-                            is AppOption.Remove -> changeHomeApps { remove(option.place, app, latestOnHome.orEmpty()) }
+                            is AppOption.Remove -> latestShown?.let { shown -> changeHomeApps { remove(option.place, app, shown) } }
                             AppOption.NewFolder -> {
                                 val slot = latestHomeApps.ring.indexOf(app)
                                 if (slot >= 0) {
@@ -486,13 +487,12 @@ fun LauncherScreen(
         return true
     }
 
-    // Where an app from the home place [from] lands, let go over [target] in another place.
-    fun landing(target: Over?, from: HomePlace?): Landing? {
-        if (from == null) return null
+    // Where an app let go over [target] in another home place lands, if it [lands][HomeApps.lands] there.
+    fun landing(target: Over?): Landing? {
         val mode = latestReorderMode
         return when (target) {
-            Over.DockEnd -> Landing.InDock(null, mode).takeIf { from != HomePlace.Dock }
-            Over.RingEnd -> Landing.OnRing(null, mode).takeIf { from != HomePlace.Ring }
+            Over.DockEnd -> Landing.InDock(null, mode)
+            Over.RingEnd -> Landing.OnRing(null, mode)
             is Over.Slot -> when (target.place) {
                 homePlaces[HomePlace.Ring] -> latestRing.getOrNull(target.index)?.let { Landing.OnRing(it, mode) }
                 homePlaces[HomePlace.Dock] -> latestDock.getOrNull(target.index)?.let { Landing.InDock(it, mode) }
@@ -507,14 +507,14 @@ fun LauncherScreen(
         val target = over
         val app = drag.app
         val foldInto = litSlot?.foldInto
-        val shown = latestOnHome.orEmpty()
+        val shown = latestShown
         when {
             drag is Drag.Within && overBin -> drag.remove?.invoke()
             placeChanged -> Unit
-            app != null && foldInto != null -> changeHomeApps { move(app, drag.home, Landing.Into(foldInto), shown) }
+            app != null && foldInto != null -> shown?.let { changeHomeApps { move(app, drag.home, Landing.Into(foldInto), it) } }
             drag is Drag.FromDrawer -> dropPlace?.let { place -> changeHomeApps { add(place, drag.app) } }
             drag is Drag.Within && target is Over.Slot && target.place === drag.place -> drag.move(target.index, latestReorderMode)
-            app != null -> landing(target, drag.home)?.let { to -> changeHomeApps { move(app, drag.home, to, shown) } }
+            app != null && shown != null -> landing(target)?.let { to -> changeHomeApps { move(app, drag.home, to, shown) } }
         }
         dragged = null
     }
@@ -530,7 +530,7 @@ fun LauncherScreen(
                     }
                 }
             },
-            onMove = ::moveFinger,
+            onMove = { finger = it },
             onDrop = ::drop,
             onCancel = { dragged = null },
         )
@@ -571,24 +571,24 @@ fun LauncherScreen(
                 if (started && startOnPress) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 started
             },
-            onMove = ::moveFinger,
+            onMove = { finger = it },
             onDrop = ::drop,
             onCancel = { dragged = null },
             startOnPress = startOnPress,
             movingIn = { place ->
                 (dragged as? Drag.Within)?.takeIf { it.place === place }?.let { Moving(it.from, makingWay, latestReorderMode) }
             },
-        ).also { place -> home?.let { homePlaces[it] = place } }
+        )
 
     val ringRearrange = remember {
         rearrange(HomePlace.Ring, items = { latestRing }, look = { it }, move = { item, target, mode ->
             changeRing { move(item, target, mode) }
-        })
+        }).also { homePlaces[HomePlace.Ring] = it }
     }
     val dockRearrange = remember {
         rearrange(HomePlace.Dock, items = { latestDock }, look = RingItem::App, move = { app, target, mode ->
             changeHomeApps { move(HomePlace.Dock, app, target, mode) }
-        })
+        }).also { homePlaces[HomePlace.Dock] = it }
     }
     val latestOpen by rememberUpdatedState(open)
     val folderRearrange = remember(open?.index) {

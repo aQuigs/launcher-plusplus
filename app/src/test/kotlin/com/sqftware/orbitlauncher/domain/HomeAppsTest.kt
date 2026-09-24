@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,7 +11,7 @@ class HomeAppsTest {
     private val mail = app("Mail")
     private val maps = app("Maps")
     private val music = app("Music")
-    private val installed = listOf(clock, mail, maps, music)
+    private val installed = setOf(clock.key, mail.key, maps.key, music.key)
 
     @Test
     fun `toggling one place leaves the other as it is`() {
@@ -69,15 +70,6 @@ class HomeAppsTest {
     }
 
     @Test
-    fun `removing an app takes a folder it empties with it`() {
-        val homeApps = HomeApps(ring = Ring(listOf(folder(clock), folder(mail, maps))), dock = Favourites(listOf(clock.key)))
-
-        assertEquals(HomeApps(ring = Ring(listOf(folder(mail, maps))), dock = homeApps.dock), homeApps.remove(HomePlace.Folder(0), clock, installed))
-        assertEquals(HomeApps(ring = Ring(listOf(folder(clock), folder(maps))), dock = homeApps.dock), homeApps.remove(HomePlace.Folder(1), mail, installed))
-        assertEquals(HomeApps(ring = homeApps.ring), homeApps.remove(HomePlace.Dock, clock, installed))
-    }
-
-    @Test
     fun `an app folded onto a ring app makes a folder of the two in that slot and leaves where it came from`() {
         val homeApps = HomeApps(ring = ringOf(clock, mail), dock = Favourites(listOf(maps.key)))
         val (shownClock, shownMail) = homeApps.ring.resolve(listOf(clock, mail))
@@ -119,21 +111,21 @@ class HomeAppsTest {
     @Test
     fun `a folder goes once the last app it shows leaves, whatever missing apps it holds`() {
         val gone = app("Gone")
-        val homeApps = HomeApps(ring = Ring(listOf(folder(clock, gone), folder(mail, maps))))
+        val homeApps = HomeApps(ring = Ring(listOf(folder(clock, gone), folder(mail, maps))), dock = Favourites(listOf(clock.key)))
+        val left = HomeApps(ring = Ring(listOf(folder(mail, maps))), dock = homeApps.dock)
 
-        assertEquals(Ring(listOf(folder(mail, maps))), homeApps.remove(HomePlace.Folder(0), clock, installed).ring)
-        assertEquals(
-            HomeApps(ring = Ring(listOf(folder(mail, maps))), dock = Favourites(listOf(clock.key))),
-            homeApps.move(clock, HomePlace.Folder(0), Landing.InDock(null, ReorderMode.Insert), installed),
-        )
-        // Taking a missing app out empties nothing the user can see.
+        assertEquals(left, homeApps.remove(HomePlace.Folder(0), clock, installed))
+        assertEquals(left, homeApps.move(clock, HomePlace.Folder(0), Landing.InDock(null, ReorderMode.Insert), installed))
+        // Taking out a missing app, or one of two shown, empties nothing the user can see, and the dock's copy is apart.
         assertEquals(Ring(listOf(folder(clock), folder(mail, maps))), homeApps.remove(HomePlace.Folder(0), gone, installed).ring)
+        assertEquals(Ring(listOf(folder(clock, gone), folder(maps))), homeApps.remove(HomePlace.Folder(1), mail, installed).ring)
+        assertEquals(HomeApps(ring = homeApps.ring), homeApps.remove(HomePlace.Dock, clock, installed))
     }
 
     @Test
     fun `an app lands at the ring's end without a target, and by the folder it left changes nothing`() {
         val homeApps = HomeApps(ring = Ring(listOf(folder(clock, mail), RingSlot.App(maps.key))), dock = Favourites(listOf(music.key)))
-        val (work) = homeApps.ring.resolve(installed)
+        val (work) = homeApps.ring.resolve(listOf(clock, mail, maps))
 
         assertEquals(
             HomeApps(ring = Ring(listOf(folder(clock, mail), RingSlot.App(maps.key), RingSlot.App(music.key)))),
@@ -143,8 +135,20 @@ class HomeAppsTest {
             HomeApps(ring = ringOf(maps)),
             HomeApps(dock = Favourites(listOf(maps.key))).move(maps, HomePlace.Dock, Landing.OnRing(null, ReorderMode.Insert), installed),
         )
-        assertEquals(homeApps, homeApps.move(clock, HomePlace.Folder(0), Landing.OnRing(work, ReorderMode.Insert), installed))
         assertEquals(homeApps, homeApps.move(clock, HomePlace.Folder(0), Landing.OnRing(work, ReorderMode.Swap), installed))
+    }
+
+    @Test
+    fun `an app lands neither in the place it is in, nor into itself or a copy, nor into the folder it left`() {
+        val homeApps = HomeApps(ring = Ring(listOf(folder(clock, mail), RingSlot.App(maps.key))), dock = Favourites(listOf(maps.key)))
+        val (work, shownMaps) = homeApps.ring.resolve(listOf(clock, mail, maps))
+
+        assertFalse(homeApps.lands(maps, HomePlace.Ring, Landing.OnRing(null, ReorderMode.Insert)))
+        assertFalse(homeApps.lands(maps, HomePlace.Dock, Landing.InDock(null, ReorderMode.Insert)))
+        assertFalse(homeApps.lands(maps, HomePlace.Dock, Landing.Into(shownMaps)))
+        assertFalse(homeApps.lands(clock, HomePlace.Folder(0), Landing.Into(work)))
+        assertTrue(homeApps.lands(maps, HomePlace.Dock, Landing.Into(work)))
+        assertTrue(homeApps.lands(clock, HomePlace.Folder(0), Landing.InDock(maps, ReorderMode.Insert)))
     }
 
     @Test

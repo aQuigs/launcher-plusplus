@@ -131,18 +131,11 @@ fun HomeRing(
             }
             val appMenu = if (openFolder != null) folderAppMenu else menu
             items.forEachIndexed { index, item ->
-                val itemKey: Any = when (item) {
-                    is RingItem.App -> item.app.key
-                    is RingItem.Folder -> item.index
-                }
-                key(itemKey) {
-                    val tag = when (item) {
-                        is RingItem.App -> HomeRingTags.slot(item.app)
-                        is RingItem.Folder -> HomeRingTags.folder(item.index)
-                    }
+                // By its tag, which names an app or a folder once on the ring.
+                key(item.tag) {
                     // The held app is laid out apart, unseen, and is no position to drop on.
                     val slot = if (index < slots) {
-                        Modifier.testTag(tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
+                        Modifier.testTag(item.tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
                     } else {
                         Modifier.alpha(0f)
                     }
@@ -266,6 +259,12 @@ private fun sparkPath(centre: Offset, half: Float): Path {
         close()
     }
 }
+
+private val RingItem.tag: String
+    get() = when (this) {
+        is RingItem.App -> HomeRingTags.slot(app)
+        is RingItem.Folder -> HomeRingTags.folder(index)
+    }
 
 /** An item lit as the one an app let go now would fold into: a little larger, ringed with the spark's colour. */
 private fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {

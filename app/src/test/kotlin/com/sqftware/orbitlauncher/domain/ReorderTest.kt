@@ -28,4 +28,16 @@ class ReorderTest {
             assertEquals(list, list.reordered(2, 5, mode))
         }
     }
+
+    @Test
+    fun `each position of a reordered list traces back to where its item was`() {
+        ReorderMode.entries.forEach { mode ->
+            (-1..5).forEach { from ->
+                (-1..5).forEach { to ->
+                    val reordered = list.reordered(from, to, mode)
+                    list.indices.forEach { assertEquals(reordered[it], list[list.reorderedFrom(it, from, to, mode)]) }
+                }
+            }
+        }
+    }
 }
