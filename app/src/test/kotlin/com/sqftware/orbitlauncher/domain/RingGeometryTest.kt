@@ -37,20 +37,20 @@ class RingGeometryTest {
 
     @Test
     fun `a few icons keep full size on the usual ring`() {
-        (0..7).forEach {
+        (0..9).forEach {
             assertEquals(RingLayout(phoneSide * RING_RADIUS_FRACTION, fullSize), ringLayout(fullSize, phoneSide, it, margin))
         }
     }
 
     @Test
     fun `a crowded ring grows toward the edges before its icons shrink`() {
-        val eight = ringLayout(fullSize, phoneSide, 8, margin)
-        assertEquals(fullSize, eight.iconSize, 1e-3f)
-        assertTrue("$eight", eight.radius > phoneSide * RING_RADIUS_FRACTION)
-
         val eleven = ringLayout(fullSize, phoneSide, 11, margin)
-        assertEquals(phoneSide * MAX_RING_RADIUS_FRACTION, eleven.radius)
-        assertEquals(48f, eleven.iconSize, 1f)
+        assertEquals(fullSize, eleven.iconSize, 1e-3f)
+        assertTrue("$eleven", eleven.radius > phoneSide * RING_RADIUS_FRACTION)
+
+        val thirteen = ringLayout(fullSize, phoneSide, 13, margin)
+        assertEquals(phoneSide * MAX_RING_RADIUS_FRACTION, thirteen.radius)
+        assertEquals(55f, thirteen.iconSize, 1f)
     }
 
     @Test

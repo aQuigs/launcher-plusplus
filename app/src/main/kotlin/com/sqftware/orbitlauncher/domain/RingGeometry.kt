@@ -13,8 +13,8 @@ const val MAX_RING_RADIUS_FRACTION = 0.4f
 /** The emblem's diameter, as a fraction of the page's shorter side. */
 const val EMBLEM_FRACTION = 0.42f
 
-/** The most of the distance between neighbours' centres an icon takes; the rest keeps them apart, as Arc does. */
-private const val RING_ICON_FILL = 0.52f
+/** The most of the distance between neighbours' centres an icon takes; the rest keeps them apart. Closer than Arc's, whose crowded rings shrink icons too far. */
+private const val RING_ICON_FILL = 0.7f
 
 /** A ring laid out: its slots' centres [radius] from the middle, each icon [iconSize] square. */
 data class RingLayout(val radius: Float, val iconSize: Float)
