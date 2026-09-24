@@ -116,7 +116,7 @@ class HomeRingTest {
         val page = compose.onRoot().getUnclippedBoundsInRoot()
         val side = min(page.width.value, page.height.value)
 
-        listOf(1, 8, 12).forEach { count ->
+        listOf(1, 11, 14).forEach { count ->
             ring = alphabet.take(count).asRingItems()
             compose.waitForIdle()
 
