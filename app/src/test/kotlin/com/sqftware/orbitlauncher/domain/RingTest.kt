@@ -76,6 +76,15 @@ class RingTest {
     }
 
     @Test
+    fun `a folder is removed if empty, and nothing else is`() {
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder(), folder(mail)))
+
+        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder(mail))), ring.removeIfEmpty(1))
+        assertEquals(ring, ring.removeIfEmpty(0))
+        assertEquals(ring, ring.removeIfEmpty(2))
+    }
+
+    @Test
     fun `toggling into a slot that is not a folder changes nothing`() {
         val ring = ringOf(clock)
 

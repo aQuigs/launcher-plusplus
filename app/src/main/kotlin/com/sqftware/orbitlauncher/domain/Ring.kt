@@ -37,7 +37,7 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
 
     /**
      * Adds [app] to the folder at [index], or takes it out if it is already there. The folder stays, whatever is left in
-     * it; a slot that is not a folder is left alone.
+     * it, so a pick can empty a folder and fill it again; a slot that is not a folder is left alone.
      */
     fun toggle(index: Int, app: AppEntry): Ring = updateFolder(index) { Favourites(it).toggle(app).keys }
 
@@ -60,6 +60,9 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     /** Drops the slot at [index]; a folder goes with its apps. */
     fun remove(index: Int): Ring = Ring(slots.filterIndexed { i, _ -> i != index })
 
+    /** Drops the folder at [index] if it holds nothing, as when a pick that started it ends with none. */
+    fun removeIfEmpty(index: Int): Ring = if (folder(index)?.keys?.isEmpty() == true) remove(index) else this
+
     /**
      * The slots with their installed apps, in order. An app that is missing is skipped but kept, on the ring or in a
      * folder, so what disappears while it updates comes back in its old place. A folder shows whatever is left in it, so
@@ -80,7 +83,8 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
         return replace(index, RingSlot.Folder(change(folder.keys)))
     }
 
-    private fun slotOf(item: RingItem): Int = when (item) {
+    /** The stored slot [item] shows, or -1 for an app without a slot of its own. */
+    fun slotOf(item: RingItem): Int = when (item) {
         is RingItem.App -> indexOf(item.app)
         is RingItem.Folder -> item.index
     }

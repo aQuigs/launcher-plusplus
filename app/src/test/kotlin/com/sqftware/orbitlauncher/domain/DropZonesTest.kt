@@ -19,6 +19,12 @@ class DropZonesTest {
     }
 
     @Test
+    fun `a disc can be shrunk to a fraction of the one that fits`() {
+        assertEquals(true, ring.discContains(500f, 520f, fraction = 0.42f))
+        assertEquals(false, ring.discContains(500f, 540f, fraction = 0.42f))
+    }
+
+    @Test
     fun `the corners of the ring's bounds are outside the disc`() {
         assertNull(zones.placeAt(1f, 101f))
         assertNull(zones.placeAt(999f, 699f))

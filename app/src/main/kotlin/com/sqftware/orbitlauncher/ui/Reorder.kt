@@ -34,6 +34,15 @@ object ReorderTags {
 /** How faint the item on the move shows where it would land, under the ghost that follows the finger. */
 private const val LANDING_ALPHA = 0.35f
 
+/** How long the finger rests over a position, off the middle of an item it could fold into, before the others make way. */
+const val MAKE_WAY_MILLIS = 300L
+
+/** How long the finger rests on the middle of an item before an app dropped there would fold into it. */
+const val FOLD_MILLIS = 500L
+
+/** How near an item's centre the finger is on its middle, where an app dropped folds in, as a share of the item's size. */
+private const val MIDDLE = 0.35f
+
 /**
  * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that moves
  * on, or the press itself with [startOnPress], picks up the item at a position, and the finger then goes as in an
@@ -73,9 +82,14 @@ class Rearrange(
      * The position nearest [finger], in root coordinates, if the finger is within that position's size of its centre.
      * Asked on every move of the finger, so it makes nothing on the way.
      */
-    fun at(finger: Offset): Int? {
+    fun at(finger: Offset): Int? = nearest(finger, within = 1f)
+
+    /** The position whose middle [finger] is on, found as [at] finds one but nearer its centre. */
+    fun middleAt(finger: Offset): Int? = nearest(finger, within = MIDDLE)
+
+    private fun nearest(finger: Offset, within: Float): Int? {
         var nearest: Int? = null
-        var nearestDistance = 1f
+        var nearestDistance = within
         placed.forEach { (index, coordinates) ->
             val centre = coordinates.localToRoot(coordinates.size.center.toOffset())
             val distance = (centre - finger).getDistance() / maxOf(coordinates.size.width, coordinates.size.height)

@@ -75,6 +75,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private const val FOLD_TARGET = "Drop to put in a folder"
+
 @RunWith(AndroidJUnit4::class)
 class LauncherScreenTest {
     @get:Rule
@@ -250,6 +252,22 @@ class LauncherScreenTest {
     private fun letGo() {
         compose.onRoot().performTouchInput { up() }
         compose.waitForIdle()
+    }
+
+    /**
+     * Holds the finger still for a little longer than [millis], the frames since it stopped aside, then nudges it, so the
+     * clock runs on as it rests.
+     */
+    private fun rest(millis: Long) {
+        compose.onRoot().performTouchInput { moveBy(Offset(0f, 0.5f), delayMillis = millis + 100) }
+        compose.waitForIdle()
+    }
+
+    /** A point over [node]'s place on the ring but off its middle, out from the ring's centre at [hub], away from the others. */
+    private fun edgeOf(node: SemanticsNodeInteraction, hub: Offset = centreOf(compose.emblem())): Offset {
+        val bounds = node.fetchSemanticsNode().boundsInRoot
+        val out = bounds.center - hub
+        return bounds.center + out / out.getDistance() * bounds.width * 0.6f
     }
 
     /**
@@ -677,10 +695,28 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun removingAppsFromAnOpenFolderLeavesItOpenDownToAnEmptyBadge() {
-        homeApps = HomeApps(ring = Ring(listOf(work)))
+    fun aFolderPickedEmptyStaysUntilThePickEnds() {
+        homeApps = HomeApps(ring = ringOf(clock, mail))
         show()
-        compose.folderSlot(0).performClick()
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("New folder").performClick()
+        assertDrawerOpen(true)
+
+        compose.onNodeWithText("Mail").performClick()
+        compose.onNodeWithText("Adding to folder").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(clock.key), folderOf())), homeApps.ring) }
+
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+        compose.folderSlot(1).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(ringOf(clock), homeApps.ring) }
+    }
+
+    @Test
+    fun removingTheLastAppFromAnOpenFolderRemovesTheFolder() {
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(mail.key), work)))
+        show()
+        compose.folderSlot(1).performClick()
 
         compose.ringSlot(mail).performTouchInput { longClick() }
         compose.onNodeWithText("New folder").assertDoesNotExist()
@@ -689,20 +725,15 @@ class LauncherScreenTest {
 
         compose.emblem().assertDoesNotExist()
         compose.ringSlot(clock).assertIsDisplayed()
-        compose.ringSlot(mail).assertDoesNotExist()
-        compose.runOnIdle { assertEquals(Ring(listOf(folderOf(clock))), homeApps.ring) }
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(mail.key), folderOf(clock))), homeApps.ring) }
 
         compose.ringSlot(clock).performTouchInput { longClick() }
         compose.onNodeWithText("Remove from folder").performClick()
 
-        compose.ringSlot(clock).assertDoesNotExist()
-        compose.closeFolder().performClick()
-        compose.folderSlot(0).assertContentDescriptionEquals("Folder, 0 apps").performClick()
         compose.emblem().assertIsDisplayed()
-        compose.folderSlot(0).performTouchInput { longClick() }
-        compose.onNodeWithText("Add apps").assertIsDisplayed()
-        compose.onNodeWithText("Remove folder").assertIsDisplayed()
-        compose.runOnIdle { assertEquals(Ring(listOf(folderOf())), homeApps.ring) }
+        compose.folderSlot(1).assertDoesNotExist()
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(ringOf(mail), homeApps.ring) }
     }
 
     @Test
@@ -922,34 +953,41 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aRingAppHeldOverAnotherSlotShowsTheRingAsItWouldBeAndTakesThatPlaceOnlyWhenDroppedThere() {
+    fun theRingMakesWayOnlyWhereTheFingerRestsAndAQuickDropStillTakesThePlaceUnderIt() {
         val four = alphabet.take(4)
         apps = four
         homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
         show()
-        val slots = four.map { centreOf(compose.ringSlot(it)) }
 
         pickUp(compose.ringSlot(four[0]))
         compose.appOptionsMenu().assertDoesNotExist()
         compose.reorderModeButton(ReorderMode.Insert).assertIsSelected()
-        dragTo(slots[2])
+        // Measured once the drag is under way: the dock comes in for it, and the ring makes room.
+        val slots = four.map { centreOf(compose.ringSlot(it)) }
 
+        // A sweep past moves nothing; a rest makes way.
+        dragTo(edgeOf(compose.ringSlot(four[2])))
+        assertNear(slots[0], centreOf(compose.ringSlot(four[0])))
+        assertNear(slots[2], centreOf(compose.ringSlot(four[2])))
+        rest(MAKE_WAY_MILLIS)
         assertNear(slots[2], centreOf(compose.ringSlot(four[0])))
         assertNear(slots[0], centreOf(compose.ringSlot(four[1])))
         assertNear(slots[1], centreOf(compose.ringSlot(four[2])))
         assertNear(slots[3], centreOf(compose.ringSlot(four[3])))
         compose.runOnIdle { assertEquals(0, homeAppsChanges) }
 
-        // Anywhere but a slot puts everything back, and so does letting go there.
+        // Resting anywhere but a slot puts everything back, and so does letting go there.
         dragTo(centreOf(compose.emblem()))
+        rest(MAKE_WAY_MILLIS)
         assertNear(slots[0], centreOf(compose.ringSlot(four[0])))
         letGo()
         compose.dragGhost().assertDoesNotExist()
         compose.reorderSwitch().assertDoesNotExist()
         compose.runOnIdle { assertEquals(0, homeAppsChanges) }
 
+        // Let go at once on another's middle, the app takes its place rather than folding into it.
         pickUp(compose.ringSlot(four[0]))
-        dragTo(slots[2])
+        dragTo(centreOf(compose.ringSlot(four[2])))
         letGo()
 
         compose.reorderSwitch().assertDoesNotExist()
@@ -960,14 +998,128 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aRingAppRestingOnAnotherLightsItAndFoldsIntoAFolderWithIt() {
+        val four = alphabet.take(4)
+        apps = four
+        homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
+        show()
+
+        pickUp(compose.ringSlot(four[0]))
+        dragTo(centreOf(compose.ringSlot(four[2])))
+        compose.ringSlot(four[2]).assert(hasStateDescription(FOLD_TARGET).not())
+        rest(FOLD_MILLIS)
+        compose.ringSlot(four[2]).assert(hasStateDescription(FOLD_TARGET))
+        letGo()
+
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps")
+        compose.runOnIdle {
+            assertEquals(Ring(listOf(RingSlot.App(four[1].key), folderOf(four[2], four[0]), RingSlot.App(four[3].key))), homeApps.ring)
+        }
+    }
+
+    @Test
+    fun aDockAppRestingOnAFolderGoesIntoIt() {
+        val first = alphabet[0]
+        apps = listOf(clock, mail, first)
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(first.key), folderOf(clock))), dock = Favourites(listOf(mail.key)))
+        show()
+
+        pickUp(compose.dockSlot(mail))
+        dragTo(centreOf(compose.folderSlot(1)))
+        rest(FOLD_MILLIS)
+        compose.folderSlot(1).assert(hasStateDescription(FOLD_TARGET))
+        letGo()
+
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(RingSlot.App(first.key), folderOf(clock, mail)))), homeApps) }
+    }
+
+    @Test
+    fun appsMoveBetweenTheRingAndTheDockToWhereTheyAreLetGo() {
+        val three = alphabet.take(3)
+        apps = three
+        homeApps = HomeApps(ring = ringOf(*three.toTypedArray()))
+        show()
+        compose.dock().assertDoesNotExist()
+
+        // The empty dock comes in for a ring app, as a place to drop it.
+        pickUp(compose.ringSlot(three[0]))
+        dragTo(centreOf(compose.dock()))
+        letGo()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(three[1], three[2]), dock = Favourites(listOf(three[0].key))), homeApps) }
+
+        pickUp(compose.dockSlot(three[0]))
+        dragTo(centreOf(compose.ringSlot(three[2])))
+        letGo()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(three[1], three[0], three[2])), homeApps) }
+    }
+
+    // The folder's icons go as it closes, the dragged one's too; its node, and the gesture on it, must stay.
+    @Test
+    fun anAppHeldOverTheMiddleOfItsFolderClosesItAndLandsOnTheRingTakingTheEmptiedFolderAway() {
+        val (first, second) = alphabet.take(2)
+        apps = listOf(clock, first, second)
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(first.key), RingSlot.App(second.key), folderOf(clock))))
+        show()
+        compose.folderSlot(2).performClick()
+
+        pickUp(compose.ringSlot(clock))
+        dragTo(centreOf(compose.closeFolder()))
+        rest(MAKE_WAY_MILLIS)
+        compose.emblem().assertIsDisplayed()
+        compose.dragGhost().assertIsDisplayed()
+        compose.reorderSwitch().assertIsDisplayed()
+        compose.ringSlot(clock).assertDoesNotExist()
+
+        dragTo(centreOf(compose.ringSlot(first)))
+        compose.dragGhost().assertIsDisplayed()
+        letGo()
+
+        compose.dragGhost().assertDoesNotExist()
+        compose.folderSlot(2).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(ringOf(clock, first, second), homeApps.ring) }
+    }
+
+    @Test
+    fun anAppDraggedOutOfItsFolderAndLetGoOffTheRingAndTheDockStaysInIt() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+
+        pickUp(compose.ringSlot(clock))
+        dragTo(centreOf(compose.closeFolder()))
+        rest(MAKE_WAY_MILLIS)
+        compose.emblem().assertIsDisplayed()
+        dragTo(centreOf(compose.clockTime()))
+        letGo()
+
+        compose.runOnIdle {
+            assertEquals(HomeApps(ring = Ring(listOf(work))), homeApps)
+            assertEquals(0, homeAppsChanges)
+        }
+    }
+
+    @Test
+    fun anAppFromTheDrawerRestingOnARingAppMakesAFolderWithIt() {
+        homeApps = HomeApps(ring = ringOf(clock))
+        show()
+        startDraggingFromDrawer(mail)
+
+        dragTo(centreOf(compose.ringSlot(clock)))
+        rest(FOLD_MILLIS)
+        letGo()
+
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(folderOf(clock, mail)))), homeApps) }
+    }
+
+    @Test
     fun aSecondFingerFlipsTheSwitchToSwapWhileTheFirstHoldsTheApp() {
         val four = alphabet.take(4)
         apps = four
         homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
         show()
-        val target = centreOf(compose.ringSlot(four[2]))
 
         pickUp(compose.ringSlot(four[0]))
+        val target = centreOf(compose.ringSlot(four[2]))
         val swap = centreOf(compose.reorderModeButton(ReorderMode.Swap))
         compose.onRoot().performTouchInput {
             down(1, swap)
@@ -1024,6 +1176,7 @@ class LauncherScreenTest {
         }
     }
 
+    // Folders do not nest, so a folder resting on an app's middle folds nothing.
     @Test
     fun aFolderMovesRoundTheRingWithItsAppsAndAnOpenFoldersAppsMoveWithinIt() {
         val (first, second) = alphabet.take(2)
@@ -1034,6 +1187,8 @@ class LauncherScreenTest {
         pickUp(compose.folderSlot(1))
         compose.folderOptionsMenu().assertDoesNotExist()
         dragTo(centreOf(compose.ringSlot(first)))
+        rest(FOLD_MILLIS)
+        compose.ringSlot(first).assert(hasStateDescription(FOLD_TARGET).not())
         letGo()
         compose.runOnIdle { assertEquals(Ring(listOf(folderOf(clock, mail, second), RingSlot.App(first.key))), homeApps.ring) }
 
@@ -1531,6 +1686,7 @@ class LauncherScreenTest {
 
         liftFromToolsCard(seven[0])
         dragTo(target)
+        rest(MAKE_WAY_MILLIS)
         compose.dragGhost().assertIsDisplayed()
         assertNear(target, centreOf(compose.collectionApp(tools, seven[0])))
         letGo()
@@ -1727,7 +1883,8 @@ class LauncherScreenTest {
         compose.onRoot().performTouchInput {
             down(icon)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            moveBy(Offset(0f, height / 4f))
+            // Past the slop, which makes it a swipe, but short of the dock, where the app would go.
+            moveBy(Offset(0f, viewConfiguration.touchSlop * 3))
             up()
         }
 
