@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -134,6 +135,8 @@ fun SemanticsNodeInteractionsProvider.launcherMenu() = onNodeWithTag(LauncherMen
 /** The home page's top-left corner in root coordinates, where the clock, the card and the ring are not. */
 fun SemanticsNodeInteractionsProvider.emptyHomeSpace() =
     page(LauncherPage.Home).fetchSemanticsNode().boundsInRoot.topLeft + Offset(10f, 10f)
+
+fun SemanticsNodeInteractionsProvider.tapEmptyHomeSpace() = onRoot().performTouchInput { click(emptyHomeSpace()) }
 
 fun SemanticsNodeInteractionsProvider.longPressEmptyHomeSpace() = onRoot().performTouchInput { longClick(emptyHomeSpace()) }
 

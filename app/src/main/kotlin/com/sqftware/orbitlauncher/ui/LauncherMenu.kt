@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -45,16 +46,19 @@ class LauncherMenuRow(val label: String, val on: Boolean? = null, val flips: Boo
 
 /**
  * The empty space of a page. Laid behind the page's content, it only gets the touches nothing on the page claims, since
- * hit testing stops at the first sibling that claims the finger. A long press opens [menu] where the finger is.
+ * hit testing stops at the first sibling that claims the finger. A tap calls [onTap]; a long press opens [menu] where
+ * the finger is.
  */
 @Composable
-fun EmptySpace(menu: LauncherMenu, modifier: Modifier = Modifier) {
+fun EmptySpace(menu: LauncherMenu, onTap: () -> Unit, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     var pressedAt by remember { mutableStateOf(Offset.Zero) }
+    val currentOnTap by rememberUpdatedState(onTap)
 
     Box(
         modifier.fillMaxSize().pointerInput(menu) {
             detectTapGestures(
+                onTap = { currentOnTap() },
                 onLongPress = { position ->
                     pressedAt = position
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
