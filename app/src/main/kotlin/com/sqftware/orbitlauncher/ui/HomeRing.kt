@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -141,23 +142,27 @@ fun HomeRing(
             .fillMaxSize()
             // Cached, so the glow animating does not lay the ring out again every frame.
             .drawWithCache {
-                val radius = layoutOn(size.minDimension).radius
+                val (radius, iconSize) = layoutOn(size.minDimension)
                 val track = Stroke(1.dp.toPx())
                 val lines = Stroke(1.5.dp.toPx(), join = StrokeJoin.Round)
+                val stars = List(slots) { index ->
+                    val (dx, dy) = ringSlotOffset(index, slots)
+                    size.center + Offset(dx, dy) * radius
+                }
                 val constellation = Path().apply {
-                    repeat(slots) { index ->
-                        val (dx, dy) = ringSlotOffset(index, slots)
-                        val star = size.center + Offset(dx, dy) * radius
-                        if (index == 0) moveTo(star.x, star.y) else lineTo(star.x, star.y)
-                    }
+                    stars.forEachIndexed { index, star -> if (index == 0) moveTo(star.x, star.y) else lineTo(star.x, star.y) }
                     close()
                 }
+                // An icon's disc can be glass the wallpaper shows through, a folder's always is, so the lines stop at its edge.
+                val discs = Path().apply { stars.forEach { addOval(Rect(it, iconSize / 2)) } }
                 onDrawBehind {
                     if (glow > 0f) drawCircle(Mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
-                    if (slots >= MIN_CONSTELLATION) {
-                        drawPath(constellation, StarLine.copy(alpha = StarLine.alpha + 0.3f * glow), style = lines)
-                    } else {
-                        drawCircle(Mark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
+                    clipPath(discs, ClipOp.Difference) {
+                        if (slots >= MIN_CONSTELLATION) {
+                            drawPath(constellation, StarLine.copy(alpha = StarLine.alpha + 0.3f * glow), style = lines)
+                        } else {
+                            drawCircle(Mark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
+                        }
                     }
                 }
             },

@@ -215,7 +215,7 @@ private fun EditButton(icon: ImageVector, description: String, modifier: Modifie
             .size(CONTROL_SIZE)
             .clip(CircleShape)
             .then(input)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Icon(icon, contentDescription = description, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }

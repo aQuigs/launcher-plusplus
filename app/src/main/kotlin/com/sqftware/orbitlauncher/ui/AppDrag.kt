@@ -147,7 +147,7 @@ fun DragGhost(
             Modifier
                 .size(RING_ICON_SIZE)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .testTag(DragTags.GHOST),
         ) {
             AppImage(app, icon, Modifier.fillMaxSize())

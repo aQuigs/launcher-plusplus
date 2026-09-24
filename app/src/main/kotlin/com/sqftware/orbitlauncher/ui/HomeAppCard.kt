@@ -24,7 +24,7 @@ fun HomeAppCard(onBecomeHomeApp: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         // Not a circle shape: its corners would grow with a line that wraps at a large font and clip the text.
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = modifier.testTag(HomeAppCardTags.CARD),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 4.dp)) {
