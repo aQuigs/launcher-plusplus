@@ -12,13 +12,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 
 /**
- * Calls [onSwipe] when a finger drags down across this node, wherever on it the finger came down: past the touch slop
- * and at least twice as far down as across. Until then nothing is consumed, so a tap on whatever the finger landed on
- * goes ahead as usual; from the move that makes it a swipe until the last finger lifts, every change is consumed, which
- * cancels that tap and keeps the pager around the node from reading a page swipe. A touch something else has taken
- * first, a long press or the pager, is left to it.
+ * Calls [onDown] or [onUp] when a finger drags down or up across this node, wherever on it the finger came down: past
+ * the touch slop and at least twice as far along as across. Until then nothing is consumed, so a tap on whatever the
+ * finger landed on goes ahead as usual; from the move that makes it a swipe until the last finger lifts, every change is
+ * consumed, which cancels that tap and keeps the pager around the node from reading a page swipe. A touch something else
+ * has taken first, a long press or the pager, is left to it.
  */
-fun Modifier.swipeDown(onSwipe: () -> Unit): Modifier = pointerInput(onSwipe) {
+fun Modifier.verticalSwipe(onDown: () -> Unit, onUp: () -> Unit): Modifier = pointerInput(onDown, onUp) {
     awaitEachGesture {
         // A pager settling from a fling takes the next touch at once, in the initial pass, which reaches it first.
         val down = awaitFirstDown(pass = PointerEventPass.Initial)
@@ -26,11 +26,11 @@ fun Modifier.swipeDown(onSwipe: () -> Unit): Modifier = pointerInput(onSwipe) {
         awaitPointerEvent(PointerEventPass.Final)
         val swipe = awaitSlop(down.id, down.position) ?: return@awaitEachGesture
         val moved = swipe.position - down.position
-        if (moved.y > 2 * abs(moved.x)) {
+        if (abs(moved.y) > 2 * abs(moved.x)) {
             swipe.consume()
-            onSwipe()
-            // The finger often carries on as the shade opens over it, and the pager takes a touch back the moment its
-            // moves stop being consumed, so a drift across would page behind the shade.
+            if (moved.y > 0) onDown() else onUp()
+            // The finger often carries on as the shade or the drawer opens over it, and the pager takes a touch back the
+            // moment its moves stop being consumed, so a drift across would page behind it.
             do {
                 val event = awaitPointerEvent()
                 event.changes.forEach { it.consume() }
@@ -42,7 +42,7 @@ fun Modifier.swipeDown(onSwipe: () -> Unit): Modifier = pointerInput(onSwipe) {
 /**
  * The move that takes [pointer] past the touch slop from [start], or null once it lifts or another gesture takes it.
  * It decides at that first crossing, where Compose's awaitTouchSlopOrCancellation watches on: once the pager follows a
- * page swipe, the finger barely moves across the page it drags, and the drift down alone would read as a swipe.
+ * page swipe, the finger barely moves across the page it drags, and its drift up or down alone would read as a swipe.
  */
 private suspend fun AwaitPointerEventScope.awaitSlop(pointer: PointerId, start: Offset): PointerInputChange? {
     while (true) {
