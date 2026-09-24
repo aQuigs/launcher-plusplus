@@ -1692,7 +1692,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aLongPressThatMovesDownOpensTheMenuRatherThanTheNotifications() {
+    fun aLongPressThatMovesDownPicksTheAppUpRatherThanOpeningTheNotifications() {
         homeApps = HomeApps(ring = ringOf(mail))
         show()
         val icon = centreOf(compose.ringSlot(mail))
@@ -1704,8 +1704,11 @@ class LauncherScreenTest {
             up()
         }
 
-        compose.appOptionsMenu().assertIsDisplayed()
-        compose.runOnIdle { assertEquals(0, notificationsOpened) }
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(0, notificationsOpened)
+            assertEquals(HomeApps(ring = ringOf(mail)), homeApps)
+        }
     }
 
     @Test
