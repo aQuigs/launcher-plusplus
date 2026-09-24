@@ -60,8 +60,14 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     /** Drops the slot at [index]; a folder goes with its apps. */
     fun remove(index: Int): Ring = Ring(slots.filterIndexed { i, _ -> i != index })
 
-    /** Drops the folder at [index] if it holds nothing, as when a pick that started it ends with none. */
-    fun removeIfEmpty(index: Int): Ring = if (folder(index)?.keys?.isEmpty() == true) remove(index) else this
+    /**
+     * Drops the folder at [index] if it shows none of [apps], as when a pick that started it ends with none; the missing
+     * apps it holds go with it.
+     */
+    fun removeIfEmpty(index: Int, apps: List<AppEntry>): Ring {
+        val shown = apps.mapTo(HashSet()) { it.key }
+        return if (folder(index)?.keys?.none(shown::contains) == true) remove(index) else this
+    }
 
     /**
      * The slots with their installed apps, in order. An app that is missing is skipped but kept, on the ring or in a

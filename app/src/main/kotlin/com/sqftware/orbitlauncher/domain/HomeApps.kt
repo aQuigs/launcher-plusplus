@@ -16,9 +16,9 @@ sealed interface HomePlace : Serializable {
 sealed interface Landing {
     /**
      * [target]'s place on the ring, as [mode] says: inserted, the app goes in before it; swapped, the two trade places.
-     * A folder never leaves the ring, so an app swapped onto one goes in before it instead.
+     * A folder never leaves the ring, so an app swapped onto one goes in before it instead. Without one, the ring's end.
      */
-    data class OnRing(val target: RingItem, val mode: ReorderMode) : Landing
+    data class OnRing(val target: RingItem?, val mode: ReorderMode) : Landing
 
     /** Into [target]: an app there and the one dropped on it become a folder, and a folder takes the app in at its end. */
     data class Into(val target: RingItem) : Landing
@@ -60,15 +60,17 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()
         is HomePlace.Folder -> copy(ring = ring.move(place.index, app, target, mode))
     }
 
-    /** Takes [app] off [place]; a folder it leaves empty goes too. */
-    fun remove(place: HomePlace, app: AppEntry): HomeApps = Draft(this).apply { put(place, app.key, GAP) }.build()
+    /** Takes [app] off [place]; a folder it leaves showing none of the [apps] there are goes too. */
+    fun remove(place: HomePlace, app: AppEntry, apps: List<AppEntry>): HomeApps =
+        Draft(this).apply { put(place, app.key, GAP) }.build(apps)
 
     /**
      * Moves [app] from [from], a place other than the one it [lands][to] in, or in from the drawer without one. It is in
      * the place it lands in once: a copy already there gives way to it, and folding it into a folder that holds it only
-     * takes it off [from], or changes nothing when that is the folder. A folder it leaves empty goes.
+     * takes it off [from], or changes nothing when that is the folder, as does landing on the ring by the folder it left.
+     * A folder it leaves showing none of the [apps] there are goes.
      */
-    fun move(app: AppEntry, from: HomePlace?, to: Landing): HomeApps {
+    fun move(app: AppEntry, from: HomePlace?, to: Landing, apps: List<AppEntry>): HomeApps {
         val draft = Draft(this)
         when (to) {
             is Landing.Into -> {
@@ -82,9 +84,9 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()
                 }
             }
             is Landing.OnRing -> {
-                val index = ring.slotOf(to.target)
-                if (index < 0) return this
-                val swapped = (ring.slots[index] as? RingSlot.App)?.key?.takeIf { to.mode == ReorderMode.Swap }
+                val index = to.target?.let(ring::slotOf) ?: ring.slots.size
+                if (index < 0 || from == HomePlace.Folder(index)) return this
+                val swapped = (ring.slots.getOrNull(index) as? RingSlot.App)?.key?.takeIf { to.mode == ReorderMode.Swap }
                 draft.leave(from, app.key, swapped)
                 draft.put(HomePlace.Ring, app.key, GAP)
                 if (swapped != null) draft.slots[index] = RingSlot.App(app.key) else draft.slots.add(index, RingSlot.App(app.key))
@@ -98,7 +100,7 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()
                 if (swapped != null) draft.dock[index] = app.key else draft.dock.add(index, app.key)
             }
         }
-        return draft.build()
+        return draft.build(apps)
     }
 
     /**
@@ -143,19 +145,25 @@ private class Draft(home: HomeApps) {
         put(place, app, swapped ?: GAP)
     }
 
-    /** The home apps with the gaps closed; a folder whose last app left goes with them. */
-    fun build() = HomeApps(
-        ring = Ring(
-            slots.mapNotNull { slot ->
-                when (slot) {
-                    is RingSlot.App -> slot.takeIf { it.key != GAP }
-                    is RingSlot.Folder -> {
-                        val left = slot.keys.filter { it != GAP }
-                        RingSlot.Folder(left).takeUnless { left.isEmpty() && GAP in slot.keys }
+    /**
+     * The home apps with the gaps closed. A folder an app left that shows none of [apps] goes with them, the missing apps
+     * it holds too: its last app the user could see has left.
+     */
+    fun build(apps: List<AppEntry>): HomeApps {
+        val shown = apps.mapTo(HashSet()) { it.key }
+        return HomeApps(
+            ring = Ring(
+                slots.mapNotNull { slot ->
+                    when (slot) {
+                        is RingSlot.App -> slot.takeIf { it.key != GAP }
+                        is RingSlot.Folder -> {
+                            val left = slot.keys.filter { it != GAP }
+                            RingSlot.Folder(left).takeUnless { GAP in slot.keys && left.none(shown::contains) }
+                        }
                     }
-                }
-            },
-        ),
-        dock = Favourites(dock.filter { it != GAP }),
-    )
+                },
+            ),
+            dock = Favourites(dock.filter { it != GAP }),
+        )
+    }
 }

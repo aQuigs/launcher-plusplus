@@ -737,6 +737,23 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun emptyingAnOpenFolderAheadOfAnotherClosesItRatherThanOpeningTheNext() {
+        val first = alphabet[0]
+        apps = listOf(clock, mail, first)
+        homeApps = HomeApps(ring = Ring(listOf(folderOf(first), work)))
+        show()
+        compose.folderSlot(0).performClick()
+
+        compose.ringSlot(first).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from folder").performClick()
+
+        compose.emblem().assertIsDisplayed()
+        compose.folderSlot(0).assertContentDescriptionEquals("Folder, 2 apps").assertIsDisplayed()
+        compose.ringSlot(clock).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Ring(listOf(work)), homeApps.ring) }
+    }
+
+    @Test
     fun theFolderMenuAddsAppsAndRemovesTheFolder() {
         homeApps = HomeApps(ring = Ring(listOf(work)))
         show()
@@ -1015,6 +1032,39 @@ class LauncherScreenTest {
         compose.runOnIdle {
             assertEquals(Ring(listOf(RingSlot.App(four[1].key), folderOf(four[2], four[0]), RingSlot.App(four[3].key))), homeApps.ring)
         }
+    }
+
+    @Test
+    fun anAppThatLeavesALitTargetAndSweepsBackMustRestAgainToFold() {
+        val four = alphabet.take(4)
+        apps = four
+        homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
+        show()
+
+        pickUp(compose.ringSlot(four[0]))
+        dragTo(centreOf(compose.ringSlot(four[2])))
+        rest(FOLD_MILLIS)
+        compose.ringSlot(four[2]).assert(hasStateDescription(FOLD_TARGET))
+
+        dragTo(centreOf(compose.emblem()))
+        dragTo(centreOf(compose.ringSlot(four[2])))
+        compose.ringSlot(four[2]).assert(hasStateDescription(FOLD_TARGET).not())
+        letGo()
+
+        compose.runOnIdle { assertEquals(ringOf(four[1], four[2], four[0], four[3]), homeApps.ring) }
+    }
+
+    @Test
+    fun aDockAppLetGoOnAnEmptyRingGoesOnIt() {
+        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        show()
+
+        pickUp(compose.dockSlot(mail))
+        dragTo(centreOf(compose.emblem()))
+        letGo()
+
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
     }
 
     @Test
