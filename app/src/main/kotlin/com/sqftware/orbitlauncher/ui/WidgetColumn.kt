@@ -17,7 +17,6 @@ import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +49,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -95,12 +96,12 @@ private val CONTROL_SIZE = 40.dp
 private val CONTROL_REACH = PAGE_PADDING / 2
 
 /**
- * The widgets on [page], top to bottom, each the page's width and its own rows tall, with a button under them to add
- * another; an empty page says so over the button. A long press on a widget puts it in edit mode, as in Arc: [editing]
- * is its id, and it wears an outline, a bin on the top-right corner that removes it, and, if its provider lets it
- * stretch up and down, a handle on the bottom-right corner that drags its height a whole row at a time, within the rows
- * the provider allows and the page shows. While one is edited the widgets take no taps, and a tap anywhere but on that
- * widget ends the mode through [onEditingChange].
+ * The widgets on [page], top to bottom, each the page's width and its own rows tall, scrolling above a button pinned to
+ * the bottom of the page to add another; an empty page says so in the middle. A long press on a widget puts it in edit
+ * mode, as in Arc: [editing] is its id, and it wears an outline, a bin on the top-right corner that removes it, and, if
+ * its provider lets it stretch up and down, a handle on the bottom-right corner that drags its height a whole row at a
+ * time, within the rows the provider allows and the page shows. While one is edited the widgets take no taps, and a tap
+ * anywhere but on that widget ends the mode through [onEditingChange].
  */
 @Composable
 fun WidgetColumn(
@@ -110,15 +111,25 @@ fun WidgetColumn(
     onEditingChange: (Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier.fillMaxSize()) {
-        val pageRows = ((maxHeight - PAGE_PADDING * 2) / ROW_HEIGHT).toInt().coerceAtLeast(1)
+    val density = LocalDensity.current
+    // The rows the page shows are those of the scrolling part, above the button.
+    var pageRows by remember { mutableIntStateOf(1) }
 
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .fillMaxSize()
+            .then(if (editing != null) Modifier.pointerInput(onEditingChange) { detectTapGestures { onEditingChange(null) } } else Modifier),
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = if (page.isEmpty) Arrangement.Center else Arrangement.spacedBy(8.dp),
             modifier = Modifier
-                .fillMaxSize()
-                .then(if (editing != null) Modifier.pointerInput(onEditingChange) { detectTapGestures { onEditingChange(null) } } else Modifier)
+                .weight(1f)
+                .fillMaxWidth()
+                .onSizeChanged { size ->
+                    pageRows = with(density) { ((size.height.toDp() - PAGE_PADDING * 2) / ROW_HEIGHT).toInt().coerceAtLeast(1) }
+                }
                 .verticalScroll(rememberScrollState())
                 .padding(PAGE_PADDING),
         ) {
@@ -126,16 +137,16 @@ fun WidgetColumn(
             page.widgets.forEach { widget ->
                 key(widget.id) { Widget(widget, actions, pageRows, editing, onEditingChange) }
             }
-            FilledTonalButton(
-                onClick = {
-                    onEditingChange(null)
-                    actions.add(pageRows)
-                },
-                modifier = Modifier.padding(top = 8.dp).testTag(WidgetTags.ADD),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Add widget")
-            }
+        }
+        FilledTonalButton(
+            onClick = {
+                onEditingChange(null)
+                actions.add(pageRows)
+            },
+            modifier = Modifier.padding(bottom = PAGE_PADDING).testTag(WidgetTags.ADD),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            Text("Add widget")
         }
     }
 }

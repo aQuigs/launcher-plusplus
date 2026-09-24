@@ -6,14 +6,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
@@ -75,19 +77,28 @@ class WidgetColumnTest {
 
     private val row = WIDGET_ROW
 
-    private fun pageRows() = ((compose.onRoot().getUnclippedBoundsInRoot().height - 32.dp) / row).toInt()
+    /** The part of the page that scrolls, above the add button. */
+    private fun scroller() = compose.onNode(hasScrollAction())
+
+    private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp) / row).toInt()
 
     private fun rowPx() = with(compose.density) { row.toPx() }
 
+    // Within its bottom padding and the button's own touch margin.
+    private fun assertAddButtonAtTheBottom() {
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        val button = compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue("$button is not at the bottom of $screen", screen.bottom - button.bottom < 24.dp)
+    }
+
     @Test
-    fun anEmptyPageSaysSoInTheMiddleOverTheAddButton() {
+    fun anEmptyPageSaysSoInTheMiddleWithTheAddButtonAtTheBottom() {
         show()
 
-        val page = compose.onRoot().getUnclippedBoundsInRoot()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
         val hint = compose.onNodeWithText("No widgets yet").assertIsDisplayed().getUnclippedBoundsInRoot()
-        val button = compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertTrue("the hint sits over the button", hint.bottom <= button.top)
-        assertTrue("$hint is not in the middle of $page", hint.top > page.height / 3 && button.bottom < page.height * 2 / 3)
+        assertTrue("$hint is not in the middle of $screen", hint.top > screen.height / 3 && hint.bottom < screen.height * 2 / 3)
+        assertAddButtonAtTheBottom()
     }
 
     @Test
@@ -102,7 +113,7 @@ class WidgetColumnTest {
     }
 
     @Test
-    fun widgetsStackInOrderAtTheirHeightsWithTheButtonBelow() {
+    fun widgetsStackInOrderAtTheirHeightsWithTheButtonAtTheBottom() {
         page = WidgetPage(listOf(search, game))
         show()
 
@@ -112,6 +123,7 @@ class WidgetColumnTest {
         assertEquals(WIDGET_ROW_HEIGHT_DP.dp, first.height)
         assertEquals((2 * WIDGET_ROW_HEIGHT_DP).dp, second.height)
         assertTrue("$first, $second, $button", first.bottom <= second.top && second.bottom <= button.top)
+        assertAddButtonAtTheBottom()
         compose.onNodeWithText("No widgets yet").assertDoesNotExist()
         compose.runOnIdle { assertEquals(listOf(search.id, game.id), shown) }
     }
@@ -137,7 +149,7 @@ class WidgetColumnTest {
         compose.widgetEditFrame().assertDoesNotExist()
 
         compose.longPressWidget(game)
-        compose.onRoot().performTouchInput { click(bottomCenter - Offset(0f, 10f)) }
+        scroller().performTouchInput { click(bottomCenter - Offset(0f, 10f)) }
         compose.widgetEditFrame().assertDoesNotExist()
 
         compose.longPressWidget(game)
@@ -196,7 +208,8 @@ class WidgetColumnTest {
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 50) }
         val tallest = compose.runOnIdle { resized.last().second }
         assertTrue("$tallest rows", tallest > 4)
-        assertTrue("the widget stops at the page", compose.widget(game).getUnclippedBoundsInRoot().bottom <= compose.onRoot().getUnclippedBoundsInRoot().bottom)
+        val shown = scroller().getUnclippedBoundsInRoot()
+        assertTrue("the widget stops above the button", compose.widget(game).getUnclippedBoundsInRoot().bottom <= shown.bottom - 16.dp)
     }
 
     @Test
@@ -221,7 +234,11 @@ class WidgetColumnTest {
         val tall = HostedWidget(id = 11, rows = rows)
         page = WidgetPage(listOf(tall))
         compose.longPressWidget(tall)
-        compose.widgetResizeHandle().performScrollTo()
+        // The last widget's handle reaches into the page's bottom padding, which performScrollTo never counts as in view,
+        // so it would scroll forever; a page's height takes the widget's two extra rows to the end.
+        val pageHeight = scroller().fetchSemanticsNode().size.height.toFloat()
+        scroller().performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, pageHeight) }
+        compose.widgetResizeHandle().assertIsDisplayed()
 
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 0.3f) }
         assertEquals(row * rows, compose.widgetHeight(tall))
