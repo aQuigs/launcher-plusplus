@@ -317,6 +317,7 @@ private fun CollectionCardView(
     unread: UnreadCounts,
 ) {
     val dragged = reorder.dragging == index
+    val colours = MaterialTheme.colorScheme
     // The others slide aside while a card is dragged, and snap back the moment it lands: they are then laid out where they
     // slid to, and animating from there would take them somewhere else first.
     val shift by animateFloatAsState(
@@ -327,7 +328,8 @@ private fun CollectionCardView(
 
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+        // Solid while dragged, so the card it passes over does not show through it.
+        colors = CardDefaults.cardColors(containerColor = if (dragged) colours.surfaceContainerHigh else colours.surfaceVariant),
         modifier = Modifier
             .fillMaxWidth()
             // Measured outside the layer below, so the card's resting place is recorded, not where it has been dragged to.
@@ -513,7 +515,7 @@ private fun Bin(bin: BinTarget, modifier: Modifier = Modifier) {
                 scaleY = scale
             }
             .clip(CircleShape)
-            .background(if (bin.highlighted) colours.error else colours.surfaceVariant)
+            .background(if (bin.highlighted) colours.error else colours.surfaceContainerHigh)
             .semantics { contentDescription = "Remove from the collection" }
             .testTag(CollectionTags.BIN),
     ) {
