@@ -1414,6 +1414,59 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aSwipeDownThatDriftsAcrossKeepsThePage() {
+        show()
+        val start = compose.emptyHomeSpace()
+
+        compose.onRoot().performTouchInput {
+            down(start)
+            moveBy(Offset(0f, viewConfiguration.touchSlop * 3))
+            repeat(10) { moveBy(Offset(width / 20f, height / 40f)) }
+            up()
+        }
+
+        assertSettledOn(LauncherPage.Home)
+        compose.runOnIdle { assertEquals(1, notificationsOpened) }
+    }
+
+    @Test
+    fun aReorderThatDriftsAcrossKeepsThePage() {
+        collections = CollectionsPage().add(tools)
+        show()
+        goToCollections()
+        val handle = centreOf(compose.collectionHandle(tools))
+
+        compose.onRoot().performTouchInput {
+            down(handle)
+            moveBy(Offset(0f, -viewConfiguration.touchSlop * 2))
+            repeat(10) { moveBy(Offset(width / 20f, 0f)) }
+            up()
+        }
+
+        assertSettledOn(LauncherPage.Collections)
+    }
+
+    @Test
+    fun aResizeThatDriftsAcrossKeepsThePageAndTheRows() {
+        widgetPage = WidgetPage(listOf(search))
+        show()
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Widgets)
+        compose.longPressWidget(search)
+        val handle = centreOf(compose.widgetResizeHandle())
+
+        compose.onRoot().performTouchInput {
+            down(handle)
+            moveBy(Offset(0f, WIDGET_ROW.toPx() * 1.7f))
+            repeat(10) { moveBy(Offset(-width / 20f, 0f)) }
+        }
+        assertEquals(WIDGET_ROW * 3, compose.widgetHeight(search))
+        compose.onRoot().performTouchInput { up() }
+
+        assertSettledOn(LauncherPage.Widgets)
+    }
+
+    @Test
     fun aLongPressThatMovesDownOpensTheMenuRatherThanTheNotifications() {
         homeApps = HomeApps(ring = ringOf(mail))
         show()

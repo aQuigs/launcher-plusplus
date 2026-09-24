@@ -5,7 +5,10 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +85,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -385,15 +389,28 @@ private fun CardHeader(
                 .align(Alignment.Center)
                 .size(48.dp)
                 .pointerInput(index) {
-                    detectVerticalDragGestures(
-                        onDragStart = { reorder.dragging = index },
-                        onVerticalDrag = { change, dy ->
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var overSlop = 0f
+                        val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over ->
                             change.consume()
-                            reorder.offset += dy
-                        },
-                        onDragEnd = { reorder.end()?.let { (from, to) -> if (from != to) latestOnMove(from, to) } },
-                        onDragCancel = { reorder.end() },
-                    )
+                            overSlop = over
+                        } ?: return@awaitEachGesture
+                        reorder.dragging = index
+                        reorder.offset = overSlop
+                        // Not verticalDrag, which leaves a move straight across to the pager and so loses the card to it.
+                        try {
+                            val dragged = drag(start.id) {
+                                reorder.offset += it.positionChange().y
+                                it.consume()
+                            }
+                            if (dragged) {
+                                reorder.end()?.let { (from, to) -> if (from != to) latestOnMove(from, to) }
+                            }
+                        } finally {
+                            reorder.end()
+                        }
+                    }
                 }
                 .semantics { contentDescription = "Reorder ${kind.title}" }
                 .testTag(CollectionTags.handle(kind)),

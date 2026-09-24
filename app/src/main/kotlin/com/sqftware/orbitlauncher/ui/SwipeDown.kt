@@ -14,8 +14,9 @@ import kotlin.math.abs
 /**
  * Calls [onSwipe] when a finger drags down across this node, wherever on it the finger came down: past the touch slop
  * and at least twice as far down as across. Until then nothing is consumed, so a tap on whatever the finger landed on
- * goes ahead as usual; the move that makes it a swipe is consumed, which cancels that tap and keeps the pager around
- * the node from reading a page swipe. A touch something else has taken first, a long press or the pager, is left to it.
+ * goes ahead as usual; from the move that makes it a swipe until the last finger lifts, every change is consumed, which
+ * cancels that tap and keeps the pager around the node from reading a page swipe. A touch something else has taken
+ * first, a long press or the pager, is left to it.
  */
 fun Modifier.swipeDown(onSwipe: () -> Unit): Modifier = pointerInput(onSwipe) {
     awaitEachGesture {
@@ -28,6 +29,12 @@ fun Modifier.swipeDown(onSwipe: () -> Unit): Modifier = pointerInput(onSwipe) {
         if (moved.y > 2 * abs(moved.x)) {
             swipe.consume()
             onSwipe()
+            // The finger often carries on as the shade opens over it, and the pager takes a touch back the moment its
+            // moves stop being consumed, so a drift across would page behind the shade.
+            do {
+                val event = awaitPointerEvent()
+                event.changes.forEach { it.consume() }
+            } while (event.changes.any { it.pressed })
         }
     }
 }
