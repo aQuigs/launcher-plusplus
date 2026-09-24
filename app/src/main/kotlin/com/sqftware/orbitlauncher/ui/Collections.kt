@@ -26,12 +26,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
@@ -199,7 +197,7 @@ fun CollectionsColumn(
     Box(modifier.fillMaxSize()) {
         Column(
             verticalArrangement = Arrangement.spacedBy(CARD_GAP),
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(PAGE_PADDING),
+            modifier = Modifier.fillMaxSize().verticalPageScroll().padding(PAGE_PADDING),
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
