@@ -128,13 +128,14 @@ data class CollectionsPage(
 
     fun removeApp(kind: CollectionKind, app: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.remove(app)) }
 
+    /** Moves [app] to [target]'s place on the card of [kind] as [mode] says. */
+    fun moveApp(kind: CollectionKind, app: AppEntry, target: AppEntry, mode: ReorderMode): CollectionsPage =
+        update(kind) { copy(apps = apps.move(app, target, mode)) }
+
     fun toggleExpanded(kind: CollectionKind): CollectionsPage = update(kind) { copy(expanded = !expanded) }
 
     /** Moves the card at [from] to [to]; a position off the page changes nothing. */
-    fun move(from: Int, to: Int): CollectionsPage {
-        if (from == to || from !in cards.indices || to !in cards.indices) return this
-        return CollectionsPage(cards.toMutableList().apply { add(to, removeAt(from)) })
-    }
+    fun move(from: Int, to: Int): CollectionsPage = CollectionsPage(cards.reordered(from, to, ReorderMode.Insert))
 
     private fun update(kind: CollectionKind, change: CollectionCard.() -> CollectionCard) =
         CollectionsPage(cards.map { if (it.kind == kind) it.change() else it })

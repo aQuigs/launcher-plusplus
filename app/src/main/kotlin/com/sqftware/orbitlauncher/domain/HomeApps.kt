@@ -38,6 +38,13 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Favourites = Favourites()
         is HomePlace.Folder -> copy(ring = ring.toggle(place.index, app))
     }
 
+    /** Moves [app] to [target]'s place at [place] as [mode] says; on the ring, only apps in slots of their own move. */
+    fun move(place: HomePlace, app: AppEntry, target: AppEntry, mode: ReorderMode): HomeApps = when (place) {
+        HomePlace.Ring -> copy(ring = ring.move(RingItem.App(app), RingItem.App(target), mode))
+        HomePlace.Dock -> copy(dock = dock.move(app, target, mode))
+        is HomePlace.Folder -> copy(ring = ring.move(place.index, app, target, mode))
+    }
+
     /**
      * The pins to set so that no shortcut stays pinned once it is nowhere on the home screen. [pinned] is the ids pinned
      * now, by package; the result holds, for each package with a pin that has gone, the ids of its pins still here.

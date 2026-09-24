@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -83,6 +82,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -95,6 +95,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.AppCategory
@@ -137,14 +138,6 @@ object CollectionTags {
     fun app(kind: CollectionKind, app: AppEntry) = "collection_${kind.name}_${app.key}"
 }
 
-/** Lifting an app off a hand-picked card to drop it on the bin: [onStart] names the card too, then it goes as an [AppDrag]. */
-class CardLift(
-    val onStart: (CollectionKind, AppEntry, Offset) -> Unit,
-    val onMove: (Offset) -> Unit,
-    val onDrop: () -> Unit,
-    val onCancel: () -> Unit,
-)
-
 /** The bin a lifted app can be dropped on: whether the finger is over it, and where it lies, in root coordinates. */
 class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
 
@@ -160,6 +153,7 @@ private const val APPS_PER_ROW = 5
 private val PAGE_PADDING = 16.dp
 private val CARD_GAP = 12.dp
 private val CARD_ICON_SIZE = 48.dp
+private val ROW_GAP = 12.dp
 private val BIN_SIZE = 72.dp
 private const val NOTICE_MILLIS = 2_000L
 
@@ -169,7 +163,9 @@ private const val NOTICE_MILLIS = 2_000L
  * chevron that calls [onToggleExpanded]: a compact card shows one row of its first apps, an expanded one every app with
  * its label. The built-in cards work their apps out from [apps] and [foregroundTime], and Most Used asks for the usage
  * access it lacks with a body that calls [onOpenUsageSettings]. A tap launches an app; a long press on a hand-picked
- * card's app starts a [lift], during which the [bin] sits at the bottom of the page. Apps wear their [unread] counts.
+ * card's app lifts it through that card's [rearrange], to move it among the card's apps or, while the [bin] sits at the
+ * bottom of the page, to drop it there. While one of its apps is on the move, a card shows where they would be if it
+ * were dropped. Apps wear their [unread] counts.
  */
 @Composable
 fun CollectionsColumn(
@@ -184,7 +180,7 @@ fun CollectionsColumn(
     onAdd: () -> Unit,
     onOpenUsageSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    lift: CardLift? = null,
+    rearrange: (CollectionKind.HandPicked) -> Rearrange? = { null },
     bin: BinTarget? = null,
     unread: UnreadCounts = UnreadCounts(),
 ) {
@@ -201,25 +197,11 @@ fun CollectionsColumn(
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
-                    val handPicked = card.kind is CollectionKind.HandPicked
+                    val handPicked = card.kind as? CollectionKind.HandPicked
                     val cardApps = when (card.kind) {
                         CollectionKind.NewApps -> newApps
                         CollectionKind.MostUsed -> mostUsed
                         is CollectionKind.HandPicked -> remember(card.apps, apps) { card.apps.resolve(apps) }
-                    }
-                    // Each hand-picked card lifts its own apps, so the drop knows which card to take the app off.
-                    val drag = if (handPicked && lift != null) {
-                        remember(lift, card.kind) {
-                            AppDrag(
-                                onStart = { app, at -> lift.onStart(card.kind, app, at) },
-                                onMove = lift.onMove,
-                                onDrop = lift.onDrop,
-                                onCancel = lift.onCancel,
-                                startOnPress = true,
-                            )
-                        }
-                    } else {
-                        null
                     }
                     CollectionCardView(
                         card = card,
@@ -230,8 +212,8 @@ fun CollectionsColumn(
                         onLaunch = onLaunch,
                         onToggleExpanded = { onToggleExpanded(card.kind) },
                         onMove = onMove,
-                        onEdit = if (handPicked) ({ onEdit(card.kind) }) else null,
-                        drag = drag,
+                        onEdit = if (handPicked != null) ({ onEdit(card.kind) }) else null,
+                        rearrange = handPicked?.let(rearrange),
                         onOpenUsageSettings = onOpenUsageSettings,
                         unread = unread,
                     )
@@ -314,7 +296,7 @@ private fun CollectionCardView(
     onToggleExpanded: () -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (() -> Unit)?,
-    drag: AppDrag?,
+    rearrange: Rearrange?,
     onOpenUsageSettings: () -> Unit,
     unread: UnreadCounts,
 ) {
@@ -348,7 +330,7 @@ private fun CollectionCardView(
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings)
             } else {
-                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, drag, unread)
+                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, rearrange, unread)
             }
         }
     }
@@ -434,7 +416,10 @@ private fun CardHeader(
     }
 }
 
-/** The card's apps in rows of five: the first row alone when not [expanded], every row with labels when it is. */
+/**
+ * The card's apps in rows of five: the first row alone when not [expanded], every row with labels when it is. One layout
+ * holds every row, so an app on the move keeps its node, and the gesture, as it goes from row to row.
+ */
 @Composable
 private fun AppGrid(
     kind: CollectionKind,
@@ -442,50 +427,66 @@ private fun AppGrid(
     expanded: Boolean,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
-    drag: AppDrag?,
+    rearrange: Rearrange?,
     unread: UnreadCounts,
 ) {
-    val shown = if (expanded) apps else apps.take(APPS_PER_ROW)
+    val moving = rearrange?.moving
+    val ordered = moving.shown(apps)
+    val shown = if (expanded) ordered else ordered.take(APPS_PER_ROW)
+    val modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE)
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE),
-    ) {
-        if (shown.isEmpty()) {
-            Text(
-                text = kind.emptyText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
-        }
-        shown.chunked(APPS_PER_ROW).forEach { row ->
-            Row(Modifier.fillMaxWidth()) {
-                row.forEach { app ->
-                    key(app.key) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            AppIcon(
-                                app = app,
-                                icon = icon,
-                                onLaunch = onLaunch,
-                                modifier = Modifier.size(CARD_ICON_SIZE).testTag(CollectionTags.app(kind, app)),
-                                drag = drag,
-                                unread = unread[app],
+    if (shown.isEmpty()) {
+        Text(
+            text = kind.emptyText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier.padding(vertical = 12.dp),
+        )
+        return
+    }
+    Layout(
+        content = {
+            shown.forEachIndexed { index, app ->
+                key(app.key) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AppIcon(
+                            app = app,
+                            icon = icon,
+                            onLaunch = onLaunch,
+                            modifier = Modifier
+                                .size(CARD_ICON_SIZE)
+                                .testTag(CollectionTags.app(kind, app))
+                                .reorderSlot(rearrange, index, moving?.at == index),
+                            drag = rearrange?.drag(index),
+                            unread = unread[app],
+                        )
+                        if (expanded) {
+                            Text(
+                                text = app.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 4.dp),
                             )
-                            if (expanded) {
-                                Text(
-                                    text = app.label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                )
-                            }
                         }
                     }
                 }
-                repeat(APPS_PER_ROW - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val width = constraints.maxWidth / APPS_PER_ROW
+        val rows = measurables.map { it.measure(Constraints.fixedWidth(width)) }.chunked(APPS_PER_ROW)
+        val heights = rows.map { row -> row.maxOf { it.height } }
+        val gap = ROW_GAP.roundToPx()
+        val height = maxOf(heights.sum() + gap * (rows.size - 1), constraints.minHeight)
+
+        layout(constraints.maxWidth, height) {
+            var top = 0
+            rows.forEachIndexed { row, cells ->
+                cells.forEachIndexed { column, cell -> cell.placeRelative(column * width, top) }
+                top += heights[row] + gap
             }
         }
     }

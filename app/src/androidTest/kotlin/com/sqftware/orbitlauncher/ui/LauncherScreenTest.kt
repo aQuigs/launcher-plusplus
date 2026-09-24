@@ -61,6 +61,7 @@ import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Ring
+import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -92,6 +93,7 @@ class LauncherScreenTest {
     private val work = folderOf(clock, mail)
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
     private val hourStylesChosen = mutableListOf<Boolean>()
+    private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
     private var ringerTaps = 0
     private var isHomeApp by mutableStateOf(true)
@@ -154,6 +156,8 @@ class LauncherScreenTest {
                 homeAppsChanges++
             },
             actions = actions,
+            reorderMode = reorderMode,
+            onReorderModeChange = { reorderMode = it },
             clock = face,
             onTwentyFourHourChange = {
                 hourStylesChosen += it
@@ -222,6 +226,17 @@ class LauncherScreenTest {
         advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
         moveTo(row + Offset(0f, -viewConfiguration.touchSlop * 2))
     }
+
+    /** Long-presses what [node] shows and moves it off its place, leaving the finger down: the item is on the move. */
+    private fun pickUp(node: SemanticsNodeInteraction) {
+        val at = centreOf(node)
+        compose.onRoot().performTouchInput { liftOut(at) }
+        compose.dragGhost().assertIsDisplayed()
+        compose.reorderSwitch().assertIsDisplayed()
+    }
+
+    private fun assertNear(expected: Offset, actual: Offset) =
+        assertTrue("$actual is at $expected", (actual - expected).getDistance() < 2f)
 
     /** Continues a drag to [target], in root coordinates. */
     private fun dragTo(target: Offset) {
@@ -907,6 +922,104 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aRingAppHeldOverAnotherSlotShowsTheRingAsItWouldBeAndTakesThatPlaceOnlyWhenDroppedThere() {
+        val four = alphabet.take(4)
+        apps = four
+        homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
+        show()
+        val slots = four.map { centreOf(compose.ringSlot(it)) }
+
+        pickUp(compose.ringSlot(four[0]))
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.reorderModeButton(ReorderMode.Insert).assertIsSelected()
+        dragTo(slots[2])
+
+        assertNear(slots[2], centreOf(compose.ringSlot(four[0])))
+        assertNear(slots[0], centreOf(compose.ringSlot(four[1])))
+        assertNear(slots[1], centreOf(compose.ringSlot(four[2])))
+        assertNear(slots[3], centreOf(compose.ringSlot(four[3])))
+        compose.runOnIdle { assertEquals(0, homeAppsChanges) }
+
+        // Anywhere but a slot puts everything back, and so does letting go there.
+        dragTo(centreOf(compose.emblem()))
+        assertNear(slots[0], centreOf(compose.ringSlot(four[0])))
+        letGo()
+        compose.dragGhost().assertDoesNotExist()
+        compose.reorderSwitch().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, homeAppsChanges) }
+
+        pickUp(compose.ringSlot(four[0]))
+        dragTo(slots[2])
+        letGo()
+
+        compose.reorderSwitch().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(ringOf(four[1], four[2], four[0], four[3]), homeApps.ring)
+            assertEquals(emptyList<AppEntry>(), launched)
+        }
+    }
+
+    @Test
+    fun aSecondFingerFlipsTheSwitchToSwapWhileTheFirstHoldsTheApp() {
+        val four = alphabet.take(4)
+        apps = four
+        homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
+        show()
+        val target = centreOf(compose.ringSlot(four[2]))
+
+        pickUp(compose.ringSlot(four[0]))
+        val swap = centreOf(compose.reorderModeButton(ReorderMode.Swap))
+        compose.onRoot().performTouchInput {
+            down(1, swap)
+            up(1)
+        }
+        compose.runOnIdle { assertEquals(ReorderMode.Swap, reorderMode) }
+        compose.reorderModeButton(ReorderMode.Swap).assertIsSelected()
+        dragTo(target)
+        letGo()
+
+        compose.runOnIdle { assertEquals(ringOf(four[2], four[1], four[0], four[3]), homeApps.ring) }
+    }
+
+    @Test
+    fun aDockAppMovesAlongTheDockAndTheRingStaysPut() {
+        val three = alphabet.take(3)
+        apps = three
+        homeApps = HomeApps(ring = ringOf(three[0]), dock = Favourites(three.map { it.key }))
+        show()
+
+        pickUp(compose.dockSlot(three[0]))
+        dragTo(centreOf(compose.dockSlot(three[2])))
+        letGo()
+
+        compose.runOnIdle {
+            assertEquals(HomeApps(ring = ringOf(three[0]), dock = Favourites(listOf(three[1].key, three[2].key, three[0].key))), homeApps)
+        }
+    }
+
+    @Test
+    fun aFolderMovesRoundTheRingWithItsAppsAndAnOpenFoldersAppsMoveWithinIt() {
+        val (first, second) = alphabet.take(2)
+        apps = listOf(clock, mail, first, second)
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(first.key), folderOf(clock, mail, second))))
+        show()
+
+        pickUp(compose.folderSlot(1))
+        compose.folderOptionsMenu().assertDoesNotExist()
+        dragTo(centreOf(compose.ringSlot(first)))
+        letGo()
+        compose.runOnIdle { assertEquals(Ring(listOf(folderOf(clock, mail, second), RingSlot.App(first.key))), homeApps.ring) }
+
+        compose.folderSlot(0).performClick()
+        pickUp(compose.ringSlot(clock))
+        dragTo(centreOf(compose.ringSlot(second)))
+        letGo()
+
+        compose.runOnIdle { assertEquals(Ring(listOf(folderOf(mail, second, clock), RingSlot.App(first.key))), homeApps.ring) }
+        compose.closeFolder().assertIsDisplayed()
+    }
+
+    @Test
     fun homeDuringADragCancelsIt() {
         show()
         startDraggingFromDrawer(mail)
@@ -1361,6 +1474,61 @@ class LauncherScreenTest {
             assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps)
             assertEquals(emptyList<AppEntry>(), launched)
         }
+    }
+
+    @Test
+    fun anAppLiftedOntoAnotherOnItsCardTakesItsPlace() {
+        val other = alphabet[0]
+        apps = listOf(clock, mail, other)
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key, clock.key, other.key)))))
+        show()
+        goToCollections()
+
+        liftFromToolsCard(mail)
+        compose.reorderSwitch().assertIsDisplayed()
+        dragTo(centreOf(compose.collectionApp(tools, clock)))
+        letGo()
+
+        compose.runOnIdle { assertEquals(Favourites(listOf(clock.key, mail.key, other.key)), collections.card(tools)!!.apps) }
+    }
+
+    // One layout holds every row, so the app keeps its gesture as the others make way for it from row to row.
+    @Test
+    fun anAppMovesFromRowToRowOnAnExpandedCard() {
+        val seven = alphabet.take(7)
+        apps = seven
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(seven.map { it.key }), expanded = true)))
+        show()
+        goToCollections()
+        val target = centreOf(compose.collectionApp(tools, seven[6]))
+
+        liftFromToolsCard(seven[0])
+        dragTo(target)
+        compose.dragGhost().assertIsDisplayed()
+        assertNear(target, centreOf(compose.collectionApp(tools, seven[0])))
+        letGo()
+
+        compose.runOnIdle { assertEquals(Favourites((seven.drop(1) + seven[0]).map { it.key }), collections.card(tools)!!.apps) }
+    }
+
+    @Test
+    fun aSecondFingerHoldingAnotherAppWhileOneIsLiftedLeavesTheFirstInCharge() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key, clock.key)))))
+        show()
+        goToCollections()
+        val other = centreOf(compose.collectionApp(tools, clock))
+
+        liftFromToolsCard(mail)
+        compose.onRoot().performTouchInput {
+            down(1, other)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(1, Offset(0f, viewConfiguration.touchSlop * 2))
+            up(1)
+        }
+        dragTo(centreOf(compose.collectionBin()))
+        letGo()
+
+        compose.runOnIdle { assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps) }
     }
 
     @Test

@@ -13,6 +13,10 @@ data class Favourites(val keys: List<String> = emptyList()) {
     /** Adds [app] at the end, or takes it off if it is already there. */
     fun toggle(app: AppEntry): Favourites = if (app in this) remove(app) else add(app)
 
+    /** Moves [app] to [target]'s place as [mode] says; either missing changes nothing. */
+    fun move(app: AppEntry, target: AppEntry, mode: ReorderMode): Favourites =
+        Favourites(keys.reordered(keys.indexOf(app.key), keys.indexOf(target.key), mode))
+
     /**
      * The installed favourites in order. A favourite whose app is missing is skipped but kept, so an app that disappears
      * while it updates comes back in its old place.
