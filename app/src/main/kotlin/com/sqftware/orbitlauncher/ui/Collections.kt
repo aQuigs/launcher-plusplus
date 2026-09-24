@@ -78,7 +78,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -113,6 +112,7 @@ import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
+import com.sqftware.orbitlauncher.ui.theme.LauncherColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
@@ -561,7 +561,7 @@ fun CollectionPicker(
         }
     }
 
-    Surface(modifier.fillMaxSize().testTag(CollectionTags.PICKER), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)) {
+    Surface(modifier.fillMaxSize().testTag(CollectionTags.PICKER), color = MaterialTheme.colorScheme.surfaceDim) {
         Box {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
@@ -698,7 +698,7 @@ fun CollectionEditor(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier.fillMaxSize().testTag(CollectionTags.EDITOR), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)) {
+    Surface(modifier.fillMaxSize().testTag(CollectionTags.EDITOR), color = MaterialTheme.colorScheme.surfaceDim) {
         AppDrawer(
             apps = apps,
             icon = icon,
@@ -753,7 +753,7 @@ private val AppCategory.glyph: ImageVector
 
 // Material glyphs the core icon set leaves out, from their published path data.
 internal fun materialGlyph(name: String, pathData: String): ImageVector =
-    materialIcon(name) { addPath(addPathNodes(pathData), fill = SolidColor(Color.Black)) }
+    materialIcon(name) { addPath(addPathNodes(pathData), fill = SolidColor(LauncherColors.onSurface)) }
 
 private val DragHandleGlyph = materialGlyph("DragHandle", "M20 9H4v2h16V9zM4 15h16v-2H4v2z")
 private val BarChartGlyph = materialGlyph("BarChart", "M4 9h4v11H4zM10 4h4v16h-4zM16 13h4v7h-4z")

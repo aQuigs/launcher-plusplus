@@ -60,6 +60,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 
 - Kotlin official code style, 4-space indent (`.editorconfig`). Terse over verbose.
 - Comments explain *why*, never *what*. Self-evident code gets no comment.
+- Colours live in `ui/theme`: components take a `colorScheme` role or a theme token, never a literal or a surface alpha copy, and a look changes by changing its role there (held by the `theme-colours-only` hook and `LauncherColorsTest`).
 - Commit messages describe the change and the reason. No `Co-Authored-By` trailers.
 - PR template: check or uncheck items, never delete them.
 

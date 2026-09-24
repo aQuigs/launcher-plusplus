@@ -463,7 +463,8 @@ fun LauncherScreen(
     // finger in root coordinates, which this box may not start at: the origin is measured after [modifier], so it is
     // the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val panel = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+    val panel = MaterialTheme.colorScheme.surfaceDim
+    val scrim = MaterialTheme.colorScheme.scrim
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
     // edge lines up with nothing of ours. It is only there to lift the light navigation icons off a bright wallpaper, so
     // it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
@@ -477,8 +478,8 @@ fun LauncherScreen(
                 val bottom = size.height + navigationBar.toPx()
                 val shade = Brush.verticalGradient(
                     0f to Color.Transparent,
-                    0.45f to Color.Black.copy(alpha = 0.06f),
-                    1f to Color.Black.copy(alpha = 0.22f),
+                    0.45f to scrim.copy(alpha = 0.06f),
+                    1f to scrim.copy(alpha = 0.22f),
                     startY = top,
                     endY = bottom,
                 )
