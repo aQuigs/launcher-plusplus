@@ -12,8 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -242,19 +242,20 @@ private fun Modifier.resizeHandle(rows: Int, range: IntRange, onDrag: (Int) -> U
         awaitEachGesture {
             val down = awaitFirstDown()
             down.consume()
-            var drag = 0f
+            var pulled = 0f
             var released = false
             fun follow(change: PointerInputChange, dy: Float) {
                 change.consume()
-                drag = heldDrag(rows, drag + dy.toDp().value, range)
-                onDrag(resizedRows(rows, drag))
+                pulled = heldDrag(rows, pulled + dy.toDp().value, range)
+                onDrag(resizedRows(rows, pulled))
             }
             // Whatever ends the gesture short of a release, the handle being rebuilt included, leaves no unstored rows shown.
             try {
-                // From the down until the drag starts; after that the handle moves with the rows, so step by step.
+                // From the down until the drag starts; after that the handle moves with the rows, so step by step. Every
+                // move is taken, sideways ones too, or the pager would take the touch back the first time one went across.
                 val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, _ -> follow(change, change.position.y - down.position.y) }
-                if (start != null && verticalDrag(start.id) { follow(it, it.positionChange().y) }) {
-                    onRelease(resizedRows(rows, drag))
+                if (start != null && drag(start.id) { follow(it, it.positionChange().y) }) {
+                    onRelease(resizedRows(rows, pulled))
                     released = true
                 }
             } finally {
