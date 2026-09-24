@@ -237,11 +237,13 @@ class LauncherScreenTest {
     }
 
     /**
-     * Swipes down from [start], in root coordinates, only just past the touch slop: a finger that ends the swipe still on
-     * what it started on would tap that too, unless the swipe cancels the tap.
+     * Swipes [down] or up from [start], in root coordinates, only just past the touch slop: a finger that ends the swipe
+     * still on what it started on would tap that too, unless the swipe cancels the tap.
      */
-    private fun swipeDownFrom(start: Offset) =
-        compose.onRoot().performTouchInput { swipe(start, start + Offset(0f, viewConfiguration.touchSlop * 3)) }
+    private fun swipeFrom(start: Offset, down: Boolean) = compose.onRoot().performTouchInput {
+        val slop = viewConfiguration.touchSlop * 3
+        swipe(start, start + Offset(0f, if (down) slop else -slop))
+    }
 
     private fun openResetDialog() {
         compose.longPressEmptyHomeSpace()
@@ -1386,31 +1388,41 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aSwipeDownAnywhereOnTheHomePageOpensTheNotificationsAndNothingElse() {
-        homeApps = HomeApps(ring = ringOf(mail))
+    fun anywhereOnTheHomePageASwipeDownOpensTheNotificationsAndASwipeUpTheDrawerAndNothingElse() {
+        homeApps = HomeApps(ring = ringOf(mail), dock = Favourites(listOf(clock.key)))
         isHomeApp = false
         show()
 
-        val onContent = listOf(compose.clockTime(), compose.ringSlot(mail), compose.emblem(), compose.homeAppCard()).map(::centreOf)
-        (listOf(compose.emptyHomeSpace()) + onContent).forEach(::swipeDownFrom)
+        val onContent = listOf(compose.clockTime(), compose.ringSlot(mail), compose.emblem(), compose.homeAppCard(), compose.dockSlot(clock))
+        (listOf(compose.emptyHomeSpace()) + onContent.map(::centreOf)).forEach { start ->
+            swipeFrom(start, down = true)
+            swipeFrom(start, down = false)
+            assertDrawerOpen(true)
+            Espresso.pressBack()
+            assertDrawerOpen(false)
+        }
 
         compose.runOnIdle {
-            assertEquals(5, notificationsOpened)
+            assertEquals(6, notificationsOpened)
             assertEquals(emptyList<AppEntry>(), launched)
             assertEquals(emptyList<String>(), opened)
             assertEquals(0, homeRequests)
         }
-        assertDrawerOpen(false)
     }
 
     @Test
-    fun aPageSwipeThatDriftsDownChangesThePageWithoutOpeningTheNotifications() {
+    fun aPageSwipeThatDriftsUpOrDownChangesThePageWithoutOpeningTheNotificationsOrTheDrawer() {
         show()
 
         compose.swipePager { swipe(center, center + Offset(-width / 2f, height / 10f)) }
-
         assertSettledOn(LauncherPage.Collections)
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Home)
+        compose.swipePager { swipe(center, center + Offset(width / 2f, -height / 10f)) }
+        assertSettledOn(LauncherPage.Widgets)
+
         compose.runOnIdle { assertEquals(0, notificationsOpened) }
+        assertDrawerOpen(false)
     }
 
     @Test

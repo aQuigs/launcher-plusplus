@@ -95,8 +95,9 @@ data class HomePress(val launcherInFront: Boolean)
  * shows the [clock] over the ring from [homeApps], with the dock at its foot: the time and the date open the clock app
  * and the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs. Until [isHomeApp],
- * a strip over the dock says so and offers [onBecomeHomeApp]. A swipe down from anywhere on the home page above the dock
- * pulls down the notification shade ([onOpenNotifications]). Long-pressing an app anywhere opens its menu of shortcuts and
+ * a strip over the dock says so and offers [onBecomeHomeApp]. From anywhere on the home page, dock included, a swipe down
+ * pulls down the notification shade ([onOpenNotifications]) and a swipe up opens the drawer. Long-pressing an app
+ * anywhere opens its menu of shortcuts and
  * options; a ring app's menu can start a folder in its slot. A folder opens in place, as in Arc: its apps take the ring's
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
@@ -562,8 +563,13 @@ fun LauncherScreen(
                 val page = layout.pages[index]
                 Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
                     when (page) {
-                        LauncherPage.Home -> Column(Modifier.fillMaxSize().onPlaced { homePage = it }) {
-                            Box(Modifier.weight(1f).swipeDown(onOpenNotifications)) {
+                        LauncherPage.Home -> Column(
+                            Modifier
+                                .fillMaxSize()
+                                .onPlaced { homePage = it }
+                                .verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() }),
+                        ) {
+                            Box(Modifier.weight(1f)) {
                                 // First, so it lies behind the clock, the ring and the card and gets only the touches they leave.
                                 EmptySpace(menu = launcherMenu)
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
