@@ -529,12 +529,18 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun backAndHomeCloseTheFolderAndStayOnTheHomePage() {
+    fun aTapOnEmptySpaceBackAndHomeCloseTheFolderAndStayOnTheHomePage() {
         homeApps = HomeApps(ring = Ring(listOf(work)))
         show()
         compose.folderSlot(0).performClick()
         compose.emblem().assertDoesNotExist()
 
+        compose.tapEmptyHomeSpace()
+        compose.emblem().assertIsDisplayed()
+        compose.launcherMenu().assertDoesNotExist()
+
+        compose.folderSlot(0).performClick()
+        compose.emblem().assertDoesNotExist()
         Espresso.pressBack()
         compose.emblem().assertIsDisplayed()
         assertSettledOn(LauncherPage.Home)
