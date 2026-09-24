@@ -6,7 +6,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-APP_ID=com.aquigs.launcherplusplus
+APP_ID=com.sqftware.orbitlauncher
 
 ./gradlew "install${VARIANT:-Debug}" -q
 adb shell cmd package set-home-activity "$APP_ID/.MainActivity"
@@ -16,4 +16,4 @@ until adb shell dumpsys activity activities | grep -q "ResumedActivity.*$APP_ID"
   sleep 1
 done
 
-echo "Launcher++ is now the home app"
+echo "Orbit is now the home app"

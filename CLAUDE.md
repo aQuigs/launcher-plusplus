@@ -30,7 +30,7 @@ Files headed `Shared script:`, `Shared workflow:` or `Shared config:` are copies
 ## Layout
 
 ```text
-app/src/main/kotlin/com/aquigs/launcherplusplus/
+app/src/main/kotlin/com/sqftware/orbitlauncher/
 ├── MainActivity.kt      # composition root: wires the repository into the UI
 ├── domain/              # pure Kotlin: types and logic, no Android imports
 ├── apps/                # Android system adapters (LauncherApps, …) behind interfaces
