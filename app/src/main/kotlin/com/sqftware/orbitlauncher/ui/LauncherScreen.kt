@@ -74,6 +74,7 @@ import com.sqftware.orbitlauncher.domain.appOptions
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -112,7 +113,8 @@ data class HomePress(val launcherInFront: Boolean)
  * folder on the ring, an app in the open folder or the dock, or, at once, an app on a hand-picked card, to move it among
  * its neighbours: they make way as the finger goes, and letting go over another's place puts it there, inserting it or
  * swapping the two as [reorderMode] says, which a switch at the top flips ([onReorderModeChange]) while an item is on
- * the move. Letting go anywhere else leaves the order as it was. Apps everywhere wear their [unread] counts; a long
+ * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
+ * as it was. Apps everywhere wear their [unread] counts; a long
  * press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -217,8 +219,24 @@ fun LauncherScreen(
         onGloballyPositioned { target -> homePage?.let { zones = zones.place(target.boundsIn(it)) } }
     val binShown by remember { derivedStateOf { (dragged as? Drag.Within)?.remove != null } }
     val overBin by remember { derivedStateOf { binShown && binBounds?.discContains(finger.x, finger.y) == true } }
+    // The halves of the reorder switch, and the one the item on the move is over: a rest there flips the mode. The
+    // switch overlaps what is under it, the first card's apps among them, so while the item is over it nothing moves.
+    var switchHalves by remember { mutableStateOf(emptyMap<ReorderMode, Bounds>()) }
+    val overSwitch by remember {
+        derivedStateOf {
+            if (dragged is Drag.Within) switchHalves.entries.find { it.value.contains(finger.x, finger.y) }?.key else null
+        }
+    }
+    val latestOnReorderModeChange by rememberUpdatedState(onReorderModeChange)
+    LaunchedEffect(overSwitch) {
+        val mode = overSwitch ?: return@LaunchedEffect
+        if (mode != latestReorderMode) {
+            delay(SWITCH_HOVER_MILLIS)
+            latestOnReorderModeChange(mode)
+        }
+    }
     val reorderTarget by remember {
-        derivedStateOf { (dragged as? Drag.Within)?.takeUnless { overBin }?.place?.at(finger) }
+        derivedStateOf { (dragged as? Drag.Within)?.takeUnless { overBin || overSwitch != null }?.place?.at(finger) }
     }
     // A place's positions hold only while it lists what it did at the press: an app updating or going mid-drag would
     // shift them under the finger, so that ends the drag.
@@ -818,7 +836,13 @@ fun LauncherScreen(
         }
         // Over the pages, and reachable by a second finger while the first holds the item.
         if (dragged is Drag.Within) {
-            ReorderModeSwitch(reorderMode, onReorderModeChange, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
+            ReorderModeSwitch(
+                mode = reorderMode,
+                onModeChange = onReorderModeChange,
+                onPlaced = { mode, bounds -> if (switchHalves[mode] != bounds) switchHalves = switchHalves + (mode to bounds) },
+                hovered = overSwitch != null,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+            )
         }
         dragged?.let { drag ->
             DragGhost(position = { finger - origin }, label = drag.label) {

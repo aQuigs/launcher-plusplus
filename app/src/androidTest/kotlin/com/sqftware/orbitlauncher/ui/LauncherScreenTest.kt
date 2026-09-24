@@ -982,6 +982,33 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun theHeldAppRestingOnTheSwitchsOtherHalfFlipsItButPassingOverDoesNot() {
+        val four = alphabet.take(4)
+        apps = four
+        homeApps = HomeApps(ring = ringOf(*four.toTypedArray()))
+        show()
+        val target = centreOf(compose.ringSlot(four[2]))
+
+        pickUp(compose.ringSlot(four[0]))
+        val swap = centreOf(compose.reorderModeButton(ReorderMode.Swap))
+        compose.mainClock.autoAdvance = false
+        dragTo(swap)
+        compose.mainClock.advanceTimeBy(SWITCH_HOVER_MILLIS / 2)
+        dragTo(target)
+        compose.mainClock.advanceTimeBy(SWITCH_HOVER_MILLIS)
+        compose.runOnIdle { assertEquals(ReorderMode.Insert, reorderMode) }
+
+        dragTo(swap)
+        compose.mainClock.advanceTimeBy(SWITCH_HOVER_MILLIS + 100)
+        compose.runOnIdle { assertEquals(ReorderMode.Swap, reorderMode) }
+        compose.mainClock.autoAdvance = true
+        dragTo(target)
+        letGo()
+
+        compose.runOnIdle { assertEquals(ringOf(four[2], four[1], four[0], four[3]), homeApps.ring) }
+    }
+
+    @Test
     fun aDockAppMovesAlongTheDockAndTheRingStaysPut() {
         val three = alphabet.take(3)
         apps = three

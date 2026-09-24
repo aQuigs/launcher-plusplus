@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -13,12 +14,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.node.LayoutAwareModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
+import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.reordered
 
@@ -137,21 +140,40 @@ data class Moving(val from: Int, val to: Int?, val mode: ReorderMode) {
     fun <T> preview(items: List<T>): List<T> = if (to == null) items else items.reordered(from, to, mode)
 }
 
+/** How long the item on the move rests on the switch's other half before it flips, so passing over it does not. */
+const val SWITCH_HOVER_MILLIS = 400L
+
 /**
  * Insert or Swap: how an item dropped on another's place gets there. It shows while an item is on the move, so a second
- * finger can flip it before the first lets go.
+ * finger can flip it before the first lets go, or the item itself, resting on the other half. Each half says where it
+ * lies, in root coordinates, through [onPlaced], and the switch is outlined while the item is [hovered] over it.
  */
 @Composable
-fun ReorderModeSwitch(mode: ReorderMode, onModeChange: (ReorderMode) -> Unit, modifier: Modifier = Modifier) {
+fun ReorderModeSwitch(
+    mode: ReorderMode,
+    onModeChange: (ReorderMode) -> Unit,
+    onPlaced: (ReorderMode, Bounds) -> Unit,
+    hovered: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colours = MaterialTheme.colorScheme
+
     // Solid, as what floats over other content is.
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier.testTag(ReorderTags.SWITCH)) {
+    Surface(
+        shape = CircleShape,
+        color = colours.surfaceContainerHigh,
+        border = if (hovered) BorderStroke(2.dp, colours.primary) else null,
+        modifier = modifier.testTag(ReorderTags.SWITCH),
+    ) {
         SingleChoiceSegmentedButtonRow(Modifier.padding(6.dp)) {
             ReorderMode.entries.forEachIndexed { index, option ->
                 SegmentedButton(
                     selected = option == mode,
                     onClick = { onModeChange(option) },
                     shape = SegmentedButtonDefaults.itemShape(index, ReorderMode.entries.size),
-                    modifier = Modifier.testTag(ReorderTags.mode(option)),
+                    modifier = Modifier
+                        .onGloballyPositioned { onPlaced(option, it.rootBounds()) }
+                        .testTag(ReorderTags.mode(option)),
                 ) {
                     Text(option.name)
                 }
