@@ -4,14 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.aquigs.launcherplusplus"
+    namespace = "com.sqftware.orbitlauncher"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.aquigs.launcherplusplus"
+        applicationId = "com.sqftware.orbitlauncher"
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
         versionName = "0.1.0"
     }
 
