@@ -1,7 +1,13 @@
 package com.sqftware.orbitlauncher.domain
 
 /** One notification as the badges see it. [number] is the count the app put on it, or 0. */
-data class PostedNotification(val packageName: String, val isGroupSummary: Boolean, val isOngoing: Boolean, val number: Int)
+data class PostedNotification(
+    val packageName: String,
+    val isGroupSummary: Boolean,
+    val isOngoing: Boolean,
+    val isMedia: Boolean,
+    val number: Int,
+)
 
 /**
  * How many unread notifications each package has. A package with none is absent. A pinned shortcut counts none: its own
@@ -20,10 +26,11 @@ data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap()) {
 
 /**
  * How many unread [this] notification stands for. A group's summary stands for members that are counted themselves, and
- * an ongoing notification (a call, a download, a playing track) is not something to read, so both count none. A
+ * an ongoing notification (a call, a download) is not something to read, so both count none. Nor does a media player: it
+ * shows as the player in Quick Settings rather than in the list, and stays once paused, when it is no longer ongoing. A
  * notification carrying a number, as a mail app's does for its unread threads, counts that many; any other counts one.
  */
-private val PostedNotification.unread: Int get() = if (isGroupSummary || isOngoing) 0 else maxOf(number, 1)
+private val PostedNotification.unread: Int get() = if (isGroupSummary || isOngoing || isMedia) 0 else maxOf(number, 1)
 
 fun unreadCounts(notifications: List<PostedNotification>): UnreadCounts = UnreadCounts(
     notifications

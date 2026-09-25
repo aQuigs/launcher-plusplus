@@ -63,6 +63,8 @@ class UnreadListener : NotificationListenerService() {
         packageName = packageName,
         isGroupSummary = notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
         isOngoing = isOngoing,
+        // Only a media style adds a session, and System UI shows such a notification as the player, not in the list.
+        isMedia = notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION),
         number = notification.number,
     )
 
