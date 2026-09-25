@@ -38,14 +38,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,12 +75,12 @@ import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
 import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
-import com.sqftware.orbitlauncher.domain.WIDGET_ROW_PITCH_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetSizing
+import com.sqftware.orbitlauncher.domain.cellsWithin
 import com.sqftware.orbitlauncher.domain.cellRange
 import com.sqftware.orbitlauncher.domain.heldDrag
-import com.sqftware.orbitlauncher.domain.resizedCells
+import com.sqftware.orbitlauncher.domain.nearestCells
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -118,28 +119,26 @@ private val CONTROL_REACH = PAGE_PADDING / 2
 /** The length of [cells] cells [cell] long and the gaps between them. */
 private fun span(cells: Int, cell: Dp) = cell * cells + GAP * (cells - 1)
 
-/**
- * The widget held to be moved and how far it has been dragged, in pixels; once it is let go, the page it landed on,
- * shown until the stored page comes back, so it does not flash back to where it was.
- */
+/** The widget held to be moved, and how far it has been dragged, in pixels. */
 private class HeldWidget {
     var id by mutableStateOf<Int?>(null)
     var offset by mutableStateOf(Offset.Zero)
-    var landed by mutableStateOf<WidgetPage?>(null)
 
-    // One cell and its gap, across and down, in pixels.
-    var pitch = Offset(1f, 1f)
-
-    fun pickUp(id: Int) {
-        if (this.id != null) return
+    /** Whether [id] was picked up: not while another is held, so a second finger cannot take over. */
+    fun pickUp(id: Int): Boolean {
+        if (this.id != null) return false
         this.id = id
         offset = Offset.Zero
+        return true
     }
 
-    /** [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged. */
-    fun preview(page: WidgetPage): WidgetPage {
-        val widget = page.widgets.find { it.id == id } ?: return landed ?: page
-        return page.move(widget.id, widget.row + (offset.y / pitch.y).roundToInt(), widget.column + (offset.x / pitch.x).roundToInt())
+    /**
+     * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged, a cell
+     * and its gap being [pitch] across and down.
+     */
+    fun preview(page: WidgetPage, pitch: Offset): WidgetPage {
+        val widget = page.widgets.find { it.id == id } ?: return page
+        return page.move(widget.id, nearestCells(widget.row, offset.y, pitch.y), nearestCells(widget.column, offset.x, pitch.x))
     }
 }
 
@@ -167,24 +166,24 @@ fun WidgetGrid(
     var pageRows by remember { mutableIntStateOf(1) }
     var columnWidth by remember { mutableStateOf(0.dp) }
     val held = remember { HeldWidget() }
-    SideEffect { held.pitch = with(density) { Offset((columnWidth + GAP).toPx(), (ROW_HEIGHT + GAP).toPx()) } }
+    val pitch = with(density) { Offset((columnWidth + GAP).toPx(), (ROW_HEIGHT + GAP).toPx()) }
+    // Only a drag that reaches other cells changes the page shown.
+    val shown by remember(page, pitch) { derivedStateOf(structuralEqualityPolicy()) { held.preview(page, pitch) } }
     val latestPage by rememberUpdatedState(page)
+    val latestPitch by rememberUpdatedState(pitch)
     val latestMove by rememberUpdatedState(actions.move)
     // One for the page's life, so the gesture that drags the edited widget is not started over mid-drag.
+    // Only the widget held is let go, so a finger on another one lifting moves nothing.
     val release = remember(held) {
-        { lifted: Boolean ->
-            val id = held.id
-            val landing = held.preview(latestPage)
+        release@{ id: Int, lifted: Boolean ->
+            if (held.id != id) return@release
+            val landing = held.preview(latestPage, latestPitch)
             held.id = null
-            if (lifted && id != null && landing != latestPage) {
-                held.landed = landing
-                landing.widgets.find { it.id == id }?.let { latestMove(id, it.row, it.column) }
-            }
+            if (lifted && landing != latestPage) landing.widgets.find { it.id == id }?.let { latestMove(id, it.row, it.column) }
         }
     }
-    LaunchedEffect(page) { held.landed = null }
     // Whatever ends edit mode, Back and HOME included, puts a held widget back.
-    LaunchedEffect(editing == null) { if (editing == null) release(false) }
+    LaunchedEffect(editing == null) { if (editing == null) held.id?.let { release(it, false) } }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -197,7 +196,7 @@ fun WidgetGrid(
             .fillMaxWidth()
             .onSizeChanged { size ->
                 with(density) {
-                    pageRows = ((size.height.toDp() - PAGE_PADDING * 2 + GAP) / (ROW_HEIGHT + GAP)).toInt().coerceAtLeast(1)
+                    pageRows = cellsWithin((size.height.toDp() - PAGE_PADDING * 2).value, ROW_HEIGHT.value).coerceAtLeast(1)
                     columnWidth = (size.width.toDp() - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
                 }
             }
@@ -206,7 +205,7 @@ fun WidgetGrid(
                 Text("No widgets yet", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(8.dp))
             }
         } else {
-            val shown = held.preview(page)
+            val places = shown.widgets.associateBy { it.id }
             Box(
                 area
                     .verticalPageScroll()
@@ -215,7 +214,7 @@ fun WidgetGrid(
                     // At least the page, so a widget can be dropped anywhere in sight.
                     .height(span(maxOf(shown.rows, pageRows), ROW_HEIGHT)),
             ) {
-                shown.widgets.find { it.id == held.id }?.let { landing ->
+                places[held.id]?.let { landing ->
                     Box(
                         Modifier
                             .offset { cellOffset(landing, columnWidth) }
@@ -226,7 +225,7 @@ fun WidgetGrid(
                 }
                 page.widgets.forEach { widget ->
                     key(widget.id) {
-                        val at = if (held.id == widget.id) widget else shown.widgets.find { it.id == widget.id } ?: widget
+                        val at = if (held.id == widget.id) widget else places[widget.id] ?: widget
                         Widget(widget, at, columnWidth, actions, pageRows, editing, onEditingChange, held, release)
                     }
                 }
@@ -235,7 +234,7 @@ fun WidgetGrid(
         FilledTonalButton(
             onClick = {
                 onEditingChange(null)
-                actions.add(pageRows, columnWidth.value.toInt())
+                actions.add(pageRows, columnWidth.value.roundToInt())
             },
             modifier = Modifier.padding(bottom = PAGE_PADDING).testTag(WidgetTags.ADD),
         ) {
@@ -263,31 +262,30 @@ private fun Widget(
     editing: Int?,
     onEditingChange: (Int?) -> Unit,
     held: HeldWidget,
-    release: (lifted: Boolean) -> Unit,
+    release: (id: Int, lifted: Boolean) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     val edited = editing == widget.id
     val dragged = held.id == widget.id
-    // The others slide aside while one is dragged, and snap the moment it lands.
-    val place by animateIntOffsetAsState(
-        targetValue = with(density) { cellOffset(at, columnWidth) },
-        animationSpec = if (held.id == null) snap() else spring(),
-        label = "widget_place",
-    )
+    // The others slide aside while one is dragged. Once it lands they are drawn in their cells at once, since even a
+    // snap would take a frame, in which the one let go would be back where it started.
+    val cell = with(density) { cellOffset(at, columnWidth) }
+    val sliding by animateIntOffsetAsState(cell, if (held.id == null) snap() else spring(), label = "widget_place")
     // The cells the outline shows while the handle is dragged. The widget takes them only once they are stored, so its
     // provider redraws once per resize rather than at every cell; until then they hold, so the outline does not jump back.
     var rows by remember(widget.rows, edited) { mutableIntStateOf(widget.rows) }
     var columns by remember(widget.columns, edited) { mutableIntStateOf(widget.columns) }
     val onLongPress = {
-        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        onEditingChange(widget.id)
-        held.pickUp(widget.id)
+        if (held.pickUp(widget.id)) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onEditingChange(widget.id)
+        }
     }
 
     Box(
         Modifier
-            .offset { place }
+            .offset { if (held.id == null) cell else sliding }
             .zIndex(if (dragged) 2f else if (edited) 1f else 0f)
             .graphicsLayer {
                 if (dragged) {
@@ -305,7 +303,7 @@ private fun Widget(
             update = {
                 it.onLongPress = onLongPress
                 it.onDrag = { moved -> if (held.id == widget.id) held.offset = moved }
-                it.onRelease = release
+                it.onRelease = { lifted -> release(widget.id, lifted) }
             },
             modifier = Modifier
                 .size(span(widget.columns, columnWidth), span(widget.rows, ROW_HEIGHT))
@@ -334,23 +332,22 @@ private fun Widget(
                         actions.remove(widget.id)
                     },
                 )
-                val rowRange = sizing.vertical.cellRange(widget.rows, WIDGET_ROW_HEIGHT_DP.toFloat(), pageRows)
-                val columnRange = sizing.horizontal.cellRange(widget.columns, columnWidth.value, WIDGET_COLUMNS - widget.column)
-                val down = rowRange.first < rowRange.last
-                val across = columnRange.first < columnRange.last
+                val down = Stretch(widget.rows, sizing.vertical.cellRange(widget.rows, ROW_HEIGHT.value, pageRows), (ROW_HEIGHT + GAP).value)
+                val across = Stretch(
+                    widget.columns,
+                    sizing.horizontal.cellRange(widget.columns, columnWidth.value, WIDGET_COLUMNS - widget.column),
+                    (columnWidth + GAP).value,
+                )
                 // A handle that could reach no other size would be a dead control.
-                if (down || across) {
+                if (down.stretches || across.stretches) {
                     EditButton(
-                        if (!across) HeightGlyph else if (!down) WidthGlyph else ResizeGlyph,
+                        if (!across.stretches) HeightGlyph else if (!down.stretches) WidthGlyph else ResizeGlyph,
                         "Resize widget",
                         Modifier.align(Alignment.BottomEnd).offset(CONTROL_REACH, CONTROL_REACH).testTag(WidgetTags.RESIZE),
                         // At the screen's edge, where a drag across would otherwise be the system's back gesture.
                         Modifier.systemGestureExclusion().resizeHandle(
-                            rows = widget.rows,
-                            columns = widget.columns,
-                            rowRange = rowRange,
-                            columnRange = columnRange,
-                            columnPitchDp = (columnWidth + GAP).value,
+                            down,
+                            across,
                             onDrag = { newRows, newColumns ->
                                 rows = newRows
                                 columns = newColumns
@@ -381,46 +378,50 @@ private fun EditButton(icon: ImageVector, description: String, modifier: Modifie
     }
 }
 
+/** One way a handle stretches a widget: the [cells] it spans, the [range] it may span, and a cell and its gap, in dp. */
+private data class Stretch(val cells: Int, val range: IntRange, val pitchDp: Float) {
+    val stretches: Boolean get() = range.first < range.last
+
+    /** The pull [pulledDp] taken [movedDp] further, held within [range]. */
+    fun pull(pulledDp: Float, movedDp: Float) = heldDrag(cells, pulledDp + movedDp, range, pitchDp)
+
+    fun cellsAt(pulledDp: Float) = nearestCells(cells, pulledDp, pitchDp)
+}
+
 /**
- * Drags a widget [rows] by [columns] to other whole cells within [rowRange] and [columnRange], a column and its gap
- * being [columnPitchDp], following the finger from where it went down, touch slop and all, and hands them to [onDrag]
- * as they change and to [onRelease] as the finger lifts; a drag the page takes over puts them back. The press is taken
- * at once, so a tap on the handle is not a tap on the page.
+ * Drags a widget to other whole cells, [down] and [across], following the finger from where it went down, touch slop
+ * and all, and hands its rows and columns to [onDrag] as they change and to [onRelease] as the finger lifts; a drag the
+ * page takes over puts them back. The press is taken at once, so a tap on the handle is not a tap on the page.
  */
 private fun Modifier.resizeHandle(
-    rows: Int,
-    columns: Int,
-    rowRange: IntRange,
-    columnRange: IntRange,
-    columnPitchDp: Float,
+    down: Stretch,
+    across: Stretch,
     onDrag: (rows: Int, columns: Int) -> Unit,
     onRelease: (rows: Int, columns: Int) -> Unit,
-) = pointerInput(rows, columns, rowRange, columnRange, columnPitchDp) {
+) = pointerInput(down, across) {
     awaitEachGesture {
-        val down = awaitFirstDown()
-        down.consume()
-        var pulledX = 0f
-        var pulledY = 0f
+        val press = awaitFirstDown()
+        press.consume()
+        var pulled = Offset.Zero
         var released = false
-        fun newRows() = resizedCells(rows, pulledY, WIDGET_ROW_PITCH_DP.toFloat())
-        fun newColumns() = resizedCells(columns, pulledX, columnPitchDp)
+        fun newRows() = down.cellsAt(pulled.y)
+        fun newColumns() = across.cellsAt(pulled.x)
         fun follow(change: PointerInputChange, moved: Offset) {
             change.consume()
-            pulledX = heldDrag(columns, pulledX + moved.x.toDp().value, columnRange, columnPitchDp)
-            pulledY = heldDrag(rows, pulledY + moved.y.toDp().value, rowRange, WIDGET_ROW_PITCH_DP.toFloat())
+            pulled = Offset(across.pull(pulled.x, moved.x.toDp().value), down.pull(pulled.y, moved.y.toDp().value))
             onDrag(newRows(), newColumns())
         }
         // Whatever ends the gesture short of a release, the handle being rebuilt included, leaves no unstored cells shown.
         try {
             // From the down until the drag starts; after that the handle moves with the cells, so step by step. Every
             // move is taken, or the pager would take the touch back the first time one went across.
-            val start = awaitTouchSlopOrCancellation(down.id) { change, _ -> follow(change, change.position - down.position) }
+            val start = awaitTouchSlopOrCancellation(press.id) { change, _ -> follow(change, change.position - press.position) }
             if (start != null && drag(start.id) { follow(it, it.positionChange()) }) {
                 onRelease(newRows(), newColumns())
                 released = true
             }
         } finally {
-            if (!released) onDrag(rows, columns)
+            if (!released) onDrag(down.cells, across.cells)
         }
     }
 }
@@ -438,7 +439,7 @@ private val ResizeGlyph = materialGlyph(
  * Takes every press on the edited widget [id] before its view sees it, as [takeTaps] does, and moves the widget
  * through [held] with one that is held, until [release]. A finger that moves on before then scrolls the page.
  */
-private fun Modifier.holdToMove(id: Int, held: HeldWidget, haptics: HapticFeedback, release: (lifted: Boolean) -> Unit) =
+private fun Modifier.holdToMove(id: Int, held: HeldWidget, haptics: HapticFeedback, release: (id: Int, lifted: Boolean) -> Unit) =
     pointerInput(id, held, haptics, release) {
         awaitEachGesture {
             val down = awaitFirstDown(pass = PointerEventPass.Initial)
@@ -447,8 +448,8 @@ private fun Modifier.holdToMove(id: Int, held: HeldWidget, haptics: HapticFeedba
             // gesture another handler had claimed.
             awaitPointerEvent(PointerEventPass.Main)
             val press = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+            if (!held.pickUp(id)) return@awaitEachGesture
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            held.pickUp(id)
             var lifted = false
             try {
                 // Every move is taken, or the pager would take the touch back.
@@ -457,7 +458,7 @@ private fun Modifier.holdToMove(id: Int, held: HeldWidget, haptics: HapticFeedba
                     it.consume()
                 }
             } finally {
-                release(lifted)
+                release(id, lifted)
             }
         }
     }

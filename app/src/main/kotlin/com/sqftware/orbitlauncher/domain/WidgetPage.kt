@@ -12,9 +12,6 @@ const val WIDGET_ROW_HEIGHT_DP = 80
 /** The space between two cells of the widget page, in dp, which a widget spanning both covers too. */
 const val WIDGET_GAP_DP = 8
 
-/** One row of the widget page and the gap below it, in dp. */
-const val WIDGET_ROW_PITCH_DP = WIDGET_ROW_HEIGHT_DP + WIDGET_GAP_DP
-
 /**
  * A widget on the page: the id the system knows it by, the row and column of its top-left cell, and the rows and
  * columns it spans.
@@ -66,7 +63,7 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
 
     private fun change(id: Int, change: (HostedWidget) -> HostedWidget): WidgetPage {
         val changed = widgets.find { it.id == id }?.let(change) ?: return this
-        return WidgetPage(listOf(changed) + widgets.filter { it.id != id }.sortedWith(PLACE)).settled()
+        return WidgetPage(listOf(changed) + widgets.filter { it.id != id }).settled()
     }
 
     /**
@@ -95,6 +92,9 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
 fun widgetCells(minDp: Int, cellDp: Float, most: Int): Int =
     ceil((minDp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt().coerceIn(1, most.coerceAtLeast(1))
 
+/** The most cells, [cellDp] each with a gap between two, that fit in [dp]. */
+fun cellsWithin(dp: Float, cellDp: Float): Int = ((dp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt()
+
 /**
  * How a widget's provider lets it be resized along one axis, in dp: whether it stretches that way at all, its minimum,
  * the lower one it may be resized to (0 when unset), and the most it may be resized to (null when unset).
@@ -118,8 +118,7 @@ data class WidgetSizing(val vertical: WidgetResize = WidgetResize(), val horizon
  */
 fun WidgetResize.cellRange(cells: Int, cellDp: Float, most: Int): IntRange {
     val min = widgetCells(minResizeDp.takeIf { resizable && it in 1..minDp } ?: minDp, cellDp, most)
-    // Rounded down, so the cells it allows fit under it.
-    val max = if (!resizable) min else maxResizeDp?.let { minOf(((it + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt(), most) } ?: most
+    val max = if (!resizable) min else maxResizeDp?.let { minOf(cellsWithin(it.toFloat(), cellDp), most) } ?: most
     return minOf(min, cells)..maxOf(max.coerceAtLeast(min), cells)
 }
 
@@ -130,8 +129,11 @@ fun WidgetResize.cellRange(cells: Int, cellDp: Float, most: Int): IntRange {
 fun heldDrag(cells: Int, dragDp: Float, range: IntRange, pitchDp: Float): Float =
     dragDp.coerceIn((range.first - cells) * pitchDp, (range.last - cells) * pitchDp)
 
-/** The whole cells nearest a handle dragged [dragDp], or back when negative, from a widget [cells] long. */
-fun resizedCells(cells: Int, dragDp: Float, pitchDp: Float): Int = cells + (dragDp / pitchDp).roundToInt()
+/**
+ * [cells], and the whole cells nearest a drag of [dragDp] on from there, or back when negative: where a widget's edge
+ * or corner lands. A cell and its gap are [pitchDp].
+ */
+fun nearestCells(cells: Int, dragDp: Float, pitchDp: Float): Int = cells + (dragDp / pitchDp).roundToInt()
 
 /** The page as text, one line per widget: its id, row, column, rows and columns, tab-separated. */
 fun WidgetPage.encode(): String = widgets.joinToString(LINE) { listOf(it.id, it.row, it.column, it.rows, it.columns).joinToString(FIELD) }
@@ -139,15 +141,15 @@ fun WidgetPage.encode(): String = widgets.joinToString(LINE) { listOf(it.id, it.
 /**
  * A line that is not a widget in the page's columns is skipped, and so is a second line for the same id, so a damaged
  * file loses that widget and keeps the rest; widgets that overlap move down out of each other's way. A line of just an
- * id and rows is from before widgets had places: those stack down the page's width in the order they come.
+ * id and rows is from before widgets had places: those take the page's width at the top, so they stack down it in the
+ * order they come.
  */
 fun decodeWidgetPage(text: String): WidgetPage {
-    var stacked = 0
     val widgets = text.nonEmptyLines()
         .mapNotNull { line ->
             val fields = line.split(FIELD).map { it.toIntOrNull()?.takeIf { n -> n >= 0 } ?: return@mapNotNull null }
             when (fields.size) {
-                2 -> HostedWidget(fields[0], stacked, 0, fields[1], WIDGET_COLUMNS).also { if (it.rows > 0) stacked += it.rows }
+                2 -> HostedWidget(fields[0], 0, 0, fields[1], WIDGET_COLUMNS)
                 5 -> HostedWidget(fields[0], fields[1], fields[2], fields[3], fields[4])
                 else -> null
             }?.takeIf { it.id > 0 && it.rows > 0 && it.columns > 0 && it.end <= WIDGET_COLUMNS }

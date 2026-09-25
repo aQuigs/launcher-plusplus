@@ -74,6 +74,7 @@ class WidgetPageTest {
             listOf(HostedWidget(7, 0, 0, 1, WIDGET_COLUMNS), HostedWidget(12, 1, 0, 3, WIDGET_COLUMNS)),
             decodeWidgetPage("7\t1\n12\t3").widgets,
         )
+        assertEquals("a line skipped leaves no gap", decodeWidgetPage("7\t1\n12\t3"), decodeWidgetPage("7\t1\n0\t2\n7\t4\n12\t3"))
     }
 
     @Test
@@ -108,9 +109,9 @@ class WidgetPageTest {
 
     @Test
     fun `a dragged edge snaps to the nearest whole cell`() {
-        assertEquals(3, resizedCells(cells = 3, dragDp = 43f, pitchDp = 88f))
-        assertEquals(4, resizedCells(cells = 3, dragDp = 45f, pitchDp = 88f))
-        assertEquals(2, resizedCells(cells = 3, dragDp = -45f, pitchDp = 88f))
+        assertEquals(3, nearestCells(cells = 3, dragDp = 43f, pitchDp = 88f))
+        assertEquals(4, nearestCells(cells = 3, dragDp = 45f, pitchDp = 88f))
+        assertEquals(2, nearestCells(cells = 3, dragDp = -45f, pitchDp = 88f))
     }
 
     @Test

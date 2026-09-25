@@ -42,9 +42,11 @@ import com.sqftware.orbitlauncher.ui.LauncherScreen
 import com.sqftware.orbitlauncher.ui.PinRequest
 import com.sqftware.orbitlauncher.ui.WidgetActions
 import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -136,9 +138,12 @@ class MainActivity : ComponentActivity() {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { repository.pinnedShortcuts().collect { value = it } }
                 }
                 LaunchedEffect(homeApps, isHomeApp) { repository.unpinAllBut(homeApps) }
-                // The widgets only draw their updates while the launcher is visible, like the clock.
+                // The widgets only draw their updates while the launcher is visible, like the clock. A change reaches the
+                // page at once rather than a dispatch later, so a widget let go is drawn where it landed in that frame.
                 val widgetPage by produceState(remember { widgetHost.page() }) {
-                    repeatOnLifecycle(Lifecycle.State.STARTED) { widgetHost.updates().collect { value = it } }
+                    repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        withContext(Dispatchers.Main.immediate) { widgetHost.updates().collect { value = it } }
+                    }
                 }
                 // Notification access is granted and revoked in Settings, so each return reads it again; the counts follow
                 // the notifications only while the launcher is visible, like the clock.

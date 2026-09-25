@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.HostedWidget
+import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetResize
@@ -40,6 +41,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class WidgetGridTest {
@@ -94,11 +96,12 @@ class WidgetGridTest {
     /** The part of the page that scrolls, above the add button. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
+    // Inside the page's padding.
     private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp + gap) / (row + gap)).toInt()
 
-    private fun columnWidth() = (scroller().getUnclippedBoundsInRoot().width - 32.dp - gap * 3) / 4
+    private fun columnWidth() = (scroller().getUnclippedBoundsInRoot().width - 32.dp - gap * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
 
-    private fun columnSpan(cells: Int) = columnWidth() * cells + gap * (cells - 1)
+    private fun columnSpan(cells: Int) = widgetSpan(cells, columnWidth())
 
     private fun rowPx() = with(compose.density) { (row + gap).toPx() }
 
@@ -135,7 +138,7 @@ class WidgetGridTest {
 
         compose.addWidgetButton().performClick()
 
-        compose.runOnIdle { assertEquals(listOf(pageRows to columnWidth.value.toInt()), added) }
+        compose.runOnIdle { assertEquals(listOf(pageRows to columnWidth.value.roundToInt()), added) }
         assertTrue("$pageRows rows fit the page", pageRows >= 4)
     }
 

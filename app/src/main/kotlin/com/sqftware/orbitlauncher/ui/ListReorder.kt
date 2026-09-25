@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * An item of a column, a collection card or a widget, dragged up or down it: which, how far the finger has moved it,
+ * An item of a column, such as a collection card, dragged up or down it: which, how far the finger has moved it,
  * and where every item rests, so the others can make way. Positions are in the column's own coordinates, which its
  * scroll offset does not touch, and [gap] is the space between items, in pixels.
  */
