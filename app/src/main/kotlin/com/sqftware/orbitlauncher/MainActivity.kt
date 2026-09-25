@@ -85,10 +85,16 @@ class MainActivity : ComponentActivity() {
         val layout = PageLayout()
         val actions = AppActions(
             icon = repository::icon,
-            launch = repository::launch,
+            launch = {
+                badges.opened(it.packageName)
+                repository.launch(it)
+            },
             shortcuts = repository::shortcuts,
             shortcutIcon = repository::shortcutIcon,
-            startShortcut = repository::startShortcut,
+            startShortcut = {
+                badges.opened(it.packageName)
+                repository.startShortcut(it)
+            },
             openAppInfo = repository::openAppInfo,
             uninstall = repository::uninstall,
         )
