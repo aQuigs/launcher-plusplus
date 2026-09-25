@@ -560,7 +560,7 @@ fun CollectionPicker(
         }
     }
 
-    Surface(modifier.fillMaxSize().testTag(CollectionTags.PICKER), color = MaterialTheme.colorScheme.surfaceDim) {
+    Panel(modifier.testTag(CollectionTags.PICKER)) {
         Box {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
@@ -697,7 +697,7 @@ fun CollectionEditor(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier.fillMaxSize().testTag(CollectionTags.EDITOR), color = MaterialTheme.colorScheme.surfaceDim) {
+    Panel(modifier.testTag(CollectionTags.EDITOR)) {
         AppDrawer(
             apps = apps,
             icon = icon,
