@@ -288,6 +288,9 @@ fun LauncherScreen(
     // drawer's chevron must not, so they go while either is up. Not animated: the overlays come and go in a frame,
     // and pages fading back in would be tappable before they could be seen.
     val overlayOpen = editing != null || pickingCollection
+    // Every page stays composed, so the home page must be told when nobody can see it.
+    val homeSettled by remember(pagerState, layout) { derivedStateOf { pagerState.settledPage == layout.homeIndex } }
+    val homeInSight = homeSettled && !drawerOpen && !overlayOpen
     LaunchedEffect(editing) {
         if (editing == null) {
             justPicked = emptySet()
@@ -834,6 +837,7 @@ fun LauncherScreen(
                                         rearrange = if (open != null) folderRearrange else ringRearrange,
                                         foldTarget = litSlot?.index,
                                         held = (dragged as? Drag.OutOfFolder)?.app,
+                                        inSight = homeInSight,
                                     )
                                     // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                     // the ring, which sizes itself to the room left, so the two can never overlap.
