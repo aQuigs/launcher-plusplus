@@ -6,6 +6,7 @@ import androidx.compose.material3.LocalTonalElevationEnabled
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 
@@ -20,12 +21,28 @@ private val Ember = Color(0xFFFF8A80)
 private val Frost = Color.White
 
 private val Glass = Frost.copy(alpha = 0.1f)
+private val DayGlass = Frost.copy(alpha = 0.35f)
+private val DayGold = lerp(Gold, Sky, 0.5f)
 private val Mist = lerp(Starlight, Sky, 0.28f)
 
-/** The home ring's drawing, in the icon's colours so it reads as the icon writ large; its marks take no hue of their own. */
-val RingMark = Frost
-val RingStarLine = Star.copy(alpha = 0.7f)
+/**
+ * The home ring's marks that lie on the wallpaper (its track, the constellation's lines, the emblem's edge, the ring round
+ * a fold target), in the icon's colours so the ring reads as the icon writ large, inked for the wallpaper like the scheme.
+ */
+class RingColors(val mark: Color, val starLine: Color, val lit: Color)
+
+private val NightRing = RingColors(mark = Frost, starLine = Star.copy(alpha = 0.7f), lit = Spark)
+private val DayRing = RingColors(mark = Sky, starLine = lerp(Sky, Star, 0.4f).copy(alpha = 0.7f), lit = DayGold)
+
+val LocalRingColors = staticCompositionLocalOf { NightRing }
+
+// The emblem is a disc of the icon's own sky whatever the wallpaper, so what is drawn inside it keeps the night's colours.
 val RingSpark = Spark
+val RingInk = Frost.copy(alpha = 0.9f)
+val RingShade = Sky
+
+/** What a glyph is drawn in before `Icon` tints it, as Material's own icons are. */
+val GlyphFill = Color.Black
 
 /**
  * Built with the full constructor, so no role is left on Material's stock greys. The surfaces come in two tiers of the
@@ -87,12 +104,58 @@ val LauncherColors = ColorScheme(
     onTertiaryFixedVariant = lerp(Sky, Gold, 0.3f),
 )
 
+/**
+ * [LauncherColors] turned over for a light wallpaper, which the system says wants dark text: the same two tiers, with the
+ * glass and the veil frosted instead of sky, what floats opaque lit frost, and sky ink for content. The scrim turns to
+ * frost too, so the shades that lift the chevron and the navigation icons off the wallpaper stay light behind dark marks.
+ * The fixed roles, the clear background and the tint stay the night's.
+ */
+val LauncherDayColors = LauncherColors.copy(
+    primary = lerp(Sky, Star, 0.3f),
+    onPrimary = Starlight,
+    primaryContainer = lerp(Frost, Star, 0.5f),
+    onPrimaryContainer = Sky,
+    inversePrimary = Star,
+    secondary = lerp(Sky, Starlight, 0.3f),
+    onSecondary = Starlight,
+    secondaryContainer = lerp(Frost, Star, 0.35f),
+    onSecondaryContainer = Sky,
+    tertiary = DayGold,
+    onTertiary = Starlight,
+    tertiaryContainer = lerp(Frost, Gold, 0.5f),
+    onTertiaryContainer = Sky,
+    onBackground = Sky,
+    surface = DayGlass,
+    onSurface = Sky,
+    surfaceVariant = DayGlass,
+    onSurfaceVariant = lerp(Sky, Starlight, 0.25f),
+    inverseSurface = Sky,
+    inverseOnSurface = Starlight,
+    error = lerp(Ember, Sky, 0.5f),
+    onError = Starlight,
+    errorContainer = lerp(Frost, Ember, 0.4f),
+    onErrorContainer = Sky,
+    outline = lerp(Sky, Starlight, 0.5f),
+    outlineVariant = Sky.copy(alpha = 0.16f),
+    scrim = Frost,
+    surfaceBright = Frost,
+    // Dense enough that text on the drawer still reads over a dark patch of the wallpaper.
+    surfaceDim = Starlight.copy(alpha = 0.92f),
+    surfaceContainerLowest = Starlight.copy(alpha = 0.6f),
+    surfaceContainerLow = lerp(Frost, Starlight, 0.4f),
+    surfaceContainer = lerp(Frost, Starlight, 0.6f),
+    surfaceContainerHigh = lerp(Frost, Starlight, 0.8f),
+    surfaceContainerHighest = Starlight,
+)
+
 @Composable
-fun LauncherTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = LauncherColors) {
+fun LauncherTheme(lightWallpaper: Boolean = false, content: @Composable () -> Unit) {
+    val (colors, ring) = if (lightWallpaper) LauncherDayColors to DayRing else LauncherColors to NightRing
+    MaterialTheme(colorScheme = colors) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
-            LocalContentColor provides LauncherColors.onBackground,
+            LocalContentColor provides colors.onBackground,
+            LocalRingColors provides ring,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
             content = content,

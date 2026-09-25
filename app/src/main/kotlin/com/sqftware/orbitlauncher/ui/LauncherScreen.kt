@@ -91,7 +91,7 @@ object LauncherTags {
 
 private val DRAWER_PEEK = 48.dp
 
-/** How far above the drawer's strip the shade along the bottom edge starts to darken the wallpaper. */
+/** How far above the drawer's strip the shade along the bottom edge starts. */
 private val BOTTOM_SHADE_FADE = 32.dp
 
 /** A HOME press. [launcherInFront] is false when the press brought the launcher back from another app. */
@@ -701,8 +701,8 @@ fun LauncherScreen(
     val panel = MaterialTheme.colorScheme.surfaceDim
     val scrim = MaterialTheme.colorScheme.scrim
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
-    // edge lines up with nothing of ours. It is only there to lift the light navigation icons off a bright wallpaper, so
-    // it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
+    // edge lines up with nothing of ours. It is in the scrim, the opposite of the navigation icons' ink, only to lift them
+    // off the wallpaper, so it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
     // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it.
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(

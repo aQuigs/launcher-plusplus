@@ -82,8 +82,8 @@ object AppDrawerTags {
 }
 
 /**
- * The chevron that peeks above the pages, pointing the way the drawer will move, on a soft shadow so it reads on a bright
- * wallpaper too. A tap calls [onClick].
+ * The chevron that peeks above the pages, pointing the way the drawer will move, on a soft halo in the scrim so it reads on
+ * any wallpaper. A tap calls [onClick].
  */
 @Composable
 fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {

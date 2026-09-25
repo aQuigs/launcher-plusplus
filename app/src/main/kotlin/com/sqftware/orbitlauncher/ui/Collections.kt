@@ -107,7 +107,7 @@ import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
-import com.sqftware.orbitlauncher.ui.theme.LauncherColors
+import com.sqftware.orbitlauncher.ui.theme.GlyphFill
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
@@ -691,7 +691,7 @@ private val AppCategory.glyph: ImageVector
 
 // Material glyphs the core icon set leaves out, from their published path data.
 internal fun materialGlyph(name: String, pathData: String): ImageVector =
-    materialIcon(name) { addPath(addPathNodes(pathData), fill = SolidColor(LauncherColors.onSurface)) }
+    materialIcon(name) { addPath(addPathNodes(pathData), fill = SolidColor(GlyphFill)) }
 
 private val DragHandleGlyph = materialGlyph("DragHandle", "M20 9H4v2h16V9zM4 15h16v-2H4v2z")
 private val BarChartGlyph = materialGlyph("BarChart", "M4 9h4v11H4zM10 4h4v16h-4zM16 13h4v7h-4z")

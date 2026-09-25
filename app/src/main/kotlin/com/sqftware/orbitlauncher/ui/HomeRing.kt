@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -61,9 +62,10 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
-import com.sqftware.orbitlauncher.ui.theme.RingMark
+import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
+import com.sqftware.orbitlauncher.ui.theme.RingInk
+import com.sqftware.orbitlauncher.ui.theme.RingShade
 import com.sqftware.orbitlauncher.ui.theme.RingSpark
-import com.sqftware.orbitlauncher.ui.theme.RingStarLine
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -80,9 +82,6 @@ internal val RING_ICON_SIZE = 64.dp
 
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
-
-/** The emblem's hint: the mark at its most present. */
-private val Ink = RingMark.copy(alpha = 0.9f)
 
 /** The launcher icon's sky, 108 wide, at 2.475 times the emblem's radius, which puts its dust between spark and edge. */
 private const val EMBLEM_ART_PER_RADIUS = 2.475f
@@ -133,6 +132,7 @@ fun HomeRing(
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
+    val marks = LocalRingColors.current
     // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
     val turning = inSight && !showHint && openFolder == null
     val spark = turnAngle(turning, SPARK_TURN_MILLIS)
@@ -161,7 +161,7 @@ fun HomeRing(
                 key(item.tag) {
                     // The held app is laid out apart, unseen, and is no position to drop on.
                     val slot = if (index < slots) {
-                        Modifier.testTag(item.tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
+                        Modifier.testTag(item.tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget, marks.lit)
                     } else {
                         Modifier.alpha(0f)
                     }
@@ -191,12 +191,12 @@ fun HomeRing(
                 // An icon's disc can be glass the wallpaper shows through, a folder's always is, so the lines stop at its edge.
                 val discs = Path().apply { stars.forEach { addOval(Rect(it, iconSize / 2)) } }
                 onDrawBehind {
-                    if (glow > 0f) drawCircle(RingMark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
+                    if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     clipPath(discs, ClipOp.Difference) {
                         if (slots >= MIN_CONSTELLATION) {
-                            drawPath(constellation, RingStarLine.copy(alpha = RingStarLine.alpha + 0.3f * glow), style = lines)
+                            drawPath(constellation, marks.starLine.copy(alpha = marks.starLine.alpha + 0.3f * glow), style = lines)
                         } else {
-                            drawCircle(RingMark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
+                            drawCircle(marks.mark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
                         }
                     }
                 }
@@ -234,13 +234,14 @@ fun HomeRing(
 @Composable
 private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
+    val edgeMark = LocalRingColors.current.mark
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(CircleShape)
             .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
-            .drawBehind { drawCircle(RingMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
+            .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (!showHint) contentDescription = "Favourites" },
     ) {
@@ -273,8 +274,8 @@ private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> F
             Text(
                 text = "Add apps",
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
-                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(MaterialTheme.colorScheme.scrim, blurRadius = 6f)),
-                color = Ink,
+                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(RingShade, blurRadius = 6f)),
+                color = RingInk,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -323,8 +324,8 @@ private val RingItem.tag: String
         is RingItem.Folder -> HomeRingTags.folder(index)
     }
 
-/** An item lit as the one an app let go now would fold into: a little larger, ringed with the spark's colour. */
-private fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {
+/** An item lit as the one an app let go now would fold into: a little larger, ringed in [colour]. */
+private fun Modifier.foldTarget(lit: Boolean, colour: Color): Modifier = if (!lit) {
     this
 } else {
     this
@@ -333,7 +334,7 @@ private fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {
             scaleX = FOLD_TARGET_SCALE
             scaleY = FOLD_TARGET_SCALE
         }
-        .drawBehind { drawCircle(RingSpark, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
+        .drawBehind { drawCircle(colour, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
 }
 
 private const val FOLD_TARGET_SCALE = 1.12f
