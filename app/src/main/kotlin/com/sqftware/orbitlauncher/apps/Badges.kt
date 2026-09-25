@@ -21,16 +21,23 @@ interface Badges {
     /** The unread counts now and as they change, empty while not [isEnabled]. Collect while the launcher is visible. */
     fun counts(): Flow<UnreadCounts>
 
+    /** Clears the counts kept for [packageName]'s dismissed notifications, now that the user is opening it. */
+    fun opened(packageName: String)
+
     /** Opens the system screen where the user grants or revokes the launcher's notification access. */
     fun openSettings()
 }
 
 private const val TAG = "NotificationBadges"
 
-/** Badges fed by [UnreadListener], which the system runs once the user allows it notification access. */
+/**
+ * Badges fed by [UnreadListener], which the system runs once the user allows it notification access, with the counts it
+ * kept for the notifications the user dismissed unread.
+ */
 class NotificationBadges(private val context: Context) : Badges {
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
     private val listener = ComponentName(context, UnreadListener::class.java)
+    private val kept = KeptUnread(context)
 
     override fun isEnabled(): Boolean = notificationManager.isNotificationListenerAccessGranted(listener)
 
@@ -39,7 +46,9 @@ class NotificationBadges(private val context: Context) : Badges {
     // Gated on the same read as [enabled], so a value the listener published before losing its access never shows, and
     // the badges and the menu's switch agree on each return to the front.
     override fun counts(): Flow<UnreadCounts> =
-        enabled().combine(UnreadListener.counts) { on, counts -> if (on) counts else UnreadCounts() }
+        combine(enabled(), UnreadListener.counts, kept.counts()) { on, live, dismissed -> if (on) live + dismissed else UnreadCounts() }
+
+    override fun opened(packageName: String) = kept.update { it.opened(packageName) }
 
     override fun openSettings() = startOrLog(TAG, "the notification access settings") {
         val forThisListener = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)

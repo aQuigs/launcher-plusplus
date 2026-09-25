@@ -64,6 +64,55 @@ class UnreadTest {
     }
 
     @Test
+    fun `a dismissed notification is kept, a tapped one clears its app and a withdrawn one changes nothing`() {
+        val kept = Kept().afterRemoval("m1", posted(mail), Removal.Dismissed).afterRemoval("c1", posted(chat), Removal.Dismissed)
+        assertEquals(UnreadCounts(mapOf(mail.packageName to 1, chat.packageName to 1)), kept.counts)
+
+        val more = kept.afterRemoval("m2", posted(mail, number = 5), Removal.Dismissed)
+        assertEquals(UnreadCounts(mapOf(mail.packageName to 6, chat.packageName to 1)), more.counts)
+        assertEquals(UnreadCounts(mapOf(chat.packageName to 1)), more.afterRemoval("m3", posted(mail), Removal.Opened).counts)
+        assertEquals(more, more.afterRemoval("m3", posted(mail), Removal.Withdrawn))
+    }
+
+    @Test
+    fun `a dismissed group summary or ongoing notification is not kept`() {
+        assertEquals(Kept(), Kept().afterRemoval("s", posted(chat, summary = true), Removal.Dismissed))
+        assertEquals(Kept(), Kept().afterRemoval("o", posted(chat, ongoing = true), Removal.Dismissed))
+    }
+
+    @Test
+    fun `a notification posted again replaces its kept count, and an opened app drops out`() {
+        val kept = Kept().afterRemoval("m", posted(mail, number = 3), Removal.Dismissed).afterRemoval("c", posted(chat), Removal.Dismissed)
+
+        assertEquals(UnreadCounts(mapOf(chat.packageName to 1)), kept.posted("m").counts)
+        assertEquals(UnreadCounts(mapOf(mail.packageName to 3)), kept.opened(chat.packageName).counts)
+        assertEquals(UnreadCounts(mapOf(mail.packageName to 4, chat.packageName to 1)), UnreadCounts(mapOf(mail.packageName to 1)) + kept.counts)
+    }
+
+    @Test
+    fun `a group's members count as dismissed only after the user dismissed its summary`() {
+        val removals = Removals()
+
+        assertEquals(Removal.Withdrawn, removals.removed("g", isGroupSummary = false, RemovalCause.SummaryRemoved))
+        assertEquals(Removal.Dismissed, removals.removed("g", isGroupSummary = true, RemovalCause.UserDismissed))
+        assertEquals(Removal.Dismissed, removals.removed("g", isGroupSummary = false, RemovalCause.SummaryRemoved))
+        assertEquals(Removal.Withdrawn, removals.removed("other", isGroupSummary = false, RemovalCause.SummaryRemoved))
+
+        removals.posted("g")
+        assertEquals(Removal.Withdrawn, removals.removed("g", isGroupSummary = false, RemovalCause.SummaryRemoved))
+    }
+
+    @Test
+    fun `a tap opens, a swipe of a lone notification dismisses, and anything else withdraws`() {
+        val removals = Removals()
+
+        assertEquals(Removal.Opened, removals.removed("g", isGroupSummary = false, RemovalCause.Tapped))
+        assertEquals(Removal.Dismissed, removals.removed("g", isGroupSummary = false, RemovalCause.UserDismissed))
+        assertEquals(Removal.Withdrawn, removals.removed("g", isGroupSummary = false, RemovalCause.Other))
+        assertEquals(Removal.Withdrawn, removals.removed("g", isGroupSummary = false, RemovalCause.SummaryRemoved))
+    }
+
+    @Test
     fun `a badge shows the count up to two digits`() {
         assertEquals("1", badgeText(1))
         assertEquals("99", badgeText(99))
