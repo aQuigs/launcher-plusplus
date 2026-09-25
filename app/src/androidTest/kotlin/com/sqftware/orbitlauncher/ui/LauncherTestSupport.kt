@@ -31,6 +31,7 @@ import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 
@@ -96,6 +97,10 @@ fun SemanticsNodeInteractionsProvider.dockSlot(app: AppEntry) = onNodeWithTag(Do
 fun SemanticsNodeInteractionsProvider.appOptionsMenu() = onNodeWithTag(AppOptionsTags.MENU)
 
 fun SemanticsNodeInteractionsProvider.dragGhost() = onNodeWithTag(DragTags.GHOST)
+
+fun SemanticsNodeInteractionsProvider.reorderSwitch() = onNodeWithTag(ReorderTags.SWITCH)
+
+fun SemanticsNodeInteractionsProvider.reorderModeButton(mode: ReorderMode) = onNodeWithTag(ReorderTags.mode(mode))
 
 fun SemanticsNodeInteractionsProvider.homeAppCard() = onNodeWithTag(HomeAppCardTags.CARD)
 

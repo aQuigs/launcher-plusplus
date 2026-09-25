@@ -43,7 +43,7 @@ fun AppIcon(
     Box(
         modifier
             .launchable(app, onLaunch, menu, presses)
-            .appDrag(app, drag)
+            .itemDrag(app, drag)
             .semantics { contentDescription = app.label.withUnread(unread) },
     ) {
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }

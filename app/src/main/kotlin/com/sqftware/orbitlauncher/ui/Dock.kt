@@ -31,7 +31,9 @@ private val FULL_DOCK_ICON_SIZE = 56.dp
 /**
  * The user's dock [apps] in one row of equal slots, together in the middle of the width. The row is as tall as a
  * full-size icon, so a crowded dock shrinks its icons but not the row, and an empty dock still holds its place. While
- * [highlighted], the row glows as the place an app being dragged would land. Each app wears its [unread] count.
+ * [highlighted], the row glows as the place an app being dragged would land. Each app wears its [unread] count. With
+ * [rearrange], a long press that moves on picks an app up to move it along the row; while one is on the move, the row
+ * shows where everything would be if it were dropped.
  */
 @Composable
 fun Dock(
@@ -42,13 +44,20 @@ fun Dock(
     highlighted: Boolean = false,
     menu: AppMenu? = null,
     unread: UnreadCounts = UnreadCounts(),
+    rearrange: Rearrange? = null,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
 
     Layout(
         content = {
-            apps.forEach { app -> key(app.key) { AppIcon(app, icon, onLaunch, Modifier.testTag(DockTags.slot(app)), menu, unread[app]) } }
+            val moving = rearrange?.moving
+            moving.shown(apps).forEachIndexed { index, app ->
+                key(app.key) {
+                    val slot = Modifier.testTag(DockTags.slot(app)).reorderSlot(rearrange, index, moving?.at == index)
+                    AppIcon(app, icon, onLaunch, slot, menu, unread[app], rearrange?.drag(index))
+                }
+            }
         },
         modifier = modifier
             .fillMaxWidth()

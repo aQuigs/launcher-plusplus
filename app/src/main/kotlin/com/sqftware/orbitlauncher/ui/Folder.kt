@@ -72,8 +72,8 @@ private const val PREVIEW_FRACTION = 0.45f
 
 /**
  * A ring slot holding [folder]: a circle, the size of an app's, filled with previews of up to four of its icons and
- * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, and a long
- * press opens its [menu].
+ * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, a long
+ * press opens its [menu], and a long press that goes on becomes a [drag].
  */
 @Composable
 fun FolderIcon(
@@ -83,6 +83,7 @@ fun FolderIcon(
     modifier: Modifier = Modifier,
     menu: FolderMenu? = null,
     unread: Int = 0,
+    drag: ItemDrag<RingItem.Folder>? = null,
 ) {
     val count = folder.apps.size
     val presses = remember { MutableInteractionSource() }
@@ -97,23 +98,30 @@ fun FolderIcon(
                 onLongClick = menu?.let { m -> { m.onOpen(folder) } },
                 onClick = { if (count > 0) onOpen(folder) },
             )
+            .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        IconDisc(presses, Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // Rows of two, spaced out in the middle: one preview alone, two side by side, three as a triangle, four as a
-            // grid. Spaced by shares of the square rather than fixed gaps, so a shrunken ring's small discs fit them too.
-            FlowRow(
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalArrangement = Arrangement.SpaceAround,
-                maxItemsInEachRow = PREVIEWS_PER_ROW,
-                modifier = Modifier.fillMaxSize(PREVIEWS_FRACTION),
-            ) {
-                // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
-                folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
-            }
-        }
+        IconDisc(presses, Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { FolderPreviews(folder, icon) }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+    }
+}
+
+/**
+ * Up to four of [folder]'s icons in rows of two, spaced out in the middle: one alone, two side by side, three as a
+ * triangle, four as a grid. Spaced by shares of the square rather than fixed gaps, so a shrunken ring's small discs fit
+ * them too.
+ */
+@Composable
+fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBitmap?) {
+    FlowRow(
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalArrangement = Arrangement.SpaceAround,
+        maxItemsInEachRow = PREVIEWS_PER_ROW,
+        modifier = Modifier.fillMaxSize(PREVIEWS_FRACTION),
+    ) {
+        // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
+        folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
     }
 }
 

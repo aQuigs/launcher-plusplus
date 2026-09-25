@@ -84,6 +84,8 @@ private const val MIN_CONSTELLATION = 4
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
  * land. An [openFolder] takes the ring over: its apps sit in the slots, each with the [folderAppMenu], and the emblem
  * gives way to a target that calls [onCloseFolder]. Each app wears its [unread] count, and a folder the sum of its apps'.
+ * With [rearrange], a long press that moves on picks up what is in a slot to move it round the ring, or round the open
+ * folder; while one is on the move, the slots show where everything would be if it were dropped.
  */
 @Composable
 fun HomeRing(
@@ -101,6 +103,7 @@ fun HomeRing(
     folderMenu: FolderMenu? = null,
     folderAppMenu: AppMenu? = null,
     unread: UnreadCounts = UnreadCounts(),
+    rearrange: Rearrange? = null,
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
@@ -109,25 +112,34 @@ fun HomeRing(
 
     Layout(
         content = {
+            val moving = rearrange?.moving
             if (openFolder != null) {
                 CloseFolderTarget(onClick = onCloseFolder)
-                openFolder.apps.forEach { app ->
+                moving.shown(openFolder.apps).forEachIndexed { index, app ->
                     key(app.key) {
-                        val tag = Modifier.testTag(HomeRingTags.slot(app))
-                        AppIcon(app, icon, onLaunch, tag, folderAppMenu, unread[app])
+                        val slot = Modifier.testTag(HomeRingTags.slot(app)).reorderSlot(rearrange, index, moving?.at == index)
+                        AppIcon(app, icon, onLaunch, slot, folderAppMenu, unread[app], rearrange?.drag(index))
                     }
                 }
             } else {
                 Emblem(showHint = showHint, onClick = onEdit)
-                ring.forEach { item ->
-                    when (item) {
-                        is RingItem.App -> key(item.app.key) {
-                            val tag = Modifier.testTag(HomeRingTags.slot(item.app))
-                            AppIcon(item.app, icon, onLaunch, tag, menu, unread[item.app])
-                        }
-                        is RingItem.Folder -> key(item.index) {
-                            val tag = Modifier.testTag(HomeRingTags.folder(item.index))
-                            FolderIcon(item, icon, onOpenFolder, tag, folderMenu, unread.sum(item.apps))
+                // Keyed outside the branches, so an item moving round while it is dragged keeps its node and the gesture.
+                moving.shown(ring).forEachIndexed { index, item ->
+                    val itemKey: Any = when (item) {
+                        is RingItem.App -> item.app.key
+                        is RingItem.Folder -> item.index
+                    }
+                    key(itemKey) {
+                        val drag = rearrange?.drag(index)
+                        when (item) {
+                            is RingItem.App -> {
+                                val slot = Modifier.testTag(HomeRingTags.slot(item.app)).reorderSlot(rearrange, index, moving?.at == index)
+                                AppIcon(item.app, icon, onLaunch, slot, menu, unread[item.app], drag)
+                            }
+                            is RingItem.Folder -> {
+                                val slot = Modifier.testTag(HomeRingTags.folder(item.index)).reorderSlot(rearrange, index, moving?.at == index)
+                                FolderIcon(item, icon, onOpenFolder, slot, folderMenu, unread.sum(item.apps), drag)
+                            }
                         }
                     }
                 }

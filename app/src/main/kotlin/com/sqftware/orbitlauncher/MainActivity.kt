@@ -23,6 +23,7 @@ import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
 import com.sqftware.orbitlauncher.apps.SystemAppUsage
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
+        val reorderModeStore = SharedPreferencesReorderModeStore(this)
         val ringer = SystemRinger(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
@@ -101,6 +103,7 @@ class MainActivity : ComponentActivity() {
                 // file holds a few keys.
                 var homeApps by remember { mutableStateOf(homeAppsStore.load()) }
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
+                var reorderMode by remember { mutableStateOf(reorderModeStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
                 val clock by produceState(remember { wallClock.face(twentyFourHour) }, twentyFourHour) {
@@ -152,6 +155,11 @@ class MainActivity : ComponentActivity() {
                         homeAppsStore.save(it)
                     },
                     actions = actions,
+                    reorderMode = reorderMode,
+                    onReorderModeChange = {
+                        reorderMode = it
+                        reorderModeStore.save(it)
+                    },
                     clock = clock,
                     onTwentyFourHourChange = {
                         twentyFourHour = it

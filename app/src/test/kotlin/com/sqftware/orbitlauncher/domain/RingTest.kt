@@ -21,6 +21,23 @@ class RingTest {
         assertEquals(ringOf(clock), ringOf(clock).newFolder(mail))
     }
 
+    // The ring shows three items, but the moves are among the four stored slots.
+    @Test
+    fun `a move lands among the stored slots, past the one kept for a missing app`() {
+        val gone = app("Gone")
+        val ring = Ring(listOf(RingSlot.App(clock.key), RingSlot.App(gone.key), folder(mail, maps), RingSlot.App(music.key)))
+        val (shownClock, shownFolder, shownMusic) = ring.resolve(all)
+
+        assertEquals(
+            Ring(listOf(RingSlot.App(gone.key), folder(mail, maps), RingSlot.App(clock.key), RingSlot.App(music.key))),
+            ring.move(shownClock, shownFolder, ReorderMode.Insert),
+        )
+        assertEquals(
+            Ring(listOf(RingSlot.App(clock.key), RingSlot.App(gone.key), RingSlot.App(music.key), folder(mail, maps))),
+            ring.move(shownMusic, shownFolder, ReorderMode.Swap),
+        )
+    }
+
     @Test
     fun `adding puts an app in a slot of its own at the end, once`() {
         val ring = ringOf(clock).add(mail)

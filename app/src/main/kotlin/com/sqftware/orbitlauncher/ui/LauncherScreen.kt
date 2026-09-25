@@ -67,12 +67,14 @@ import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.appOptions
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -107,7 +109,12 @@ data class HomePress(val launcherInFront: Boolean)
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
  * pencil opens an editor over the screen that adds apps to it, and the button under the cards opens the picker that adds
  * and removes cards, whose last tile opens a dialog naming a new custom collection. An app long-pressed on a hand-picked
- * card lifts off it, and dropping it on the bin takes it off the card. Apps everywhere wear their [unread] counts; a long
+ * card lifts off it, and dropping it on the bin takes it off the card. A long press that moves on picks up an app or a
+ * folder on the ring, an app in the open folder or the dock, or, at once, an app on a hand-picked card, to move it among
+ * its neighbours: they make way as the finger goes, and letting go over another's place puts it there, inserting it or
+ * swapping the two as [reorderMode] says, which a switch at the top flips ([onReorderModeChange]) while an item is on
+ * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
+ * as it was. Apps everywhere wear their [unread] counts; a long
  * press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -130,6 +137,8 @@ fun LauncherScreen(
     homeApps: HomeApps,
     onHomeAppsChange: (HomeApps) -> Unit,
     actions: AppActions,
+    reorderMode: ReorderMode,
+    onReorderModeChange: (ReorderMode) -> Unit,
     clock: ClockFace,
     onTwentyFourHourChange: (Boolean) -> Unit,
     onOpenClock: () -> Unit,
@@ -163,6 +172,10 @@ fun LauncherScreen(
     val ring = remember(homeApps.ring, onHome) { homeApps.ring.resolve(onHome.orEmpty()) }
     val dock = remember(homeApps.dock, onHome) { homeApps.dock.resolve(onHome.orEmpty()) }
     val latestHomeApps by rememberUpdatedState(homeApps)
+    val latestApps by rememberUpdatedState(apps)
+    val latestRing by rememberUpdatedState(ring)
+    val latestDock by rememberUpdatedState(dock)
+    val latestReorderMode by rememberUpdatedState(reorderMode)
     val latestOnHomeAppsChange by rememberUpdatedState(onHomeAppsChange)
     val latestCollections by rememberUpdatedState(collections)
     val latestOnCollectionsChange by rememberUpdatedState(onCollectionsChange)
@@ -186,11 +199,12 @@ fun LauncherScreen(
     // Explicit receiver: the resolved ring above shadows the stored one inside the lambda.
     fun changeRing(change: Ring.() -> Ring) = changeHomeApps { copy(ring = this.ring.change()) }
 
-    // An app on its way out of the drawer or off a collection card, the finger holding it and where it could land, in
-    // root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are derived, so the
-    // ring, the dock and the bin recompose when the finger changes zone, not whenever it moves. The ring and the dock are
-    // measured on the home page and judged where it settles, at the pager's origin: a drag from another page goes home
-    // under the finger, and a drop must not miss because the page has not arrived yet.
+    // An app on its way out of the drawer, or an item on the move within its place, the finger holding it and where it
+    // could land, in root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are
+    // derived, so the ring, the dock, the cards and the bin recompose when the finger changes zone or position, not
+    // whenever it moves. The ring and the dock are measured on the home page and judged where it settles, at the pager's
+    // origin: a drag from another page goes home under the finger, and a drop must not miss because the page has not
+    // arrived yet.
     var dragged by remember { mutableStateOf<Drag?>(null) }
     var finger by remember { mutableStateOf(Offset.Zero) }
     var homePage by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -203,7 +217,31 @@ fun LauncherScreen(
 
     fun Modifier.dropZone(place: DropZones.(Bounds) -> DropZones) =
         onGloballyPositioned { target -> homePage?.let { zones = zones.place(target.boundsIn(it)) } }
-    val overBin by remember { derivedStateOf { dragged is Drag.FromCard && binBounds?.discContains(finger.x, finger.y) == true } }
+    val binShown by remember { derivedStateOf { (dragged as? Drag.Within)?.remove != null } }
+    val overBin by remember { derivedStateOf { binShown && binBounds?.discContains(finger.x, finger.y) == true } }
+    // The halves of the reorder switch, and the one the item on the move is over: a rest there flips the mode. The
+    // switch overlaps what is under it, the first card's apps among them, so while the item is over it nothing moves.
+    var switchHalves by remember { mutableStateOf(emptyMap<ReorderMode, Bounds>()) }
+    val overSwitch by remember {
+        derivedStateOf {
+            if (dragged is Drag.Within) switchHalves.entries.find { it.value.contains(finger.x, finger.y) }?.key else null
+        }
+    }
+    val latestOnReorderModeChange by rememberUpdatedState(onReorderModeChange)
+    LaunchedEffect(overSwitch) {
+        val mode = overSwitch ?: return@LaunchedEffect
+        if (mode != latestReorderMode) {
+            delay(SWITCH_HOVER_MILLIS)
+            latestOnReorderModeChange(mode)
+        }
+    }
+    val reorderTarget by remember {
+        derivedStateOf { (dragged as? Drag.Within)?.takeUnless { overBin || overSwitch != null }?.place?.at(finger) }
+    }
+    // A place's positions hold only while it lists what it did at the press: an app updating or going mid-drag would
+    // shift them under the finger, so that ends the drag.
+    val placeChanged by remember { derivedStateOf { (dragged as? Drag.Within)?.current?.invoke() == false } }
+    LaunchedEffect(placeChanged) { if (placeChanged) dragged = null }
 
     // Picking and searching are modes of the drawer, so they end however the drawer closes: chevron, drag, Back or HOME.
     // They wait for the drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up
@@ -345,19 +383,29 @@ fun LauncherScreen(
         )
     }
 
+    // One drag at a time: a second finger reaching for the reorder switch may long-press another item on its way.
+    fun beginDrag(drag: Drag, position: Offset): Boolean {
+        if (dragged != null) return false
+        closeMenu()
+        dragged = drag
+        finger = position
+        return true
+    }
+
     val dragFromDrawer = remember {
         AppDrag(
             onStart = { app, position ->
-                closeMenu()
-                dragged = Drag.FromDrawer(app)
-                finger = position
-                // The targets are on the home page, wherever the drawer was opened from.
-                closeDrawer()
-                goHome()
+                beginDrag(Drag.FromDrawer(app), position).also { started ->
+                    // The targets are on the home page, wherever the drawer was opened from.
+                    if (started) {
+                        closeDrawer()
+                        goHome()
+                    }
+                }
             },
             onMove = { finger = it },
             onDrop = {
-                val app = dragged?.app
+                val app = (dragged as? Drag.FromDrawer)?.app
                 val place = dropPlace
                 if (app != null && place != null) changeHomeApps { add(place, app) }
                 dragged = null
@@ -366,23 +414,88 @@ fun LauncherScreen(
         )
     }
 
-    val cardLift = remember {
-        CardLift(
-            onStart = { kind, app, position ->
-                closeMenu()
-                // The lift is the answer to the long press, as the menu is elsewhere, so it gets the same nudge.
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                dragged = Drag.FromCard(app, kind)
-                finger = position
+    /**
+     * Moving what [items] lists at the press among itself: [move] puts one where another is, as the mode says, and a place
+     * with a bin [remove]s one dropped there. [look] is how an item shows under the finger, with its [label] if given.
+     */
+    fun <T> rearrange(
+        items: () -> List<T>,
+        look: (T) -> RingItem,
+        move: (T, T, ReorderMode) -> Unit,
+        remove: ((T) -> Unit)? = null,
+        label: ((T) -> String)? = null,
+        startOnPress: Boolean = false,
+    ): Rearrange = Rearrange(
+            onStart = { index, position ->
+                val listed = items()
+                val item = listed.getOrNull(index)
+                val within = item?.let {
+                    Drag.Within(
+                        place = this,
+                        from = index,
+                        item = look(it),
+                        label = label?.invoke(it),
+                        move = { to, mode -> move(it, listed[to], mode) },
+                        remove = remove?.let { r -> { r(it) } },
+                        current = { items() == listed },
+                    )
+                }
+                val started = within != null && beginDrag(within, position)
+                // Lifted at the press, the lift is the answer to the long press, as the menu is elsewhere, so it gets the
+                // same nudge.
+                if (started && startOnPress) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                started
             },
             onMove = { finger = it },
             onDrop = {
-                val lifted = dragged as? Drag.FromCard
-                if (lifted != null && overBin) changeCollections { removeApp(lifted.kind, lifted.app) }
+                (dragged as? Drag.Within)?.let { within ->
+                    when {
+                        overBin -> within.remove?.invoke()
+                        !placeChanged -> reorderTarget?.let { within.move(it, latestReorderMode) }
+                    }
+                }
                 dragged = null
             },
             onCancel = { dragged = null },
+            startOnPress = startOnPress,
+            movingIn = { place ->
+                (dragged as? Drag.Within)?.takeIf { it.place === place }?.let { Moving(it.from, reorderTarget, latestReorderMode) }
+            },
         )
+
+    val ringRearrange = remember {
+        rearrange(items = { latestRing }, look = { it }, move = { item, target, mode ->
+            changeRing { move(item, target, mode) }
+        })
+    }
+    val dockRearrange = remember {
+        rearrange(items = { latestDock }, look = RingItem::App, move = { app, target, mode ->
+            changeHomeApps { move(HomePlace.Dock, app, target, mode) }
+        })
+    }
+    val latestOpen by rememberUpdatedState(open)
+    val folderRearrange = remember(open?.index) {
+        open?.let { folder ->
+            rearrange(items = { latestOpen?.apps.orEmpty() }, look = RingItem::App, move = { app, target, mode ->
+                changeHomeApps { move(HomePlace.Folder(folder.index), app, target, mode) }
+            })
+        }
+    }
+    val cardRearrange = remember {
+        val byKind = mutableMapOf<CollectionKind.HandPicked, Rearrange>()
+        val rearrangeFor: (CollectionKind.HandPicked) -> Rearrange = { kind ->
+            byKind.getOrPut(kind) {
+                rearrange(
+                    items = { latestCollections.card(kind)?.apps?.resolve(latestApps.orEmpty()).orEmpty() },
+                    look = RingItem::App,
+                    move = { app, target, mode -> changeCollections { moveApp(kind, app, target, mode) } },
+                    remove = { app -> changeCollections { removeApp(kind, app) } },
+                    label = AppEntry::label,
+                    startOnPress = true,
+                )
+            }
+        }
+        rearrangeFor
     }
 
     val launcherMenu = remember {
@@ -599,6 +712,7 @@ fun LauncherScreen(
                                         folderMenu = folderMenu,
                                         folderAppMenu = folderAppMenu,
                                         unread = unread,
+                                        rearrange = if (open != null) folderRearrange else ringRearrange,
                                     )
                                     // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                     // the ring, which sizes itself to the room left, so the two can never overlap.
@@ -624,6 +738,7 @@ fun LauncherScreen(
                                     highlighted = dropPlace == HomePlace.Dock,
                                     menu = dockMenu,
                                     unread = unread,
+                                    rearrange = dockRearrange,
                                 )
                             }
                         }
@@ -642,8 +757,8 @@ fun LauncherScreen(
                                 onEdit = { editing = it.name },
                                 onAdd = { pickingCollection = true },
                                 onOpenUsageSettings = onOpenUsageSettings,
-                                lift = cardLift,
-                                bin = if (dragged is Drag.FromCard) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
+                                rearrange = cardRearrange,
+                                bin = if (binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
                                 unread = unread,
                             )
                         }
@@ -719,21 +834,50 @@ fun LauncherScreen(
                 onDismiss = { confirmingPin = null },
             )
         }
+        // Over the pages, and reachable by a second finger while the first holds the item.
+        if (dragged is Drag.Within) {
+            ReorderModeSwitch(
+                mode = reorderMode,
+                onModeChange = onReorderModeChange,
+                onPlaced = { mode, bounds -> if (switchHalves[mode] != bounds) switchHalves = switchHalves + (mode to bounds) },
+                hovered = overSwitch != null,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+            )
+        }
         dragged?.let { drag ->
-            DragGhost(drag.app, actions.icon, position = { finger - origin }, label = (drag as? Drag.FromCard)?.app?.label)
+            DragGhost(position = { finger - origin }, label = drag.label) {
+                when (val item = drag.item) {
+                    is RingItem.App -> AppImage(item.app, actions.icon, Modifier.fillMaxSize())
+                    is RingItem.Folder -> FolderPreviews(item, actions.icon)
+                }
+            }
         }
     }
 }
 
-/** An app being dragged, and where from. */
+/** What is being dragged, and where from: how it shows under the finger, with its [label] if it has one. */
 private sealed interface Drag {
-    val app: AppEntry
+    val item: RingItem
+    val label: String? get() = null
 
     /** Out of the drawer, to the ring or the dock. */
-    data class FromDrawer(override val app: AppEntry) : Drag
+    data class FromDrawer(val app: AppEntry) : Drag {
+        override val item = RingItem.App(app)
+    }
 
-    /** Off the card of [kind], to the bin. */
-    data class FromCard(override val app: AppEntry, val kind: CollectionKind) : Drag
+    /**
+     * The item at [from] in [place]: to another of its positions, which [move] takes it to, or, for a place with a bin,
+     * onto the bin, which [remove]s it. [current] says whether the place still lists what it did at the press.
+     */
+    class Within(
+        val place: Rearrange,
+        val from: Int,
+        override val item: RingItem,
+        override val label: String?,
+        val move: (to: Int, ReorderMode) -> Unit,
+        val remove: (() -> Unit)?,
+        val current: () -> Boolean,
+    ) : Drag
 }
 
 /** The long-press menu that is showing. It keeps what it shows while [expanded] turns false, so it animates away whole. */

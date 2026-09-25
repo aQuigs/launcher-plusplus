@@ -47,6 +47,16 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
         return if (index < 0) this else replace(index, RingSlot.Folder(listOf(app.key)))
     }
 
+    /**
+     * Moves [item]'s slot to [target]'s as [mode] says, a folder with its apps. The slots are the stored ones, so one kept
+     * for a missing app keeps its place among them; an item without a slot changes nothing.
+     */
+    fun move(item: RingItem, target: RingItem, mode: ReorderMode): Ring = Ring(slots.reordered(slotOf(item), slotOf(target), mode))
+
+    /** Moves [app] to [target]'s place in the folder at [index] as [mode] says; a slot that is not a folder is left alone. */
+    fun move(index: Int, app: AppEntry, target: AppEntry, mode: ReorderMode): Ring =
+        updateFolder(index) { Favourites(it).move(app, target, mode).keys }
+
     /** Drops the slot at [index]; a folder goes with its apps. */
     fun remove(index: Int): Ring = Ring(slots.filterIndexed { i, _ -> i != index })
 
@@ -68,6 +78,11 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     private fun updateFolder(index: Int, change: (List<String>) -> List<String>): Ring {
         val folder = folder(index) ?: return this
         return replace(index, RingSlot.Folder(change(folder.keys)))
+    }
+
+    private fun slotOf(item: RingItem): Int = when (item) {
+        is RingItem.App -> indexOf(item.app)
+        is RingItem.Folder -> item.index
     }
 
     private fun replace(index: Int, slot: RingSlot) = Ring(slots.toMutableList().apply { this[index] = slot })

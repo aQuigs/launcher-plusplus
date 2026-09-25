@@ -279,7 +279,7 @@ private fun AppRow(
     val picked = picking?.isPicked(app) == true
     val action = when {
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
-        picking == null -> Modifier.launchable(app, onLaunch, menu).appDrag(app, drag)
+        picking == null -> Modifier.launchable(app, onLaunch, menu).itemDrag(app, drag)
         picking.mark == PickMark.Check -> {
             Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
         }
