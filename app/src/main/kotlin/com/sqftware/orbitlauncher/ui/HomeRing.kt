@@ -1,6 +1,11 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +33,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -78,11 +84,14 @@ private val Ink = RingMark.copy(alpha = 0.9f)
 private const val EMBLEM_ART_PER_RADIUS = 2.475f
 private const val EMBLEM_SPARK = 0.3f
 
+/** How long the spark takes to turn once: slow enough to read as drift, not a spinner. */
+private const val SPARK_TURN_MILLIS = 60_000
+
 /** Fewer items make a point, a line or a triangle whose edges cut across the emblem, so they keep a circle. */
 private const val MIN_CONSTELLATION = 4
 
 /**
- * The [ring] of favourite apps and folders, joined like the stars of the launcher icon, round a static emblem. Tap an
+ * The [ring] of favourite apps and folders, joined like the stars of the launcher icon, round an emblem. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
  * the emblem to choose the favourites on the ring and in the dock. With [showHint] the emblem invites you to add apps
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
@@ -202,11 +211,14 @@ fun HomeRing(
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark in the middle, or the hint to add apps in its place. Quiet, so the icons stay the eye's first stop.
+ * icon's spark turning slowly in the middle, or the hint to add apps in its place. Quiet, so the icons stay the eye's
+ * first stop.
  */
 @Composable
 private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
+    val turn = rememberInfiniteTransition(label = "spark")
+    val angle by turn.animateFloat(0f, 360f, infiniteRepeatable(tween(SPARK_TURN_MILLIS, easing = LinearEasing)), label = "spark")
 
     Box(
         contentAlignment = Alignment.Center,
@@ -224,7 +236,7 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
                 onDrawBehind {
                     clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
                     drawCircle(RingMark.copy(alpha = 0.35f), radius = outer, style = edge)
-                    if (!showHint) drawPath(spark, RingSpark)
+                    if (!showHint) rotate(angle) { drawPath(spark, RingSpark) }
                 }
             }
             .testTag(HomeRingTags.EMBLEM)
