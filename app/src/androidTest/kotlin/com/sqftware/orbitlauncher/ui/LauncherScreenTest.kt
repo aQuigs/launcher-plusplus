@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import android.view.View
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -9,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
@@ -1661,6 +1664,21 @@ class LauncherScreenTest {
         compose.onNodeWithText("Add to Bills").assertIsDisplayed()
         compose.editorRow("Mail").performClick()
         compose.runOnIdle { assertEquals(Favourites(listOf(mail.key)), collections.card(bills)!!.apps) }
+    }
+
+    @Test
+    fun aPanelFillsTheNavigationBarBelowIt() {
+        // Clear of the system bars, as MainActivity lays it out.
+        show(Modifier.safeDrawingPadding())
+        goToCollections()
+
+        compose.addCollectionButton().performClick()
+
+        val bottom = compose.collectionPicker().fetchSemanticsNode().boundsInRoot.bottom.toInt()
+        val window = compose.onRoot().captureToImage()
+        assertTrue("No navigation bar below the panel", bottom < window.height)
+        val edge = window.toPixelMap(startX = 1, startY = bottom - 1, width = 1, height = window.height - bottom + 1)
+        assertEquals(edge[0, 0], edge[0, edge.height - 1])
     }
 
     @Test

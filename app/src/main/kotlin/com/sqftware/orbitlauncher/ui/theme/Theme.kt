@@ -30,7 +30,7 @@ val RingSpark = Spark
 /**
  * Built with the full constructor, so no role is left on Material's stock greys. The surfaces come in two tiers of the
  * icon's sky. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
- * container) and cards are faint glass, and full-screen panels (the drawer, the collection picker) ask for the veil of
+ * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) ask for the veil of
  * `surfaceDim` by name, so a container on one never stacks a second veil. What floats over other content (menus, dialogs,
  * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit sky, or the icons beneath would
  * show through. Content colours are all opaque, so their contrast does not hang on the wallpaper.
