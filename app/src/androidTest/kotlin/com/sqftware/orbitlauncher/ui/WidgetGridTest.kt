@@ -96,8 +96,8 @@ class WidgetGridTest {
     /** The part of the page that scrolls, above the add button. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
-    // Inside the page's padding.
-    private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp + gap) / (row + gap)).toInt()
+    // Inside the page's padding, less the button's row.
+    private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp + gap) / (row + gap)).toInt() - 1
 
     private fun columnWidth() = (scroller().getUnclippedBoundsInRoot().width - 32.dp - gap * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
 
@@ -112,11 +112,11 @@ class WidgetGridTest {
     // Within a pixel, as the cells are placed on whole pixels.
     private fun assertNear(expected: Dp, actual: Dp) = assertTrue("$actual is not $expected", abs((expected - actual).value) <= 1f)
 
-    // Within its bottom padding and the button's own touch margin.
+    // In the page's bottom row, inside its padding.
     private fun assertAddButtonAtTheBottom() {
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
         val button = compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertTrue("$button is not at the bottom of $screen", screen.bottom - button.bottom < 24.dp)
+        assertTrue("$button is not in the bottom row of $screen", button.top > screen.bottom - 16.dp - row && button.bottom < screen.bottom - 16.dp)
     }
 
     @Test
@@ -256,6 +256,24 @@ class WidgetGridTest {
     }
 
     @Test
+    fun aWidgetDraggedTowardTheButtonStopsInTheRowAboveIt() {
+        page = WidgetPage(listOf(game))
+        show()
+        val pageRows = pageRows()
+        compose.longPressWidget(game)
+
+        compose.widget(game).performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
+        compose.widget(game).performTouchInput {
+            repeat(4) { moveBy(Offset(0f, rowPx() * 5)) }
+            up()
+        }
+
+        compose.runOnIdle { assertEquals(listOf(Triple(game.id, pageRows - game.rows, 0)), moved) }
+        assertTrue("it is above the button", bounds(game).bottom <= compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+    }
+
+    @Test
     fun aWidgetThatIgnoresTouchesIsEditedOnALongPressButNotOnATap() {
         page = WidgetPage(listOf(inert))
         show()
@@ -309,8 +327,7 @@ class WidgetGridTest {
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 50) }
         val tallest = compose.runOnIdle { resized.last().second }
         assertTrue("$tallest rows", tallest > 4)
-        val area = scroller().getUnclippedBoundsInRoot()
-        assertTrue("the widget stops above the button", bounds(top).bottom <= area.bottom - 16.dp)
+        assertTrue("the widget stops above the button", bounds(top).bottom <= compose.addWidgetButton().getUnclippedBoundsInRoot().top)
     }
 
     @Test

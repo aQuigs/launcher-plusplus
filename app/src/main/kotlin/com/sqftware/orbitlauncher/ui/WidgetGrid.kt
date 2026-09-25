@@ -20,7 +20,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -134,17 +133,20 @@ private class HeldWidget {
 
     /**
      * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged, a cell
-     * and its gap being [pitch] across and down.
+     * and its gap being [pitch] across and down. It stays within [pageRows], or the rows the page already reaches down
+     * to, so no drag takes it under the button.
      */
-    fun preview(page: WidgetPage, pitch: Offset): WidgetPage {
+    fun preview(page: WidgetPage, pitch: Offset, pageRows: Int): WidgetPage {
         val widget = page.widgets.find { it.id == id } ?: return page
-        return page.move(widget.id, nearestCells(widget.row, offset.y, pitch.y), nearestCells(widget.column, offset.x, pitch.x))
+        val row = nearestCells(widget.row, offset.y, pitch.y).coerceAtMost(maxOf(pageRows, page.rows) - widget.rows)
+        return page.move(widget.id, row, nearestCells(widget.column, offset.x, pitch.x))
     }
 }
 
 /**
  * The widgets on [page], on a grid of [WIDGET_COLUMNS] columns and rows of [WIDGET_ROW_HEIGHT_DP], each in its own
- * cells, scrolling above a button pinned to the bottom of the page to add another; an empty page says so in the middle.
+ * cells, scrolling under a button to add another, pinned in the page's bottom row, where no widget goes; an empty page
+ * says so in the middle.
  * Cells no widget takes stay empty. A long press on a widget puts it in edit mode, as in Arc: [editing] is its id, and
  * it wears an outline, a bin on the top-right corner that removes it, and, if its provider lets it stretch, a handle on
  * the bottom-right corner that drags its size a whole cell at a time, within what the provider allows, the rows the
@@ -168,16 +170,17 @@ fun WidgetGrid(
     val held = remember { HeldWidget() }
     val pitch = with(density) { Offset((columnWidth + GAP).toPx(), (ROW_HEIGHT + GAP).toPx()) }
     // Only a drag that reaches other cells changes the page shown.
-    val shown by remember(page, pitch) { derivedStateOf(structuralEqualityPolicy()) { held.preview(page, pitch) } }
+    val shown by remember(page, pitch, pageRows) { derivedStateOf(structuralEqualityPolicy()) { held.preview(page, pitch, pageRows) } }
     val latestPage by rememberUpdatedState(page)
     val latestPitch by rememberUpdatedState(pitch)
+    val latestPageRows by rememberUpdatedState(pageRows)
     val latestMove by rememberUpdatedState(actions.move)
     // One for the page's life, so the gesture that drags the edited widget is not started over mid-drag.
     // Only the widget held is let go, so a finger on another one lifting moves nothing.
     val release = remember(held) {
         release@{ id: Int, lifted: Boolean ->
             if (held.id != id) return@release
-            val landing = held.preview(latestPage, latestPitch)
+            val landing = held.preview(latestPage, latestPitch, latestPageRows)
             held.id = null
             if (lifted && landing != latestPage) landing.widgets.find { it.id == id }?.let { latestMove(id, it.row, it.column) }
         }
@@ -185,18 +188,17 @@ fun WidgetGrid(
     // Whatever ends edit mode, Back and HOME included, puts a held widget back.
     LaunchedEffect(editing == null) { if (editing == null) held.id?.let { release(it, false) } }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
+    Box(
+        modifier
             .fillMaxSize()
             .then(if (editing != null) Modifier.pointerInput(onEditingChange) { detectTapGestures { onEditingChange(null) } } else Modifier),
     ) {
         val area = Modifier
-            .weight(1f)
-            .fillMaxWidth()
+            .fillMaxSize()
             .onSizeChanged { size ->
                 with(density) {
-                    pageRows = cellsWithin((size.height.toDp() - PAGE_PADDING * 2).value, ROW_HEIGHT.value).coerceAtLeast(1)
+                    // Less the bottom row, which is the button's.
+                    pageRows = (cellsWithin((size.height.toDp() - PAGE_PADDING * 2).value, ROW_HEIGHT.value) - 1).coerceAtLeast(1)
                     columnWidth = (size.width.toDp() - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
                 }
             }
@@ -210,6 +212,7 @@ fun WidgetGrid(
                 area
                     .verticalPageScroll()
                     .padding(PAGE_PADDING)
+                    .padding(bottom = ROW_HEIGHT + GAP)
                     .fillMaxWidth()
                     // At least the page, so a widget can be dropped anywhere in sight.
                     .height(span(maxOf(shown.rows, pageRows), ROW_HEIGHT)),
@@ -231,15 +234,23 @@ fun WidgetGrid(
                 }
             }
         }
-        FilledTonalButton(
-            onClick = {
-                onEditingChange(null)
-                actions.add(pageRows, columnWidth.value.roundToInt())
-            },
-            modifier = Modifier.padding(bottom = PAGE_PADDING).testTag(WidgetTags.ADD),
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = PAGE_PADDING)
+                .height(ROW_HEIGHT),
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-            Text("Add widget")
+            FilledTonalButton(
+                onClick = {
+                    onEditingChange(null)
+                    actions.add(pageRows, columnWidth.value.roundToInt())
+                },
+                modifier = Modifier.testTag(WidgetTags.ADD),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text("Add widget")
+            }
         }
     }
 }
