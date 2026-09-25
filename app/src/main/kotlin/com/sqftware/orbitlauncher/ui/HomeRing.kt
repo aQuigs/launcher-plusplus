@@ -91,6 +91,9 @@ private const val EMBLEM_SPARK = 0.3f
 /** How long the spark takes to turn once: slow enough to read as drift, not a spinner. */
 private const val SPARK_TURN_MILLIS = 60_000
 
+/** How long the sky takes to turn once: slower than the spark, so the dust seems farther off. */
+private const val SKY_TURN_MILLIS = 180_000
+
 /** Fewer items make a point, a line or a triangle whose edges cut across the emblem, so they keep a circle. */
 private const val MIN_CONSTELLATION = 4
 
@@ -131,7 +134,9 @@ fun HomeRing(
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
     // Here rather than in the emblem, which an open folder removes, so the spark keeps its angle across one.
-    val spark = sparkAngle(turning = inSight && !showHint && openFolder == null)
+    val turning = inSight && !showHint && openFolder == null
+    val spark = turnAngle(turning, SPARK_TURN_MILLIS)
+    val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
     // The one layout both the drawn lines and the icons follow.
     fun Density.layoutOn(side: Float) = ringLayout(RING_ICON_SIZE.toPx(), side, slots, RING_EDGE_MARGIN.toPx())
 
@@ -141,7 +146,7 @@ fun HomeRing(
             if (openFolder != null) {
                 CloseFolderTarget(onClick = onCloseFolder)
             } else {
-                Emblem(showHint = showHint, sparkAngle = { spark.value }, onClick = onEdit)
+                Emblem(showHint = showHint, skyAngle = { skyTurn.value }, sparkAngle = { spark.value }, onClick = onEdit)
             }
             // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
             // gesture moving it, while it moves round and while the folder it is dragged out of closes under the finger.
@@ -223,11 +228,11 @@ fun HomeRing(
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark in the middle, sky and spark turned to [sparkAngle], or the hint to add apps in its place. Quiet, so the icons stay the eye's
- * first stop.
+ * icon's spark in the middle, the sky turned to [skyAngle] and the spark to [sparkAngle], or the hint to add apps in its
+ * place. Quiet, so the icons stay the eye's first stop.
  */
 @Composable
-private fun Emblem(showHint: Boolean, sparkAngle: () -> Float, onClick: () -> Unit) {
+private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
 
     Box(
@@ -239,25 +244,32 @@ private fun Emblem(showHint: Boolean, sparkAngle: () -> Float, onClick: () -> Un
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (!showHint) contentDescription = "Favourites" },
     ) {
-        // A layer of its own, so turning the sky and spark changes a property of that layer and nothing is drawn again.
+        // Sky and spark each on a layer of their own, so turning them changes a property of the layer and nothing is drawn
+        // again.
         Spacer(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { rotationZ = sparkAngle() }
+                .graphicsLayer { rotationZ = skyAngle() }
                 .drawWithCache {
                     val outer = size.emblemRadius
                     val disc = Path().apply { addOval(Rect(size.center, outer)) }
                     val side = outer * EMBLEM_ART_PER_RADIUS
                     val art = Size(side, side)
                     val inset = (size.minDimension - side) / 2
-                    val spark = sparkPath(size.center, outer * EMBLEM_SPARK)
-                    onDrawBehind {
-                        clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
-                        if (!showHint) drawPath(spark, RingSpark)
-                    }
+                    onDrawBehind { clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } } }
                 },
         )
-        if (showHint) {
+        if (!showHint) {
+            Spacer(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { rotationZ = sparkAngle() }
+                    .drawWithCache {
+                        val spark = sparkPath(size.center, size.emblemRadius * EMBLEM_SPARK)
+                        onDrawBehind { drawPath(spark, RingSpark) }
+                    },
+            )
+        } else {
             Text(
                 text = "Add apps",
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
@@ -276,17 +288,17 @@ private fun Emblem(showHint: Boolean, sparkAngle: () -> Float, onClick: () -> Un
 private val Size.emblemRadius get() = minDimension / 2 * 0.96f
 
 /**
- * The spark's angle in degrees: a turn every [SPARK_TURN_MILLIS] while [turning]. Otherwise no animation asks for frames,
- * so a home page nobody sees does not redraw the window, and the spark holds its angle, so it never jumps.
+ * An angle in degrees, a turn every [millis] while [turning]. Otherwise no animation asks for frames, so a home page
+ * nobody sees does not redraw the window, and the angle holds, so what it turns never jumps.
  */
 @Composable
-private fun sparkAngle(turning: Boolean): State<Float> {
+private fun turnAngle(turning: Boolean, millis: Int): State<Float> {
     val rest = remember { mutableFloatStateOf(0f) }
     if (!turning) return rest
 
     val from = rest.floatValue
-    val turn = rememberInfiniteTransition(label = "spark")
-        .animateFloat(from, from + 360f, infiniteRepeatable(tween(SPARK_TURN_MILLIS, easing = LinearEasing)), label = "spark")
+    val turn = rememberInfiniteTransition(label = "turn")
+        .animateFloat(from, from + 360f, infiniteRepeatable(tween(millis, easing = LinearEasing)), label = "turn")
     DisposableEffect(Unit) { onDispose { rest.floatValue = turn.value % 360f } }
     return turn
 }
