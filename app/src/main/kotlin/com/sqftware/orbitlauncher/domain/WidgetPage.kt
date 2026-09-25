@@ -17,6 +17,9 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
     fun remove(id: Int): WidgetPage = WidgetPage(widgets.filter { it.id != id })
 
     fun resize(id: Int, rows: Int): WidgetPage = WidgetPage(widgets.map { if (it.id == id) it.copy(rows = rows) else it })
+
+    /** The page with the widget [id] taken out and put back at [to], the others closing up around it. */
+    fun move(id: Int, to: Int): WidgetPage = WidgetPage(widgets.reordered(widgets.indexOfFirst { it.id == id }, to, ReorderMode.Insert))
 }
 
 /** The height of one row of the widget page, in dp. */

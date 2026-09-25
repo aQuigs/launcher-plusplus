@@ -56,13 +56,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -187,7 +183,7 @@ fun CollectionsColumn(
     val newApps = remember(apps) { newApps(apps) }
     val mostUsed = remember(apps, foregroundTime) { foregroundTime?.let { mostUsed(apps, it) } }
     val gap = with(LocalDensity.current) { CARD_GAP.toPx() }
-    val reorder = remember(gap) { Reorder(gap) }
+    val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }
 
     Box(modifier.fillMaxSize()) {
@@ -228,69 +224,12 @@ fun CollectionsColumn(
     }
 }
 
-/**
- * A card taken by its handle: which, how far the finger has moved it, and where every card rests, so the others can
- * make way. Positions are in the column's own coordinates, which its scroll offset does not touch.
- */
-private class Reorder(private val gap: Float) {
-    var count by mutableIntStateOf(0)
-    var dragging by mutableStateOf<Int?>(null)
-    var offset by mutableFloatStateOf(0f)
-    private val tops = mutableStateMapOf<Int, Float>()
-    private val heights = mutableStateMapOf<Int, Float>()
-
-    /** Where the dragged card would land: past every card whose middle its own middle has crossed. */
-    val target: Int? by derivedStateOf {
-        val from = dragging
-        val top = tops[from]
-        val height = heights[from]
-        if (from == null || top == null || height == null) {
-            null
-        } else {
-            val middle = top + offset + height / 2
-            (0 until count).count { it != from && middleOf(it).let { m -> m != null && m < middle } }
-        }
-    }
-
-    // Only a change is written: a state map tells its readers about every put, and every layout pass places every card.
-    fun place(index: Int, top: Float, height: Float) {
-        if (tops[index] != top) tops[index] = top
-        if (heights[index] != height) heights[index] = height
-    }
-
-    /** How far the card at [index] moves aside, in pixels, to leave the dragged card its place. */
-    fun shift(index: Int): Float {
-        val from = dragging ?: return 0f
-        val to = target ?: return 0f
-        val room = (heights[from] ?: return 0f) + gap
-        return when (index) {
-            in (from + 1)..to -> -room
-            in to until from -> room
-            else -> 0f
-        }
-    }
-
-    /** Ends the drag, saying where the card came from and where it landed. */
-    fun end(): Pair<Int, Int>? {
-        val move = dragging?.let { from -> target?.let { from to it } }
-        dragging = null
-        offset = 0f
-        return move
-    }
-
-    private fun middleOf(index: Int): Float? {
-        val top = tops[index] ?: return null
-        val height = heights[index] ?: return null
-        return top + height / 2
-    }
-}
-
 @Composable
 private fun CollectionCardView(
     card: CollectionCard,
     apps: List<AppEntry>?,
     index: Int,
-    reorder: Reorder,
+    reorder: ListReorder,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: () -> Unit,
@@ -341,7 +280,7 @@ private fun CardHeader(
     kind: CollectionKind,
     expanded: Boolean,
     index: Int,
-    reorder: Reorder,
+    reorder: ListReorder,
     onMove: (from: Int, to: Int) -> Unit,
     onToggleExpanded: () -> Unit,
     onEdit: (() -> Unit)?,

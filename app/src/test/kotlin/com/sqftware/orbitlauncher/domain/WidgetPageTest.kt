@@ -21,6 +21,15 @@ class WidgetPageTest {
     }
 
     @Test
+    fun `a move takes a widget out and puts it back at another place`() {
+        val three = page.add(HostedWidget(20, 2))
+        assertEquals(listOf(12, 20, 7), three.move(7, 2).widgets.map { it.id })
+        assertEquals(listOf(20, 7, 12), three.move(20, 0).widgets.map { it.id })
+        assertEquals(three, three.move(12, 1))
+        assertEquals(three, three.move(99, 0))
+    }
+
+    @Test
     fun `a page comes back as it went`() {
         assertEquals("7\t1\n12\t3", page.encode())
         assertEquals(page, decodeWidgetPage(page.encode()))

@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import android.graphics.Color
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -47,6 +49,7 @@ class WidgetColumnTest {
     private val shown = mutableListOf<Int>()
     private val tapped = mutableListOf<Int>()
     private val resized = mutableListOf<Pair<Int, Int>>()
+    private val moved = mutableListOf<Pair<Int, Int>>()
     private var editing by mutableStateOf<Int?>(null)
     private var storesAtOnce = true
     private var sizings = emptyMap<Int, WidgetSizing>()
@@ -67,6 +70,10 @@ class WidgetColumnTest {
                 resize = { id, rows ->
                     resized += id to rows
                     if (storesAtOnce) page = page.resize(id, rows)
+                },
+                move = { id, to ->
+                    moved += id to to
+                    page = page.move(id, to)
                 },
                 sizing = { sizings[it] ?: WidgetSizing() },
             ),
@@ -156,6 +163,47 @@ class WidgetColumnTest {
         compose.addWidgetButton().performClick()
         compose.widgetEditFrame().assertDoesNotExist()
         compose.runOnIdle { assertEquals("no tap reached a widget while one was edited", listOf(game.id), tapped) }
+    }
+
+    @Test
+    fun aLongPressThatDragsOnMovesTheWidgetAndItStaysWhereItIsLetGo() {
+        page = WidgetPage(listOf(search, game))
+        show()
+        val searchTop = compose.widget(search).getUnclippedBoundsInRoot().top
+
+        compose.widget(game).performTouchInput { down(center) }
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag(WidgetTags.EDIT).fetchSemanticsNodes().isNotEmpty() }
+        compose.widget(game).performTouchInput {
+            moveBy(Offset(0f, -rowPx()))
+            moveBy(Offset(0f, -rowPx()))
+        }
+        assertTrue("the others make way while it is held", compose.widget(search).getUnclippedBoundsInRoot().top > searchTop)
+        compose.runOnIdle { assertEquals("nothing is stored while it is held", emptyList<Pair<Int, Int>>(), moved) }
+        compose.widget(game).performTouchInput { up() }
+
+        compose.runOnIdle { assertEquals(listOf(game.id to 0), moved) }
+        assertEquals(searchTop, compose.widget(game).getUnclippedBoundsInRoot().top)
+        assertTrue(compose.widget(game).getUnclippedBoundsInRoot().bottom <= compose.widget(search).getUnclippedBoundsInRoot().top)
+        compose.runOnIdle { assertEquals("it stays edited", game.id, editing) }
+    }
+
+    @Test
+    fun aPressHeldOnTheEditedWidgetMovesIt() {
+        page = WidgetPage(listOf(search, game))
+        show()
+        compose.longPressWidget(search)
+        compose.runOnIdle { assertEquals("a long press that does not move moves nothing", emptyList<Pair<Int, Int>>(), moved) }
+
+        compose.widget(search).performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
+        compose.widget(search).performTouchInput {
+            moveBy(Offset(0f, rowPx()))
+            moveBy(Offset(0f, rowPx()))
+            up()
+        }
+
+        compose.runOnIdle { assertEquals(listOf(search.id to 1), moved) }
+        assertTrue(compose.widget(game).getUnclippedBoundsInRoot().bottom <= compose.widget(search).getUnclippedBoundsInRoot().top)
     }
 
     @Test

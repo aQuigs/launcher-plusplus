@@ -115,6 +115,7 @@ class LauncherScreenTest {
         add = widgetsAdded::add,
         remove = {},
         resize = { _, _ -> },
+        move = { _, _ -> },
         sizing = { WidgetSizing() },
     )
     // Empty rather than the default page, so the built-in cards do not double the apps the other tests look for.
