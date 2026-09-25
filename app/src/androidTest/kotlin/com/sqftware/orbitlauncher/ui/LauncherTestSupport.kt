@@ -94,6 +94,8 @@ fun SemanticsNodeInteractionsProvider.dock() = onNodeWithTag(DockTags.DOCK)
 
 fun SemanticsNodeInteractionsProvider.dockSlot(app: AppEntry) = onNodeWithTag(DockTags.slot(app))
 
+fun SemanticsNodeInteractionsProvider.dockFolder(index: Int) = onNodeWithTag(DockTags.folder(index))
+
 fun SemanticsNodeInteractionsProvider.appOptionsMenu() = onNodeWithTag(AppOptionsTags.MENU)
 
 fun SemanticsNodeInteractionsProvider.dragGhost() = onNodeWithTag(DragTags.GHOST)

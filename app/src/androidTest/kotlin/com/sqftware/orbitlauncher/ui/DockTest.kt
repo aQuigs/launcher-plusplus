@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -35,7 +36,7 @@ class DockTest {
         docked = apps
         compose.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                Dock(apps = docked, icon = { null }, onLaunch = onLaunch, unread = unread)
+                Dock(items = docked.map(RingItem::App), icon = { null }, onLaunch = onLaunch, onOpenFolder = {}, unread = unread)
             }
         }
     }

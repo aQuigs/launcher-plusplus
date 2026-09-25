@@ -67,9 +67,7 @@ import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Landing
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageLayout
-import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.RingItem
-import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -105,8 +103,9 @@ data class HomePress(val launcherInFront: Boolean)
  * a strip over the dock says so and offers [onBecomeHomeApp]. From anywhere on the home page, dock included, a swipe down
  * pulls down the notification shade ([onOpenNotifications]) and a swipe up opens the drawer. Long-pressing an app
  * anywhere opens its menu of shortcuts and
- * options; a ring app's menu can start a folder in its slot. A folder opens in place, as in Arc: its apps take the ring's
- * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
+ * options; the menu of an app on the ring or in the dock can start a folder in its slot. A folder, on the ring or in the
+ * dock, opens in place on the ring, as in Arc: its apps take the ring's slots and the emblem makes way for a target that
+ * closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
  * [widgets]; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
@@ -120,8 +119,8 @@ data class HomePress(val launcherInFront: Boolean)
  * or swapping the two as [reorderMode] says, which a switch at the top flips ([onReorderModeChange]) while an item is on
  * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
  * as it was. An app goes between the ring and the dock the same way, and one held over the middle of its open folder
- * closes it and goes on to either. An app, from the drawer too, resting on the middle of a ring app or folder lights it,
- * and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts; a long
+ * closes it and goes on to either. An app, from the drawer too, resting on the middle of an app or folder on the ring or
+ * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts; a long
  * press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -176,8 +175,8 @@ fun LauncherScreen(
     // The drawer, search and the collections list the installed apps alone; home keeps shortcuts too. It waits for both,
     // so the ring does not space itself out again when the shortcuts join.
     val onHome = remember(apps, pinnedShortcuts) { if (apps != null && pinnedShortcuts != null) apps + pinnedShortcuts else null }
-    val ring = remember(homeApps.ring, onHome) { homeApps.ring.resolve(onHome.orEmpty()) }
-    val dock = remember(homeApps.dock, onHome) { homeApps.dock.resolve(onHome.orEmpty()) }
+    val ring = remember(homeApps.ring, onHome) { homeApps.ring.resolve(onHome.orEmpty(), HomePlace.Ring) }
+    val dock = remember(homeApps.dock, onHome) { homeApps.dock.resolve(onHome.orEmpty(), HomePlace.Dock) }
     val shown = remember(onHome) { onHome?.mapTo(HashSet()) { it.key } }
     val latestHomeApps by rememberUpdatedState(homeApps)
     val latestApps by rememberUpdatedState(apps)
@@ -194,15 +193,17 @@ fun LauncherScreen(
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
 
-    // The open folder is part of the ring, named by its slot, so Back reaches it through this screen's BackHandler.
-    var openFolder by remember { mutableStateOf<Int?>(null) }
+    // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
+    // through this screen's BackHandler.
+    var openFolder by remember { mutableStateOf<HomePlace.Folder?>(null) }
 
     // Callbacks built once read the home apps through the latest state, so what they change is always the current ring.
-    // A folder taken off hands its slot number to the one after it, which would then show open in its stead.
+    // The open folder is named by its slot, so it closes once another folder may show there: a dock folder's neighbours
+    // stay live while it is open, and one of them going or moving shifts the slots.
     fun changeHomeApps(change: HomeApps.() -> HomeApps) {
         val changed = latestHomeApps.change()
         if (changed == latestHomeApps) return
-        if (changed.ring.folderCount < latestHomeApps.ring.folderCount) openFolder = null
+        if (openFolder?.let { latestHomeApps.keeps(it, changed) } == false) openFolder = null
         latestOnHomeAppsChange(changed)
     }
 
@@ -210,9 +211,6 @@ fun LauncherScreen(
         val changed = latestCollections.change()
         if (changed != latestCollections) latestOnCollectionsChange(changed)
     }
-
-    // Explicit receiver: the resolved ring above shadows the stored one inside the lambda.
-    fun changeRing(change: Ring.() -> Ring) = changeHomeApps { copy(ring = this.ring.change()) }
 
     // An app on its way out of the drawer, or an item on the move within its place, the finger holding it and where it
     // could land, in root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are
@@ -270,7 +268,7 @@ fun LauncherScreen(
             // A folder left empty goes once its pick is over, not while toggling apps off and on again. Not before the apps
             // load, as until then it shows none of them.
             (picking as? HomePlace.Folder)?.let { folder ->
-                latestShown?.let { shown -> changeRing { removeIfEmpty(folder.index, shown) } }
+                latestShown?.let { shown -> changeHomeApps { change(folder.holder) { removeIfEmpty(folder.index, shown) } } }
             }
             picking = null
             query = ""
@@ -301,26 +299,31 @@ fun LauncherScreen(
     // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
     var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
     var openingMenu by remember { mutableStateOf<Job?>(null) }
-    val open = ring.filterIsInstance<RingItem.Folder>().find { it.index == openFolder }
+    val open = openFolder?.let { at ->
+        (if (at.holder == HomePlace.Ring) ring else dock).filterIsInstance<RingItem.Folder>().find { it.at == at }
+    }
     // A slot number outliving its folder would open a folder made later in that slot by itself.
     LaunchedEffect(open == null) { if (open == null) openFolder = null }
 
     // The ring's and the dock's positions, so an app can be dragged from one home place to another. Each is registered as
     // it is built, below, with the drag handling that needs these.
-    val homePlaces = remember { mutableMapOf<HomePlace, Rearrange>() }
+    val homePlaces = remember { mutableMapOf<HomePlace.Slots, Rearrange>() }
+
+    fun itemsOf(holder: HomePlace.Slots) = if (holder == HomePlace.Ring) latestRing else latestDock
     // What resting the finger has done. A pause off the middle of anything the dragged app could fold into makes its own
     // place make way for it there, and over the middle of an open folder closes the folder; a longer one on such a middle
     // lights that item, and letting go folds the app into it. A quick sweep changes nothing.
     var makingWay by remember { mutableStateOf<Int?>(null) }
     var lit by remember { mutableStateOf<Over.Slot?>(null) }
 
-    // The ring item an app dragged onto the middle of the ring's position [hit], where it shows as the ring makes way,
-    // would fold into, if the app lands there; nothing for a folder dragged, as folders do not nest.
-    fun foldInto(drag: Drag, ringPlace: Rearrange, hit: Rearrange.Hit): RingItem? {
+    // Folding an app dragged onto the middle of position [hit] of [holder], the ring or the dock, into the item that shows
+    // there as the place makes way, if the app lands there; nothing for a folder dragged, as folders do not nest.
+    fun foldInto(drag: Drag, holder: HomePlace.Slots, place: Rearrange, hit: Rearrange.Hit): Landing.Into? {
         if (!hit.onMiddle) return null
         val app = drag.app ?: return null
-        val item = latestRing.getOrNull(ringPlace.moving?.sourceOf(latestRing, hit.index) ?: hit.index) ?: return null
-        return item.takeIf { latestHomeApps.lands(app, drag.home, Landing.Into(it)) }
+        val items = itemsOf(holder)
+        val item = items.getOrNull(place.moving?.sourceOf(items, hit.index) ?: hit.index) ?: return null
+        return Landing.Into(holder, item).takeIf { latestHomeApps.lands(app, drag.home, it) }
     }
 
     fun overFor(drag: Drag): Over? {
@@ -333,13 +336,14 @@ fun LauncherScreen(
             return Over.FolderCentre
         }
         val place = zones.placeAt(onHome.x, onHome.y)
-        // The dock's row first: the ring's lowest slot reaches down towards it.
+        // The dock's row first, for an app or one of the dock's own folders: the ring's lowest slot reaches down towards it.
         val dockPlace = homePlaces[HomePlace.Dock]
-        if (drag.app != null && dockPlace != null && place == HomePlace.Dock) {
-            return dockPlace.at(finger)?.let { Over.Slot(dockPlace, it) } ?: Over.DockEnd
+        if (dockPlace != null && place == HomePlace.Dock && (drag.app != null || own === dockPlace)) {
+            return dockPlace.hit(finger)?.let { Over.Slot(dockPlace, it.index, foldInto(drag, HomePlace.Dock, dockPlace, it)) }
+                ?: Over.DockEnd.takeIf { drag.app != null }
         }
         val ringPlace = homePlaces[HomePlace.Ring]
-        ringPlace?.hit(finger)?.let { return Over.Slot(ringPlace, it.index, foldInto(drag, ringPlace, it)) }
+        ringPlace?.hit(finger)?.let { return Over.Slot(ringPlace, it.index, foldInto(drag, HomePlace.Ring, ringPlace, it)) }
         if (own !== ringPlace) own?.at(finger)?.let { return Over.Slot(own, it) }
         // Off every slot, as all of an empty ring is.
         return Over.RingEnd.takeIf { drag.app != null && place == HomePlace.Ring }
@@ -348,13 +352,13 @@ fun LauncherScreen(
     val over by remember { derivedStateOf { dragged?.let(::overFor) } }
 
     // The folder closes, so the ring comes back under the finger, and the app goes on as one dragged out of it. The folder
-    // is named by its slot, so the drag holds only while the ring does.
+    // is named by its slot, so the drag holds only while the ring and the dock do.
     fun leaveFolder() {
         val within = dragged as? Drag.Within ?: return
         val app = within.app ?: return
         val folder = within.home as? HomePlace.Folder ?: return
-        val left = latestRing
-        dragged = Drag.OutOfFolder(app, folder, current = { latestRing == left })
+        val left = latestRing to latestDock
+        dragged = Drag.OutOfFolder(app, folder, current = { (latestRing to latestDock) == left })
         makingWay = null
         openFolder = null
     }
@@ -428,11 +432,11 @@ fun LauncherScreen(
                     onOption = { option ->
                         when (option) {
                             is AppOption.Remove -> latestShown?.let { shown -> changeHomeApps { remove(option.place, app, shown) } }
-                            AppOption.NewFolder -> {
-                                val slot = latestHomeApps.ring.indexOf(app)
+                            AppOption.NewFolder -> (place as? HomePlace.Slots)?.let { holder ->
+                                val slot = latestHomeApps.slots(holder).indexOf(app)
                                 if (slot >= 0) {
-                                    changeRing { newFolder(app) }
-                                    pickFor(HomePlace.Folder(slot))
+                                    changeHomeApps { change(holder) { newFolder(app) } }
+                                    pickFor(HomePlace.Folder(holder, slot))
                                 }
                             }
                             AppOption.AppInfo -> actions.openAppInfo(app)
@@ -448,27 +452,27 @@ fun LauncherScreen(
     val drawerMenu = remember(actions) { appMenu(place = null) }
     val ringMenu = remember(actions) { appMenu(HomePlace.Ring) }
     val dockMenu = remember(actions) { appMenu(HomePlace.Dock) }
-    val folderAppMenu = remember(actions, open?.index) { open?.let { appMenu(HomePlace.Folder(it.index)) } }
+    val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(it.at) } }
     val folderMenu = remember {
         FolderMenu(
             onOpen = { folder ->
                 openingMenu?.cancel()
-                openMenu = OpenMenu.Folder(folder.index)
+                openMenu = OpenMenu.Folder(folder.at)
             },
             content = { folder ->
-                (openMenu as? OpenMenu.Folder)?.takeIf { it.index == folder.index }?.let { shown ->
+                (openMenu as? OpenMenu.Folder)?.takeIf { it.at == folder.at }?.let { shown ->
                     DisposableEffect(Unit) {
-                        onDispose { if ((openMenu as? OpenMenu.Folder)?.index == folder.index) closeMenu() }
+                        onDispose { if ((openMenu as? OpenMenu.Folder)?.at == folder.at) closeMenu() }
                     }
                     FolderOptionsMenu(
                         expanded = shown.expanded,
                         onOption = { option ->
                             when (option) {
-                                FolderOption.AddApps -> pickFor(HomePlace.Folder(folder.index))
+                                FolderOption.AddApps -> pickFor(folder.at)
                                 FolderOption.Remove -> {
                                     // The next folder along inherits this slot's number, and would inherit the fading menu too.
                                     openMenu = null
-                                    changeRing { remove(folder.index) }
+                                    changeHomeApps { change(folder.at.holder) { remove(folder.at.index) } }
                                 }
                             }
                         },
@@ -494,12 +498,10 @@ fun LauncherScreen(
     fun landing(target: Over?): Landing? {
         val mode = latestReorderMode
         return when (target) {
-            Over.DockEnd -> Landing.InDock(null, mode)
-            Over.RingEnd -> Landing.OnRing(null, mode)
-            is Over.Slot -> when (target.place) {
-                homePlaces[HomePlace.Ring] -> latestRing.getOrNull(target.index)?.let { Landing.OnRing(it, mode) }
-                homePlaces[HomePlace.Dock] -> latestDock.getOrNull(target.index)?.let { Landing.InDock(it, mode) }
-                else -> null
+            Over.DockEnd -> Landing.At(HomePlace.Dock, null, mode)
+            Over.RingEnd -> Landing.At(HomePlace.Ring, null, mode)
+            is Over.Slot -> homePlaces.entries.find { it.value === target.place }?.key?.let { holder ->
+                itemsOf(holder).getOrNull(target.index)?.let { Landing.At(holder, it, mode) }
             }
             else -> null
         }
@@ -514,7 +516,7 @@ fun LauncherScreen(
         when {
             drag is Drag.Within && overBin -> drag.remove?.invoke()
             placeChanged -> Unit
-            app != null && foldInto != null -> shown?.let { changeHomeApps { move(app, drag.home, Landing.Into(foldInto), it) } }
+            app != null && foldInto != null -> shown?.let { changeHomeApps { move(app, drag.home, foldInto, it) } }
             drag is Drag.FromDrawer -> dropPlace?.let { place -> changeHomeApps { add(place, drag.app) } }
             drag is Drag.Within && target is Over.Slot && target.place === drag.place -> drag.move(target.index, latestReorderMode)
             app != null && shown != null -> landing(target)?.let { to -> changeHomeApps { move(app, drag.home, to, shown) } }
@@ -583,22 +585,19 @@ fun LauncherScreen(
             },
         )
 
-    val ringRearrange = remember {
-        rearrange(HomePlace.Ring, items = { latestRing }, look = { it }, move = { item, target, mode ->
-            changeRing { move(item, target, mode) }
-        }).also { homePlaces[HomePlace.Ring] = it }
-    }
-    val dockRearrange = remember {
-        rearrange(HomePlace.Dock, items = { latestDock }, look = RingItem::App, move = { app, target, mode ->
-            changeHomeApps { move(HomePlace.Dock, app, target, mode) }
-        }).also { homePlaces[HomePlace.Dock] = it }
-    }
+    fun slotsRearrange(holder: HomePlace.Slots) =
+        rearrange(holder, items = { itemsOf(holder) }, look = { it }, move = { item, target, mode ->
+            changeHomeApps { change(holder) { move(item, target, mode) } }
+        }).also { homePlaces[holder] = it }
+
+    val ringRearrange = remember { slotsRearrange(HomePlace.Ring) }
+    val dockRearrange = remember { slotsRearrange(HomePlace.Dock) }
     val latestOpen by rememberUpdatedState(open)
-    val folderRearrange = remember(open?.index) {
+    val folderRearrange = remember(open?.at) {
         open?.let { folder ->
-            val place = HomePlace.Folder(folder.index)
+            val place = folder.at
             rearrange(place, items = { latestOpen?.apps.orEmpty() }, look = RingItem::App, move = { app, target, mode ->
-                changeHomeApps { move(place, app, target, mode) }
+                changeHomeApps { change(place.holder) { move(place.index, app, target, mode) } }
             })
         }
     }
@@ -824,7 +823,7 @@ fun LauncherScreen(
                                         showHint = homeApps.ring.isEmpty || (onHome != null && ring.isEmpty()),
                                         icon = actions.icon,
                                         onLaunch = actions.launch,
-                                        onOpenFolder = { openFolder = it.index },
+                                        onOpenFolder = { openFolder = it.at },
                                         onCloseFolder = { openFolder = null },
                                         onEdit = { pickFor(HomePlace.Ring) },
                                         modifier = Modifier.weight(1f).dropZone { copy(ring = it) },
@@ -835,7 +834,7 @@ fun LauncherScreen(
                                         folderAppMenu = folderAppMenu,
                                         unread = unread,
                                         rearrange = if (open != null) folderRearrange else ringRearrange,
-                                        foldTarget = litSlot?.index,
+                                        foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                         held = (dragged as? Drag.OutOfFolder)?.app,
                                         inSight = homeInSight,
                                     )
@@ -854,18 +853,21 @@ fun LauncherScreen(
                             // does not move when they arrive. An empty dock shows while an app is dragged from the drawer or
                             // another home place, as a place to drop it, and slides in and out so the ring above moves rather
                             // than jumps.
-                            val dockShown = dock.isNotEmpty() || (onHome == null && homeApps.dock.keys.isNotEmpty()) ||
+                            val dockShown = dock.isNotEmpty() || (onHome == null && !homeApps.dock.isEmpty) ||
                                 dragged?.let { it.app != null && (it is Drag.FromDrawer || it.home != null) } == true
                             AnimatedVisibility(visible = dockShown) {
                                 Dock(
-                                    apps = dock,
+                                    items = dock,
                                     icon = actions.icon,
                                     onLaunch = actions.launch,
+                                    onOpenFolder = { openFolder = it.at },
                                     modifier = Modifier.dropZone { copy(dock = it) },
                                     highlighted = dropPlace == HomePlace.Dock,
                                     menu = dockMenu,
+                                    folderMenu = folderMenu,
                                     unread = unread,
                                     rearrange = dockRearrange,
+                                    foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Dock }?.index,
                                 )
                             }
                         }
@@ -1024,8 +1026,8 @@ private sealed interface Drag {
 
 /** What the finger holding a dragged item is over, as far as letting it go there goes. */
 private sealed interface Over {
-    /** Position [index] of [place], on the middle of the ring item a dragged app would fold into, if [foldInto] is given. */
-    data class Slot(val place: Rearrange, val index: Int, val foldInto: RingItem? = null) : Over
+    /** Position [index] of [place], on the middle of the item a dragged app would fold into, as [foldInto] says if given. */
+    data class Slot(val place: Rearrange, val index: Int, val foldInto: Landing.Into? = null) : Over
 
     /** The dock's row away from its apps, whose end an app goes to. */
     data object DockEnd : Over
@@ -1056,8 +1058,8 @@ private sealed interface OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 
-    /** The menu of the folder in the ring's slot [index]. */
-    data class Folder(val index: Int, override val expanded: Boolean = true) : OpenMenu {
+    /** The menu of the folder [at] its place and slot. */
+    data class Folder(val at: HomePlace.Folder, override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 
@@ -1066,8 +1068,6 @@ private sealed interface OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 }
-
-private val Ring.folderCount: Int get() = slots.count { it is RingSlot.Folder }
 
 internal fun LayoutCoordinates.rootBounds(): Bounds = boundsIn(findRootCoordinates())
 

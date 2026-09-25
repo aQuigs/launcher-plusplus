@@ -5,7 +5,6 @@ import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sqftware.orbitlauncher.domain.CollectionsPage
-import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.Ring
@@ -31,7 +30,7 @@ class RelauncherTest {
     @Test
     fun erasingForgetsEveryStore() {
         SharedPreferencesHomeAppsStore(context).save(
-            HomeApps(ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.Folder(listOf("b/B")))), dock = Favourites(listOf("c/C"))),
+            HomeApps(ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.Folder(listOf("b/B")))), dock = Ring(listOf(RingSlot.App("c/C")))),
         )
         // Emptied, which is stored, unlike the default page.
         SharedPreferencesCollectionsStore(context).save(CollectionsPage(emptyList()))

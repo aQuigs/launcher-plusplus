@@ -21,13 +21,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.UnreadCounts
 
 object FolderTags {
     const val MENU = "folder_options"
@@ -71,7 +78,7 @@ private const val PREVIEWS_FRACTION = 0.86f
 private const val PREVIEW_FRACTION = 0.45f
 
 /**
- * A ring slot holding [folder]: a circle, the size of an app's, filled with previews of up to four of its icons and
+ * A slot on the ring or in the dock holding [folder]: a circle, the size of an app's, filled with previews of up to four of its icons and
  * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, a long
  * press opens its [menu], and a long press that goes on becomes a [drag].
  */
@@ -124,6 +131,44 @@ fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBit
         folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
     }
 }
+
+/**
+ * What a slot on the ring or in the dock shows: [item] as an app, launched by a tap and wearing its [unread] count, or as
+ * a folder, opened by a tap and wearing its apps' sum. A long press opens the app's [menu] or the folder's [folderMenu],
+ * and one that goes on becomes a [drag].
+ */
+@Composable
+internal fun SlotIcon(
+    item: RingItem,
+    icon: suspend (AppEntry) -> ImageBitmap?,
+    onLaunch: (AppEntry) -> Unit,
+    onOpenFolder: (RingItem.Folder) -> Unit,
+    modifier: Modifier,
+    menu: AppMenu?,
+    folderMenu: FolderMenu?,
+    unread: UnreadCounts,
+    drag: ItemDrag<Any?>?,
+) {
+    when (item) {
+        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread[item.app], drag)
+        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.sum(item.apps), drag)
+    }
+}
+
+/** An item lit as the one an app let go now would fold into: a little larger, ringed in [colour]. */
+internal fun Modifier.foldTarget(lit: Boolean, colour: Color): Modifier = if (!lit) {
+    this
+} else {
+    this
+        .semantics { stateDescription = "Drop to put in a folder" }
+        .graphicsLayer {
+            scaleX = FOLD_TARGET_SCALE
+            scaleY = FOLD_TARGET_SCALE
+        }
+        .drawBehind { drawCircle(colour, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
+}
+
+private const val FOLD_TARGET_SCALE = 1.12f
 
 /** A folder's long-press menu. Choosing an item dismisses the menu, then hands on the choice. */
 @Composable

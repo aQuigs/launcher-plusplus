@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.RingSlot
@@ -24,7 +23,7 @@ class HomeAppsStoreTest {
     @Test
     fun theRingAndTheDockComeBackApart() {
         val ring = Ring(listOf(RingSlot.App("a/A"), RingSlot.Folder(listOf("b/B", "c/C")), RingSlot.Folder(emptyList())))
-        val homeApps = HomeApps(ring = ring, dock = Favourites(listOf("c/C")))
+        val homeApps = HomeApps(ring = ring, dock = Ring(listOf(RingSlot.App("c/C"), RingSlot.Folder(listOf("a/A", "d/D")))))
 
         store.save(homeApps)
 

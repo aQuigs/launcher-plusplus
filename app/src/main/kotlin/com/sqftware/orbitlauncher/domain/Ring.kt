@@ -1,6 +1,6 @@
 package com.sqftware.orbitlauncher.domain
 
-/** One slot on the ring: an app, or a folder of apps in order. Both keep [AppEntry.key]s so a reload of the app list keeps them. */
+/** One slot on the ring or in the dock: an app, or a folder of apps in order. Both keep [AppEntry.key]s so a reload of the app list keeps them. */
 sealed interface RingSlot {
     data class App(val key: String) : RingSlot
 
@@ -10,19 +10,19 @@ sealed interface RingSlot {
     }
 }
 
-/** What a ring slot shows once its apps are looked up in the installed list. */
+/** What a slot shows once its apps are looked up in the installed list. */
 sealed interface RingItem {
     data class App(val app: AppEntry) : RingItem
 
-    /** [index] is the folder's slot on the ring, which is how the picker and the folder's menu name it. */
-    data class Folder(val index: Int, val apps: List<AppEntry>) : RingItem
+    /** [at] is the folder's place and slot, which is how the picker and the folder's menu name it. */
+    data class Folder(val at: HomePlace.Folder, val apps: List<AppEntry>) : RingItem
 }
 
-/** The slots round the emblem, in order. */
+/** Slots in order: round the emblem on the ring, or along the dock, which holds apps and folders alike. */
 data class Ring(val slots: List<RingSlot> = emptyList()) {
     val isEmpty: Boolean get() = slots.isEmpty()
 
-    /** The apps in slots of their own. An app inside a folder is not on the ring itself, so it can be added there too. */
+    /** The apps in slots of their own. An app inside a folder is not in its place itself, so it can be added there too. */
     val apps: Favourites get() = Favourites(slots.filterIsInstance<RingSlot.App>().map { it.key })
 
     fun folder(index: Int): RingSlot.Folder? = slots.getOrNull(index) as? RingSlot.Folder
@@ -70,16 +70,16 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     fun removeIfEmpty(index: Int, shown: Set<String>): Ring = if (folder(index)?.showsNone(shown) == true) remove(index) else this
 
     /**
-     * The slots with their installed apps, in order. An app that is missing is skipped but kept, on the ring or in a
-     * folder, so what disappears while it updates comes back in its old place. A folder shows whatever is left in it, so
-     * a folder emptied by the user is an empty badge, not a gap.
+     * The slots of [place] with their installed apps, in order. An app that is missing is skipped but kept, in its slot
+     * or in a folder, so what disappears while it updates comes back in its old place. A folder shows whatever is left in
+     * it, so a folder emptied by the user is an empty badge, not a gap.
      */
-    fun resolve(apps: List<AppEntry>): List<RingItem> {
+    fun resolve(apps: List<AppEntry>, place: HomePlace.Slots): List<RingItem> {
         val byKey = apps.associateBy { it.key }
         return slots.mapIndexedNotNull { index, slot ->
             when (slot) {
                 is RingSlot.App -> byKey[slot.key]?.let(RingItem::App)
-                is RingSlot.Folder -> RingItem.Folder(index, slot.keys.mapNotNull(byKey::get))
+                is RingSlot.Folder -> RingItem.Folder(HomePlace.Folder(place, index), slot.keys.mapNotNull(byKey::get))
             }
         }
     }
@@ -92,7 +92,7 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     /** The stored slot [item] shows, or -1 for an app without a slot of its own. */
     fun slotOf(item: RingItem): Int = when (item) {
         is RingItem.App -> indexOf(item.app)
-        is RingItem.Folder -> item.index
+        is RingItem.Folder -> item.at.index
     }
 
     private fun replace(index: Int, slot: RingSlot) = Ring(slots.toMutableList().apply { this[index] = slot })

@@ -32,7 +32,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -49,7 +48,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -165,11 +163,7 @@ fun HomeRing(
                     } else {
                         Modifier.alpha(0f)
                     }
-                    val drag = rearrange?.drag(index)
-                    when (item) {
-                        is RingItem.App -> AppIcon(item.app, icon, onLaunch, slot, appMenu, unread[item.app], drag)
-                        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, slot, folderMenu, unread.sum(item.apps), drag)
-                    }
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index))
                 }
             }
         },
@@ -321,23 +315,8 @@ private fun sparkPath(centre: Offset, half: Float): Path {
 private val RingItem.tag: String
     get() = when (this) {
         is RingItem.App -> HomeRingTags.slot(app)
-        is RingItem.Folder -> HomeRingTags.folder(index)
+        is RingItem.Folder -> HomeRingTags.folder(at.index)
     }
-
-/** An item lit as the one an app let go now would fold into: a little larger, ringed in [colour]. */
-private fun Modifier.foldTarget(lit: Boolean, colour: Color): Modifier = if (!lit) {
-    this
-} else {
-    this
-        .semantics { stateDescription = "Drop to put in a folder" }
-        .graphicsLayer {
-            scaleX = FOLD_TARGET_SCALE
-            scaleY = FOLD_TARGET_SCALE
-        }
-        .drawBehind { drawCircle(colour, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
-}
-
-private const val FOLD_TARGET_SCALE = 1.12f
 
 /** The emblem's place while a folder is open: nothing to see, as in Arc, but a tap there closes the folder. */
 @Composable

@@ -3,7 +3,6 @@ package com.sqftware.orbitlauncher.apps
 import android.content.Context
 import androidx.core.content.edit
 import com.sqftware.orbitlauncher.domain.HomeApps
-import com.sqftware.orbitlauncher.domain.decodeFavourites
 import com.sqftware.orbitlauncher.domain.decodeRing
 import com.sqftware.orbitlauncher.domain.encode
 
@@ -17,7 +16,7 @@ class SharedPreferencesHomeAppsStore(context: Context) : HomeAppsStore {
     private val prefs = context.getSharedPreferences("home", Context.MODE_PRIVATE)
 
     // One string per place rather than a string set: a set does not keep the order.
-    override fun load() = HomeApps(ring = decodeRing(read(RING_KEY)), dock = decodeFavourites(read(DOCK_KEY)))
+    override fun load() = HomeApps(ring = decodeRing(read(RING_KEY)), dock = decodeRing(read(DOCK_KEY)))
 
     override fun save(homeApps: HomeApps) {
         prefs.edit {

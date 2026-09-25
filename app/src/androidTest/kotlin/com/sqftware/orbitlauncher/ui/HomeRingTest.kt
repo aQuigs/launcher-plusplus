@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
@@ -130,7 +131,7 @@ class HomeRingTest {
     @Test
     fun aFolderSlotIsTheSizeOfAnAppSlotAndOpensOnATap() {
         val opened = mutableListOf<RingItem.Folder>()
-        val work = RingItem.Folder(1, listOf(mail, clock, alphabet[0]))
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, clock, alphabet[0]))
         showItems(listOf(RingItem.App(clock), work), onOpenFolder = opened::add)
 
         compose.folderSlot(1).assertContentDescriptionEquals("Folder, 3 apps").assertWidthIsEqualTo(iconWidth(clock))
@@ -141,7 +142,7 @@ class HomeRingTest {
 
     @Test
     fun unreadCountsBadgeAppsAddUpOnFoldersAndReachAnOpenFoldersApps() {
-        val work = RingItem.Folder(1, listOf(mail, alphabet[0]))
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, alphabet[0]))
         unread = UnreadCounts(mapOf(clock.packageName to 3, mail.packageName to 98, alphabet[0].packageName to 4))
         showItems(listOf(RingItem.App(clock), work, RingItem.App(alphabet[1])))
 
@@ -168,7 +169,7 @@ class HomeRingTest {
     @Test
     fun anEmptyFolderIsABadgeThatDoesNotOpen() {
         val opened = mutableListOf<RingItem.Folder>()
-        showItems(listOf(RingItem.App(clock), RingItem.Folder(1, emptyList())), onOpenFolder = opened::add)
+        showItems(listOf(RingItem.App(clock), RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), emptyList())), onOpenFolder = opened::add)
 
         compose.folderSlot(1).assertContentDescriptionEquals("Folder, 0 apps").assertWidthIsEqualTo(iconWidth(clock))
         compose.folderSlot(1).performClick()
@@ -179,7 +180,7 @@ class HomeRingTest {
     @Test
     fun anOpenFolderPutsItsAppsInTheRingSlotsInPlaceOfTheEmblem() {
         var closes = 0
-        val work = RingItem.Folder(1, listOf(mail, alphabet[0]))
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, alphabet[0]))
         showItems(listOf(RingItem.App(clock), work), onCloseFolder = { closes++ })
         val emblem = compose.emblem().getUnclippedBoundsInRoot()
         val slotOfClock = compose.ringSlot(clock).getUnclippedBoundsInRoot()
