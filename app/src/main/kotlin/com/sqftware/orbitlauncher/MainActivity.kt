@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
             add = widgetHost::add,
             remove = widgetHost::remove,
             resize = widgetHost::resize,
+            move = widgetHost::move,
             sizing = widgetHost::sizing,
         )
         val layout = PageLayout()

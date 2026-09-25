@@ -109,7 +109,7 @@ data class HomePress(val launcherInFront: Boolean)
  * slots and the emblem makes way for a target that closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
- * [widgets]; a long press puts a widget in edit mode, to resize or remove it, until a tap elsewhere or the page goes
+ * [widgets]; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
  * out of view. The collections page shows the cards of [collections], the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
  * pencil opens an editor over the screen that adds apps to it, and the button under the cards opens the picker that adds

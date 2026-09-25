@@ -28,7 +28,7 @@ interface WidgetHost {
     fun page(): WidgetPage
 
     /**
-     * [page] now, then again each time a widget is added, removed, resized or lost with its provider. The widgets draw their
+     * [page] now, then again each time a widget is added, removed, resized, moved or lost with its provider. The widgets draw their
      * updates only while this is collected, so collect it while the launcher is visible.
      */
     fun updates(): Flow<WidgetPage>
@@ -41,6 +41,9 @@ interface WidgetHost {
 
     /** Makes the widget [id] [rows] tall. */
     fun resize(id: Int, rows: Int)
+
+    /** Moves the widget [id] to place [to] on the page, top to bottom. */
+    fun move(id: Int, to: Int)
 
     /** How the provider of the widget [id] lets it be resized. */
     fun sizing(id: Int): WidgetSizing
@@ -123,6 +126,8 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
     }
 
     override fun resize(id: Int, rows: Int) = set(page.value.resize(id, rows))
+
+    override fun move(id: Int, to: Int) = set(page.value.move(id, to))
 
     override fun sizing(id: Int): WidgetSizing {
         val info = manager.getAppWidgetInfo(id) ?: return WidgetSizing(vertical = false)
