@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +15,6 @@ import androidx.compose.material.icons.materialPath
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -24,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -37,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.ui.theme.DiscEdge
+import com.sqftware.orbitlauncher.ui.theme.FolderEdge
 
 object FolderTags {
     const val MENU = "folder_options"
@@ -110,12 +111,10 @@ fun FolderIcon(
             .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into a light wallpaper.
-        IconDisc(
-            presses,
-            Modifier.fillMaxSize().border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) { FolderPreviews(folder, icon) }
+        // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into the wallpaper.
+        IconDisc(presses, Modifier.fillMaxSize().edge(FolderEdge), contentAlignment = Alignment.Center) {
+            FolderPreviews(folder, icon)
+        }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
     }
@@ -160,6 +159,15 @@ internal fun SlotIcon(
         is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread[item.app], drag)
         is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.sum(item.apps), drag)
     }
+}
+
+/** Rings the circle inscribed in the item with [edge]'s two lines, the dark one outermost. */
+private fun Modifier.edge(edge: DiscEdge): Modifier = drawWithContent {
+    drawContent()
+    val line = 1.dp.toPx()
+    val radius = size.minDimension / 2
+    drawCircle(edge.outer, radius = radius - line / 2, style = Stroke(line))
+    drawCircle(edge.inner, radius = radius - line * 1.5f, style = Stroke(line))
 }
 
 /** An item lit as the one an app let go now would fold into: a little larger, ringed in [colour]. */
