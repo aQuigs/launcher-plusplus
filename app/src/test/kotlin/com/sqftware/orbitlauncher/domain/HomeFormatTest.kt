@@ -42,15 +42,6 @@ class HomeFormatTest {
     }
 
     @Test
-    fun `favourites are one key per line`() {
-        val favourites = Favourites(listOf(clock.key, mail.key))
-
-        assertEquals("pkg.Clock/pkg.Clock.Main\npkg.Mail/pkg.Mail.Main", favourites.encode())
-        assertEquals(favourites, decodeFavourites(favourites.encode()))
-        assertEquals(Favourites(), decodeFavourites(""))
-    }
-
-    @Test
     fun `a shortcut whose id holds a line break or a tab cannot be stored`() {
         assertTrue(isStorable(shortcutKey("web", "da8ed822-1ea0")))
         assertFalse(isStorable(shortcutKey("web", "two\nlines")))

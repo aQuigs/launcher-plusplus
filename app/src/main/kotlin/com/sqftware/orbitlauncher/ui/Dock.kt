@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.dockRow
 import kotlin.math.roundToInt
@@ -24,27 +25,34 @@ object DockTags {
     const val DOCK = "dock"
 
     fun slot(app: AppEntry) = "dock_${app.key}"
+
+    fun folder(index: Int) = "dock_folder_$index"
 }
 
 private val FULL_DOCK_ICON_SIZE = 56.dp
 
 /**
- * The user's dock [apps] in one row of equal slots, together in the middle of the width. The row is as tall as a
- * full-size icon, so a crowded dock shrinks its icons but not the row, and an empty dock still holds its place. While
- * [highlighted], the row glows as the place an app being dragged would land. Each app wears its [unread] count. With
- * [rearrange], a long press that moves on picks an app up to move it along the row; while one is on the move, the row
- * shows where everything would be if it were dropped.
+ * The user's dock [items], apps and folders, in one row of equal slots, together in the middle of the width. The row is
+ * as tall as a full-size icon, so a crowded dock shrinks its icons but not the row, and an empty dock still holds its
+ * place. While [highlighted], the row glows as the place an app being dragged would land. Tap an app to launch it or
+ * long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]. Each app wears its
+ * [unread] count, and a folder the sum of its apps'. With [rearrange], a long press that moves on picks an item up to
+ * move it along the row; while one is on the move, the row shows where everything would be if it were dropped. The item
+ * at [foldTarget] is lit as the one an app let go now would fold into.
  */
 @Composable
 fun Dock(
-    apps: List<AppEntry>,
+    items: List<RingItem>,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
+    onOpenFolder: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,
     highlighted: Boolean = false,
     menu: AppMenu? = null,
+    folderMenu: FolderMenu? = null,
     unread: UnreadCounts = UnreadCounts(),
     rearrange: Rearrange? = null,
+    foldTarget: Int? = null,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
@@ -52,10 +60,14 @@ fun Dock(
     Layout(
         content = {
             val moving = rearrange?.moving
-            moving.shown(apps).forEachIndexed { index, app ->
-                key(app.key) {
-                    val slot = Modifier.testTag(DockTags.slot(app)).reorderSlot(rearrange, index, moving?.at == index)
-                    AppIcon(app, icon, onLaunch, slot, menu, unread[app], rearrange?.drag(index))
+            moving.shown(items).forEachIndexed { index, item ->
+                val tag = when (item) {
+                    is RingItem.App -> DockTags.slot(item.app)
+                    is RingItem.Folder -> DockTags.folder(item.at.index)
+                }
+                key(tag) {
+                    val slot = Modifier.testTag(tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, menu, folderMenu, unread, rearrange?.drag(index))
                 }
             }
         },

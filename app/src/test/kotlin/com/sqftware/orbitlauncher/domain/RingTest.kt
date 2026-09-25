@@ -26,7 +26,7 @@ class RingTest {
     fun `a move lands among the stored slots, past the one kept for a missing app`() {
         val gone = app("Gone")
         val ring = Ring(listOf(RingSlot.App(clock.key), RingSlot.App(gone.key), folder(mail, maps), RingSlot.App(music.key)))
-        val (shownClock, shownFolder, shownMusic) = ring.resolve(all)
+        val (shownClock, shownFolder, shownMusic) = ring.resolve(all, HomePlace.Ring)
 
         assertEquals(
             Ring(listOf(RingSlot.App(gone.key), folder(mail, maps), RingSlot.App(clock.key), RingSlot.App(music.key))),
@@ -115,8 +115,8 @@ class RingTest {
     fun `a missing app is skipped but kept, in a folder too`() {
         val ring = Ring(listOf(RingSlot.App(clock.key), folder(mail, maps)))
 
-        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(1, listOf(maps))), ring.resolve(listOf(clock, maps)))
-        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(1, listOf(mail, maps))), ring.resolve(all))
+        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(maps))), ring.resolve(listOf(clock, maps), HomePlace.Ring))
+        assertEquals(listOf(RingItem.App(clock), RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, maps))), ring.resolve(all, HomePlace.Ring))
     }
 
     @Test
@@ -124,8 +124,8 @@ class RingTest {
         val ring = Ring(listOf(folder(mail, maps), folder(), folder(music)))
 
         assertEquals(
-            listOf(RingItem.Folder(0, emptyList()), RingItem.Folder(1, emptyList()), RingItem.Folder(2, listOf(music))),
-            ring.resolve(listOf(clock, music)),
+            listOf(RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 0), emptyList()), RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), emptyList()), RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 2), listOf(music))),
+            ring.resolve(listOf(clock, music), HomePlace.Ring),
         )
     }
 

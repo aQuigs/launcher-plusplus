@@ -339,7 +339,7 @@ class LauncherScreenTest {
     @Test
     fun theHomePageAsksToBeTheHomeAppUntilItIs() {
         isHomeApp = false
-        homeApps = HomeApps(ring = ringOf(clock), dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(clock), dock = ringOf(mail))
         show()
         val card = compose.homeAppCard().assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue("the card sits under the ring", compose.ringSlot(clock).getUnclippedBoundsInRoot().bottom <= card.top)
@@ -480,7 +480,7 @@ class LauncherScreenTest {
 
         compose.placeOption(HomePlace.Dock).performClick()
         compose.onNodeWithText("Mail").performClick()
-        compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(mail.key))), homeApps) }
+        compose.runOnIdle { assertEquals(HomeApps(dock = ringOf(mail)), homeApps) }
 
         Espresso.pressBack()
         assertDrawerOpen(false)
@@ -490,7 +490,7 @@ class LauncherScreenTest {
 
     @Test
     fun eachPlaceChecksTheAppsAlreadyThere() {
-        homeApps = HomeApps(ring = ringOf(clock), dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(clock), dock = ringOf(mail))
         show()
         compose.emblem().performClick()
         assertDrawerOpen(true)
@@ -509,7 +509,7 @@ class LauncherScreenTest {
         compose.dock().assertDoesNotExist()
         val undocked = compose.emblem().getUnclippedBoundsInRoot().bottom
 
-        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(dock = ringOf(mail))
 
         compose.dockSlot(mail).assertIsDisplayed()
         assertTrue("the dock takes space", compose.emblem().getUnclippedBoundsInRoot().bottom < undocked)
@@ -517,7 +517,7 @@ class LauncherScreenTest {
 
     @Test
     fun storedDockAppsHoldTheDockRowUntilTheAppsLoad() {
-        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(dock = ringOf(mail))
         apps = null
         show()
         val loading = compose.emblem().getUnclippedBoundsInRoot()
@@ -530,7 +530,7 @@ class LauncherScreenTest {
 
     @Test
     fun theDockLeavesWithTheHomePageAndTheOtherPagesReachTheDrawerHandle() {
-        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(dock = ringOf(mail))
         show()
         compose.dockSlot(mail).assertIsDisplayed()
 
@@ -809,7 +809,7 @@ class LauncherScreenTest {
 
     @Test
     fun removingAnAppFromTheDockKeepsItOnTheRing() {
-        homeApps = HomeApps(ring = ringOf(mail), dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = ringOf(mail), dock = ringOf(mail))
         show()
 
         compose.dockSlot(mail).performTouchInput { longClick() }
@@ -903,7 +903,7 @@ class LauncherScreenTest {
 
     @Test
     fun aDropOnTheDockCountsBeforeTheHomePageHasComeBack() {
-        homeApps = HomeApps(dock = Favourites(listOf(clock.key)))
+        homeApps = HomeApps(dock = ringOf(clock))
         show()
         val dock = centreOf(compose.dock())
         goToCollections()
@@ -918,7 +918,7 @@ class LauncherScreenTest {
             up()
         }
 
-        compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(clock.key, mail.key))), homeApps) }
+        compose.runOnIdle { assertEquals(HomeApps(dock = ringOf(clock, mail)), homeApps) }
     }
 
     @Test
@@ -934,7 +934,7 @@ class LauncherScreenTest {
         compose.dragGhost().assertDoesNotExist()
         compose.dockSlot(mail).assertIsDisplayed()
         compose.ringSlot(mail).assertDoesNotExist()
-        compose.runOnIdle { assertEquals(HomeApps(dock = Favourites(listOf(mail.key))), homeApps) }
+        compose.runOnIdle { assertEquals(HomeApps(dock = ringOf(mail)), homeApps) }
     }
 
     @Test
@@ -1042,7 +1042,7 @@ class LauncherScreenTest {
 
     @Test
     fun aDockAppLetGoOnAnEmptyRingGoesOnIt() {
-        homeApps = HomeApps(dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(dock = ringOf(mail))
         show()
 
         pickUp(compose.dockSlot(mail))
@@ -1065,7 +1065,7 @@ class LauncherScreenTest {
         pickUp(compose.ringSlot(three[0]))
         dragTo(centreOf(compose.dock()))
         letGo()
-        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(three[1], three[2]), dock = Favourites(listOf(three[0].key))), homeApps) }
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(three[1], three[2]), dock = ringOf(three[0])), homeApps) }
 
         pickUp(compose.dockSlot(three[0]))
         dragTo(centreOf(compose.ringSlot(three[2])))
@@ -1176,6 +1176,82 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aDockAppRestingOnAnotherFoldsIntoADockFolderThatOpensOnTheRing() {
+        val other = alphabet[0]
+        apps = listOf(clock, mail, other)
+        homeApps = HomeApps(ring = ringOf(other), dock = ringOf(clock, mail))
+        show()
+
+        pickUp(compose.dockSlot(clock))
+        dragTo(centreOf(compose.dockSlot(mail)))
+        rest(FOLD_MILLIS)
+        compose.dockSlot(mail).assert(hasStateDescription(FOLD_TARGET))
+        letGo()
+
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(other), dock = Ring(listOf(folderOf(mail, clock)))), homeApps) }
+        compose.dockFolder(0).assertContentDescriptionEquals("Folder, 2 apps").performClick()
+        compose.emblem().assertDoesNotExist()
+        compose.ringSlot(other).assertDoesNotExist()
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.ringSlot(clock).performClick()
+        compose.runOnIdle { assertEquals(listOf(clock), launched) }
+
+        compose.closeFolder().performClick()
+        compose.ringSlot(other).assertIsDisplayed()
+        compose.dockFolder(0).assertIsDisplayed()
+    }
+
+    // A folder is named by its slot: the dock app ahead of it going would otherwise open the next folder in its stead.
+    @Test
+    fun removingADockAppAheadOfAnOpenDockFolderClosesIt() {
+        val (first, second) = alphabet.take(2)
+        apps = listOf(clock, mail, first, second)
+        homeApps = HomeApps(dock = Ring(listOf(RingSlot.App(clock.key), folderOf(mail), folderOf(first, second))))
+        show()
+        compose.dockFolder(1).performClick()
+        compose.ringSlot(mail).assertIsDisplayed()
+
+        compose.dockSlot(clock).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from the dock").performClick()
+
+        compose.runOnIdle { assertEquals(Ring(listOf(folderOf(mail), folderOf(first, second))), homeApps.dock) }
+        compose.emblem().assertIsDisplayed()
+        compose.ringSlot(first).assertDoesNotExist()
+    }
+
+    @Test
+    fun aDockFolderMovesAlongTheDockWithItsApps() {
+        val other = alphabet[0]
+        apps = listOf(clock, mail, other)
+        homeApps = HomeApps(ring = ringOf(other), dock = Ring(listOf(folderOf(clock, mail), RingSlot.App(other.key))))
+        show()
+
+        pickUp(compose.dockFolder(0))
+        dragTo(centreOf(compose.dockSlot(other)))
+        letGo()
+
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(other.key), folderOf(clock, mail))), homeApps.dock) }
+    }
+
+    @Test
+    fun newFolderFromADockAppStartsOneInItsDockSlot() {
+        homeApps = HomeApps(dock = ringOf(clock, mail))
+        show()
+
+        compose.dockSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("New folder").performClick()
+
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Adding to folder").assertIsDisplayed()
+        compose.onNodeWithText("Clock").performClick()
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(clock.key), folderOf(mail, clock))), homeApps.dock) }
+
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+        compose.dockFolder(1).assertContentDescriptionEquals("Folder, 2 apps").assertIsDisplayed()
+    }
+
+    @Test
     fun aSecondFingerFlipsTheSwitchToSwapWhileTheFirstHoldsTheApp() {
         val four = alphabet.take(4)
         apps = four
@@ -1228,7 +1304,7 @@ class LauncherScreenTest {
     fun aDockAppMovesAlongTheDockAndTheRingStaysPut() {
         val three = alphabet.take(3)
         apps = three
-        homeApps = HomeApps(ring = ringOf(three[0]), dock = Favourites(three.map { it.key }))
+        homeApps = HomeApps(ring = ringOf(three[0]), dock = ringOf(*three.toTypedArray()))
         show()
 
         pickUp(compose.dockSlot(three[0]))
@@ -1236,7 +1312,7 @@ class LauncherScreenTest {
         letGo()
 
         compose.runOnIdle {
-            assertEquals(HomeApps(ring = ringOf(three[0]), dock = Favourites(listOf(three[1].key, three[2].key, three[0].key))), homeApps)
+            assertEquals(HomeApps(ring = ringOf(three[0]), dock = ringOf(three[1], three[2], three[0])), homeApps)
         }
     }
 
@@ -1355,7 +1431,7 @@ class LauncherScreenTest {
 
     @Test
     fun unreadCountsReachTheRingTheDockTheDrawerAndAnOpenFolder() {
-        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(clock.key), work)), dock = Favourites(listOf(mail.key)))
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(clock.key), work)), dock = ringOf(mail))
         unread = UnreadCounts(mapOf(clock.packageName to 3, mail.packageName to 7))
         show()
 
@@ -1849,7 +1925,7 @@ class LauncherScreenTest {
 
     @Test
     fun anywhereOnTheHomePageASwipeDownOpensTheNotificationsAndASwipeUpTheDrawerAndNothingElse() {
-        homeApps = HomeApps(ring = ringOf(mail), dock = Favourites(listOf(clock.key)))
+        homeApps = HomeApps(ring = ringOf(mail), dock = ringOf(clock))
         isHomeApp = false
         show()
 

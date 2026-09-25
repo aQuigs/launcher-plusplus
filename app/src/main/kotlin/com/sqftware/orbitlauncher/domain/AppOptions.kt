@@ -17,7 +17,7 @@ sealed interface AppOption {
 /** The options for [app] long-pressed in [place], or in the drawer when [place] is null, in menu order. */
 fun appOptions(app: AppEntry, place: HomePlace?): List<AppOption> = listOfNotNull(
     place?.let(AppOption::Remove),
-    AppOption.NewFolder.takeIf { place == HomePlace.Ring },
+    AppOption.NewFolder.takeIf { place is HomePlace.Slots },
     AppOption.AppInfo,
     AppOption.Uninstall.takeIf { app.canUninstall },
 )

@@ -3,15 +3,10 @@ package com.sqftware.orbitlauncher.domain
 internal const val LINE = "\n"
 internal const val FIELD = "\t"
 
-/** Favourites as text, one key per line, in order. */
-fun Favourites.encode(): String = keys.joinToString(LINE)
-
-fun decodeFavourites(text: String): Favourites = Favourites(text.nonEmptyLines())
-
 /**
- * The ring as text, one line per slot: an app is its key, and a folder is a tab followed by its keys, tab-separated. No
- * key holds a tab, so a folder is any line with one, even a folder of one app or none, and a ring stored before folders
- * is all app lines and still reads.
+ * The ring or the dock as text, one line per slot: an app is its key, and a folder is a tab followed by its keys,
+ * tab-separated. No key holds a tab, so a folder is any line with one, even a folder of one app or none, and a place
+ * stored before it had folders is all app lines and still reads.
  */
 fun Ring.encode(): String = slots.joinToString(LINE) { slot ->
     when (slot) {

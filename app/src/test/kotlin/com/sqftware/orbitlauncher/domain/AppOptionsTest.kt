@@ -12,14 +12,15 @@ class AppOptionsTest {
     }
 
     @Test
-    fun `a place on the home screen first offers to take the app out of it`() {
-        assertEquals(
-            listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder, AppOption.AppInfo, AppOption.Uninstall),
-            appOptions(maps, HomePlace.Ring),
-        )
-        for (place in listOf(HomePlace.Dock, HomePlace.Folder(2))) {
-            assertEquals(listOf(AppOption.Remove(place), AppOption.AppInfo, AppOption.Uninstall), appOptions(maps, place))
+    fun `a place on the home screen first offers to take the app out of it, and the ring and the dock a new folder`() {
+        for (place in listOf(HomePlace.Ring, HomePlace.Dock)) {
+            assertEquals(
+                listOf(AppOption.Remove(place), AppOption.NewFolder, AppOption.AppInfo, AppOption.Uninstall),
+                appOptions(maps, place),
+            )
         }
+        val folder = HomePlace.Folder(HomePlace.Dock, 2)
+        assertEquals(listOf(AppOption.Remove(folder), AppOption.AppInfo, AppOption.Uninstall), appOptions(maps, folder))
     }
 
     @Test
