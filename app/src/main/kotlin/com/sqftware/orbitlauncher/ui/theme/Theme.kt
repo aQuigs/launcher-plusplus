@@ -41,6 +41,15 @@ val RingSpark = Spark
 val RingInk = Frost.copy(alpha = 0.9f)
 val RingShade = Sky
 
+/**
+ * The edge of a folder's glass disc: a dark line round a light one, the same in both schemes. The scheme follows the
+ * wallpaper as a whole, but a disc sits on one patch of it, which may be light under the night scheme or dark under the
+ * day's, so one of the two lines has to stand out on whatever is there.
+ */
+class DiscEdge(val outer: Color, val inner: Color)
+
+val FolderEdge = DiscEdge(outer = Sky.copy(alpha = 0.5f), inner = Frost.copy(alpha = 0.5f))
+
 /** What a glyph is drawn in before `Icon` tints it, as Material's own icons are. */
 val GlyphFill = Color.Black
 

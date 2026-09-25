@@ -41,6 +41,15 @@ class LauncherColorsTest {
         }
     }
 
+    // 3:1 is the WCAG floor for a control's edge; either scheme may be showing, so it cannot lean on the scheme's colours.
+    @Test
+    fun `a folder's edge stands out on a white and on a black wallpaper`() {
+        listOf(Color.White, Color.Black).forEach { wallpaper ->
+            val best = listOf(FolderEdge.outer, FolderEdge.inner).maxOf { contrast(it.compositeOver(wallpaper), wallpaper) }
+            assertTrue("edge on $wallpaper: $best", best >= 3f)
+        }
+    }
+
     private fun contrast(a: Color, b: Color): Float {
         val (light, dark) = listOf(a.luminance(), b.luminance()).sortedDescending()
         return (light + 0.05f) / (dark + 0.05f)
