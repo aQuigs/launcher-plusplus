@@ -7,8 +7,8 @@ class UnreadTest {
     private val mail = app("Mail")
     private val chat = app("Chat")
 
-    private fun posted(app: AppEntry, summary: Boolean = false, ongoing: Boolean = false, number: Int = 0) =
-        PostedNotification(app.packageName, isGroupSummary = summary, isOngoing = ongoing, number = number)
+    private fun posted(app: AppEntry, summary: Boolean = false, ongoing: Boolean = false, media: Boolean = false, number: Int = 0) =
+        PostedNotification(app.packageName, isGroupSummary = summary, isOngoing = ongoing, isMedia = media, number = number)
 
     @Test
     fun `each notification counts one for its package`() {
@@ -29,6 +29,11 @@ class UnreadTest {
     @Test
     fun `an ongoing notification is not unread`() {
         assertEquals(UnreadCounts(), unreadCounts(listOf(posted(mail, ongoing = true))))
+    }
+
+    @Test
+    fun `a media player is not unread, playing or paused`() {
+        assertEquals(UnreadCounts(), unreadCounts(listOf(posted(mail, media = true), posted(mail, ongoing = true, media = true))))
     }
 
     @Test
@@ -75,9 +80,10 @@ class UnreadTest {
     }
 
     @Test
-    fun `a dismissed group summary or ongoing notification is not kept`() {
+    fun `a dismissed group summary, ongoing notification or media player is not kept`() {
         assertEquals(Kept(), Kept().afterRemoval("s", posted(chat, summary = true), Removal.Dismissed))
         assertEquals(Kept(), Kept().afterRemoval("o", posted(chat, ongoing = true), Removal.Dismissed))
+        assertEquals(Kept(), Kept().afterRemoval("p", posted(chat, media = true), Removal.Dismissed))
     }
 
     @Test
