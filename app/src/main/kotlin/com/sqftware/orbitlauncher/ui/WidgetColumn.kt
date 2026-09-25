@@ -24,9 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -130,7 +128,7 @@ fun WidgetColumn(
                 .onSizeChanged { size ->
                     pageRows = with(density) { ((size.height.toDp() - PAGE_PADDING * 2) / ROW_HEIGHT).toInt().coerceAtLeast(1) }
                 }
-                .verticalScroll(rememberScrollState())
+                .verticalPageScroll()
                 .padding(PAGE_PADDING),
         ) {
             if (page.isEmpty) Text("No widgets yet", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(8.dp))

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -250,6 +251,28 @@ class LauncherScreenTest {
         compose.onNodeWithText("Reset launcher").performClick()
         compose.launcherMenu().assertDoesNotExist()
         compose.resetDialog().assertIsDisplayed()
+    }
+
+    /**
+     * Drags a long collections page [up] or down and lets go, runs [meanwhile] with the clock stopped, then swipes across
+     * to the home page before whatever the drag set going can settle.
+     */
+    private fun swipeHomeFromCollectionsAfter(up: Boolean, durationMillis: Long, meanwhile: () -> Unit) {
+        collections = CollectionsPage(AppCategory.entries.map { CollectionCard(CollectionKind.Category(it), Favourites(listOf(mail.key))) })
+        show()
+        goToCollections()
+
+        compose.mainClock.autoAdvance = false
+        // Off the centre line, where each card has its reorder handle.
+        compose.swipePager {
+            val start = Offset(width / 4f, centerY)
+            swipe(start, start + Offset(0f, if (up) -200.dp.toPx() else 200.dp.toPx()), durationMillis)
+        }
+        meanwhile()
+        compose.swipePager { swipeRight() }
+        compose.mainClock.autoAdvance = true
+
+        assertSettledOn(LauncherPage.Home)
     }
 
     private fun goToCollections() {
@@ -487,6 +510,22 @@ class LauncherScreenTest {
         assertSettledOn(LauncherPage.Home)
 
         compose.dockSlot(mail).assertIsDisplayed()
+    }
+
+    @Test
+    fun aSidewaysSwipeWhileTheCollectionsPageStillScrollsTurnsThePage() {
+        val card = compose.collectionCard(CollectionKind.Category(AppCategory.Video))
+        swipeHomeFromCollectionsAfter(up = true, durationMillis = 100) {
+            compose.mainClock.advanceTimeBy(50)
+            val flinging = card.getUnclippedBoundsInRoot().top
+            compose.mainClock.advanceTimeByFrame()
+            assertTrue("the page still scrolls", card.getUnclippedBoundsInRoot().top < flinging)
+        }
+    }
+
+    @Test
+    fun aSidewaysSwipeWhileTheCollectionsPageSpringsBackFromItsTopTurnsThePage() {
+        swipeHomeFromCollectionsAfter(up = false, durationMillis = 300) { compose.mainClock.advanceTimeByFrame() }
     }
 
     @Test
