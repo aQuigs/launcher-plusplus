@@ -26,6 +26,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sqftware.orbitlauncher.apps.SystemRelauncher
 import com.sqftware.orbitlauncher.apps.SystemWallClock
+import com.sqftware.orbitlauncher.apps.SystemWallpaper
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.ui.DockTags
@@ -213,11 +214,12 @@ class MainActivityTest {
     }
 
     @Test
-    fun theSystemBarsDrawLightIconsOverTheWallpaper() {
+    fun theSystemBarsDrawIconsInTheWallpapersInk() {
         compose.activityRule.scenario.onActivity { activity ->
             val bars = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-            assertFalse("status bar icons are dark", bars.isAppearanceLightStatusBars)
-            assertFalse("navigation bar icons are dark", bars.isAppearanceLightNavigationBars)
+            val light = SystemWallpaper(activity).isLight()
+            assertEquals("status bar icons are dark on a light wallpaper only", light, bars.isAppearanceLightStatusBars)
+            assertEquals("navigation bar icons are dark on a light wallpaper only", light, bars.isAppearanceLightNavigationBars)
             assertFalse("the system draws its own backing again", activity.window.isNavigationBarContrastEnforced)
         }
     }
