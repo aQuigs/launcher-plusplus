@@ -223,7 +223,7 @@ fun HomeRing(
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark in the middle at [sparkAngle], or the hint to add apps in its place. Quiet, so the icons stay the eye's
+ * icon's spark in the middle, sky and spark turned to [sparkAngle], or the hint to add apps in its place. Quiet, so the icons stay the eye's
  * first stop.
  */
 @Composable
@@ -235,21 +235,28 @@ private fun Emblem(showHint: Boolean, sparkAngle: () -> Float, onClick: () -> Un
         modifier = Modifier
             .clip(CircleShape)
             .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
-            .drawWithCache {
-                val outer = size.emblemRadius
-                val disc = Path().apply { addOval(Rect(size.center, outer)) }
-                val edge = Stroke(1.dp.toPx())
-                val side = outer * EMBLEM_ART_PER_RADIUS
-                val art = Size(side, side)
-                val inset = (size.minDimension - side) / 2
-                onDrawBehind {
-                    clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
-                    drawCircle(RingMark.copy(alpha = 0.35f), radius = outer, style = edge)
-                }
-            }
+            .drawBehind { drawCircle(RingMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (!showHint) contentDescription = "Favourites" },
     ) {
+        // A layer of its own, so turning the sky and spark changes a property of that layer and nothing is drawn again.
+        Spacer(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = sparkAngle() }
+                .drawWithCache {
+                    val outer = size.emblemRadius
+                    val disc = Path().apply { addOval(Rect(size.center, outer)) }
+                    val side = outer * EMBLEM_ART_PER_RADIUS
+                    val art = Size(side, side)
+                    val inset = (size.minDimension - side) / 2
+                    val spark = sparkPath(size.center, outer * EMBLEM_SPARK)
+                    onDrawBehind {
+                        clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
+                        if (!showHint) drawPath(spark, RingSpark)
+                    }
+                },
+        )
         if (showHint) {
             Text(
                 text = "Add apps",
@@ -261,17 +268,6 @@ private fun Emblem(showHint: Boolean, sparkAngle: () -> Float, onClick: () -> Un
                 overflow = TextOverflow.Ellipsis,
                 // Inside the disc, clear of the sky's dust, however large the font.
                 modifier = Modifier.fillMaxWidth(0.55f),
-            )
-        } else {
-            // A layer of its own, so turning it changes a property of that layer and the sky is never drawn again.
-            Spacer(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { rotationZ = sparkAngle() }
-                    .drawWithCache {
-                        val spark = sparkPath(size.center, size.emblemRadius * EMBLEM_SPARK)
-                        onDrawBehind { drawPath(spark, RingSpark) }
-                    },
             )
         }
     }
