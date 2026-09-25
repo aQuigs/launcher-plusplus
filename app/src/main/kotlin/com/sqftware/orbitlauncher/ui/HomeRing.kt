@@ -76,7 +76,7 @@ object HomeRingTags {
 }
 
 /** The size of a ring icon while the ring has room, and of an icon being dragged onto it. */
-internal val RING_ICON_SIZE = 64.dp
+internal val RING_ICON_SIZE = 56.dp
 
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
