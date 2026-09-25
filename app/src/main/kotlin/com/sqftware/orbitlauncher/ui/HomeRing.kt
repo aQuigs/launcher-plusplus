@@ -17,10 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -92,7 +92,7 @@ private const val EMBLEM_SPARK = 0.3f
 private const val SPARK_TURN_MILLIS = 60_000
 
 /** How long the sky takes to turn once: slower than the spark, so the dust seems farther off. */
-private const val SKY_TURN_MILLIS = 180_000
+private const val SKY_TURN_MILLIS = 600_000
 
 /** Fewer items make a point, a line or a triangle whose edges cut across the emblem, so they keep a circle. */
 private const val MIN_CONSTELLATION = 4
@@ -108,7 +108,7 @@ private const val MIN_CONSTELLATION = 4
  * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
  * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
  * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends. The emblem's
- * spark turns slowly while the ring is [inSight], and holds still otherwise.
+ * sky and spark turn slowly while the ring is [inSight], and hold still otherwise.
  */
 @Composable
 fun HomeRing(
@@ -133,7 +133,7 @@ fun HomeRing(
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
-    // Here rather than in the emblem, which an open folder removes, so the spark keeps its angle across one.
+    // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
     val turning = inSight && !showHint && openFolder == null
     val spark = turnAngle(turning, SPARK_TURN_MILLIS)
     val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
