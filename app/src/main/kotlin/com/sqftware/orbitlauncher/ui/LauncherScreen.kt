@@ -872,7 +872,7 @@ fun LauncherScreen(
                             }
                         }
                         LauncherPage.Widgets -> {
-                            WidgetColumn(page = widgetPage, actions = widgets, editing = editedWidget, onEditingChange = { editingWidget = it })
+                            WidgetGrid(page = widgetPage, actions = widgets, editing = editedWidget, onEditingChange = { editingWidget = it })
                         }
                         LauncherPage.Collections -> {
                             CollectionsColumn(

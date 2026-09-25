@@ -14,19 +14,24 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.HostedWidget
-import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
+import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
+import com.sqftware.orbitlauncher.domain.WidgetResize
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -34,28 +39,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.abs
 
 @RunWith(AndroidJUnit4::class)
-class WidgetColumnTest {
+class WidgetGridTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val search = HostedWidget(id = 3, rows = 1)
-    private val game = HostedWidget(id = 8, rows = 2)
-    private val inert = HostedWidget(id = 5, rows = 1)
+    private val search = HostedWidget(id = 3, row = 0, column = 0, rows = 1, columns = 4)
+    private val game = HostedWidget(id = 8, row = 1, column = 0, rows = 2, columns = 4)
+    private val inert = HostedWidget(id = 5, row = 0, column = 0, rows = 1, columns = 4)
     private var page by mutableStateOf(WidgetPage())
-    private val added = mutableListOf<Int>()
+    private val added = mutableListOf<Pair<Int, Int>>()
     private val removed = mutableListOf<Int>()
     private val shown = mutableListOf<Int>()
     private val tapped = mutableListOf<Int>()
-    private val resized = mutableListOf<Pair<Int, Int>>()
-    private val moved = mutableListOf<Pair<Int, Int>>()
+    private val resized = mutableListOf<Triple<Int, Int, Int>>()
+    private val moved = mutableListOf<Triple<Int, Int, Int>>()
     private var editing by mutableStateOf<Int?>(null)
     private var storesAtOnce = true
     private var sizings = emptyMap<Int, WidgetSizing>()
 
     private fun show() = compose.setContent {
-        WidgetColumn(
+        WidgetGrid(
             page = page,
             actions = WidgetActions(
                 view = { context, id ->
@@ -65,15 +71,15 @@ class WidgetColumnTest {
                         if (id != inert.id) setOnClickListener { tapped += id }
                     }
                 },
-                add = added::add,
+                add = { rows, columnWidth -> added += rows to columnWidth },
                 remove = removed::add,
-                resize = { id, rows ->
-                    resized += id to rows
-                    if (storesAtOnce) page = page.resize(id, rows)
+                resize = { id, rows, columns ->
+                    resized += Triple(id, rows, columns)
+                    if (storesAtOnce) page = page.resize(id, rows, columns)
                 },
-                move = { id, to ->
-                    moved += id to to
-                    page = page.move(id, to)
+                move = { id, row, column ->
+                    moved += Triple(id, row, column)
+                    page = page.move(id, row, column)
                 },
                 sizing = { sizings[it] ?: WidgetSizing() },
             ),
@@ -83,13 +89,25 @@ class WidgetColumnTest {
     }
 
     private val row = WIDGET_ROW
+    private val gap = WIDGET_GAP_DP.dp
 
     /** The part of the page that scrolls, above the add button. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
-    private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp) / row).toInt()
+    private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp + gap) / (row + gap)).toInt()
 
-    private fun rowPx() = with(compose.density) { row.toPx() }
+    private fun columnWidth() = (scroller().getUnclippedBoundsInRoot().width - 32.dp - gap * 3) / 4
+
+    private fun columnSpan(cells: Int) = columnWidth() * cells + gap * (cells - 1)
+
+    private fun rowPx() = with(compose.density) { (row + gap).toPx() }
+
+    private fun columnPx() = with(compose.density) { (columnWidth() + gap).toPx() }
+
+    private fun bounds(widget: HostedWidget) = compose.widget(widget).getUnclippedBoundsInRoot()
+
+    // Within a pixel, as the cells are placed on whole pixels.
+    private fun assertNear(expected: Dp, actual: Dp) = assertTrue("$actual is not $expected", abs((expected - actual).value) <= 1f)
 
     // Within its bottom padding and the button's own touch margin.
     private fun assertAddButtonAtTheBottom() {
@@ -110,29 +128,39 @@ class WidgetColumnTest {
 
     @Test
     fun theAddButtonAsksForAWidgetSizedForThePage() {
+        page = WidgetPage(listOf(search))
         show()
         val pageRows = pageRows()
+        val columnWidth = columnWidth()
 
         compose.addWidgetButton().performClick()
 
-        compose.runOnIdle { assertEquals(listOf(pageRows), added) }
+        compose.runOnIdle { assertEquals(listOf(pageRows to columnWidth.value.toInt()), added) }
         assertTrue("$pageRows rows fit the page", pageRows >= 4)
     }
 
     @Test
-    fun widgetsStackInOrderAtTheirHeightsWithTheButtonAtTheBottom() {
-        page = WidgetPage(listOf(search, game))
+    fun widgetsSitInTheirCellsSideBySideAndLeaveEmptyCellsEmpty() {
+        val clock = HostedWidget(id = 9, row = 0, column = 0, rows = 1, columns = 2)
+        val battery = HostedWidget(id = 10, row = 0, column = 3, rows = 2, columns = 1)
+        val notes = HostedWidget(id = 11, row = 3, column = 1, rows = 1, columns = 3)
+        page = WidgetPage(listOf(clock, battery, notes))
         show()
 
-        val first = compose.widget(search).assertIsDisplayed().getUnclippedBoundsInRoot()
-        val second = compose.widget(game).assertIsDisplayed().getUnclippedBoundsInRoot()
-        val button = compose.addWidgetButton().getUnclippedBoundsInRoot()
-        assertEquals(WIDGET_ROW_HEIGHT_DP.dp, first.height)
-        assertEquals((2 * WIDGET_ROW_HEIGHT_DP).dp, second.height)
-        assertTrue("$first, $second, $button", first.bottom <= second.top && second.bottom <= button.top)
+        val origin = bounds(clock)
+        val batteryAt = bounds(battery)
+        val notesAt = bounds(notes)
+        assertNear(columnSpan(2), origin.width)
+        assertNear(row, origin.height)
+        assertNear(origin.left + (columnWidth() + gap) * 3, batteryAt.left)
+        assertNear(origin.top, batteryAt.top)
+        assertNear(widgetSpan(2), batteryAt.height)
+        assertNear(origin.left + columnWidth() + gap, notesAt.left)
+        assertNear(origin.top + (row + gap) * 3, notesAt.top)
+        assertNear(columnSpan(3), notesAt.width)
         assertAddButtonAtTheBottom()
         compose.onNodeWithText("No widgets yet").assertDoesNotExist()
-        compose.runOnIdle { assertEquals(listOf(search.id, game.id), shown) }
+        compose.runOnIdle { assertEquals(listOf(clock.id, battery.id, notes.id), shown) }
     }
 
     @Test
@@ -166,44 +194,62 @@ class WidgetColumnTest {
     }
 
     @Test
-    fun aLongPressThatDragsOnMovesTheWidgetAndItStaysWhereItIsLetGo() {
-        page = WidgetPage(listOf(search, game))
+    fun aLongPressThatDragsOnMovesTheWidgetToEmptyCellsAndItStaysWhereItIsLetGo() {
+        val small = game.copy(columns = 2)
+        page = WidgetPage(listOf(search, small))
         show()
-        val searchTop = compose.widget(search).getUnclippedBoundsInRoot().top
+        val searchAt = bounds(search)
+        val smallAt = bounds(small)
 
-        compose.widget(game).performTouchInput { down(center) }
+        compose.widget(small).performTouchInput { down(center) }
         compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithTag(WidgetTags.EDIT).fetchSemanticsNodes().isNotEmpty() }
-        compose.widget(game).performTouchInput {
-            moveBy(Offset(0f, -rowPx()))
-            moveBy(Offset(0f, -rowPx()))
+        compose.widget(small).performTouchInput {
+            moveBy(Offset(columnPx(), rowPx()))
+            moveBy(Offset(columnPx(), rowPx()))
         }
-        assertTrue("the others make way while it is held", compose.widget(search).getUnclippedBoundsInRoot().top > searchTop)
-        compose.runOnIdle { assertEquals("nothing is stored while it is held", emptyList<Pair<Int, Int>>(), moved) }
-        compose.widget(game).performTouchInput { up() }
+        val landing = compose.onNodeWithTag(WidgetTags.LANDING).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertNear(smallAt.left + (columnWidth() + gap) * 2, landing.left)
+        assertNear(smallAt.top + (row + gap) * 2, landing.top)
+        compose.runOnIdle { assertEquals("nothing is stored while it is held", emptyList<Triple<Int, Int, Int>>(), moved) }
+        compose.widget(small).performTouchInput { up() }
 
-        compose.runOnIdle { assertEquals(listOf(game.id to 0), moved) }
-        assertEquals(searchTop, compose.widget(game).getUnclippedBoundsInRoot().top)
-        assertTrue(compose.widget(game).getUnclippedBoundsInRoot().bottom <= compose.widget(search).getUnclippedBoundsInRoot().top)
-        compose.runOnIdle { assertEquals("it stays edited", game.id, editing) }
+        compose.runOnIdle { assertEquals(listOf(Triple(small.id, 3, 2)), moved) }
+        compose.onNodeWithTag(WidgetTags.LANDING).assertDoesNotExist()
+        assertNear(landing.left, bounds(small).left)
+        assertNear(landing.top, bounds(small).top)
+        assertEquals("the widget above keeps its place", searchAt, bounds(search))
+        compose.runOnIdle { assertEquals("it stays edited", small.id, editing) }
     }
 
     @Test
-    fun aPressHeldOnTheEditedWidgetMovesIt() {
+    fun aPressHeldOnTheEditedWidgetMovesItAndTheWidgetsItCoversMakeWayBelow() {
         page = WidgetPage(listOf(search, game))
         show()
+        val gameTop = bounds(game).top
         compose.longPressWidget(search)
-        compose.runOnIdle { assertEquals("a long press that does not move moves nothing", emptyList<Pair<Int, Int>>(), moved) }
+        compose.runOnIdle { assertEquals("a long press that does not move moves nothing", emptyList<Triple<Int, Int, Int>>(), moved) }
 
         compose.widget(search).performTouchInput { down(center) }
         compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
-        compose.widget(search).performTouchInput {
-            moveBy(Offset(0f, rowPx()))
-            moveBy(Offset(0f, rowPx()))
-            up()
-        }
+        compose.widget(search).performTouchInput { moveBy(Offset(0f, rowPx())) }
+        compose.mainClock.advanceTimeBy(1_000)
+        assertTrue("the others make way while it is held", bounds(game).top > gameTop)
+        compose.widget(search).performTouchInput { up() }
 
-        compose.runOnIdle { assertEquals(listOf(search.id to 1), moved) }
-        assertTrue(compose.widget(game).getUnclippedBoundsInRoot().bottom <= compose.widget(search).getUnclippedBoundsInRoot().top)
+        compose.runOnIdle { assertEquals(listOf(Triple(search.id, 1, 0)), moved) }
+        assertNear(gameTop, bounds(search).top)
+        assertTrue(bounds(search).bottom <= bounds(game).top)
+    }
+
+    @Test
+    fun aLongPressThatDoesNotMoveLeavesNoLandingBehind() {
+        page = WidgetPage(listOf(search, game))
+        show()
+
+        compose.longPressWidget(game)
+
+        compose.widgetEditFrame().assertIsDisplayed()
+        compose.onNodeWithTag(WidgetTags.LANDING).assertDoesNotExist()
     }
 
     @Test
@@ -237,49 +283,66 @@ class WidgetColumnTest {
     }
 
     @Test
-    fun theHandleResizesTheWidgetInWholeRowsAsItIsDraggedAndStoresTheRowsOnRelease() {
+    fun theHandleResizesTheWidgetInWholeCellsBothWaysAndStoresThemOnRelease() {
         // First, so that at the page's full height its handle is still on screen.
-        page = WidgetPage(listOf(game, search))
+        page = WidgetPage(listOf(game.copy(row = 0), search.copy(row = 2)))
         show()
-        compose.longPressWidget(game)
+        val top = game.copy(row = 0)
+        compose.longPressWidget(top)
 
         compose.widgetResizeHandle().performTouchInput {
             down(center)
-            moveBy(Offset(0f, rowPx() * 1.7f))
+            moveBy(Offset(-columnPx() * 1.3f, rowPx() * 1.7f))
         }
-        assertEquals(row * 4, compose.widgetHeight(game))
-        compose.runOnIdle { assertEquals("nothing is stored while the handle is held", emptyList<Pair<Int, Int>>(), resized) }
+        assertNear(widgetSpan(4), bounds(top).height)
+        assertNear(columnSpan(3), compose.widgetEditFrame().getUnclippedBoundsInRoot().width)
+        compose.runOnIdle { assertEquals("nothing is stored while the handle is held", emptyList<Triple<Int, Int, Int>>(), resized) }
         compose.widgetResizeHandle().performTouchInput { up() }
-        compose.runOnIdle { assertEquals(listOf(game.id to 4), resized) }
-        assertEquals(row * 4, compose.widgetHeight(game))
+        compose.runOnIdle { assertEquals(listOf(Triple(top.id, 4, 3)), resized) }
+        assertNear(widgetSpan(4), bounds(top).height)
+        assertNear(columnSpan(3), bounds(top).width)
+        assertTrue("the widget below makes way", bounds(top).bottom <= bounds(search).top)
 
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 50) }
         val tallest = compose.runOnIdle { resized.last().second }
         assertTrue("$tallest rows", tallest > 4)
-        val shown = scroller().getUnclippedBoundsInRoot()
-        assertTrue("the widget stops above the button", compose.widget(game).getUnclippedBoundsInRoot().bottom <= shown.bottom - 16.dp)
+        val area = scroller().getUnclippedBoundsInRoot()
+        assertTrue("the widget stops above the button", bounds(top).bottom <= area.bottom - 16.dp)
     }
 
     @Test
-    fun theWidgetHoldsTheDraggedRowsUntilTheyAreStored() {
+    fun theHandleStopsAtThePagesRightEdge() {
+        val small = HostedWidget(id = 9, row = 0, column = 2, rows = 1, columns = 1)
+        page = WidgetPage(listOf(small))
+        show()
+        compose.longPressWidget(small)
+
+        compose.widgetResizeHandle().performTouchInput { swipe(center, center + Offset(columnPx() * 3, 0f)) }
+
+        compose.runOnIdle { assertEquals(listOf(Triple(small.id, 1, 2)), resized) }
+    }
+
+    @Test
+    fun theWidgetHoldsTheDraggedCellsUntilTheyAreStored() {
         page = WidgetPage(listOf(game))
         storesAtOnce = false
         show()
         compose.longPressWidget(game)
 
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx()) }
-        compose.runOnIdle { assertEquals(listOf(game.id to 3), resized) }
-        assertEquals(row * 3, compose.widgetHeight(game))
+        compose.runOnIdle { assertEquals(listOf(Triple(game.id, 3, 4)), resized) }
+        assertNear(widgetSpan(3), compose.widgetHeight(game))
 
-        page = page.resize(game.id, 3)
-        assertEquals(row * 3, compose.widgetHeight(game))
+        page = page.resize(game.id, 3, 4)
+        assertNear(widgetSpan(3), compose.widgetHeight(game))
     }
 
     @Test
     fun aWidgetTallerThanThePageKeepsItsRowsUntilItIsDraggedAndResizesFromThere() {
+        page = WidgetPage(listOf(search))
         show()
         val rows = pageRows() + 2
-        val tall = HostedWidget(id = 11, rows = rows)
+        val tall = HostedWidget(id = 11, row = 0, column = 0, rows = rows, columns = 4)
         page = WidgetPage(listOf(tall))
         compose.longPressWidget(tall)
         // The last widget's handle reaches into the page's bottom padding, which performScrollTo never counts as in view,
@@ -289,15 +352,20 @@ class WidgetColumnTest {
         compose.widgetResizeHandle().assertIsDisplayed()
 
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 0.3f) }
-        assertEquals(row * rows, compose.widgetHeight(tall))
+        assertNear(widgetSpan(rows), compose.widgetHeight(tall))
         compose.widgetResizeHandle().performTouchInput { swipeUp(centerY, centerY - rowPx()) }
-        compose.runOnIdle { assertEquals("only a change is stored", listOf(tall.id to rows - 1), resized) }
+        compose.runOnIdle { assertEquals("only a change is stored", listOf(Triple(tall.id, rows - 1, 4)), resized) }
     }
 
     @Test
-    fun aWidgetThatCannotTakeAnotherHeightHasNoHandle() {
+    fun aWidgetThatCannotTakeAnotherSizeHasNoHandle() {
         page = WidgetPage(listOf(search, game))
-        sizings = mapOf(game.id to WidgetSizing(vertical = false), search.id to WidgetSizing(maxResizeHeightDp = 80))
+        // Minimums that take the widgets' own cells.
+        val fullWidth = WidgetResize(resizable = false, minDp = 2000)
+        sizings = mapOf(
+            game.id to WidgetSizing(vertical = WidgetResize(resizable = false, minDp = 160), horizontal = fullWidth),
+            search.id to WidgetSizing(vertical = WidgetResize(maxResizeDp = 80), horizontal = fullWidth),
+        )
         show()
 
         compose.longPressWidget(game)
@@ -312,15 +380,16 @@ class WidgetColumnTest {
 
     @Test
     fun aScrollStartingOnAWidgetStillScrollsThePageWhileOneIsEdited() {
+        page = WidgetPage(listOf(search))
         show()
-        val tall = HostedWidget(id = 11, rows = pageRows())
+        val tall = HostedWidget(id = 11, row = 1, column = 0, rows = pageRows(), columns = 4)
         page = WidgetPage(listOf(search, tall))
         compose.longPressWidget(search)
-        val top = compose.widget(search).getUnclippedBoundsInRoot().top
+        val top = bounds(search).top
 
         compose.widget(tall).performTouchInput { swipeUp(centerY, centerY - rowPx() * 2) }
 
-        assertTrue("the page scrolled", compose.widget(search).getUnclippedBoundsInRoot().top < top)
+        assertTrue("the page scrolled", bounds(search).top < top)
         compose.runOnIdle { assertEquals(search.id, editing) }
     }
 }
