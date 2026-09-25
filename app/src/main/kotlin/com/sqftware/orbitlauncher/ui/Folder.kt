@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
-import com.sqftware.orbitlauncher.ui.theme.RingSpark
 
 object FolderTags {
     const val MENU = "folder_options"
@@ -155,8 +155,8 @@ internal fun SlotIcon(
     }
 }
 
-/** An item lit as the one an app let go now would fold into: a little larger, ringed with the spark's colour. */
-internal fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {
+/** An item lit as the one an app let go now would fold into: a little larger, ringed in [colour]. */
+internal fun Modifier.foldTarget(lit: Boolean, colour: Color): Modifier = if (!lit) {
     this
 } else {
     this
@@ -165,7 +165,7 @@ internal fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {
             scaleX = FOLD_TARGET_SCALE
             scaleY = FOLD_TARGET_SCALE
         }
-        .drawBehind { drawCircle(RingSpark, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
+        .drawBehind { drawCircle(colour, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
 }
 
 private const val FOLD_TARGET_SCALE = 1.12f

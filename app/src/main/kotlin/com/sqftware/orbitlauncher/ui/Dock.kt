@@ -19,6 +19,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.dockRow
+import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
 import kotlin.math.roundToInt
 
 object DockTags {
@@ -56,6 +57,7 @@ fun Dock(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
+    val marks = LocalRingColors.current
 
     Layout(
         content = {
@@ -66,7 +68,7 @@ fun Dock(
                     is RingItem.Folder -> DockTags.folder(item.at.index)
                 }
                 key(tag) {
-                    val slot = Modifier.testTag(tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
+                    val slot = Modifier.testTag(tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget, marks.lit)
                     SlotIcon(item, icon, onLaunch, onOpenFolder, slot, menu, folderMenu, unread, rearrange?.drag(index))
                 }
             }

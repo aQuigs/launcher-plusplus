@@ -1,16 +1,26 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -29,6 +39,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.Layout
@@ -49,9 +60,10 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
-import com.sqftware.orbitlauncher.ui.theme.RingMark
+import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
+import com.sqftware.orbitlauncher.ui.theme.RingInk
+import com.sqftware.orbitlauncher.ui.theme.RingShade
 import com.sqftware.orbitlauncher.ui.theme.RingSpark
-import com.sqftware.orbitlauncher.ui.theme.RingStarLine
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -69,18 +81,21 @@ internal val RING_ICON_SIZE = 64.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
-/** The emblem's hint: the mark at its most present. */
-private val Ink = RingMark.copy(alpha = 0.9f)
-
 /** The launcher icon's sky, 108 wide, at 2.475 times the emblem's radius, which puts its dust between spark and edge. */
 private const val EMBLEM_ART_PER_RADIUS = 2.475f
 private const val EMBLEM_SPARK = 0.3f
+
+/** How long the spark takes to turn once: slow enough to read as drift, not a spinner. */
+private const val SPARK_TURN_MILLIS = 60_000
+
+/** How long the sky takes to turn once: slower than the spark, so the dust seems farther off. */
+private const val SKY_TURN_MILLIS = 600_000
 
 /** Fewer items make a point, a line or a triangle whose edges cut across the emblem, so they keep a circle. */
 private const val MIN_CONSTELLATION = 4
 
 /**
- * The [ring] of favourite apps and folders, joined like the stars of the launcher icon, round a static emblem. Tap an
+ * The [ring] of favourite apps and folders, joined like the stars of the launcher icon, round an emblem. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
  * the emblem to choose the favourites on the ring and in the dock. With [showHint] the emblem invites you to add apps
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
@@ -89,7 +104,8 @@ private const val MIN_CONSTELLATION = 4
  * With [rearrange], a long press that moves on picks up what is in a slot to move it round the ring, or round the open
  * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
  * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
- * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends.
+ * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends. The emblem's
+ * sky and spark turn slowly while the ring is [inSight], and hold still otherwise.
  */
 @Composable
 fun HomeRing(
@@ -110,16 +126,26 @@ fun HomeRing(
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
     held: AppEntry? = null,
+    inSight: Boolean = true,
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
+    val marks = LocalRingColors.current
+    // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
+    val turning = inSight && !showHint && openFolder == null
+    val spark = turnAngle(turning, SPARK_TURN_MILLIS)
+    val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
     // The one layout both the drawn lines and the icons follow.
     fun Density.layoutOn(side: Float) = ringLayout(RING_ICON_SIZE.toPx(), side, slots, RING_EDGE_MARGIN.toPx())
 
     Layout(
         content = {
             val moving = rearrange?.moving
-            if (openFolder != null) CloseFolderTarget(onClick = onCloseFolder) else Emblem(showHint = showHint, onClick = onEdit)
+            if (openFolder != null) {
+                CloseFolderTarget(onClick = onCloseFolder)
+            } else {
+                Emblem(showHint = showHint, skyAngle = { skyTurn.value }, sparkAngle = { spark.value }, onClick = onEdit)
+            }
             // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
             // gesture moving it, while it moves round and while the folder it is dragged out of closes under the finger.
             val items = if (openFolder != null) {
@@ -133,7 +159,7 @@ fun HomeRing(
                 key(item.tag) {
                     // The held app is laid out apart, unseen, and is no position to drop on.
                     val slot = if (index < slots) {
-                        Modifier.testTag(item.tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
+                        Modifier.testTag(item.tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget, marks.lit)
                     } else {
                         Modifier.alpha(0f)
                     }
@@ -159,12 +185,12 @@ fun HomeRing(
                 // An icon's disc can be glass the wallpaper shows through, a folder's always is, so the lines stop at its edge.
                 val discs = Path().apply { stars.forEach { addOval(Rect(it, iconSize / 2)) } }
                 onDrawBehind {
-                    if (glow > 0f) drawCircle(RingMark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
+                    if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     clipPath(discs, ClipOp.Difference) {
                         if (slots >= MIN_CONSTELLATION) {
-                            drawPath(constellation, RingStarLine.copy(alpha = RingStarLine.alpha + 0.3f * glow), style = lines)
+                            drawPath(constellation, marks.starLine.copy(alpha = marks.starLine.alpha + 0.3f * glow), style = lines)
                         } else {
-                            drawCircle(RingMark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
+                            drawCircle(marks.mark.copy(alpha = 0.22f + 0.48f * glow), radius = radius, style = track)
                         }
                     }
                 }
@@ -196,40 +222,54 @@ fun HomeRing(
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark in the middle, or the hint to add apps in its place. Quiet, so the icons stay the eye's first stop.
+ * icon's spark in the middle, the sky turned to [skyAngle] and the spark to [sparkAngle], or the hint to add apps in its
+ * place. Quiet, so the icons stay the eye's first stop.
  */
 @Composable
-private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
+private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
+    val edgeMark = LocalRingColors.current.mark
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(CircleShape)
             .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
-            .drawWithCache {
-                val outer = size.minDimension / 2 * 0.96f
-                val disc = Path().apply { addOval(Rect(size.center, outer)) }
-                val edge = Stroke(1.dp.toPx())
-                val side = outer * EMBLEM_ART_PER_RADIUS
-                val art = Size(side, side)
-                val inset = (size.minDimension - side) / 2
-                val spark = sparkPath(size.center, outer * EMBLEM_SPARK)
-                onDrawBehind {
-                    clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
-                    drawCircle(RingMark.copy(alpha = 0.35f), radius = outer, style = edge)
-                    if (!showHint) drawPath(spark, RingSpark)
-                }
-            }
+            .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (!showHint) contentDescription = "Favourites" },
     ) {
-        if (showHint) {
+        // Sky and spark each on a layer of their own, so turning them changes a property of the layer and nothing is drawn
+        // again.
+        Spacer(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = skyAngle() }
+                .drawWithCache {
+                    val outer = size.emblemRadius
+                    val disc = Path().apply { addOval(Rect(size.center, outer)) }
+                    val side = outer * EMBLEM_ART_PER_RADIUS
+                    val art = Size(side, side)
+                    val inset = (size.minDimension - side) / 2
+                    onDrawBehind { clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } } }
+                },
+        )
+        if (!showHint) {
+            Spacer(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { rotationZ = sparkAngle() }
+                    .drawWithCache {
+                        val spark = sparkPath(size.center, size.emblemRadius * EMBLEM_SPARK)
+                        onDrawBehind { drawPath(spark, RingSpark) }
+                    },
+            )
+        } else {
             Text(
                 text = "Add apps",
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
-                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(MaterialTheme.colorScheme.scrim, blurRadius = 6f)),
-                color = Ink,
+                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(RingShade, blurRadius = 6f)),
+                color = RingInk,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -238,6 +278,24 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
             )
         }
     }
+}
+
+private val Size.emblemRadius get() = minDimension / 2 * 0.96f
+
+/**
+ * An angle in degrees, a turn every [millis] while [turning]. Otherwise no animation asks for frames, so a home page
+ * nobody sees does not redraw the window, and the angle holds, so what it turns never jumps.
+ */
+@Composable
+private fun turnAngle(turning: Boolean, millis: Int): State<Float> {
+    val rest = remember { mutableFloatStateOf(0f) }
+    if (!turning) return rest
+
+    val from = rest.floatValue
+    val turn = rememberInfiniteTransition(label = "turn")
+        .animateFloat(from, from + 360f, infiniteRepeatable(tween(millis, easing = LinearEasing)), label = "turn")
+    DisposableEffect(Unit) { onDispose { rest.floatValue = turn.value % 360f } }
+    return turn
 }
 
 /** The launcher icon's four-point spark, [half] from its [centre] to each tip, its sides bowed in as on the icon. */

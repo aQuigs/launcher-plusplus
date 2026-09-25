@@ -89,7 +89,7 @@ object LauncherTags {
 
 private val DRAWER_PEEK = 48.dp
 
-/** How far above the drawer's strip the shade along the bottom edge starts to darken the wallpaper. */
+/** How far above the drawer's strip the shade along the bottom edge starts. */
 private val BOTTOM_SHADE_FADE = 32.dp
 
 /** A HOME press. [launcherInFront] is false when the press brought the launcher back from another app. */
@@ -108,7 +108,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closes it; its own menu fills it from the drawer or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
- * [widgets]; a long press puts a widget in edit mode, to resize or remove it, until a tap elsewhere or the page goes
+ * [widgets]; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
  * out of view. The collections page shows the cards of [collections], the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
  * pencil opens an editor over the screen that adds apps to it, and the button under the cards opens the picker that adds
@@ -286,6 +286,9 @@ fun LauncherScreen(
     // drawer's chevron must not, so they go while either is up. Not animated: the overlays come and go in a frame,
     // and pages fading back in would be tappable before they could be seen.
     val overlayOpen = editing != null || pickingCollection
+    // Every page stays composed, so the home page must be told when nobody can see it.
+    val homeSettled by remember(pagerState, layout) { derivedStateOf { pagerState.settledPage == layout.homeIndex } }
+    val homeInSight = homeSettled && !drawerOpen && !overlayOpen
     LaunchedEffect(editing) {
         if (editing == null) {
             justPicked = emptySet()
@@ -697,8 +700,8 @@ fun LauncherScreen(
     val panel = MaterialTheme.colorScheme.surfaceDim
     val scrim = MaterialTheme.colorScheme.scrim
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
-    // edge lines up with nothing of ours. It is only there to lift the light navigation icons off a bright wallpaper, so
-    // it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
+    // edge lines up with nothing of ours. It is in the scrim, the opposite of the navigation icons' ink, only to lift them
+    // off the wallpaper, so it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
     // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it.
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(
@@ -833,6 +836,7 @@ fun LauncherScreen(
                                         rearrange = if (open != null) folderRearrange else ringRearrange,
                                         foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                         held = (dragged as? Drag.OutOfFolder)?.app,
+                                        inSight = homeInSight,
                                     )
                                     // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                     // the ring, which sizes itself to the room left, so the two can never overlap.

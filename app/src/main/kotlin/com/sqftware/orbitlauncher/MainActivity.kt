@@ -30,6 +30,7 @@ import com.sqftware.orbitlauncher.apps.SystemAppUsage
 import com.sqftware.orbitlauncher.apps.SystemRelauncher
 import com.sqftware.orbitlauncher.apps.SystemRinger
 import com.sqftware.orbitlauncher.apps.SystemWallClock
+import com.sqftware.orbitlauncher.apps.SystemWallpaper
 import com.sqftware.orbitlauncher.apps.SystemWidgetHost
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -53,15 +54,13 @@ class MainActivity : ComponentActivity() {
     private val pinRequests = pinRequestChannel.receiveAsFlow()
     private lateinit var repository: LauncherAppsRepository
     private lateinit var widgetHost: SystemWidgetHost
+    private var barsLight: Boolean? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // LauncherTheme is dark only, so both bars draw light icons whatever the system theme. Dark also drops the backing
-        // the system draws behind three-button navigation: LauncherScreen shades the bottom edge itself.
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-        )
+        val wallpaper = SystemWallpaper(this)
+        val lightAtStart = wallpaper.isLight()
+        showBarsFor(lightAtStart)
         repository = LauncherAppsRepository(this)
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
@@ -80,15 +79,22 @@ class MainActivity : ComponentActivity() {
             add = widgetHost::add,
             remove = widgetHost::remove,
             resize = widgetHost::resize,
+            move = widgetHost::move,
             sizing = widgetHost::sizing,
         )
         val layout = PageLayout()
         val actions = AppActions(
             icon = repository::icon,
-            launch = repository::launch,
+            launch = {
+                badges.opened(it.packageName)
+                repository.launch(it)
+            },
             shortcuts = repository::shortcuts,
             shortcutIcon = repository::shortcutIcon,
-            startShortcut = repository::startShortcut,
+            startShortcut = {
+                badges.opened(it.packageName)
+                repository.startShortcut(it)
+            },
             openAppInfo = repository::openAppInfo,
             uninstall = repository::uninstall,
         )
@@ -97,7 +103,13 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) askToPin(intent)
 
         setContent {
-            LauncherTheme {
+            // Read before the first frame, so the launcher never flashes the other look. A new wallpaper is set from
+            // elsewhere, so it is followed while the launcher is visible and read again on each return.
+            val lightWallpaper by produceState(lightAtStart) {
+                repeatOnLifecycle(Lifecycle.State.STARTED) { wallpaper.lightness().collect { value = it } }
+            }
+            LaunchedEffect(lightWallpaper) { showBarsFor(lightWallpaper) }
+            LauncherTheme(lightWallpaper = lightWallpaper) {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys.
@@ -219,5 +231,19 @@ class MainActivity : ComponentActivity() {
         if (intent.component?.className != PIN_REQUESTS) return
         val pin = repository.pinRequest(intent) ?: return
         pinRequestChannel.trySend(PinRequest(pin.shortcut, pin.appLabel, pin::icon, pin::accept))
+    }
+
+    // The bars draw their icons in the same ink as LauncherTheme for the wallpaper, whatever the system theme. A fixed
+    // style also drops the backing the system draws behind three-button navigation: LauncherScreen shades the bottom edge
+    // itself.
+    private fun showBarsFor(lightWallpaper: Boolean) {
+        if (lightWallpaper == barsLight) return
+        barsLight = lightWallpaper
+        val style = if (lightWallpaper) {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
     }
 }
