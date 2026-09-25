@@ -19,3 +19,13 @@ fun <T> List<T>.reordered(from: Int, to: Int, mode: ReorderMode): List<T> {
         }
     }
 }
+
+/** The position in this list of the item that [reordered], given the same [from], [to] and [mode], puts at [position]. */
+fun <T> List<T>.reorderedFrom(position: Int, from: Int, to: Int, mode: ReorderMode): Int = when {
+    from !in indices || to !in indices -> position
+    position == to -> from
+    mode == ReorderMode.Swap -> if (position == from) to else position
+    position in from..<to -> position + 1
+    position in to + 1..from -> position - 1
+    else -> position
+}

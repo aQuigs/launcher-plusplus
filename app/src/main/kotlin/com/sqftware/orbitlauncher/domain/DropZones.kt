@@ -7,9 +7,9 @@ import kotlin.math.min
 data class Bounds(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     fun contains(x: Float, y: Float): Boolean = x in left..right && y in top..bottom
 
-    /** Whether ([x], [y]) is within the largest disc that fits, centred. */
-    fun discContains(x: Float, y: Float): Boolean =
-        hypot(x - (left + right) / 2, y - (top + bottom) / 2) <= min(right - left, bottom - top) / 2
+    /** Whether ([x], [y]) is within the largest disc that fits, centred, or that disc shrunk to [fraction] of it. */
+    fun discContains(x: Float, y: Float, fraction: Float = 1f): Boolean =
+        hypot(x - (left + right) / 2, y - (top + bottom) / 2) <= min(right - left, bottom - top) * fraction / 2
 }
 
 /**

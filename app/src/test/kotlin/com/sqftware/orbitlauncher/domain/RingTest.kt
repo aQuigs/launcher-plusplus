@@ -76,6 +76,17 @@ class RingTest {
     }
 
     @Test
+    fun `a folder is removed if it shows no app, and nothing else is`() {
+        val ring = Ring(listOf(RingSlot.App(clock.key), folder(), folder(mail), folder(maps)))
+        val installed = setOf(clock.key, mail.key)
+
+        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder(mail), folder(maps))), ring.removeIfEmpty(1, installed))
+        assertEquals(Ring(listOf(RingSlot.App(clock.key), folder(), folder(mail))), ring.removeIfEmpty(3, installed))
+        assertEquals(ring, ring.removeIfEmpty(0, installed))
+        assertEquals(ring, ring.removeIfEmpty(2, installed))
+    }
+
+    @Test
     fun `toggling into a slot that is not a folder changes nothing`() {
         val ring = ringOf(clock)
 

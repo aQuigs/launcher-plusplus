@@ -13,7 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.Layout
@@ -35,6 +38,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -85,7 +89,9 @@ private const val MIN_CONSTELLATION = 4
  * land. An [openFolder] takes the ring over: its apps sit in the slots, each with the [folderAppMenu], and the emblem
  * gives way to a target that calls [onCloseFolder]. Each app wears its [unread] count, and a folder the sum of its apps'.
  * With [rearrange], a long press that moves on picks up what is in a slot to move it round the ring, or round the open
- * folder; while one is on the move, the slots show where everything would be if it were dropped.
+ * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
+ * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
+ * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends.
  */
 @Composable
 fun HomeRing(
@@ -104,6 +110,8 @@ fun HomeRing(
     folderAppMenu: AppMenu? = null,
     unread: UnreadCounts = UnreadCounts(),
     rearrange: Rearrange? = null,
+    foldTarget: Int? = null,
+    held: AppEntry? = null,
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
@@ -113,34 +121,28 @@ fun HomeRing(
     Layout(
         content = {
             val moving = rearrange?.moving
-            if (openFolder != null) {
-                CloseFolderTarget(onClick = onCloseFolder)
-                moving.shown(openFolder.apps).forEachIndexed { index, app ->
-                    key(app.key) {
-                        val slot = Modifier.testTag(HomeRingTags.slot(app)).reorderSlot(rearrange, index, moving?.at == index)
-                        AppIcon(app, icon, onLaunch, slot, folderAppMenu, unread[app], rearrange?.drag(index))
-                    }
-                }
+            if (openFolder != null) CloseFolderTarget(onClick = onCloseFolder) else Emblem(showHint = showHint, onClick = onEdit)
+            // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
+            // gesture moving it, while it moves round and while the folder it is dragged out of closes under the finger.
+            val items = if (openFolder != null) {
+                moving.shown(openFolder.apps).map(RingItem::App)
             } else {
-                Emblem(showHint = showHint, onClick = onEdit)
-                // Keyed outside the branches, so an item moving round while it is dragged keeps its node and the gesture.
-                moving.shown(ring).forEachIndexed { index, item ->
-                    val itemKey: Any = when (item) {
-                        is RingItem.App -> item.app.key
-                        is RingItem.Folder -> item.index
+                moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
+            }
+            val appMenu = if (openFolder != null) folderAppMenu else menu
+            items.forEachIndexed { index, item ->
+                // By its tag, which names an app or a folder once on the ring.
+                key(item.tag) {
+                    // The held app is laid out apart, unseen, and is no position to drop on.
+                    val slot = if (index < slots) {
+                        Modifier.testTag(item.tag).reorderSlot(rearrange, index, moving?.at == index).foldTarget(index == foldTarget)
+                    } else {
+                        Modifier.alpha(0f)
                     }
-                    key(itemKey) {
-                        val drag = rearrange?.drag(index)
-                        when (item) {
-                            is RingItem.App -> {
-                                val slot = Modifier.testTag(HomeRingTags.slot(item.app)).reorderSlot(rearrange, index, moving?.at == index)
-                                AppIcon(item.app, icon, onLaunch, slot, menu, unread[item.app], drag)
-                            }
-                            is RingItem.Folder -> {
-                                val slot = Modifier.testTag(HomeRingTags.folder(item.index)).reorderSlot(rearrange, index, moving?.at == index)
-                                FolderIcon(item, icon, onOpenFolder, slot, folderMenu, unread.sum(item.apps), drag)
-                            }
-                        }
+                    val drag = rearrange?.drag(index)
+                    when (item) {
+                        is RingItem.App -> AppIcon(item.app, icon, onLaunch, slot, appMenu, unread[item.app], drag)
+                        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, slot, folderMenu, unread.sum(item.apps), drag)
                     }
                 }
             }
@@ -179,9 +181,11 @@ fun HomeRing(
         val centreSize = (side * EMBLEM_FRACTION).roundToInt()
         val centre = measurables.first().measure(Constraints.fixed(centreSize, centreSize))
         val iconPx = iconSize.roundToInt()
-        val icons = measurables.drop(1).map { it.measure(Constraints.fixed(iconPx, iconPx)) }
+        val icons = measurables.subList(1, 1 + slots).map { it.measure(Constraints.fixed(iconPx, iconPx)) }
+        val held = measurables.drop(1 + slots).map { it.measure(Constraints.fixed(0, 0)) }
 
         layout(constraints.maxWidth, constraints.maxHeight) {
+            held.forEach { it.place(0, 0) }
             fun Placeable.placeCentred(x: Float, y: Float) = place((x - width / 2f).roundToInt(), (y - height / 2f).roundToInt())
 
             val centreX = constraints.maxWidth / 2f
@@ -255,6 +259,27 @@ private fun sparkPath(centre: Offset, half: Float): Path {
         close()
     }
 }
+
+private val RingItem.tag: String
+    get() = when (this) {
+        is RingItem.App -> HomeRingTags.slot(app)
+        is RingItem.Folder -> HomeRingTags.folder(index)
+    }
+
+/** An item lit as the one an app let go now would fold into: a little larger, ringed with the spark's colour. */
+private fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {
+    this
+} else {
+    this
+        .semantics { stateDescription = "Drop to put in a folder" }
+        .graphicsLayer {
+            scaleX = FOLD_TARGET_SCALE
+            scaleY = FOLD_TARGET_SCALE
+        }
+        .drawBehind { drawCircle(RingSpark, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
+}
+
+private const val FOLD_TARGET_SCALE = 1.12f
 
 /** The emblem's place while a folder is open: nothing to see, as in Arc, but a tap there closes the folder. */
 @Composable

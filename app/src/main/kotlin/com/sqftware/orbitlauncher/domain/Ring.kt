@@ -4,7 +4,10 @@ package com.sqftware.orbitlauncher.domain
 sealed interface RingSlot {
     data class App(val key: String) : RingSlot
 
-    data class Folder(val keys: List<String>) : RingSlot
+    data class Folder(val keys: List<String>) : RingSlot {
+        /** Whether it shows none of the apps whose keys are [shown], holding only missing ones or none at all. */
+        fun showsNone(shown: Set<String>): Boolean = keys.none(shown::contains)
+    }
 }
 
 /** What a ring slot shows once its apps are looked up in the installed list. */
@@ -37,7 +40,7 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
 
     /**
      * Adds [app] to the folder at [index], or takes it out if it is already there. The folder stays, whatever is left in
-     * it; a slot that is not a folder is left alone.
+     * it, so a pick can empty a folder and fill it again; a slot that is not a folder is left alone.
      */
     fun toggle(index: Int, app: AppEntry): Ring = updateFolder(index) { Favourites(it).toggle(app).keys }
 
@@ -61,6 +64,12 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     fun remove(index: Int): Ring = Ring(slots.filterIndexed { i, _ -> i != index })
 
     /**
+     * Drops the folder at [index] if it [showsNone][RingSlot.Folder.showsNone] of the [shown] apps, as when a pick that
+     * started it ends with none; the missing apps it holds go with it.
+     */
+    fun removeIfEmpty(index: Int, shown: Set<String>): Ring = if (folder(index)?.showsNone(shown) == true) remove(index) else this
+
+    /**
      * The slots with their installed apps, in order. An app that is missing is skipped but kept, on the ring or in a
      * folder, so what disappears while it updates comes back in its old place. A folder shows whatever is left in it, so
      * a folder emptied by the user is an empty badge, not a gap.
@@ -80,7 +89,8 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
         return replace(index, RingSlot.Folder(change(folder.keys)))
     }
 
-    private fun slotOf(item: RingItem): Int = when (item) {
+    /** The stored slot [item] shows, or -1 for an app without a slot of its own. */
+    fun slotOf(item: RingItem): Int = when (item) {
         is RingItem.App -> indexOf(item.app)
         is RingItem.Folder -> item.index
     }
