@@ -14,6 +14,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -100,7 +105,8 @@ private const val MIN_CONSTELLATION = 4
  * With [rearrange], a long press that moves on picks up what is in a slot to move it round the ring, or round the open
  * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
  * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
- * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends.
+ * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends. The emblem's
+ * spark turns slowly while [turning], which the caller clears whenever the ring is out of sight.
  */
 @Composable
 fun HomeRing(
@@ -121,6 +127,7 @@ fun HomeRing(
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
     held: AppEntry? = null,
+    turning: Boolean = true,
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
@@ -130,7 +137,7 @@ fun HomeRing(
     Layout(
         content = {
             val moving = rearrange?.moving
-            if (openFolder != null) CloseFolderTarget(onClick = onCloseFolder) else Emblem(showHint = showHint, onClick = onEdit)
+            if (openFolder != null) CloseFolderTarget(onClick = onCloseFolder) else Emblem(showHint = showHint, turning = turning, onClick = onEdit)
             // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
             // gesture moving it, while it moves round and while the folder it is dragged out of closes under the finger.
             val items = if (openFolder != null) {
@@ -211,14 +218,13 @@ fun HomeRing(
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark turning slowly in the middle, or the hint to add apps in its place. Quiet, so the icons stay the eye's
- * first stop.
+ * icon's spark in the middle, turning slowly while [turning], or the hint to add apps in its place. Quiet, so the icons
+ * stay the eye's first stop.
  */
 @Composable
-private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
+private fun Emblem(showHint: Boolean, turning: Boolean, onClick: () -> Unit) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
-    val turn = rememberInfiniteTransition(label = "spark")
-    val angle by turn.animateFloat(0f, 360f, infiniteRepeatable(tween(SPARK_TURN_MILLIS, easing = LinearEasing)), label = "spark")
+    val angle by sparkAngle(turning && !showHint)
 
     Box(
         contentAlignment = Alignment.Center,
@@ -256,6 +262,21 @@ private fun Emblem(showHint: Boolean, onClick: () -> Unit) {
             )
         }
     }
+}
+
+/**
+ * The spark's angle in degrees: a turn every [SPARK_TURN_MILLIS] while [turning]. Otherwise no animation asks for frames,
+ * so a home page nobody sees does not redraw the window, and the spark holds its angle, so it never jumps.
+ */
+@Composable
+private fun sparkAngle(turning: Boolean): State<Float> {
+    val rest = remember { mutableFloatStateOf(0f) }
+    if (!turning) return rest
+
+    val turn = rememberInfiniteTransition(label = "spark")
+        .animateFloat(0f, 360f, infiniteRepeatable(tween(SPARK_TURN_MILLIS, easing = LinearEasing)), label = "spark")
+    DisposableEffect(Unit) { onDispose { rest.floatValue += turn.value } }
+    return remember { derivedStateOf { rest.floatValue + turn.value } }
 }
 
 /** The launcher icon's four-point spark, [half] from its [centre] to each tip, its sides bowed in as on the icon. */

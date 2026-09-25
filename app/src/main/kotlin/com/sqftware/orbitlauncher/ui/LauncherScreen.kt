@@ -834,6 +834,8 @@ fun LauncherScreen(
                                         rearrange = if (open != null) folderRearrange else ringRearrange,
                                         foldTarget = litSlot?.index,
                                         held = (dragged as? Drag.OutOfFolder)?.app,
+                                        // Every page stays composed, so the ring must be told when it is out of sight.
+                                        turning = pagerState.settledPage == layout.homeIndex && !drawerOpen && !overlayOpen,
                                     )
                                     // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                     // the ring, which sizes itself to the room left, so the two can never overlap.
