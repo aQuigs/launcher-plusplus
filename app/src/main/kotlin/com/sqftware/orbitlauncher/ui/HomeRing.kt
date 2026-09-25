@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.CircleShape
@@ -16,7 +17,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -106,7 +105,7 @@ private const val MIN_CONSTELLATION = 4
  * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
  * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
  * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends. The emblem's
- * spark turns slowly while [turning], which the caller clears whenever the ring is out of sight.
+ * spark turns slowly while the ring is [inSight], and holds still otherwise.
  */
 @Composable
 fun HomeRing(
@@ -127,17 +126,23 @@ fun HomeRing(
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
     held: AppEntry? = null,
-    turning: Boolean = true,
+    inSight: Boolean = true,
 ) {
     val slots = openFolder?.apps?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
+    // Here rather than in the emblem, which an open folder removes, so the spark keeps its angle across one.
+    val spark = sparkAngle(turning = inSight && !showHint && openFolder == null)
     // The one layout both the drawn lines and the icons follow.
     fun Density.layoutOn(side: Float) = ringLayout(RING_ICON_SIZE.toPx(), side, slots, RING_EDGE_MARGIN.toPx())
 
     Layout(
         content = {
             val moving = rearrange?.moving
-            if (openFolder != null) CloseFolderTarget(onClick = onCloseFolder) else Emblem(showHint = showHint, turning = turning, onClick = onEdit)
+            if (openFolder != null) {
+                CloseFolderTarget(onClick = onCloseFolder)
+            } else {
+                Emblem(showHint = showHint, sparkAngle = { spark.value }, onClick = onEdit)
+            }
             // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
             // gesture moving it, while it moves round and while the folder it is dragged out of closes under the finger.
             val items = if (openFolder != null) {
@@ -218,13 +223,12 @@ fun HomeRing(
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark in the middle, turning slowly while [turning], or the hint to add apps in its place. Quiet, so the icons
- * stay the eye's first stop.
+ * icon's spark in the middle at [sparkAngle], or the hint to add apps in its place. Quiet, so the icons stay the eye's
+ * first stop.
  */
 @Composable
-private fun Emblem(showHint: Boolean, turning: Boolean, onClick: () -> Unit) {
+private fun Emblem(showHint: Boolean, sparkAngle: () -> Float, onClick: () -> Unit) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
-    val angle by sparkAngle(turning && !showHint)
 
     Box(
         contentAlignment = Alignment.Center,
@@ -232,17 +236,15 @@ private fun Emblem(showHint: Boolean, turning: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
             .drawWithCache {
-                val outer = size.minDimension / 2 * 0.96f
+                val outer = size.emblemRadius
                 val disc = Path().apply { addOval(Rect(size.center, outer)) }
                 val edge = Stroke(1.dp.toPx())
                 val side = outer * EMBLEM_ART_PER_RADIUS
                 val art = Size(side, side)
                 val inset = (size.minDimension - side) / 2
-                val spark = sparkPath(size.center, outer * EMBLEM_SPARK)
                 onDrawBehind {
                     clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } }
                     drawCircle(RingMark.copy(alpha = 0.35f), radius = outer, style = edge)
-                    if (!showHint) rotate(angle) { drawPath(spark, RingSpark) }
                 }
             }
             .testTag(HomeRingTags.EMBLEM)
@@ -260,9 +262,22 @@ private fun Emblem(showHint: Boolean, turning: Boolean, onClick: () -> Unit) {
                 // Inside the disc, clear of the sky's dust, however large the font.
                 modifier = Modifier.fillMaxWidth(0.55f),
             )
+        } else {
+            // A layer of its own, so turning it changes a property of that layer and the sky is never drawn again.
+            Spacer(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { rotationZ = sparkAngle() }
+                    .drawWithCache {
+                        val spark = sparkPath(size.center, size.emblemRadius * EMBLEM_SPARK)
+                        onDrawBehind { drawPath(spark, RingSpark) }
+                    },
+            )
         }
     }
 }
+
+private val Size.emblemRadius get() = minDimension / 2 * 0.96f
 
 /**
  * The spark's angle in degrees: a turn every [SPARK_TURN_MILLIS] while [turning]. Otherwise no animation asks for frames,
@@ -273,10 +288,11 @@ private fun sparkAngle(turning: Boolean): State<Float> {
     val rest = remember { mutableFloatStateOf(0f) }
     if (!turning) return rest
 
+    val from = rest.floatValue
     val turn = rememberInfiniteTransition(label = "spark")
-        .animateFloat(0f, 360f, infiniteRepeatable(tween(SPARK_TURN_MILLIS, easing = LinearEasing)), label = "spark")
-    DisposableEffect(Unit) { onDispose { rest.floatValue += turn.value } }
-    return remember { derivedStateOf { rest.floatValue + turn.value } }
+        .animateFloat(from, from + 360f, infiniteRepeatable(tween(SPARK_TURN_MILLIS, easing = LinearEasing)), label = "spark")
+    DisposableEffect(Unit) { onDispose { rest.floatValue = turn.value % 360f } }
+    return turn
 }
 
 /** The launcher icon's four-point spark, [half] from its [centre] to each tip, its sides bowed in as on the icon. */
