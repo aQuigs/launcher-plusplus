@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.materialPath
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -108,7 +110,12 @@ fun FolderIcon(
             .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        IconDisc(presses, Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { FolderPreviews(folder, icon) }
+        // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into a light wallpaper.
+        IconDisc(
+            presses,
+            Modifier.fillMaxSize().border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { FolderPreviews(folder, icon) }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
     }
