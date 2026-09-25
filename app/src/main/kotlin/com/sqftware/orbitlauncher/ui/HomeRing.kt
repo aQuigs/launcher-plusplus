@@ -276,7 +276,7 @@ private fun Modifier.foldTarget(lit: Boolean): Modifier = if (!lit) {
             scaleX = FOLD_TARGET_SCALE
             scaleY = FOLD_TARGET_SCALE
         }
-        .drawBehind { drawCircle(Spark, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
+        .drawBehind { drawCircle(RingSpark, radius = size.minDimension / 2 + 3.dp.toPx(), style = Stroke(2.dp.toPx())) }
 }
 
 private const val FOLD_TARGET_SCALE = 1.12f
