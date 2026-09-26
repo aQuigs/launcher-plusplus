@@ -891,6 +891,7 @@ fun LauncherScreen(
                                             held = (dragged as? Drag.OutOfFolder)?.app,
                                             inSight = homeInSight,
                                             dock = dock,
+                                            dockSlot = { dockRearrange.boundsOf(it, dock) },
                                         )
                                         // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                         // the ring, which sizes itself to the room left, so the two can never overlap.

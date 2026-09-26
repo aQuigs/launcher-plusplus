@@ -62,10 +62,8 @@ fun Dock(
 
     Layout(
         content = {
-            val moving = rearrange?.moving
-            val arriving = rearrange?.arriving
-            val landsAt = arriving?.to ?: moving?.at
-            (arriving?.preview(items) ?: moving.shown(items)).forEachIndexed { index, item ->
+            val landsAt = rearrange?.arriving?.to ?: rearrange?.moving?.at
+            (rearrange?.shown(items) ?: items).forEachIndexed { index, item ->
                 val tag = when (item) {
                     is RingItem.App -> DockTags.slot(item.app)
                     is RingItem.Folder -> DockTags.folder(item.at.index)

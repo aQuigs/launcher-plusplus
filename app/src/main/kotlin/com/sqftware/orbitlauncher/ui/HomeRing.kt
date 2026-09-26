@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
@@ -167,7 +168,8 @@ private sealed interface Part {
  * ends or the ring makes way for it, showing where it would land as an app from another place does. The emblem's sky and
  * spark turn slowly while the ring is [inSight], and hold still otherwise. A folder opened or closed out of sight, or
  * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
- * still found.
+ * still found, and [dockSlot] where the dock shows a folder, in root coordinates, so its planet leaves from there and
+ * goes back there.
  */
 @Composable
 fun HomeRing(
@@ -190,6 +192,7 @@ fun HomeRing(
     held: AppEntry? = null,
     inSight: Boolean = true,
     dock: List<RingItem> = emptyList(),
+    dockSlot: (RingItem.Folder) -> Bounds? = { null },
 ) {
     val arrival = rearrange?.arriving
     val making = if (openFolder == null) arrival?.preview(ring) else null
@@ -348,18 +351,23 @@ fun HomeRing(
             }
             part to measurable.measure(size?.let { Constraints.fixed(it, it) } ?: Constraints.fixed(constraints.maxWidth, constraints.maxHeight))
         }
-        // Where the planet's slot is, as an offset from the centre: on the ring, or below it for one in the dock. Found by
-        // place, not by its stored slot, which counts apps that are missing from the ring.
+        // Found by place, not by its stored slot, which counts apps that are missing from the ring.
         val planetIndex = centred?.let(ring::indexOf) ?: -1
-        val planetSlot = when {
-            centred?.at?.holder == HomePlace.Dock -> Offset(0f, constraints.maxHeight / 2f)
-            planetIndex >= 0 -> ringSlotOffset(planetIndex, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
-            else -> Offset.Zero
-        }
 
         layout(constraints.maxWidth, constraints.maxHeight) {
             val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
             val out = spread.value
+            // Where the planet's slot is, as an offset from the centre, and how large: on the ring, or in the dock, which
+            // lies outside the ring's box and is read where the dock placed it.
+            val dockBounds = centred?.takeIf { it.at.holder == HomePlace.Dock }?.let(dockSlot)
+            val planetSlot = when {
+                dockBounds != null -> coordinates?.let {
+                    Offset((dockBounds.left + dockBounds.right) / 2, (dockBounds.top + dockBounds.bottom) / 2) - it.localToRoot(middle)
+                } ?: Offset.Zero
+                planetIndex >= 0 -> ringSlotOffset(planetIndex, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
+                else -> Offset.Zero
+            }
+            val slotSize = dockBounds?.let { it.right - it.left } ?: ringIconSize
             val planetAt = middle + planetSlot * (1f - out)
             fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
 
@@ -396,7 +404,7 @@ fun HomeRing(
                         }
                     }
                     Part.Planet -> placeable.placeAt(planetAt) {
-                        scaleX = lerp(ringIconSize / (centreSize * CENTRE_PLANET), 1f, out)
+                        scaleX = lerp(slotSize / (centreSize * CENTRE_PLANET), 1f, out)
                         scaleY = scaleX
                     }
                     is Part.Slot -> when {
