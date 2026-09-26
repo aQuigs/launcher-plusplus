@@ -8,9 +8,9 @@ import com.sqftware.orbitlauncher.domain.encode
 
 /**
  * A widget pick the system has not answered yet: the id allocated for it, the rows the page had room for, and how wide
- * a column of the page was, in dp.
+ * a column and how tall a row of the page were, in dp.
  */
-data class WidgetPick(val id: Int, val pageRows: Int, val columnWidthDp: Int)
+data class WidgetPick(val id: Int, val pageRows: Int, val columnWidthDp: Int, val rowHeightDp: Int)
 
 interface WidgetPageStore {
     fun load(): WidgetPage
@@ -32,11 +32,11 @@ class SharedPreferencesWidgetPageStore(context: Context) : WidgetPageStore {
 
     override fun loadPick(): WidgetPick? {
         val fields = prefs.getString(PICK_KEY, null)?.split(FIELD)?.map(String::toIntOrNull) ?: return null
-        return if (fields.size == 3 && null !in fields) WidgetPick(fields[0]!!, fields[1]!!, fields[2]!!) else null
+        return if (fields.size == 4 && null !in fields) WidgetPick(fields[0]!!, fields[1]!!, fields[2]!!, fields[3]!!) else null
     }
 
     override fun savePick(pick: WidgetPick?) = prefs.edit {
-        if (pick == null) remove(PICK_KEY) else putString(PICK_KEY, "${pick.id}$FIELD${pick.pageRows}$FIELD${pick.columnWidthDp}")
+        if (pick == null) remove(PICK_KEY) else putString(PICK_KEY, listOf(pick.id, pick.pageRows, pick.columnWidthDp, pick.rowHeightDp).joinToString(FIELD))
     }
 
     private companion object {

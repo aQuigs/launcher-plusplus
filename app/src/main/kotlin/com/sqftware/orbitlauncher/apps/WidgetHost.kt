@@ -14,7 +14,6 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
-import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetResize
 import com.sqftware.orbitlauncher.domain.WidgetSizing
@@ -37,9 +36,9 @@ interface WidgetHost {
 
     /**
      * Lets the user pick a widget for the page, where it takes the cells its provider asks for, up to [pageRows] rows
-     * and the page's width, with columns [columnWidthDp] wide.
+     * and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall.
      */
-    fun add(pageRows: Int, columnWidthDp: Int)
+    fun add(pageRows: Int, columnWidthDp: Int, rowHeightDp: Int)
 
     /** Takes the widget [id] off the page and gives its id back to the system. */
     fun remove(id: Int)
@@ -111,14 +110,14 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
 
     override fun updates(): Flow<WidgetPage> = page.onStart { host.startListening() }.onCompletion { host.stopListening() }
 
-    override fun add(pageRows: Int, columnWidthDp: Int) {
+    override fun add(pageRows: Int, columnWidthDp: Int, rowHeightDp: Int) {
         val inProgress = pending
         if (inProgress != null) {
             // Only a pick from before the process started can still be waiting once the user is back to ask again.
             if (inProgress != restored) return
             discard(inProgress)
         }
-        val pick = WidgetPick(host.allocateAppWidgetId(), pageRows, columnWidthDp)
+        val pick = WidgetPick(host.allocateAppWidgetId(), pageRows, columnWidthDp, rowHeightDp)
         pending = pick
         val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pick.id)
         if (!start("the widget picker") { picker.launch(intent) }) discard(pick)
@@ -174,7 +173,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         set(
             page.value.add(
                 pick.id,
-                rows = widgetCells(info.minHeight.toDp(), WIDGET_ROW_HEIGHT_DP.toFloat(), pick.pageRows),
+                rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp.toFloat(), pick.pageRows),
                 columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp.toFloat(), WIDGET_COLUMNS),
             ),
         )
