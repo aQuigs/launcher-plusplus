@@ -4,32 +4,40 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
 import kotlin.random.Random
 
 private class FieldStar(val x: Float, val y: Float, val radius: Float, val brightness: Float)
 
-// One star to a square of this side, so a bigger screen gets more stars rather than sparser ones.
+// The field is a tile a phone's screen fits in, repeated beyond it. A star sits a fixed distance from the top left, not
+// at a share of the area drawn, so when the keyboard shrinks the drawer for a search it covers stars rather than
+// squeezing them up.
+private val TILE_WIDTH = 480.dp
+private val TILE_HEIGHT = 960.dp
 private val STAR_SPACING = 60.dp
 
 // Seeded, so the sky is the same every time the drawer opens. Squaring skews the field to many dim specks and few
 // bright stars, as a real sky is.
 private val FieldStars = Random(1790464006).let { random ->
-    List(400) {
+    List((TILE_WIDTH.value * TILE_HEIGHT.value / (STAR_SPACING.value * STAR_SPACING.value)).toInt()) {
         val weight = random.nextFloat().let { it * it }
         FieldStar(random.nextFloat(), random.nextFloat(), radius = 0.5f + 0.9f * weight, brightness = 0.3f + 0.7f * weight)
     }
 }
 
-/** A faint scatter of stars over the whole draw area, in [colour] at its brightest and scaled by [alpha]. */
-fun DrawScope.drawStarField(colour: Color, alpha: Float = 1f) {
-    if (alpha <= 0f) return
-    val spacing = STAR_SPACING.toPx()
-    val count = (size.width * size.height / (spacing * spacing)).toInt().coerceAtMost(FieldStars.size)
-    FieldStars.take(count).forEach { star ->
-        drawCircle(
-            colour.copy(alpha = colour.alpha * star.brightness * alpha),
-            radius = star.radius.dp.toPx(),
-            center = Offset(star.x * size.width, star.y * size.height),
-        )
+/** A faint scatter of stars over the whole draw area, in [colour] at its brightest. */
+fun DrawScope.drawStarField(colour: Color) {
+    if (colour.alpha <= 0f) return
+    val tileWidth = TILE_WIDTH.toPx()
+    val tileHeight = TILE_HEIGHT.toPx()
+    repeat(ceil(size.width / tileWidth).toInt()) { column ->
+        repeat(ceil(size.height / tileHeight).toInt()) { row ->
+            FieldStars.forEach { star ->
+                val centre = Offset((column + star.x) * tileWidth, (row + star.y) * tileHeight)
+                if (centre.x < size.width && centre.y < size.height) {
+                    drawCircle(colour.copy(alpha = colour.alpha * star.brightness), star.radius.dp.toPx(), centre)
+                }
+            }
+        }
     }
 }

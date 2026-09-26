@@ -798,7 +798,7 @@ fun LauncherScreen(
                         drawRect(panel.copy(alpha = panel.alpha * open), size = Size(size.width, strip))
                         drawRect(panel, Offset(0f, strip))
                         // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
-                        drawStarField(star, alpha = open)
+                        drawStarField(star.copy(alpha = star.alpha * open))
                     },
                 ) {
                     DrawerHandle(
