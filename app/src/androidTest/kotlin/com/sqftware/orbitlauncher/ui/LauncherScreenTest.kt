@@ -1129,6 +1129,25 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun anAppOutOfItsFolderLandsBeforeItWhereTheRingMadeWay() {
+        val (first, second) = alphabet.take(2)
+        apps = listOf(clock, mail, first, second)
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(first.key), work, RingSlot.App(second.key))))
+        show()
+        compose.folderSlot(1).performClick()
+
+        pickUp(compose.ringSlot(clock))
+        dragTo(centreOf(compose.closeFolder()))
+        rest(MAKE_WAY_MILLIS)
+        dragTo(edgeOf(compose.folderSlot(1)))
+        rest(MAKE_WAY_MILLIS)
+        compose.ringSlot(clock).assertIsDisplayed()
+        letGo()
+
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(first.key), RingSlot.App(clock.key), folderOf(mail), RingSlot.App(second.key))), homeApps.ring) }
+    }
+
+    @Test
     fun anAppDraggedOutOfItsFolderAndLetGoOffTheRingAndTheDockStaysInIt() {
         homeApps = HomeApps(ring = Ring(listOf(work)))
         show()

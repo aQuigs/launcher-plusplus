@@ -324,7 +324,9 @@ fun LauncherScreen(
             val way = makingWay
             val app = drag?.app
             if (drag == null || app == null || way == null || !arrives(drag, way.place)) return@derivedStateOf null
-            homePlaces.entries.find { it.value === way.place }?.let { (holder, _) -> holder to Arriving(app, way.index, latestReorderMode) }
+            homePlaces.entries.find { it.value === way.place }?.let { (holder, _) ->
+                Arriving(app, way.index, latestReorderMode).takeIf { it.showsAmong(itemsOf(holder)) }?.let { holder to it }
+            }
         }
     }
     fun arrivingIn(holder: HomePlace.Slots) = arriving?.takeIf { it.first == holder }?.second

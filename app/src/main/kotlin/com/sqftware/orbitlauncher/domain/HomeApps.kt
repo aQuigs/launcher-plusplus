@@ -81,17 +81,16 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
 
     /**
      * Whether [app] from [from], another home place or the drawer without one, can land [to]: not in the place it is in,
-     * nor into itself or a copy of itself, nor into or by the folder it left.
+     * nor into itself, a copy of itself or the folder it left. It may land by that folder, as between any two slots.
      */
     fun lands(app: AppEntry, from: HomePlace?, to: Landing): Boolean {
         val index = indexOf(to)
-        val folderLeft = from == HomePlace.Folder(to.holder, index)
         return when (to) {
             is Landing.Into -> {
                 val slot = slots(to.holder).slots.getOrNull(index)
-                slot != null && slot != RingSlot.App(app.key) && !folderLeft
+                slot != null && slot != RingSlot.App(app.key) && from != HomePlace.Folder(to.holder, index)
             }
-            is Landing.At -> index >= 0 && from != to.holder && !folderLeft
+            is Landing.At -> index >= 0 && from != to.holder
         }
     }
 

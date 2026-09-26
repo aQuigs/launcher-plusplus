@@ -163,18 +163,20 @@ data class Moving(val from: Int, val to: Int?, val mode: ReorderMode) {
     fun <T> sourceOf(items: List<T>, position: Int): Int = if (to == null) position else items.reorderedFrom(position, from, to, mode)
 }
 
-/**
- * An app from another place that position [to] of the ring or the dock makes way for, as [mode] says. A folder never
- * leaves its place, so the app goes in before one there, as it lands.
- */
+/** An app from another place that position [to] of the ring or the dock makes way for, as [mode] says. */
 data class Arriving(val app: AppEntry, val to: Int, val mode: ReorderMode) {
-    private fun modeAmong(items: List<RingItem>) = if (items.getOrNull(to) is RingItem.Folder) ReorderMode.Insert else mode
+    /**
+     * Whether [items] make way for it. Swapped in, it leaves as many slots, so the one under the finger stays there. A
+     * folder never leaves its place, so an app swapped onto one lands in before it instead: showing that would add a
+     * slot and slide the folder off the finger, which would then rest on the app next along, and back again.
+     */
+    fun showsAmong(items: List<RingItem>) = mode == ReorderMode.Insert || items.getOrNull(to) !is RingItem.Folder
 
     /** [items] as they would be if the app were dropped now. */
-    fun preview(items: List<RingItem>): List<RingItem> = items.arrived(RingItem.App(app), to, modeAmong(items))
+    fun preview(items: List<RingItem>): List<RingItem> = items.arrived(RingItem.App(app), to, mode)
 
     /** Where in [items] the one that would show at [position] is, or null for the app arriving there. */
-    fun sourceOf(items: List<RingItem>, position: Int): Int? = items.arrivedFrom(position, to, modeAmong(items))
+    fun sourceOf(items: List<RingItem>, position: Int): Int? = items.arrivedFrom(position, to, mode)
 }
 
 /** How long the item on the move rests on the switch's other half before it flips, so passing over it does not. */
