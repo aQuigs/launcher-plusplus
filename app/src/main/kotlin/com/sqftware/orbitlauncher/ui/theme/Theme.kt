@@ -68,7 +68,7 @@ val OrbitTrack = Star.copy(alpha = 0.55f)
 /**
  * What one planet of the Solar system look adds to a folder: a [tint] through its glass, the colours of the touch it wears
  * ([accent], and [accent2] where it has two), its [moon]s, and its [features] in the order it draws them (the Earth's
- * land and clouds, Jupiter's bands, Saturn's rings). Each planet uses only the ones it has.
+ * land, ice and clouds, Jupiter's bands, Saturn's rings). Each planet uses only the ones it has.
  */
 class PlanetPaint(
     val tint: Color,
@@ -78,10 +78,8 @@ class PlanetPaint(
     val features: List<Color> = emptyList(),
 )
 
-private fun tint(colour: Long) = Color(colour).copy(alpha = 0.3f)
+private fun tint(colour: Long, alpha: Float = 0.3f) = Color(colour).copy(alpha = alpha)
 
-private val Forest = Color(0xFF3F9B4A).copy(alpha = 0.9f)
-private val Meadow = Color(0xFF4FA653).copy(alpha = 0.9f)
 private val JupiterBrown = Color(0xFFA8704A)
 private val JupiterTan = Color(0xFFD6B284).copy(alpha = 0.6f)
 
@@ -89,12 +87,10 @@ val PlanetPaints = mapOf(
     Planet.Mercury to PlanetPaint(tint(0xFFC9C4BB), accent = Color(0xFFFFD678), accent2 = Color(0x00FF8A3D)),
     Planet.Venus to PlanetPaint(tint(0xFFF3DCA0), accent = Color(0xFFFFF0C8).copy(alpha = 0.9f)),
     Planet.Earth to PlanetPaint(
-        tint(0xFF4B8FF0),
+        // Deeper than the other planets' glass, so the land reads against the sea.
+        tint(0xFF2F74D8, alpha = 0.6f),
         moon = Color(0xFFD8D3CB),
-        features = listOf(
-            Forest, Meadow, Forest, Color(0xFFC9B27A).copy(alpha = 0.85f), Meadow, Forest,
-            Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.65f),
-        ),
+        features = listOf(Color(0xFF4CA64F), Color(0xFFF4F8FB), Color.White.copy(alpha = 0.55f)),
     ),
     Planet.Mars to PlanetPaint(tint(0xFFE0794A), accent = Color(0xFFD0643A).copy(alpha = 0.9f), moon = Color(0xFFC9B8A8)),
     Planet.Jupiter to PlanetPaint(
