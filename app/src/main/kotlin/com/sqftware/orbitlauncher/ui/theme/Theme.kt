@@ -123,9 +123,9 @@ val GlyphFill = Color.Black
  * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) ask for the veil of
  * `surfaceDim` by name, so a container on one never stacks a second veil. What floats over other content (menus, dialogs,
  * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit sky, or the icons beneath would
- * show through. A tonal button's `secondaryContainer` is a faint tint of sky in both schemes, rimmed by [TonalEdge], so
- * it shows on a light wallpaper without drawing the eye. Content colours are all opaque, so their contrast does not hang
- * on the wallpaper.
+ * show through. A tonal button's `secondaryContainer` is a faint tint, of sky by night and frost by day, rimmed by
+ * [TonalEdge], so it shows on a light wallpaper without drawing the eye. Content colours are all opaque, so their
+ * contrast does not hang on the wallpaper.
  */
 val LauncherColors = ColorScheme(
     primary = Star,
@@ -183,7 +183,7 @@ val LauncherColors = ColorScheme(
  * [LauncherColors] turned over for a light wallpaper, which the system says wants dark text: the same two tiers, with the
  * glass and the veil frosted instead of sky, what floats opaque lit frost, and sky ink for content. The scrim turns to
  * frost too, so the shades that lift the chevron and the navigation icons off the wallpaper stay light behind dark marks.
- * The fixed roles, the clear background, the tint and a tonal button's fill stay the night's.
+ * The fixed roles, the clear background and the tint stay the night's.
  */
 val LauncherDayColors = LauncherColors.copy(
     primary = lerp(Sky, Star, 0.3f),
@@ -193,6 +193,7 @@ val LauncherDayColors = LauncherColors.copy(
     inversePrimary = Star,
     secondary = lerp(Sky, Starlight, 0.3f),
     onSecondary = Starlight,
+    secondaryContainer = DayGlass,
     onSecondaryContainer = Sky,
     tertiary = DayGold,
     onTertiary = Starlight,
@@ -222,7 +223,7 @@ val LauncherDayColors = LauncherColors.copy(
     surfaceContainerHighest = Starlight,
 )
 
-/** The rim of a tonal button, whose fill is too faint to hold its edge on a light wallpaper. */
+/** The rim of a tonal button, whose tint is too faint to hold its edge on a light wallpaper. */
 val TonalEdge = Sky.copy(alpha = 0.5f)
 
 @Composable
