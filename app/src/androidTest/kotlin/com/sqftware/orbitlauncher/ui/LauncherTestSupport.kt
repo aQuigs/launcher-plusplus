@@ -35,7 +35,6 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
-import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 
 val clock = AppEntry("Clock", "com.example.clock", "com.example.clock.Main")
 val mail = AppEntry("Mail", "com.example.mail", "com.example.mail.Main")
@@ -120,10 +119,8 @@ fun SemanticsNodeInteractionsProvider.widgetRemoveButton() = onNodeWithTag(Widge
 
 fun SemanticsNodeInteractionsProvider.widgetResizeHandle() = onNodeWithTag(WidgetTags.RESIZE)
 
-val WIDGET_ROW = WIDGET_ROW_HEIGHT_DP.dp
-
-/** The length of [cells] cells of the widget page, rows unless [cell] says otherwise, and the gaps between them. */
-fun widgetSpan(cells: Int, cell: Dp = WIDGET_ROW) = cell * cells + WIDGET_GAP_DP.dp * (cells - 1)
+/** The length of [cells] cells of the widget page, [cell] each, and the gaps between them. */
+fun widgetSpan(cells: Int, cell: Dp) = cell * cells + WIDGET_GAP_DP.dp * (cells - 1)
 
 fun SemanticsNodeInteractionsProvider.widgetHeight(widget: HostedWidget) = widget(widget).getUnclippedBoundsInRoot().height
 

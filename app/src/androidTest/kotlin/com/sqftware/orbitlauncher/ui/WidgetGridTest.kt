@@ -31,6 +31,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
+import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
+import com.sqftware.orbitlauncher.domain.widgetRowsWithin
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetResize
 import com.sqftware.orbitlauncher.domain.WidgetSizing
@@ -41,7 +43,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class WidgetGridTest {
@@ -52,7 +53,7 @@ class WidgetGridTest {
     private val game = HostedWidget(id = 8, row = 1, column = 0, rows = 2, columns = 4)
     private val inert = HostedWidget(id = 5, row = 0, column = 0, rows = 1, columns = 4)
     private var page by mutableStateOf(WidgetPage())
-    private val added = mutableListOf<Pair<Int, Int>>()
+    private val added = mutableListOf<Triple<Int, Float, Float>>()
     private val removed = mutableListOf<Int>()
     private val shown = mutableListOf<Int>()
     private val tapped = mutableListOf<Int>()
@@ -73,7 +74,7 @@ class WidgetGridTest {
                         if (id != inert.id) setOnClickListener { tapped += id }
                     }
                 },
-                add = { rows, columnWidth -> added += rows to columnWidth },
+                add = { rows, columnWidth, rowHeight -> added += Triple(rows, columnWidth, rowHeight) },
                 remove = removed::add,
                 resize = { id, rows, columns ->
                     resized += Triple(id, rows, columns)
@@ -90,20 +91,25 @@ class WidgetGridTest {
         )
     }
 
-    private val row = WIDGET_ROW
     private val gap = WIDGET_GAP_DP.dp
 
     /** The part of the page that scrolls, above the add button. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
-    // Inside the page's padding, less the button's row.
-    private fun pageRows() = ((scroller().getUnclippedBoundsInRoot().height - 32.dp + gap) / (row + gap)).toInt() - 1
+    // Inside the page's padding, down to the gap above the add button.
+    private fun rows() = widgetRowsWithin(
+        (compose.addWidgetButton().getUnclippedBoundsInRoot().top - gap - scroller().getUnclippedBoundsInRoot().top - 16.dp).value,
+    )
+
+    private fun pageRows() = rows().count
+
+    private fun row() = rows().heightDp.dp
 
     private fun columnWidth() = (scroller().getUnclippedBoundsInRoot().width - 32.dp - gap * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
 
     private fun columnSpan(cells: Int) = widgetSpan(cells, columnWidth())
 
-    private fun rowPx() = with(compose.density) { (row + gap).toPx() }
+    private fun rowPx() = with(compose.density) { (row() + gap).toPx() }
 
     private fun columnPx() = with(compose.density) { (columnWidth() + gap).toPx() }
 
@@ -112,11 +118,10 @@ class WidgetGridTest {
     // Within a pixel, as the cells are placed on whole pixels.
     private fun assertNear(expected: Dp, actual: Dp) = assertTrue("$actual is not $expected", abs((expected - actual).value) <= 1f)
 
-    // In the page's bottom row, inside its padding.
+    // Inside the page's padding.
     private fun assertAddButtonAtTheBottom() {
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
-        val button = compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertTrue("$button is not in the bottom row of $screen", button.top > screen.bottom - 16.dp - row && button.bottom < screen.bottom - 16.dp)
+        assertNear(screen.bottom - 16.dp, compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot().bottom)
     }
 
     @Test
@@ -135,11 +140,26 @@ class WidgetGridTest {
         show()
         val pageRows = pageRows()
         val columnWidth = columnWidth()
+        val row = row()
 
         compose.addWidgetButton().performClick()
 
-        compose.runOnIdle { assertEquals(listOf(pageRows to columnWidth.value.roundToInt()), added) }
+        val (rows, width, height) = compose.runOnIdle { added.single() }
+        assertEquals(pageRows, rows)
+        assertNear(columnWidth, width.dp)
+        assertNear(row, height.dp)
         assertTrue("$pageRows rows fit the page", pageRows >= 4)
+    }
+
+    @Test
+    fun theRowsStretchDownToTheAddButton() {
+        page = WidgetPage(listOf(search))
+        show()
+        val last = HostedWidget(id = 12, row = pageRows() - 1, column = 0, rows = 1, columns = 1)
+        page = WidgetPage(listOf(search, last))
+
+        assertNear(compose.addWidgetButton().getUnclippedBoundsInRoot().top - gap, bounds(last).bottom)
+        assertTrue("${bounds(last).height} is shorter than a row", bounds(last).height >= WIDGET_ROW_HEIGHT_DP.dp)
     }
 
     @Test
@@ -154,12 +174,12 @@ class WidgetGridTest {
         val batteryAt = bounds(battery)
         val notesAt = bounds(notes)
         assertNear(columnSpan(2), origin.width)
-        assertNear(row, origin.height)
+        assertNear(row(), origin.height)
         assertNear(origin.left + (columnWidth() + gap) * 3, batteryAt.left)
         assertNear(origin.top, batteryAt.top)
-        assertNear(widgetSpan(2), batteryAt.height)
+        assertNear(widgetSpan(2, row()), batteryAt.height)
         assertNear(origin.left + columnWidth() + gap, notesAt.left)
-        assertNear(origin.top + (row + gap) * 3, notesAt.top)
+        assertNear(origin.top + (row() + gap) * 3, notesAt.top)
         assertNear(columnSpan(3), notesAt.width)
         assertAddButtonAtTheBottom()
         compose.onNodeWithText("No widgets yet").assertDoesNotExist()
@@ -212,7 +232,7 @@ class WidgetGridTest {
         }
         val landing = compose.onNodeWithTag(WidgetTags.LANDING).assertIsDisplayed().getUnclippedBoundsInRoot()
         assertNear(smallAt.left + (columnWidth() + gap) * 2, landing.left)
-        assertNear(smallAt.top + (row + gap) * 2, landing.top)
+        assertNear(smallAt.top + (row() + gap) * 2, landing.top)
         compose.runOnIdle { assertEquals("nothing is stored while it is held", emptyList<Triple<Int, Int, Int>>(), moved) }
         compose.widget(small).performTouchInput { up() }
 
@@ -320,12 +340,12 @@ class WidgetGridTest {
             down(center)
             moveBy(Offset(-columnPx() * 1.3f, rowPx() * 1.7f))
         }
-        assertNear(widgetSpan(4), bounds(top).height)
+        assertNear(widgetSpan(4, row()), bounds(top).height)
         assertNear(columnSpan(3), compose.widgetEditFrame().getUnclippedBoundsInRoot().width)
         compose.runOnIdle { assertEquals("nothing is stored while the handle is held", emptyList<Triple<Int, Int, Int>>(), resized) }
         compose.widgetResizeHandle().performTouchInput { up() }
         compose.runOnIdle { assertEquals(listOf(Triple(top.id, 4, 3)), resized) }
-        assertNear(widgetSpan(4), bounds(top).height)
+        assertNear(widgetSpan(4, row()), bounds(top).height)
         assertNear(columnSpan(3), bounds(top).width)
         assertTrue("the widget below makes way", bounds(top).bottom <= bounds(search).top)
 
@@ -356,10 +376,10 @@ class WidgetGridTest {
 
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx()) }
         compose.runOnIdle { assertEquals(listOf(Triple(game.id, 3, 4)), resized) }
-        assertNear(widgetSpan(3), compose.widgetHeight(game))
+        assertNear(widgetSpan(3, row()), compose.widgetHeight(game))
 
         page = page.resize(game.id, 3, 4)
-        assertNear(widgetSpan(3), compose.widgetHeight(game))
+        assertNear(widgetSpan(3, row()), compose.widgetHeight(game))
     }
 
     @Test
@@ -377,7 +397,7 @@ class WidgetGridTest {
         compose.widgetResizeHandle().assertIsDisplayed()
 
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 0.3f) }
-        assertNear(widgetSpan(rows), compose.widgetHeight(tall))
+        assertNear(widgetSpan(rows, row()), compose.widgetHeight(tall))
         compose.widgetResizeHandle().performTouchInput { swipeUp(centerY, centerY - rowPx()) }
         compose.runOnIdle { assertEquals("only a change is stored", listOf(Triple(tall.id, rows - 1, 4)), resized) }
     }

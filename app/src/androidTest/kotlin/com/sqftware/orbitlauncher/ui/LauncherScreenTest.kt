@@ -120,7 +120,7 @@ class LauncherScreenTest {
     private val widgetsAdded = mutableListOf<Int>()
     private val widgets = WidgetActions(
         view = { context, _ -> View(context) },
-        add = { rows, _ -> widgetsAdded += rows },
+        add = { rows, _, _ -> widgetsAdded += rows },
         remove = {},
         resize = { _, _, _ -> },
         move = { _, _, _ -> },
@@ -2105,15 +2105,17 @@ class LauncherScreenTest {
         show()
         compose.swipePager { swipeRight() }
         assertSettledOn(LauncherPage.Widgets)
+        val row = compose.widgetHeight(search)
         compose.longPressWidget(search)
         val handle = centreOf(compose.widgetResizeHandle())
 
         compose.onRoot().performTouchInput {
             down(handle)
-            moveBy(Offset(0f, WIDGET_ROW.toPx() * 1.7f))
+            moveBy(Offset(0f, row.toPx() * 1.7f))
             repeat(10) { moveBy(Offset(-width / 20f, 0f)) }
         }
-        assertEquals(widgetSpan(3), compose.widgetHeight(search))
+        // Within a pixel, as a stretched row need not be a whole one.
+        assertEquals(widgetSpan(3, row).value, compose.widgetHeight(search).value, 1f)
         compose.onRoot().performTouchInput { up() }
 
         assertSettledOn(LauncherPage.Widgets)
@@ -2176,17 +2178,18 @@ class LauncherScreenTest {
         show()
         compose.swipePager { swipeRight() }
         assertSettledOn(LauncherPage.Widgets)
+        val row = compose.widgetHeight(search)
         compose.longPressWidget(search)
 
         compose.widgetResizeHandle().performTouchInput {
             down(center)
-            moveBy(Offset(0f, WIDGET_ROW.toPx() * 1.7f))
+            moveBy(Offset(0f, row.toPx() * 1.7f))
         }
-        assertEquals(widgetSpan(3), compose.widgetHeight(search))
+        assertEquals(widgetSpan(3, row).value, compose.widgetHeight(search).value, 1f)
         Espresso.pressBack()
 
         compose.widgetEditFrame().assertDoesNotExist()
-        assertEquals(WIDGET_ROW, compose.widgetHeight(search))
+        assertEquals(row, compose.widgetHeight(search))
         assertSettledOn(LauncherPage.Widgets)
     }
 

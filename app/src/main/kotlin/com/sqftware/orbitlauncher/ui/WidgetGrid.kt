@@ -20,12 +20,17 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
@@ -37,8 +42,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +71,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -76,12 +82,11 @@ import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
 import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetSizing
-import com.sqftware.orbitlauncher.domain.cellsWithin
 import com.sqftware.orbitlauncher.domain.cellRange
 import com.sqftware.orbitlauncher.domain.heldDrag
 import com.sqftware.orbitlauncher.domain.nearestCells
+import com.sqftware.orbitlauncher.domain.widgetRowsWithin
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 object WidgetTags {
     const val ADD = "widget_add"
@@ -94,19 +99,18 @@ object WidgetTags {
 }
 
 /**
- * What the widget page asks of the system: a widget's view, a new one for a page of so many rows and columns so wide, a
+ * What the widget page asks of the system: a widget's view, a new one for a page of so many rows of cells so big, a
  * removal, a resize, a move to other cells, and how a widget's provider lets it be resized.
  */
 class WidgetActions(
     val view: (Context, Int) -> View,
-    val add: (pageRows: Int, columnWidthDp: Int) -> Unit,
+    val add: (pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) -> Unit,
     val remove: (Int) -> Unit,
     val resize: (id: Int, rows: Int, columns: Int) -> Unit,
     val move: (id: Int, row: Int, column: Int) -> Unit,
     val sizing: (Int) -> WidgetSizing,
 )
 
-private val ROW_HEIGHT = WIDGET_ROW_HEIGHT_DP.dp
 private val GAP = WIDGET_GAP_DP.dp
 private val PAGE_PADDING = 16.dp
 private val CONTROL_SIZE = 40.dp
@@ -152,9 +156,9 @@ private class HeldWidget {
 }
 
 /**
- * The widgets on [page], on a grid of [WIDGET_COLUMNS] columns and rows of [WIDGET_ROW_HEIGHT_DP], each in its own
- * cells, scrolling under a button to add another, pinned in the page's bottom row, where no widget goes; an empty page
- * says so in the middle.
+ * The widgets on [page], on a grid of [WIDGET_COLUMNS] columns and rows of at least [WIDGET_ROW_HEIGHT_DP], each in its
+ * own cells, scrolling under a button to add another, pinned below the rows the page shows, where no widget goes; an
+ * empty page says so in the middle.
  * Cells no widget takes stay empty. A long press on a widget puts it in edit mode, as in Arc: [editing] is its id, and
  * it wears an outline, a bin on the top-right corner that removes it, and, if its provider lets it stretch, a handle on
  * the bottom-right corner that drags its size a whole cell at a time, within what the provider allows, the rows the
@@ -172,11 +176,17 @@ fun WidgetGrid(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    // The rows the page shows are those of the scrolling part, above the button.
-    var pageRows by remember { mutableIntStateOf(1) }
-    var columnWidth by remember { mutableStateOf(0.dp) }
+    val keyboard = WindowInsets.ime
+    val bars = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+    var area by remember { mutableStateOf(DpSize.Zero) }
+    var buttonHeight by remember { mutableStateOf(0.dp) }
+    // The rows the page shows are those of the scrolling part, above the button, and all they leave the button is its
+    // own height and a gap.
+    val rows = remember(area.height, buttonHeight) { widgetRowsWithin((area.height - PAGE_PADDING * 2 - buttonHeight - GAP).value) }
+    val pageRows = rows.count
+    val cell = DpSize(maxOf((area.width - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS, 0.dp), rows.heightDp.dp)
     val held = remember { HeldWidget() }
-    val pitch = with(density) { Offset((columnWidth + GAP).toPx(), (ROW_HEIGHT + GAP).toPx()) }
+    val pitch = with(density) { Offset((cell.width + GAP).toPx(), (cell.height + GAP).toPx()) }
     // Only a drag that reaches other cells changes the page shown.
     val shown by remember(page, pitch, pageRows) { derivedStateOf(structuralEqualityPolicy()) { held.preview(page, pitch, pageRows) } }
     val latestPage by rememberUpdatedState(page)
@@ -205,10 +215,10 @@ fun WidgetGrid(
             .fillMaxSize()
             .onSizeChanged { size ->
                 with(density) {
-                    // Less the bottom row, which is the button's.
-                    pageRows = (cellsWithin((size.height.toDp() - PAGE_PADDING * 2).value, ROW_HEIGHT.value) - 1).coerceAtLeast(1)
-                    columnWidth = (size.width.toDp() - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
-                }
+                    // The keyboard, raised for the drawer's search, squeezes this page too. Measured as if it were down,
+                    // the rows keep their height, so no widget is resized and redrawn by its provider meanwhile.
+                    val squeeze = (keyboard.getBottom(this) - bars.getBottom(this)).coerceAtLeast(0)
+                    area = DpSize(size.width.toDp(), (size.height + squeeze).toDp())                }
             }
         if (page.isEmpty) {
             Box(area, contentAlignment = Alignment.Center) {
@@ -220,16 +230,16 @@ fun WidgetGrid(
                 area
                     .verticalPageScroll()
                     .padding(PAGE_PADDING)
-                    .padding(bottom = ROW_HEIGHT + GAP)
+                    .padding(bottom = buttonHeight + GAP)
                     .fillMaxWidth()
                     // At least the page, so a widget can be dropped anywhere in sight.
-                    .height(span(maxOf(shown.rows, pageRows), ROW_HEIGHT)),
+                    .height(span(maxOf(shown.rows, pageRows), cell.height)),
             ) {
                 places[held.id]?.let { landing ->
                     Box(
                         Modifier
-                            .offset { cellOffset(landing, columnWidth) }
-                            .size(span(landing.columns, columnWidth), span(landing.rows, ROW_HEIGHT))
+                            .offset { cellOffset(landing, cell) }
+                            .size(span(landing.columns, cell.width), span(landing.rows, cell.height))
                             .background(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.large)
                             .testTag(WidgetTags.LANDING),
                     )
@@ -237,24 +247,24 @@ fun WidgetGrid(
                 page.widgets.forEach { widget ->
                     key(widget.id) {
                         val at = if (held.id == widget.id) widget else places[widget.id] ?: widget
-                        Widget(widget, at, columnWidth, pitch, reach(page, pageRows), actions, pageRows, editing, onEditingChange, held, release)
+                        Widget(widget, at, cell, pitch, reach(page, pageRows), actions, pageRows, editing, onEditingChange, held, release)
                     }
                 }
             }
         }
+        // Measured around the button, whose touch target is taller than the pill it draws.
         Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
+            Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = PAGE_PADDING)
-                .height(ROW_HEIGHT),
+                .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
+                .testTag(WidgetTags.ADD),
         ) {
             FilledTonalButton(
                 onClick = {
                     onEditingChange(null)
-                    actions.add(pageRows, columnWidth.value.roundToInt())
+                    actions.add(pageRows, cell.width.value, cell.height.value)
                 },
-                modifier = Modifier.testTag(WidgetTags.ADD),
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                 Text("Add widget")
@@ -266,9 +276,9 @@ fun WidgetGrid(
 /** The rows a widget may be dragged down to: the page's, above the button, or more if the page already reaches further. */
 private fun reach(page: WidgetPage, pageRows: Int) = maxOf(pageRows, page.rows)
 
-/** Where the top-left cell of [widget] is, on a grid of columns [columnWidth] wide. */
-private fun Density.cellOffset(widget: HostedWidget, columnWidth: Dp) =
-    IntOffset(((columnWidth + GAP) * widget.column).roundToPx(), ((ROW_HEIGHT + GAP) * widget.row).roundToPx())
+/** Where the top-left cell of [widget] is, on a grid of [cell]s. */
+private fun Density.cellOffset(widget: HostedWidget, cell: DpSize) =
+    IntOffset(((cell.width + GAP) * widget.column).roundToPx(), ((cell.height + GAP) * widget.row).roundToPx())
 
 /**
  * The [widget] as stored, shown in the cells of [at], which [held] drags about the page's first [reach] rows, a cell and
@@ -278,7 +288,7 @@ private fun Density.cellOffset(widget: HostedWidget, columnWidth: Dp) =
 private fun Widget(
     widget: HostedWidget,
     at: HostedWidget,
-    columnWidth: Dp,
+    cell: DpSize,
     pitch: Offset,
     reach: Int,
     actions: WidgetActions,
@@ -294,8 +304,8 @@ private fun Widget(
     val dragged = held.id == widget.id
     // The others slide aside while one is dragged. Once it lands they are drawn in their cells at once, since even a
     // snap would take a frame, in which the one let go would be back where it started.
-    val cell = with(density) { cellOffset(at, columnWidth) }
-    val sliding by animateIntOffsetAsState(cell, if (held.id == null) snap() else spring(), label = "widget_place")
+    val place = with(density) { cellOffset(at, cell) }
+    val sliding by animateIntOffsetAsState(place, if (held.id == null) snap() else spring(), label = "widget_place")
     // The cells the outline shows while the handle is dragged. The widget takes them only once they are stored, so its
     // provider redraws once per resize rather than at every cell; until then they hold, so the outline does not jump back.
     var rows by remember(widget.rows, edited) { mutableIntStateOf(widget.rows) }
@@ -309,7 +319,7 @@ private fun Widget(
 
     Box(
         Modifier
-            .offset { if (held.id == null) cell else sliding }
+            .offset { if (held.id == null) place else sliding }
             .zIndex(if (dragged) 2f else if (edited) 1f else 0f)
             .graphicsLayer {
                 if (dragged) {
@@ -318,7 +328,7 @@ private fun Widget(
                     translationY = shift.y
                 }
             }
-            .size(span(maxOf(columns, widget.columns), columnWidth), span(maxOf(rows, widget.rows), ROW_HEIGHT))
+            .size(span(maxOf(columns, widget.columns), cell.width), span(maxOf(rows, widget.rows), cell.height))
             .semantics { contentDescription = "Widget" }
             .testTag(WidgetTags.widget(widget.id)),
     ) {
@@ -331,7 +341,7 @@ private fun Widget(
                 it.onRelease = { lifted -> release(widget.id, lifted) }
             },
             modifier = Modifier
-                .size(span(widget.columns, columnWidth), span(widget.rows, ROW_HEIGHT))
+                .size(span(widget.columns, cell.width), span(widget.rows, cell.height))
                 .then(
                     when {
                         edited -> Modifier.holdToMove(widget.id, held, haptics, release)
@@ -344,7 +354,7 @@ private fun Widget(
             val sizing = remember(widget.id) { actions.sizing(widget.id) }
             Box(
                 Modifier
-                    .size(span(columns, columnWidth), span(rows, ROW_HEIGHT))
+                    .size(span(columns, cell.width), span(rows, cell.height))
                     .border(2.dp, MaterialTheme.colorScheme.onBackground)
                     .testTag(WidgetTags.EDIT),
             ) {
@@ -357,11 +367,11 @@ private fun Widget(
                         actions.remove(widget.id)
                     },
                 )
-                val down = Stretch(widget.rows, sizing.vertical.cellRange(widget.rows, ROW_HEIGHT.value, pageRows), (ROW_HEIGHT + GAP).value)
+                val down = Stretch(widget.rows, sizing.vertical.cellRange(widget.rows, cell.height.value, pageRows), (cell.height + GAP).value)
                 val across = Stretch(
                     widget.columns,
-                    sizing.horizontal.cellRange(widget.columns, columnWidth.value, WIDGET_COLUMNS - widget.column),
-                    (columnWidth + GAP).value,
+                    sizing.horizontal.cellRange(widget.columns, cell.width.value, WIDGET_COLUMNS - widget.column),
+                    (cell.width + GAP).value,
                 )
                 // A handle that could reach no other size would be a dead control.
                 if (down.stretches || across.stretches) {

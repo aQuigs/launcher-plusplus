@@ -32,8 +32,8 @@ class WidgetPageStoreTest {
 
     @Test
     fun thePickInProgressComesBackUntilItIsCleared() {
-        store.savePick(WidgetPick(id = 14, pageRows = 9, columnWidthDp = 90))
-        assertEquals(WidgetPick(14, 9, 90), SharedPreferencesWidgetPageStore(context).loadPick())
+        store.savePick(WidgetPick(id = 14, pageRows = 9, columnWidthDp = 90.5f, rowHeightDp = 84.25f))
+        assertEquals(WidgetPick(14, 9, 90.5f, 84.25f), SharedPreferencesWidgetPageStore(context).loadPick())
 
         store.savePick(null)
 
