@@ -42,6 +42,17 @@ class HomeFormatTest {
     }
 
     @Test
+    fun `a folder's planet pick stands before its first tab and stays through edits`() {
+        val ring = ringOf(clock, mail).newFolder(mail).pick(1, PlanetPick.Of(Planet.Saturn)).toggle(1, maps)
+        val plain = Ring(listOf(folder(clock))).pick(0, PlanetPick.Plain)
+
+        assertEquals("pkg.Clock/pkg.Clock.Main\nSaturn\tpkg.Mail/pkg.Mail.Main\tpkg.Maps/pkg.Maps.Main", ring.encode())
+        assertEquals(ring, decodeRing(ring.encode()))
+        assertEquals("Plain\tpkg.Clock/pkg.Clock.Main", plain.encode())
+        assertEquals(plain, decodeRing(plain.encode()))
+    }
+
+    @Test
     fun `a shortcut whose id holds a line break or a tab cannot be stored`() {
         assertTrue(isStorable(shortcutKey("web", "da8ed822-1ea0")))
         assertFalse(isStorable(shortcutKey("web", "two\nlines")))

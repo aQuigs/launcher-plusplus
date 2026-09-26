@@ -4,7 +4,8 @@ package com.sqftware.orbitlauncher.domain
 sealed interface RingSlot {
     data class App(val key: String) : RingSlot
 
-    data class Folder(val keys: List<String>) : RingSlot {
+    /** [pick] is the planet it is in the Solar system look, which travels with it. */
+    data class Folder(val keys: List<String>, val pick: PlanetPick = PlanetPick.Auto) : RingSlot {
         /** Whether it shows none of the apps whose keys are [shown], holding only missing ones or none at all. */
         fun showsNone(shown: Set<String>): Boolean = keys.none(shown::contains)
     }
@@ -15,7 +16,7 @@ sealed interface RingItem {
     data class App(val app: AppEntry) : RingItem
 
     /** [at] is the folder's place and slot, which is how the picker and the folder's menu name it. */
-    data class Folder(val at: HomePlace.Folder, val apps: List<AppEntry>) : RingItem
+    data class Folder(val at: HomePlace.Folder, val apps: List<AppEntry>, val pick: PlanetPick = PlanetPick.Auto) : RingItem
 }
 
 /** Slots in order: round the emblem on the ring, or along the dock, which holds apps and folders alike. */
@@ -60,6 +61,9 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     fun move(index: Int, app: AppEntry, target: AppEntry, mode: ReorderMode): Ring =
         updateFolder(index) { Favourites(it).move(app, target, mode).keys }
 
+    /** Makes the folder at [index] the planet [pick] names; a slot that is not a folder is left alone. */
+    fun pick(index: Int, pick: PlanetPick): Ring = folder(index)?.let { replace(index, it.copy(pick = pick)) } ?: this
+
     /** Drops the slot at [index]; a folder goes with its apps. */
     fun remove(index: Int): Ring = Ring(slots.filterIndexed { i, _ -> i != index })
 
@@ -79,14 +83,14 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
         return slots.mapIndexedNotNull { index, slot ->
             when (slot) {
                 is RingSlot.App -> byKey[slot.key]?.let(RingItem::App)
-                is RingSlot.Folder -> RingItem.Folder(HomePlace.Folder(place, index), slot.keys.mapNotNull(byKey::get))
+                is RingSlot.Folder -> RingItem.Folder(HomePlace.Folder(place, index), slot.keys.mapNotNull(byKey::get), slot.pick)
             }
         }
     }
 
     private fun updateFolder(index: Int, change: (List<String>) -> List<String>): Ring {
         val folder = folder(index) ?: return this
-        return replace(index, RingSlot.Folder(change(folder.keys)))
+        return replace(index, folder.copy(keys = change(folder.keys)))
     }
 
     /** The stored slot [item] shows, or -1 for an app without a slot of its own. */

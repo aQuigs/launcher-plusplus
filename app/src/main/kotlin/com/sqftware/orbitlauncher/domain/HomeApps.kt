@@ -43,6 +43,25 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
         HomePlace.Dock -> copy(dock = dock.change())
     }
 
+    /**
+     * These home apps with every folder left to [planetsFor]'s order given the planet it has now, or made plain, so the
+     * planet stays its own as other folders come and go or move round.
+     */
+    fun withPlanetsKept(): HomeApps {
+        val planets = planetsFor((ring.slots + dock.slots).filterIsInstance<RingSlot.Folder>().map { it.pick }).iterator()
+        fun Ring.kept() = Ring(
+            slots.map { slot ->
+                if (slot !is RingSlot.Folder) return@map slot
+                val planet = planets.next()
+                if (slot.pick == PlanetPick.Auto) slot.copy(pick = planet?.let(PlanetPick::Of) ?: PlanetPick.Plain) else slot
+            },
+        )
+        return HomeApps(ring = ring.kept(), dock = dock.kept())
+    }
+
+    /** These home apps with the folder at [place] made the planet [pick] names. */
+    fun pick(place: HomePlace.Folder, pick: PlanetPick): HomeApps = change(place.holder) { pick(place.index, pick) }
+
     /** The apps at [place]: those in slots of their own for the ring or the dock, and none for a folder that is not there. */
     operator fun get(place: HomePlace): Favourites = when (place) {
         is HomePlace.Slots -> slots(place).apps
@@ -108,7 +127,7 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
                 draft.put(from, app.key, GAP)
                 draft.slots(to.holder)[index] = when (val slot = slots(to.holder).slots[index]) {
                     is RingSlot.App -> RingSlot.Folder(listOf(slot.key, app.key))
-                    is RingSlot.Folder -> RingSlot.Folder(Favourites(slot.keys).add(app).keys)
+                    is RingSlot.Folder -> slot.copy(keys = Favourites(slot.keys).add(app).keys)
                 }
             }
             is Landing.At -> draft.land(app.key, from, to.holder, index, to.mode)
@@ -158,7 +177,7 @@ private class Draft(home: HomeApps) {
             is HomePlace.Folder -> {
                 val slots = slots(place.holder)
                 (slots.getOrNull(place.index) as? RingSlot.Folder)?.let { folder ->
-                    slots[place.index] = RingSlot.Folder(folder.keys.map { if (it == app) key else it })
+                    slots[place.index] = folder.copy(keys = folder.keys.map { if (it == app) key else it })
                 }
             }
             null -> Unit
@@ -193,7 +212,7 @@ private class Draft(home: HomeApps) {
         slots.mapNotNull { slot ->
             when (slot) {
                 is RingSlot.App -> slot.takeIf { it.key != GAP }
-                is RingSlot.Folder -> RingSlot.Folder(slot.keys.filter { it != GAP }).takeUnless {
+                is RingSlot.Folder -> slot.copy(keys = slot.keys.filter { it != GAP }).takeUnless {
                     GAP in slot.keys && slot.showsNone(shown)
                 }
             }

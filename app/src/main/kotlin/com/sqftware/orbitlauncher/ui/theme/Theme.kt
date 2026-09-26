@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import com.sqftware.orbitlauncher.domain.Planet
 
 // The launcher icon's palette (res/drawable/ic_launcher_*.xml). Only this file names a colour, and the rest of the app
 // reaches these through the scheme's roles or the ring's tokens below.
@@ -49,6 +50,73 @@ val RingShade = Sky
 class DiscEdge(val outer: Color, val inner: Color)
 
 val FolderEdge = DiscEdge(outer = Sky.copy(alpha = 0.5f), inner = Frost.copy(alpha = 0.5f))
+
+/** What rims a planet's moons and rings, so they show on a light wallpaper as the folder's edge does. */
+val PlanetShadow = Sky.copy(alpha = 0.6f)
+
+/** A moon on a folder's edge: a spark ringed in shade, so it too shows on any patch of wallpaper. */
+val FolderMoon = DiscEdge(outer = PlanetShadow, inner = Spark)
+
+/** The tilted ring across a Ringed planet's disc: gold, shadowed on its outer edge so it shows on a light wallpaper. */
+val PlanetRing = DiscEdge(outer = PlanetShadow, inner = Gold.copy(alpha = 0.85f))
+
+/** The small planet at the heart of the Moons in orbit look, lit from the top left, and the track its moons follow. */
+val OrbitCoreLit = Color(0xFF4A5AA8)
+val OrbitCoreShade = Color(0xFF18214A)
+val OrbitTrack = Star.copy(alpha = 0.55f)
+
+/**
+ * What one planet of the Solar system look adds to a folder: a [tint] through its glass, the colours of the touch it wears
+ * ([accent], and [accent2] where it has two), its [moon]s, and its [features] in the order it draws them (the Earth's
+ * land and clouds, Jupiter's bands, Saturn's rings). Each planet uses only the ones it has.
+ */
+class PlanetPaint(
+    val tint: Color,
+    val accent: Color = Color.Transparent,
+    val accent2: Color = Color.Transparent,
+    val moon: Color = Color.Transparent,
+    val features: List<Color> = emptyList(),
+)
+
+private fun tint(colour: Long) = Color(colour).copy(alpha = 0.3f)
+
+private val Forest = Color(0xFF3F9B4A).copy(alpha = 0.9f)
+private val Meadow = Color(0xFF4FA653).copy(alpha = 0.9f)
+private val JupiterBrown = Color(0xFFA8704A)
+private val JupiterTan = Color(0xFFD6B284).copy(alpha = 0.6f)
+
+val PlanetPaints = mapOf(
+    Planet.Mercury to PlanetPaint(tint(0xFFC9C4BB), accent = Color(0xFFFFD678), accent2 = Color(0x00FF8A3D)),
+    Planet.Venus to PlanetPaint(tint(0xFFF3DCA0), accent = Color(0xFFFFF0C8).copy(alpha = 0.9f)),
+    Planet.Earth to PlanetPaint(
+        tint(0xFF4B8FF0),
+        moon = Color(0xFFD8D3CB),
+        features = listOf(
+            Forest, Meadow, Forest, Color(0xFFC9B27A).copy(alpha = 0.85f), Meadow, Forest,
+            Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.65f),
+        ),
+    ),
+    Planet.Mars to PlanetPaint(tint(0xFFE0794A), accent = Color(0xFFD0643A).copy(alpha = 0.9f), moon = Color(0xFFC9B8A8)),
+    Planet.Jupiter to PlanetPaint(
+        tint(0xFFE9CFA0),
+        accent = Color(0xFFF6E2C4).copy(alpha = 0.8f),
+        accent2 = Color(0xFFC4553A).copy(alpha = 0.95f),
+        features = listOf(
+            JupiterBrown.copy(alpha = 0.6f), JupiterTan, JupiterBrown.copy(alpha = 0.65f), Color(0xFFECD6B0).copy(alpha = 0.5f),
+            Color(0xFFBE8458).copy(alpha = 0.65f), JupiterTan, Color(0xFF966240).copy(alpha = 0.6f),
+        ),
+    ),
+    Planet.Saturn to PlanetPaint(
+        tint(0xFFF2DFA6),
+        features = listOf(
+            Color(0xFFB89A66).copy(alpha = 0.55f), Color(0xFFF0DBA6).copy(alpha = 0.95f),
+            Color(0xFF281E14).copy(alpha = 0.55f), Color(0xFFD6BC84).copy(alpha = 0.9f),
+        ),
+    ),
+    Planet.Uranus to PlanetPaint(tint(0xFF9FE3E8), accent = Color(0xFFC8F5FA).copy(alpha = 0.85f)),
+    Planet.Neptune to PlanetPaint(tint(0xFF3A63D6), accent = Color(0xFF3A63D6).copy(alpha = 0.95f), moon = Color(0xFFE6E0D6)),
+    Planet.Pluto to PlanetPaint(tint(0xFFE3CDB0), accent = Color(0xFFFBF1DE), moon = Color(0xFFB3AEA9)),
+)
 
 /** What a glyph is drawn in before `Icon` tints it, as Material's own icons are. */
 val GlyphFill = Color.Black

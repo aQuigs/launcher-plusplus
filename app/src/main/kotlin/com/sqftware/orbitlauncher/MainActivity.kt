@@ -22,6 +22,7 @@ import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesFolderLookStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
+        val folderLookStore = SharedPreferencesFolderLookStore(this)
         val reorderModeStore = SharedPreferencesReorderModeStore(this)
         val ringer = SystemRinger(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
@@ -114,9 +116,11 @@ class MainActivity : ComponentActivity() {
             LauncherTheme(lightWallpaper = lightWallpaper) {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
-                // file holds a few keys.
-                var homeApps by remember { mutableStateOf(homeAppsStore.load()) }
+                // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
+                // as folders come and go.
+                var homeApps by remember { mutableStateOf(homeAppsStore.load().withPlanetsKept()) }
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
+                var folderLook by remember { mutableStateOf(folderLookStore.load()) }
                 var reorderMode by remember { mutableStateOf(reorderModeStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
@@ -168,8 +172,8 @@ class MainActivity : ComponentActivity() {
                     pinnedShortcuts = pinnedShortcuts,
                     homeApps = homeApps,
                     onHomeAppsChange = {
-                        homeApps = it
-                        homeAppsStore.save(it)
+                        homeApps = it.withPlanetsKept()
+                        homeAppsStore.save(homeApps)
                     },
                     actions = actions,
                     reorderMode = reorderMode,
@@ -181,6 +185,11 @@ class MainActivity : ComponentActivity() {
                     onTwentyFourHourChange = {
                         twentyFourHour = it
                         hourStyleStore.save(it)
+                    },
+                    folderLook = folderLook,
+                    onFolderLookChange = {
+                        folderLook = it
+                        folderLookStore.save(it)
                     },
                     onOpenClock = wallClock::openClock,
                     onOpenCalendar = wallClock::openCalendar,
