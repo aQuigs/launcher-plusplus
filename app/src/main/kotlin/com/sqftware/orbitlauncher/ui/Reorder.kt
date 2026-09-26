@@ -88,6 +88,16 @@ class Rearrange(
         if (placed[index] === coordinates) placed.remove(index)
     }
 
+    /** [items] in the order the place shows them: making way for an app arriving, or with one of its own on the move. */
+    fun shown(items: List<RingItem>): List<RingItem> = arriving?.preview(items) ?: moving.shown(items)
+
+    /**
+     * Where the place shows [item] of its [items], in root coordinates, once placed. A slot's layer dropped as a drag ends
+     * leaves its coordinates detached until it is placed again, so those give no bounds.
+     */
+    fun boundsOf(item: RingItem, items: List<RingItem>): Bounds? =
+        placed[shown(items).indexOf(item)]?.takeIf { it.isAttached }?.rootBounds()
+
     /** The finger over position [index] of the place, [onMiddle] when near enough its centre that an app dropped folds in. */
     data class Hit(val index: Int, val onMiddle: Boolean)
 

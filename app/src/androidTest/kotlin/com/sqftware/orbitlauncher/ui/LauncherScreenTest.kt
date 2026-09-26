@@ -74,6 +74,7 @@ import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetSizing
+import kotlin.math.abs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
@@ -1274,6 +1275,24 @@ class LauncherScreenTest {
         compose.closeFolder().performClick()
         compose.ringSlot(other).assertIsDisplayed()
         compose.dockFolder(0).assertIsDisplayed()
+    }
+
+    @Test
+    fun aDockFolderOpensOutOfItsOwnSlotInTheDock() {
+        val (first, second, third) = alphabet.take(3)
+        apps = listOf(clock, mail, first, second, third)
+        homeApps = HomeApps(dock = Ring(listOf(folderOf(first, second), RingSlot.App(clock.key), RingSlot.App(mail.key), RingSlot.App(third.key))))
+        show()
+        val folder = centreOf(compose.dockFolder(0))
+        val middle = centreOf(compose.dock()).x
+        compose.mainClock.autoAdvance = false
+
+        compose.dockFolder(0).performClick()
+        compose.mainClock.advanceTimeByFrame()
+
+        val leaving = centreOf(compose.ringSlot(first)).x
+        assertTrue("the first app starts at its folder, not the middle", abs(leaving - folder.x) < abs(leaving - middle))
+        compose.mainClock.autoAdvance = true
     }
 
     // A folder is named by its slot: the dock app ahead of it going would otherwise open the next folder in its stead.
