@@ -21,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -39,20 +40,27 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -73,8 +81,11 @@ import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
 import com.sqftware.orbitlauncher.ui.theme.RingInk
 import com.sqftware.orbitlauncher.ui.theme.RingShade
 import com.sqftware.orbitlauncher.ui.theme.RingSpark
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 object HomeRingTags {
     const val EMBLEM = "ring_emblem"
@@ -100,33 +111,63 @@ private const val SPARK_TURN_MILLIS = 60_000
 /** How long the sky takes to turn once: slower than the spark, so the dust seems farther off. */
 private const val SKY_TURN_MILLIS = 600_000
 
+/** How long an open folder's planet takes to reach the centre, and to go back to its slot. */
+private const val SPREAD_MILLIS = 380
+private const val FOLD_BACK_MILLIS = 320
+
+/** How large an app is, against its size on the ring, while it is still inside its planet. */
+private const val FOLDED_SCALE = 0.3f
+
+/** How far round, in radians, an app spirals on its way out of its planet to its slot. */
+private const val SPIRAL = 1.4f
+
+/** How much farther out the ring drifts, as a share of its radius, while it steps aside for an open folder. */
+private const val DRIFT = 0.5f
+
+/** How much of the emblem's disc an open folder's planet takes in the centre. */
+private const val CENTRE_PLANET = 0.62f
+
 /** Fewer items make a point, a line or a triangle whose edges cut across the emblem, so they keep a circle. */
 private const val MIN_CONSTELLATION = 4
 
-/** How long a folder's apps take to come out of its slot or fold back in: quick, so opening a folder never feels slow. */
-private const val UNFOLD_MILLIS = 180
+/** Which of the ring's parts a child of its layout is, so each is measured and placed as that part. */
+private sealed interface Part {
+    data object Emblem : Part
 
-/** How small a folder's apps are while inside it. */
-private const val FOLDED_SCALE = 0.3f
+    /** The open folder's planet, in the centre or on its way there or back. */
+    data object Planet : Part
 
-/** Where a dock folder's apps come from: the bottom of the ring, towards the dock. */
-private val DOCK_FOLDER_ORIGIN = 0f to 1f
+    /** What takes every touch while an opening folder's apps are still on their way out. */
+    data object Shield : Part
+
+    /** What is in slot [index] of the ring, or of the open folder. */
+    data class Slot(val index: Int) : Part
+
+    data object Held : Part
+
+    /** The ring's item in slot [index], stepping aside as a folder opens. */
+    data class Leaving(val index: Int) : Part
+
+    /** App [index] of a folder going back into its planet. */
+    data class Folding(val index: Int) : Part
+}
 
 /**
  * The [ring] of favourite apps and folders, joined like the stars of the launcher icon, round an emblem. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
  * the emblem to choose the favourites on the ring and in the dock. With [showHint] the emblem invites you to add apps
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
- * land. An [openFolder] takes the ring over: its apps come out of the folder's slot to sit in the slots, each with the
- * [folderAppMenu], and the emblem gives way to a target that calls [onCloseFolder]. Closed, the apps fold back into the
- * slot before the ring returns. Each app wears its [unread] count, and a folder the sum of its apps'.
- * With [rearrange], a long press that moves on picks up what is in a slot to move it round the ring, or round the open
- * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
- * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
- * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends or the ring
- * makes way for it, showing where it would land as an app from another place does. The emblem's
- * sky and spark turn slowly while the ring is [inSight], and hold still otherwise. The [dock]'s items are where a dock
- * folder that closes is still found.
+ * land. A folder is a planet: an [openFolder] glides from its slot into the centre in the emblem's place, its apps
+ * spiralling out round it into the slots, each with the [folderAppMenu], while the ring drifts outward and fades; a tap
+ * on the planet calls [onCloseFolder], and it goes back the way it came. Each app wears its [unread] count, and a folder
+ * the sum of its apps'. With [rearrange], a long press that moves on picks up what is in a slot to move it round the
+ * ring, or round the open folder; while one is on the move, the slots show where everything would be if it were
+ * dropped. The item at [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of
+ * a folder that has closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag
+ * ends or the ring makes way for it, showing where it would land as an app from another place does. The emblem's sky and
+ * spark turn slowly while the ring is [inSight], and hold still otherwise. A folder opened or closed out of sight, or
+ * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
+ * still found.
  */
 @Composable
 fun HomeRing(
@@ -150,132 +191,248 @@ fun HomeRing(
     inSight: Boolean = true,
     dock: List<RingItem> = emptyList(),
 ) {
-    fun folderAt(at: HomePlace.Folder) = (if (at.holder == HomePlace.Ring) ring else dock).find { it is RingItem.Folder && it.at == at }
-    val fold = rememberFold(openFolder, animate = held == null && inSight, ::folderAt)
-    val closing = if (openFolder == null) fold.closing else null
-    val shown = openFolder ?: closing
-    val arriving = rearrange?.arriving
-    val making = if (shown == null) arriving?.preview(ring) else null
-    val slots = shown?.apps?.size ?: making?.size ?: ring.size
-    // By its place in the list, which skips the stored slots of missing apps, not by its stored slot.
-    val origin = shown?.at?.let { at ->
-        if (at.holder != HomePlace.Ring) return@let DOCK_FOLDER_ORIGIN
-        ring.indexOf(folderAt(at)).takeIf { it >= 0 }?.let { ringSlotOffset(it, ring.size) }
-    }
+    val arrival = rearrange?.arriving
+    val making = if (openFolder == null) arrival?.preview(ring) else null
+    val slots = openFolder?.apps?.size ?: making?.size ?: ring.size
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
     val marks = LocalRingColors.current
     // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
-    val turning = inSight && !showHint && shown == null
+    val turning = inSight && !showHint && openFolder == null
     val spark = turnAngle(turning, SPARK_TURN_MILLIS)
     val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
-    // The one layout both the drawn lines and the icons follow.
-    fun Density.layoutOn(side: Float) = ringLayout(RING_ICON_SIZE.toPx(), side, slots, RING_EDGE_MARGIN.toPx())
+    fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx())
 
-    // Read where it is used, in layout and drawing, so the fold moving the apps neither composes nor measures them again.
-    fun unfolded() = if (origin != null) fold.progress.value else 1f
-
-    // Slot [index]'s place, in radii from the centre, as far out of the folder's slot as the apps have come.
-    fun starAt(index: Int): Offset {
-        val slot = ringSlotOffset(index, slots).let { (dx, dy) -> Offset(dx, dy) }
-        val from = origin?.let { (dx, dy) -> Offset(dx, dy) } ?: return slot
-        return lerp(from, slot, unfolded())
+    // How far the open folder's planet has come from its slot: 0 there, 1 in the centre with its apps round it. The
+    // [planet] is the folder open, or last open until it is back in its slot.
+    val spread = remember { Animatable(0f) }
+    var planet by remember { mutableStateOf<RingItem.Folder?>(null) }
+    SideEffect { if (openFolder != null) planet = openFolder }
+    // The folder that is out of its slot, if only part way; plain, as only the effect below reads it.
+    val spreading = remember { object { var at: HomePlace.Folder? = null } }
+    // An app dragged out closes its folder under the finger, and the drag carries on from there, not from the planet; and
+    // a folder that changed or went has its apps somewhere else to be.
+    val folding = planet?.takeIf { openFolder == null && held == null && inSight && it == folderAt(it.at, ring, dock) }
+    LaunchedEffect(openFolder?.at) {
+        if (openFolder != null) {
+            // Reopened on its way back, it turns round from where it is.
+            if (spreading.at != openFolder.at) spread.snapTo(0f)
+            spreading.at = openFolder.at
+            if (inSight) spread.animateTo(1f, tween(SPREAD_MILLIS, easing = FastOutSlowInEasing)) else spread.snapTo(1f)
+        } else {
+            if (folding != null) spread.animateTo(0f, tween(FOLD_BACK_MILLIS, easing = FastOutSlowInEasing))
+            spread.snapTo(0f)
+            spreading.at = null
+            planet = null
+        }
     }
+    val centred = openFolder ?: folding
+    // The ring stays until the folder's apps are all out, and they are only a tap away once they are, so a second tap on
+    // the planet cannot launch one still bunched there.
+    val spreadingOut by remember(openFolder != null) { derivedStateOf { openFolder != null && spread.value < 1f } }
+
+    val moving = rearrange?.moving
+    // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a gesture
+    // moving it, while it moves round and while the folder it is dragged out of closes under the finger. The ring's items
+    // stepping aside and a folder's apps going home are keyed the same, so each keeps its node, and its icon, from where
+    // it was before.
+    val items = when {
+        openFolder != null -> moving.shown(openFolder.apps).map(RingItem::App)
+        making != null -> making
+        else -> moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
+    }
+    val landsAt = arrival?.to ?: moving?.at
 
     Layout(
         content = {
-            // A closing folder's apps are only on their way in, nothing to move or drop onto.
-            val rearrange = rearrange.takeIf { closing == null }
-            val moving = rearrange?.moving
-            if (shown != null) {
-                CloseFolderTarget(onClick = onCloseFolder)
-            } else {
-                Emblem(showHint = showHint, skyAngle = { skyTurn.value }, sparkAngle = { spark.value }, onClick = onEdit)
+            if (openFolder == null || spreadingOut) {
+                Emblem(showHint, { skyTurn.value }, { spark.value }, onEdit, Modifier.layoutId(Part.Emblem))
             }
-            // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
-            // gesture moving it, while it moves round, while the folder it is dragged out of closes under the finger, and
-            // while the ring makes way for it.
-            val items = when {
-                shown != null -> moving.shown(shown.apps).map(RingItem::App)
-                making != null -> making
-                else -> moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
-            }
-            val landsAt = arriving?.to ?: moving?.at
-            val appMenu = if (shown != null) folderAppMenu else menu
-            val folding = if (origin == null) {
-                Modifier
-            } else {
-                Modifier.graphicsLayer {
-                    val unfolded = unfolded()
-                    scaleX = lerp(FOLDED_SCALE, 1f, unfolded)
-                    scaleY = scaleX
-                    alpha = unfolded
+            centred?.let { folder ->
+                key(Part.Planet) {
+                    CentrePlanet(folder, icon, onClose = onCloseFolder.takeIf { openFolder != null }, { 1f - spread.value }, Modifier.layoutId(Part.Planet))
                 }
             }
+            val appMenu = if (openFolder != null) folderAppMenu else menu
             items.forEachIndexed { index, item ->
                 // By its tag, which names an app or a folder once on the ring.
                 key(item.tag) {
                     // The held app is laid out apart, unseen, and is no position to drop on.
                     val slot = if (index < slots) {
-                        Modifier
-                            .testTag(item.tag)
-                            .then(folding)
-                            .reorderSlot(rearrange, index, landsAt == index)
-                            .foldTarget(index == foldTarget && closing == null, marks.lit)
+                        Modifier.layoutId(Part.Slot(index)).testTag(item.tag).reorderSlot(rearrange, index, landsAt == index)
+                            .foldTarget(index == foldTarget, marks.lit)
                     } else {
-                        Modifier.alpha(0f)
+                        Modifier.layoutId(Part.Held).alpha(0f)
                     }
                     SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index))
                 }
             }
+            // Only pictures of what is going: the ring stepping aside for an opening folder, and a closed folder's apps
+            // going back into its planet while the ring returns and takes the touches.
+            if (spreadingOut) {
+                ring.forEachIndexed { index, item ->
+                    if (item is RingItem.Folder && item.at == openFolder?.at) return@forEachIndexed
+                    key(item.tag) {
+                        SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Leaving(index)).inert(), null, null, unread, null)
+                    }
+                }
+            }
+            folding?.apps?.forEachIndexed { index, app ->
+                val item = RingItem.App(app)
+                key(item.tag) {
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Folding(index)).inert(), null, null, unread, null)
+                }
+            }
+            if (spreadingOut) Spacer(Modifier.layoutId(Part.Shield).inert())
         },
         modifier = modifier
             .fillMaxSize()
-            // Cached, so the glow animating does not lay the ring out again every frame.
+            // Cached, so the glow and the planet moving do not lay the ring out again every frame.
             .drawWithCache {
-                val (radius, iconSize) = layoutOn(size.minDimension)
                 val track = Stroke(1.dp.toPx())
-                val lines = Stroke(1.5.dp.toPx(), join = StrokeJoin.Round)
-                val unfolded = unfolded()
-                val stars = List(slots) { size.center + starAt(it) * radius }
-                val constellation = Path().apply {
-                    stars.forEachIndexed { index, star -> if (index == 0) moveTo(star.x, star.y) else lineTo(star.x, star.y) }
-                    close()
+                val lineStroke = Stroke(1.5.dp.toPx(), join = StrokeJoin.Round)
+
+                // The lines joining [count] slots, stopped at the edges of their discs: glass the wallpaper shows through.
+                fun constellation(count: Int): Pair<Path, Path>? {
+                    if (count < MIN_CONSTELLATION) return null
+                    val (radius, iconSize) = layoutOn(size.minDimension, count)
+                    val stars = List(count) { index ->
+                        val (dx, dy) = ringSlotOffset(index, count)
+                        size.center + Offset(dx, dy) * radius
+                    }
+                    val path = Path().apply {
+                        stars.forEachIndexed { index, star -> if (index == 0) moveTo(star.x, star.y) else lineTo(star.x, star.y) }
+                        close()
+                    }
+                    return path to Path().apply { stars.forEach { addOval(Rect(it, iconSize / 2)) } }
                 }
-                // An icon's disc can be glass the wallpaper shows through, a folder's always is, so the lines stop at its edge.
-                val discs = Path().apply { stars.forEach { addOval(Rect(it, iconSize / 2 * lerp(FOLDED_SCALE, 1f, unfolded))) } }
-                onDrawBehind {
-                    if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
-                    clipPath(discs, ClipOp.Difference) {
-                        if (slots >= MIN_CONSTELLATION) {
-                            drawPath(constellation, marks.starLine.copy(alpha = (marks.starLine.alpha + 0.3f * glow) * unfolded), style = lines)
-                        } else {
-                            drawCircle(marks.mark.copy(alpha = (0.22f + 0.48f * glow) * unfolded), radius = radius, style = track)
+
+                // An app on its way in from another place makes way for itself among the ring's.
+                val ringLines = constellation(making?.size ?: ring.size)
+                val ringRadius = layoutOn(size.minDimension, making?.size ?: ring.size).radius
+                val planetApps = centred?.apps?.size
+                val folderLines = planetApps?.let(::constellation)
+                val folderRadius = planetApps?.let { layoutOn(size.minDimension, it).radius }
+
+                fun DrawScope.draw(lines: Pair<Path, Path>?, radius: Float, alpha: Float) {
+                    if (alpha <= 0f) return
+                    if (lines != null) {
+                        clipPath(lines.second, ClipOp.Difference) {
+                            drawPath(lines.first, marks.starLine.copy(alpha = (marks.starLine.alpha + 0.3f * glow) * alpha), style = lineStroke)
                         }
+                    } else {
+                        drawCircle(marks.mark.copy(alpha = (0.22f + 0.48f * glow) * alpha), radius = radius, style = track)
+                    }
+                }
+                onDrawBehind {
+                    val out = spread.value
+                    if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
+                    if (openFolder == null && folding == null) {
+                        draw(ringLines, ringRadius, 1f)
+                    } else {
+                        val drift = 1f + DRIFT * out
+                        scale(drift, drift) { draw(ringLines, ringRadius, 1f - out) }
+                        if (folderRadius != null) draw(folderLines, folderRadius, out * out)
                     }
                 }
             },
     ) { measurables, constraints ->
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
-        val (radius, iconSize) = layoutOn(side)
+        val (radius, iconSize) = layoutOn(side, slots)
+        val (ringRadius, ringIconSize) = layoutOn(side, ring.size)
+        val shownPlanet = centred
+        val (folderRadius, folderIconSize) = layoutOn(side, shownPlanet?.apps?.size ?: 1)
         val centreSize = (side * EMBLEM_FRACTION).roundToInt()
-        val centre = measurables.first().measure(Constraints.fixed(centreSize, centreSize))
-        val iconPx = iconSize.roundToInt()
-        val icons = measurables.subList(1, 1 + slots).map { it.measure(Constraints.fixed(iconPx, iconPx)) }
-        val held = measurables.drop(1 + slots).map { it.measure(Constraints.fixed(0, 0)) }
+        val placeables = measurables.map { measurable ->
+            val part = measurable.layoutId as Part
+            val size = when (part) {
+                Part.Emblem, Part.Planet -> centreSize
+                is Part.Slot -> iconSize.roundToInt()
+                Part.Held -> 0
+                is Part.Leaving -> ringIconSize.roundToInt()
+                is Part.Folding -> folderIconSize.roundToInt()
+                Part.Shield -> null
+            }
+            part to measurable.measure(size?.let { Constraints.fixed(it, it) } ?: Constraints.fixed(constraints.maxWidth, constraints.maxHeight))
+        }
+        // Where the planet's slot is, as an offset from the centre: on the ring, or below it for one in the dock. Found by
+        // place, not by its stored slot, which counts apps that are missing from the ring.
+        val planetSlot = shownPlanet?.at?.let { at ->
+            val index = ring.indexOfFirst { it is RingItem.Folder && it.at == at }
+            when {
+                at.holder == HomePlace.Dock -> Offset(0f, constraints.maxHeight / 2f)
+                index >= 0 -> ringSlotOffset(index, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
+                else -> Offset.Zero
+            }
+        } ?: Offset.Zero
+        val planetIndex = shownPlanet?.at?.let { at -> ring.indexOfFirst { it is RingItem.Folder && it.at == at } }
 
         layout(constraints.maxWidth, constraints.maxHeight) {
-            held.forEach { it.place(0, 0) }
-            fun Placeable.placeCentred(x: Float, y: Float) = place((x - width / 2f).roundToInt(), (y - height / 2f).roundToInt())
+            val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
+            val out = spread.value
+            val planetAt = middle + planetSlot * (1f - out)
+            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
 
-            val centreX = constraints.maxWidth / 2f
-            val centreY = constraints.maxHeight / 2f
-            centre.placeCentred(centreX, centreY)
-            icons.forEachIndexed { index, placeable ->
-                val (x, y) = starAt(index) * radius
-                placeable.placeCentred(centreX + x, centreY + y)
+            fun Placeable.placeAt(at: Offset, layer: (GraphicsLayerScope.() -> Unit)? = null) {
+                val x = (at.x - width / 2f).roundToInt()
+                val y = (at.y - height / 2f).roundToInt()
+                if (layer == null) place(x, y) else placeWithLayer(x, y, layerBlock = layer)
+            }
+
+            // On its way out of the planet, [out] of the way: at 0 small and unseen at its heart, at 1 in [slot] of [count].
+            fun Placeable.placeSpiralling(index: Int, count: Int, radius: Float) {
+                val angle = 2 * PI * index / count + (1f - out) * SPIRAL
+                placeAt(planetAt + Offset(sin(angle).toFloat(), -cos(angle).toFloat()) * (radius * out)) {
+                    scaleX = lerp(FOLDED_SCALE, 1f, out)
+                    scaleY = scaleX
+                    alpha = (out * 1.6f).coerceAtMost(1f)
+                }
+            }
+
+            // The ring's item in [index], drifted outward and faded as far as the planet has come.
+            fun Placeable.placeDrifting(index: Int) = placeAt(middle + (slotAt(index, ring.size, ringRadius) - middle) * (1f + DRIFT * out)) {
+                alpha = if (index == planetIndex) 0f else 1f - out
+            }
+
+            placeables.forEach { (part, placeable) ->
+                when (part) {
+                    Part.Emblem -> if (shownPlanet == null) {
+                        placeable.placeAt(middle)
+                    } else {
+                        placeable.placeAt(middle) {
+                            scaleX = lerp(1f, 0.4f, out)
+                            scaleY = scaleX
+                            alpha = 1f - out
+                        }
+                    }
+                    Part.Planet -> placeable.placeAt(planetAt) {
+                        scaleX = lerp(ringIconSize / (centreSize * CENTRE_PLANET), 1f, out)
+                        scaleY = scaleX
+                    }
+                    is Part.Slot -> when {
+                        openFolder != null -> placeable.placeSpiralling(part.index, slots, radius)
+                        folding != null -> placeable.placeDrifting(part.index)
+                        else -> placeable.placeAt(slotAt(part.index, slots, radius))
+                    }
+                    Part.Held -> placeable.place(0, 0)
+                    is Part.Leaving -> placeable.placeDrifting(part.index)
+                    is Part.Folding -> placeable.placeSpiralling(part.index, shownPlanet?.apps?.size ?: 1, folderRadius)
+                    Part.Shield -> placeable.place(0, 0)
+                }
             }
         }
     }
+}
+
+/** The folder at [at] as [ring] or [dock] shows it now, if it is there. */
+private fun folderAt(at: HomePlace.Folder, ring: List<RingItem>, dock: List<RingItem>) =
+    (if (at.holder == HomePlace.Ring) ring else dock).find { it is RingItem.Folder && it.at == at }
+
+/**
+ * Takes every touch on the item, before anything in it, so what it covers cannot be pressed, and hides it from
+ * accessibility: it only pictures something on its way, which is found where it lands.
+ */
+private fun Modifier.inert(): Modifier = clearAndSetSemantics {}.pointerInput(Unit) {
+    awaitPointerEventScope { while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
 }
 
 /**
@@ -285,13 +442,13 @@ fun HomeRing(
  * place. Quiet, so the icons stay the eye's first stop.
  */
 @Composable
-private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit) {
+private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
     val edgeMark = LocalRingColors.current.mark
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .clip(CircleShape)
             .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
             .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
@@ -357,52 +514,6 @@ private fun turnAngle(turning: Boolean, millis: Int): State<Float> {
     return turn
 }
 
-/**
- * How far a folder's apps are out of its slot, from 0 inside to 1 in their own slots, and the folder whose apps are
- * [closing]: they keep the slots while they fold back in, then give them back to the ring.
- */
-private class Fold(closing: RingItem.Folder?, start: Float) {
-    val progress = Animatable(start)
-    var closing by mutableStateOf(closing)
-}
-
-/** What the last composition showed, known to the next one without composing again when it changes. */
-private class LastShown {
-    var composed = false
-    var folder: RingItem.Folder? = null
-}
-
-/**
- * The fold of [openFolder]'s apps. A folder opened after the ring first showed comes out of its slot, and one closed
- * folds back in, if it may [animate]; one opened or closed with the ring, or while it may not, is in place at once. So
- * is one closed because it changed or went, which [folderAt] no longer finds as it was: its apps have somewhere else to be.
- */
-@Composable
-private fun rememberFold(openFolder: RingItem.Folder?, animate: Boolean, folderAt: (HomePlace.Folder) -> RingItem?): Fold {
-    val last = remember { LastShown() }
-    val fold = remember(openFolder?.at) {
-        val moves = animate && last.composed
-        when {
-            openFolder != null -> Fold(closing = null, start = if (moves) 0f else 1f)
-            else -> Fold(closing = last.folder?.takeIf { moves && folderAt(it.at) == it }, start = 1f)
-        }
-    }
-    SideEffect {
-        last.composed = true
-        last.folder = openFolder
-    }
-    LaunchedEffect(fold) {
-        val spec = tween<Float>(UNFOLD_MILLIS, easing = FastOutSlowInEasing)
-        if (fold.closing != null) {
-            fold.progress.animateTo(0f, spec)
-            fold.closing = null
-        } else {
-            fold.progress.animateTo(1f, spec)
-        }
-    }
-    return fold
-}
-
 /** The launcher icon's four-point spark, [half] from its [centre] to each tip, its sides bowed in as on the icon. */
 private fun sparkPath(centre: Offset, half: Float): Path {
     val bow = half * 0.22f
@@ -423,13 +534,25 @@ private val RingItem.tag: String
         is RingItem.Folder -> HomeRingTags.folder(at.index)
     }
 
-/** The emblem's place while a folder is open: nothing to see, as in Arc, but a tap there closes the folder. */
+/**
+ * An open [folder]'s planet in the ring's centre, where the emblem was, drawn a little smaller than it; a tap there calls
+ * [onClose]. Without [onClose] it is only the planet going back to its slot. [inner] fades its previews, as its apps are
+ * round it.
+ */
 @Composable
-private fun CloseFolderTarget(onClick: () -> Unit) {
+private fun CentrePlanet(
+    folder: RingItem.Folder,
+    icon: suspend (AppEntry) -> ImageBitmap?,
+    onClose: (() -> Unit)?,
+    inner: () -> Float,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        Modifier
+        modifier
             .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = "Close folder" },
-    )
+            .then(if (onClose != null) Modifier.clickable(onClick = onClose).semantics { contentDescription = "Close folder" } else Modifier.clearAndSetSemantics {}),
+        contentAlignment = Alignment.Center,
+    ) {
+        PlanetFace(folder, icon, Modifier.fillMaxSize(CENTRE_PLANET), inner = inner)
+    }
 }

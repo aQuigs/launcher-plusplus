@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
 import androidx.compose.material3.DropdownMenu
@@ -22,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -36,11 +36,10 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
-import com.sqftware.orbitlauncher.ui.theme.DiscEdge
-import com.sqftware.orbitlauncher.ui.theme.FolderEdge
 
 object FolderTags {
     const val MENU = "folder_options"
+    const val PLANET_DIALOG = "folder_planet_dialog"
 }
 
 /** A folder's long-press menu, opened and shown like an [AppMenu]. */
@@ -49,6 +48,7 @@ typealias FolderMenu = LongPressMenu<RingItem.Folder>
 /** What a folder's long-press menu offers, in menu order. */
 enum class FolderOption(val label: String, val icon: ImageVector) {
     AddApps("Add apps", Icons.Default.Add),
+    Planet("Change planet", Icons.Default.Star),
     Remove("Remove folder", Icons.Default.Close),
 }
 
@@ -81,8 +81,8 @@ private const val PREVIEWS_FRACTION = 0.86f
 private const val PREVIEW_FRACTION = 0.45f
 
 /**
- * A slot on the ring or in the dock holding [folder]: a circle, the size of an app's, filled with previews of up to four of its icons and
- * wearing a badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, a long
+ * A slot on the ring or in the dock holding [folder]: a planet the size of an app, in the look the user chose, wearing a
+ * badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, a long
  * press opens its [menu], and a long press that goes on becomes a [drag].
  */
 @Composable
@@ -111,10 +111,7 @@ fun FolderIcon(
             .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into the wallpaper.
-        IconDisc(presses, Modifier.fillMaxSize().edge(FolderEdge), contentAlignment = Alignment.Center) {
-            FolderPreviews(folder, icon)
-        }
+        PlanetFace(folder, icon, Modifier.fillMaxSize(), presses)
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
     }
@@ -161,15 +158,6 @@ internal fun SlotIcon(
     }
 }
 
-/** Rings the circle inscribed in the item with [edge]'s two lines, the dark one outermost. */
-private fun Modifier.edge(edge: DiscEdge): Modifier = drawWithContent {
-    drawContent()
-    val line = 1.dp.toPx()
-    val radius = size.minDimension / 2
-    drawCircle(edge.outer, radius = radius - line / 2, style = Stroke(line))
-    drawCircle(edge.inner, radius = radius - line * 1.5f, style = Stroke(line))
-}
-
 /** An item lit as the one an app let go now would fold into: a little larger, ringed in [colour]. */
 internal fun Modifier.foldTarget(lit: Boolean, colour: Color): Modifier = if (!lit) {
     this
@@ -185,11 +173,18 @@ internal fun Modifier.foldTarget(lit: Boolean, colour: Color): Modifier = if (!l
 
 private const val FOLD_TARGET_SCALE = 1.12f
 
-/** A folder's long-press menu. Choosing an item dismisses the menu, then hands on the choice. */
+/**
+ * A folder's long-press menu of [options]. Choosing an item dismisses the menu, then hands on the choice.
+ */
 @Composable
-fun FolderOptionsMenu(expanded: Boolean, onOption: (FolderOption) -> Unit, onDismiss: () -> Unit) {
+fun FolderOptionsMenu(
+    expanded: Boolean,
+    onOption: (FolderOption) -> Unit,
+    onDismiss: () -> Unit,
+    options: List<FolderOption> = FolderOption.entries,
+) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(FolderTags.MENU)) {
-        FolderOption.entries.forEach { option ->
+        options.forEach { option ->
             DropdownMenuItem(
                 text = { Text(option.label) },
                 leadingIcon = { Icon(option.icon, contentDescription = null) },

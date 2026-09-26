@@ -33,6 +33,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -57,12 +58,15 @@ import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.Favourites
+import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageLayout
+import com.sqftware.orbitlauncher.domain.Planet
+import com.sqftware.orbitlauncher.domain.PlanetPick
 import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingSlot
@@ -98,6 +102,7 @@ class LauncherScreenTest {
     private val work = folderOf(clock, mail)
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
     private val hourStylesChosen = mutableListOf<Boolean>()
+    private var folderLook by mutableStateOf(FolderLook.SolarSystem)
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
     private var ringerTaps = 0
@@ -169,6 +174,8 @@ class LauncherScreenTest {
                 hourStylesChosen += it
                 face = face.copy(twentyFourHour = it)
             },
+            folderLook = folderLook,
+            onFolderLookChange = { folderLook = it },
             onOpenClock = { opened += "clock" },
             onOpenCalendar = { opened += "calendar" },
             ringerMode = ringerMode,
@@ -776,6 +783,26 @@ class LauncherScreenTest {
         compose.folderSlot(0).assertDoesNotExist()
         compose.onNodeWithText("Add apps").assertIsDisplayed()
         compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+    }
+
+    @Test
+    fun theFolderMenuPicksTheFoldersPlanetInTheSolarSystemOnly() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performTouchInput { longClick() }
+        compose.onNodeWithText("Change planet").performClick()
+        compose.onNodeWithTag(FolderTags.PLANET_DIALOG).assertIsDisplayed()
+        compose.onNodeWithText("Mercury").assertIsSelected()
+
+        compose.onNodeWithText("Saturn").performClick()
+
+        compose.onNodeWithTag(FolderTags.PLANET_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(work.copy(pick = PlanetPick.Of(Planet.Saturn))))), homeApps) }
+
+        folderLook = FolderLook.Rim
+        compose.folderSlot(0).performTouchInput { longClick() }
+        compose.folderOptionsMenu().assertIsDisplayed()
+        compose.onNodeWithText("Change planet").assertDoesNotExist()
     }
 
     @Test
@@ -1537,6 +1564,21 @@ class LauncherScreenTest {
         compose.onNodeWithText("24-hour clock").assertIsOff()
         compose.onNodeWithText("24-hour clock").performClick()
         compose.runOnIdle { assertEquals(listOf(false, true), hourStylesChosen) }
+    }
+
+    @Test
+    fun theLauncherMenusFolderLookRowShowsTheLookAndItsDialogChangesIt() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Folder look").assert(hasText("Solar system")).performClick()
+        compose.onNodeWithTag(LauncherMenuTags.LOOK_DIALOG).assertIsDisplayed()
+
+        compose.onNodeWithText("Moons in orbit").performClick()
+
+        compose.onNodeWithTag(LauncherMenuTags.LOOK_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(FolderLook.Orbit, folderLook) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Folder look").assert(hasText("Moons in orbit"))
     }
 
     @Test

@@ -3,16 +3,21 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -67,6 +72,8 @@ class HomeRingTest {
             )
         }
     }
+
+    private val DpRect.middle get() = Offset((left + right).value / 2, (top + bottom).value / 2)
 
     private fun iconWidth(app: AppEntry) = compose.ringSlot(app).getUnclippedBoundsInRoot().width
 
@@ -201,32 +208,31 @@ class HomeRingTest {
     }
 
     @Test
-    fun aFolderOpensOutOfItsSlotAndFoldsBackIn() {
-        // Stored after a missing app's slot, so its slot number is not its place on the ring.
+    fun aFolderSpreadsOutOfItsPlanetAndFoldsBackIntoIt() {
+        val launched = mutableListOf<AppEntry>()
+        // Stored in slot 2, but second on the ring, as an app missing from the ring before it leaves it.
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 2), listOf(mail, alphabet[0]))
-        showItems(listOf(RingItem.App(clock), work))
+        showItems(listOf(RingItem.App(clock), work), onLaunch = launched::add)
+        val planet = compose.folderSlot(2).getUnclippedBoundsInRoot().middle
         val slotOfClock = compose.ringSlot(clock).getUnclippedBoundsInRoot()
-        val slotOfFolder = compose.folderSlot(2).getUnclippedBoundsInRoot()
         compose.mainClock.autoAdvance = false
 
         openFolder = work
         compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeByFrame()
 
-        assertTrue("the first app starts out at the folder's slot", compose.ringSlot(mail).getUnclippedBoundsInRoot().top > slotOfClock.bottom)
-
-        compose.mainClock.advanceTimeBy(UNFOLD_WAIT_MILLIS)
-        assertEquals("then takes the top slot", slotOfClock, compose.ringSlot(mail).getUnclippedBoundsInRoot())
+        val leaving = compose.ringSlot(mail).getUnclippedBoundsInRoot().middle
+        assertTrue("the first app starts at its planet", (leaving - planet).getDistance() < (leaving - slotOfClock.middle).getDistance())
+        compose.onRoot().performTouchInput { click(Offset(planet.x.dp.toPx(), planet.y.dp.toPx())) }
+        assertEquals("a second tap on the planet launches nothing unseen", emptyList<AppEntry>(), launched)
+        compose.mainClock.advanceTimeBy(1_000)
+        assertEquals("then reaches its slot", slotOfClock, compose.ringSlot(mail).getUnclippedBoundsInRoot())
 
         openFolder = null
-        compose.mainClock.advanceTimeBy(HALFWAY_MILLIS)
+        compose.mainClock.advanceTimeByFrame()
 
-        compose.folderSlot(2).assertDoesNotExist()
-        assertTrue("closed, the apps fold back in", compose.ringSlot(mail).getUnclippedBoundsInRoot().top > slotOfClock.bottom)
-
-        compose.mainClock.advanceTimeBy(UNFOLD_WAIT_MILLIS)
-        compose.ringSlot(mail).assertDoesNotExist()
-        assertEquals("before the folder comes back", slotOfFolder, compose.folderSlot(2).getUnclippedBoundsInRoot())
+        compose.folderSlot(2).assertExists()
+        compose.onNodeWithContentDescription(mail.label).assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
     }
 
     @Test
@@ -241,9 +247,8 @@ class HomeRingTest {
         compose.mainClock.advanceTimeByFrame()
 
         compose.ringSlot(mail).assertDoesNotExist()
+        compose.onNodeWithContentDescription(mail.label).assertDoesNotExist()
         compose.ringSlot(clock).assertIsDisplayed()
+        compose.emblem().assertIsDisplayed()
     }
 }
-
-private const val HALFWAY_MILLIS = 120L
-private const val UNFOLD_WAIT_MILLIS = 400L
