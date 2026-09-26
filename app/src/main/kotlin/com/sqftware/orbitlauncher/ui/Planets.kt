@@ -104,8 +104,8 @@ fun PlanetFace(
         Modifier.drawWithCache {
             val radius = size.minDimension / 2
             val disc = Path().apply { addOval(Rect(size.center, radius)) }
-            val band = Path()
-            onDrawBehind { drawPlanetGlass(planet, radius, style.minutes, disc, band) }
+            val outline = Path()
+            onDrawBehind { drawPlanetGlass(planet, radius, style.minutes, disc, outline) }
         }
     }
     val moons = if (style.look == FolderLook.Rim) Modifier.moons(folder.apps.size) else Modifier
@@ -238,26 +238,27 @@ internal fun Planet?.discFraction() = if (this == Planet.Pluto) PLUTO_DISC else 
 private const val PLUTO_DISC = 0.78f
 
 /**
- * Tints a folder's disc of [radius] with [planet]'s colour through its glass. The Earth's land and clouds go round on
- * it, and Jupiter's bands roll, each at its own pace, with the Great Red Spot drifting across, round the far side and
- * back, as Jupiter spins faster than any other planet.
+ * Tints a folder's disc of [radius] with [planet]'s colour through its glass, tracing shapes on it into [outline]. The
+ * Earth's continents turn on it under drifting clouds, and Jupiter's bands roll, each at its own pace, with the Great Red
+ * Spot drifting across, round the far side and back, as Jupiter spins faster than any other planet.
  */
-private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: () -> Float, disc: Path, band: Path) {
+private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: () -> Float, disc: Path, outline: Path) {
     val paint = PlanetPaints.getValue(planet)
     clipPath(disc) {
         drawCircle(paint.tint, radius, center)
         when (planet) {
             Planet.Earth -> {
-                val spin = orbitAngle(minutes, EARTH_SPIN)
-                EARTH_FEATURES.forEachIndexed { index, (longitude, latitude, size) ->
-                    val angle = longitude + spin
-                    val depth = cos(angle)
-                    if (depth <= 0f) return@forEachIndexed
-                    val at = center + Offset(sin(angle) * radius * 0.82f * cos(latitude), latitude * radius)
-                    val oval = Size((size * radius * depth).coerceAtLeast(0.5f) * 2, size * radius * 1.6f)
-                    val colour = paint.features[index]
-                    drawOval(colour.copy(alpha = colour.alpha * min(1f, depth * 2.5f)), at - Offset(oval.width / 2, oval.height / 2), oval)
+                val (land, ice, cloud) = paint.features
+                // One path a colour, so the canvas fills a few paths a frame, not one a shape.
+                fun draw(shapes: List<GlobeShape>, spin: Float, colour: Color) {
+                    outline.rewind()
+                    shapes.forEach { it.addTo(outline, center, radius, spin, EARTH_TILT) }
+                    drawPath(outline, colour)
                 }
+                val spin = orbitAngle(minutes, EARTH_SPIN)
+                draw(EarthLand, spin, land)
+                draw(listOf(EarthIce), spin, ice)
+                draw(EarthClouds, orbitAngle(minutes, CLOUD_SPIN), cloud)
             }
             Planet.Jupiter -> {
                 val drift = orbitAngle(minutes, JUPITER_SPIN)
@@ -266,12 +267,12 @@ private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: ()
                     fun edge(x: Float, side: Float) =
                         center.y + (latitude + side) * radius + sin(x / radius * 5 + drift * (1 + index * 0.35f) + index) * radius * 0.035f
                     fun x(step: Int) = -radius + 2 * radius * step / BAND_STEPS
-                    band.rewind()
-                    band.moveTo(center.x + x(0), edge(x(0), -height / 2))
-                    for (step in 0..BAND_STEPS) band.lineTo(center.x + x(step), edge(x(step), -height / 2))
-                    for (step in BAND_STEPS downTo 0) band.lineTo(center.x + x(step), edge(x(step), height / 2))
-                    band.close()
-                    drawPath(band, paint.features[index])
+                    outline.rewind()
+                    outline.moveTo(center.x + x(0), edge(x(0), -height / 2))
+                    for (step in 0..BAND_STEPS) outline.lineTo(center.x + x(step), edge(x(step), -height / 2))
+                    for (step in BAND_STEPS downTo 0) outline.lineTo(center.x + x(step), edge(x(step), height / 2))
+                    outline.close()
+                    drawPath(outline, paint.features[index])
                 }
                 val spot = drift * 0.6f
                 val depth = cos(spot)
@@ -289,12 +290,6 @@ private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: ()
         }
     }
 }
-
-/** Longitude and latitude in radians and size against the disc of the Earth's land and clouds, in [PlanetPaint.features]' order. */
-private val EARTH_FEATURES = listOf(
-    Triple(0.3f, -0.35f, 0.34f), Triple(1.1f, 0.25f, 0.3f), Triple(2.4f, -0.1f, 0.38f), Triple(3.4f, 0.4f, 0.26f),
-    Triple(4.6f, -0.2f, 0.32f), Triple(5.5f, 0.3f, 0.22f), Triple(1.8f, -0.5f, 0.24f), Triple(4.0f, 0.55f, 0.22f),
-)
 
 /** Where each of Jupiter's bands lies from the disc's centre, and how tall it is, against its radius. */
 private val JUPITER_BANDS = listOf(
@@ -404,6 +399,7 @@ private const val SATURN_TILT_SQUASH = 0.3f
 
 // Turns a minute: quick enough to see, and in the order of the real ones.
 private const val EARTH_SPIN = 3f
+private const val CLOUD_SPIN = 3.6f
 private const val JUPITER_SPIN = 5f
 private const val VENUS_SPIN = -2.5f
 private const val MOON_ORBIT = 1.2f
@@ -413,3 +409,6 @@ private const val TRITON_ORBIT = -1.6f
 private const val CHARON_ORBIT = -1f
 private const val SATURN_TILT = -23f
 private const val URANUS_TILT = 81f
+
+/** How far the Earth leans its north towards us, in radians, where most of its land is. */
+private const val EARTH_TILT = 0.35f
