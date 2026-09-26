@@ -2,10 +2,13 @@
 # Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
 # Runs a command holding this repo's emulator lock, so sessions that share the emulator take turns.
-# The command inherits the lock and the OS drops it when the command ends, however it ends, so it can't leak.
+# Boots the emulator first and stops it after, since a quickboot costs seconds and an idle emulator costs RAM and battery.
+# The command inherits the lock, so killing this script can't free it while the command still runs, and the OS drops it once both are gone.
 # Usage: scripts/emulator-lock.sh <command> [args...]
 #   e.g. scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest
+#   KEEP_EMULATOR=1 leaves the emulator running for device work that follows right away; scripts/emulator.sh stop stops it later
 #   LOCK_WAIT_MINUTES (default 20) is how long to wait for another session's lock before failing; EMULATOR_LOCK overrides the lock path
+#   IMAGE_TAG and HEADLESS pass through to scripts/emulator.sh
 
 set -e
 
@@ -29,15 +32,26 @@ WAIT_MINUTES=${LOCK_WAIT_MINUTES:-20}
 
 touch "$LOCK"
 
-# -e keeps the lock across the exec below
-if ! zsystem flock -e -t 0 "$LOCK" 2>/dev/null; then
+# -e lets the command inherit the lock
+if ! zsystem flock -e -f LOCK_FD -t 0 "$LOCK" 2>/dev/null; then
   echo "Waiting up to $WAIT_MINUTES min for the emulator lock, held by $(cat "$HOLDER" 2>/dev/null)"
-  if ! zsystem flock -e -t $(( WAIT_MINUTES * 60 )) "$LOCK"; then
+  if ! zsystem flock -e -f LOCK_FD -t $(( WAIT_MINUTES * 60 )) "$LOCK"; then
     echo "Gave up after $WAIT_MINUTES min waiting for the emulator lock $LOCK, held by $(cat "$HOLDER" 2>/dev/null)"
     exit 1
   fi
 fi
 
-# exec keeps this PID, so the holder recorded is the command itself
 print -r -- "pid $$ since $(date '+%H:%M:%S'): $*" > "$HOLDER"
-exec "$@"
+export EMULATOR_LOCK_HELD=1
+
+# The emulator outlives this script, so it must not inherit the lock
+"$SCRIPT_DIR/emulator.sh" {LOCK_FD}>&-
+
+STATUS=0
+"$@" || STATUS=$?
+
+if [[ -z $KEEP_EMULATOR ]]; then
+  "$SCRIPT_DIR/emulator.sh" stop {LOCK_FD}>&-
+fi
+
+exit $STATUS

@@ -16,8 +16,9 @@ Custom Android home screen (launcher). Native Kotlin + Jetpack Compose, built an
 ./gradlew testDebugUnitTest          # JVM unit tests (pre-commit runs them too)
 ./gradlew assembleDebug              # → app/build/outputs/apk/debug/app-debug.apk
 ./gradlew lintDebug                  # Android lint → app/build/reports/lint-results-debug.html (pre-commit runs it too)
-scripts/emulator.sh                  # AVD from the installed Play Store image, boot, wait (IMAGE_TAG=google_apis for adb root, HEADLESS=1 for no window)
-./gradlew connectedDebugAndroidTest  # Compose UI + activity tests on the running emulator
+scripts/emulator-lock.sh <command>   # device work: boots the emulator under the shared lock, runs <command>, stops it
+scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest  # Compose UI + activity tests on the emulator
+scripts/emulator.sh [stop]           # boot (or stop) the AVD from the installed Play Store image by hand (IMAGE_TAG=google_apis for adb root, HEADLESS=1 for no window)
 scripts/run.sh                       # install debug build, make it the home app, go home (VARIANT=Release for the minified build)
 scripts/screenshot.sh [name]         # adb screencap → screenshots/<name>.png (gitignored)
 scripts/record.sh [name] [seconds]   # adb screenrecord → screenshots/<name>.mp4 (gitignored)

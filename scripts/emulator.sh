@@ -3,9 +3,9 @@
 
 # Boots this repo's emulator, creating its AVD on first use, and waits until Android is ready.
 # Uses the system image bootstrap.sh installed; this script never installs anything.
-# The emulator stops itself once no session has used it for a while, so run this before device work even if it booted earlier.
-# Usage: scripts/emulator.sh   (IMAGE_TAG=google_apis for the rootable image, HEADLESS=1 for no window,
-#   EMULATOR_IDLE_MINUTES to change the default 20 min idle stop, KEEP_EMULATOR=1 to never stop it)
+# emulator-lock.sh runs it before and after device work; run it directly only to use the emulator yourself.
+# Usage: scripts/emulator.sh        (IMAGE_TAG=google_apis for the rootable image, HEADLESS=1 for no window)
+#        scripts/emulator.sh stop   stops it once no session is using it, saving the snapshot that makes the next boot quick
 
 set -e
 
@@ -30,38 +30,52 @@ fi
 RELATIVE_DIR=${IMAGE_DIRS[1]#$IMAGE_ROOT/}
 API_DIR=${RELATIVE_DIR%%/*}
 
+# Worktrees share the repo's AVD and emulator-lock.sh's lock, so both are named after the main checkout, not the worktree
+MAIN_CHECKOUT=$(git rev-parse --path-format=absolute --git-common-dir)
+MAIN_CHECKOUT=${MAIN_CHECKOUT:h}
+
 # One AVD per repo, API level, and variant, so a newer image from bootstrap gets a fresh AVD
-REPO_NAME=$(basename "$PWD" | tr '-' '_')
+REPO_NAME=${${MAIN_CHECKOUT:t}//-/_}
 AVD_NAME=${REPO_NAME}_${API_DIR#android-}_$IMAGE_TAG
 AVD_DIR=$HOME/.android/avd/$AVD_NAME.avd
 LOG_FILE=${TMPDIR:-/tmp}/emulator-$AVD_NAME.log
 
-# emulator-lock.sh's lock, named after the main checkout so worktrees share it; the holder file's mtime is the last use
-LOCK=${EMULATOR_LOCK:-/tmp/${$(git rev-parse --path-format=absolute --git-common-dir):h:t}-emulator.flock}
-HOLDER=$LOCK.holder
-IDLE_MINUTES=${EMULATOR_IDLE_MINUTES:-20}
+LOCK=${EMULATOR_LOCK:-/tmp/${MAIN_CHECKOUT:t}-emulator.flock}
+WAIT_MINUTES=${LOCK_WAIT_MINUTES:-20}
 
-stop_when_idle() {
-  while sleep 60 && kill -0 $EMULATOR_PID; do
-    (
-      if ! zsystem flock -t 0 "$LOCK"; then
-        touch "$HOLDER"
-        exit
-      fi
-      [[ -n $(find "$HOLDER" -mmin -$IDLE_MINUTES) ]] && exit
+if [[ $1 == stop ]]; then
+  # Under emulator-lock.sh the lock is already ours, and asking for it again would wait on ourselves
+  if [[ -z $EMULATOR_LOCK_HELD ]]; then
+    touch "$LOCK"
+    if ! zsystem flock -t $(( WAIT_MINUTES * 60 )) "$LOCK"; then
+      echo "Gave up after $WAIT_MINUTES min waiting for the emulator lock $LOCK, held by $(cat "$LOCK.holder" 2>/dev/null)"
+      exit 1
+    fi
+  fi
 
-      # Keeps the lock until the snapshot is saved, so no session starts on a stopping emulator
-      adb -e emu kill
-      repeat 120 { kill -0 $EMULATOR_PID || break; sleep 1 }
-    )
-  done
-}
+  if [[ $(adb -e emu avd name 2>/dev/null | head -1 | tr -d '\r') != "$AVD_NAME" ]]; then
+    echo "$AVD_NAME is not running"
+    exit 0
+  fi
+
+  echo "Stopping $AVD_NAME"
+  adb -e emu kill > /dev/null
+
+  # The console closes before the snapshot is saved, so the process exiting is the real signal
+  repeat 120 {
+    if ! pgrep -f -- "-avd $AVD_NAME( |\$)" > /dev/null; then
+      echo "Stopped $AVD_NAME"
+      exit 0
+    fi
+    sleep 1
+  }
+  echo "$AVD_NAME is still running 2 min after it was told to stop, see $LOG_FILE"
+  exit 1
+fi
 
 # adb -e ignores plugged-in phones; a different emulator must be stopped because the boot wait cannot tell them apart
 RUNNING_AVD=$(adb -e emu avd name 2>/dev/null | head -1 | tr -d '\r')
 if [[ $RUNNING_AVD == "$AVD_NAME" ]]; then
-  # Counts as use, so the idle stop doesn't catch a session that is still building
-  touch "$HOLDER"
   echo "$AVD_NAME is already running"
   exit 0
 elif [[ -n $RUNNING_AVD ]]; then
@@ -94,11 +108,5 @@ done
 
 # Taps show up in screen recordings; it's a persisted system setting, so re-applying each boot also covers fresh AVDs
 adb -e shell settings put system show_touches 1
-
-if [[ -z $KEEP_EMULATOR ]]; then
-  touch "$HOLDER"
-  stop_when_idle &> /dev/null &!
-  echo "It stops after $IDLE_MINUTES min unused (KEEP_EMULATOR=1 keeps it running)"
-fi
 
 echo "Emulator $AVD_NAME is ready"
