@@ -39,8 +39,8 @@ private val FULL_DOCK_ICON_SIZE = 56.dp
  * long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]. Each app wears its
  * [unread] count, and a folder the sum of its apps'. With [rearrange], a long press that moves on picks an item up to
  * move it along the row; while one is on the move, the row shows where everything would be if it were dropped. The item
- * at [foldTarget] is lit as the one an app let go now would fold into, and an app [arriving] from another place shows
- * where it would land among the others.
+ * at [foldTarget] is lit as the one an app let go now would fold into, and one arriving from another place shows where
+ * it would land among the others.
  */
 @Composable
 fun Dock(
@@ -55,7 +55,6 @@ fun Dock(
     unread: UnreadCounts = UnreadCounts(),
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
-    arriving: Arriving? = null,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
@@ -64,6 +63,7 @@ fun Dock(
     Layout(
         content = {
             val moving = rearrange?.moving
+            val arriving = rearrange?.arriving
             val landsAt = arriving?.to ?: moving?.at
             (arriving?.preview(items) ?: moving.shown(items)).forEachIndexed { index, item ->
                 val tag = when (item) {

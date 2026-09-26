@@ -318,18 +318,13 @@ fun LauncherScreen(
     var lit by remember { mutableStateOf<Over.Slot?>(null) }
 
     fun arrives(drag: Drag, place: Rearrange) = drag.app != null && drag.home != null && place !== (drag as? Drag.Within)?.place
-    val arriving by remember {
-        derivedStateOf {
-            val drag = dragged
-            val way = makingWay
-            val app = drag?.app
-            if (drag == null || app == null || way == null || !arrives(drag, way.place)) return@derivedStateOf null
-            homePlaces.entries.find { it.value === way.place }?.let { (holder, _) ->
-                Arriving(app, way.index, latestReorderMode).takeIf { it.showsAmong(itemsOf(holder)) }?.let { holder to it }
-            }
-        }
+
+    // The app from another home place that [holder]'s [place] makes way for, where the finger rests.
+    fun arrivalIn(holder: HomePlace.Slots, place: Rearrange): Arriving? {
+        val way = makingWay?.takeIf { it.place === place } ?: return null
+        val app = dragged?.takeIf { arrives(it, place) }?.app ?: return null
+        return Arriving(app, way.index, latestReorderMode).takeIf { it.showsAmong(itemsOf(holder)) }
     }
-    fun arrivingIn(holder: HomePlace.Slots) = arriving?.takeIf { it.first == holder }?.second
 
     // Folding an app dragged onto the middle of position [hit] of [holder], the ring or the dock, into the item that shows
     // there as the place makes way, if the app lands there; nothing for a folder dragged, as folders do not nest.
@@ -337,7 +332,7 @@ fun LauncherScreen(
         if (!hit.onMiddle) return null
         val app = drag.app ?: return null
         val items = itemsOf(holder)
-        val source = arrivingIn(holder)?.let { it.sourceOf(items, hit.index) ?: return null }
+        val source = place.arriving?.let { it.sourceOf(items, hit.index) ?: return null }
             ?: place.moving?.sourceOf(items, hit.index) ?: hit.index
         val item = items.getOrNull(source) ?: return null
         return Landing.Into(holder, item).takeIf { latestHomeApps.lands(app, drag.home, it) }
@@ -576,6 +571,7 @@ fun LauncherScreen(
         remove: ((T) -> Unit)? = null,
         label: ((T) -> String)? = null,
         startOnPress: Boolean = false,
+        arrivingIn: (Rearrange) -> Arriving? = { null },
     ): Rearrange = Rearrange(
             onStart = { index, position ->
                 val listed = items()
@@ -602,6 +598,7 @@ fun LauncherScreen(
             onDrop = ::drop,
             onCancel = { dragged = null },
             startOnPress = startOnPress,
+            arrivingIn = arrivingIn,
             movingIn = { place ->
                 (dragged as? Drag.Within)?.takeIf { it.place === place }?.let {
                     Moving(it.from, makingWay?.takeIf { way -> way.place === place }?.index, latestReorderMode)
@@ -610,9 +607,13 @@ fun LauncherScreen(
         )
 
     fun slotsRearrange(holder: HomePlace.Slots) =
-        rearrange(holder, items = { itemsOf(holder) }, look = { it }, move = { item, target, mode ->
-            changeHomeApps { change(holder) { move(item, target, mode) } }
-        }).also { homePlaces[holder] = it }
+        rearrange(
+            holder,
+            items = { itemsOf(holder) },
+            look = { it },
+            move = { item, target, mode -> changeHomeApps { change(holder) { move(item, target, mode) } } },
+            arrivingIn = { arrivalIn(holder, it) },
+        ).also { homePlaces[holder] = it }
 
     val ringRearrange = remember { slotsRearrange(HomePlace.Ring) }
     val dockRearrange = remember { slotsRearrange(HomePlace.Dock) }
@@ -860,7 +861,6 @@ fun LauncherScreen(
                                         rearrange = if (open != null) folderRearrange else ringRearrange,
                                         foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                         held = (dragged as? Drag.OutOfFolder)?.app,
-                                        arriving = arrivingIn(HomePlace.Ring),
                                         inSight = homeInSight,
                                         dock = dock,
                                     )
@@ -894,7 +894,6 @@ fun LauncherScreen(
                                     unread = unread,
                                     rearrange = dockRearrange,
                                     foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Dock }?.index,
-                                    arriving = arrivingIn(HomePlace.Dock),
                                 )
                             }
                         }

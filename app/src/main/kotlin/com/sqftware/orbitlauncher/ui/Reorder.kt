@@ -52,7 +52,8 @@ private const val MIDDLE = 0.35f
  * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that moves
  * on, or the press itself with [startOnPress], picks up the item at a position, and the finger then goes as in an
  * [ItemDrag]. The place marks each position with [reorderSlot], so the finger can be told which one it is over, and
- * shows its items as [moving] says while one of them is on the move.
+ * shows its items as [moving] says while one of them is on the move, or as [arriving] says while an app from another
+ * place is.
  */
 class Rearrange(
     private val onStart: Rearrange.(index: Int, Offset) -> Boolean,
@@ -61,6 +62,7 @@ class Rearrange(
     private val onCancel: () -> Unit,
     private val startOnPress: Boolean = false,
     private val movingIn: (Rearrange) -> Moving?,
+    private val arrivingIn: (Rearrange) -> Arriving? = { null },
 ) {
     // The positions' coordinates rather than their bounds: a page scrolling past would otherwise write them every frame,
     // while they are only read as the finger moves.
@@ -69,6 +71,9 @@ class Rearrange(
 
     /** The item of this place on the move, if it is one of this place's; read in composition, it follows the finger. */
     val moving: Moving? get() = movingIn(this)
+
+    /** The app from another place this one makes way for, if any; read in composition, it follows the finger. */
+    val arriving: Arriving? get() = arrivingIn(this)
 
     /** What picks up the item at [index]. */
     fun drag(index: Int): ItemDrag<Any?> =

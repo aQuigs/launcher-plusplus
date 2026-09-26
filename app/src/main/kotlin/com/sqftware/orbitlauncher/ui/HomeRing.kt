@@ -124,7 +124,7 @@ private val DOCK_FOLDER_ORIGIN = 0f to 1f
  * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
  * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
  * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends or the ring
- * makes way for it. An app [arriving] from another place shows where it would land among the others. The emblem's
+ * makes way for it, showing where it would land as an app from another place does. The emblem's
  * sky and spark turn slowly while the ring is [inSight], and hold still otherwise. The [dock]'s items are where a dock
  * folder that closes is still found.
  */
@@ -147,7 +147,6 @@ fun HomeRing(
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
     held: AppEntry? = null,
-    arriving: Arriving? = null,
     inSight: Boolean = true,
     dock: List<RingItem> = emptyList(),
 ) {
@@ -155,6 +154,7 @@ fun HomeRing(
     val fold = rememberFold(openFolder, animate = held == null && inSight, ::folderAt)
     val closing = if (openFolder == null) fold.closing else null
     val shown = openFolder ?: closing
+    val arriving = rearrange?.arriving
     val making = if (shown == null) arriving?.preview(ring) else null
     val slots = shown?.apps?.size ?: making?.size ?: ring.size
     // By its place in the list, which skips the stored slots of missing apps, not by its stored slot.
