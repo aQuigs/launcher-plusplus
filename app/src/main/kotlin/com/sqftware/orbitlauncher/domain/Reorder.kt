@@ -29,3 +29,20 @@ fun <T> List<T>.reorderedFrom(position: Int, from: Int, to: Int, mode: ReorderMo
     position in to + 1..from -> position - 1
     else -> position
 }
+
+/**
+ * This list with [item], from elsewhere, put at [to] as [mode] says: in before what is there, or in its stead. At the end
+ * it is added whatever the mode, and a [to] beyond that changes nothing.
+ */
+fun <T> List<T>.arrived(item: T, to: Int, mode: ReorderMode): List<T> {
+    if (to !in 0..size) return this
+    return toMutableList().apply { if (mode == ReorderMode.Swap && to < size) this[to] = item else add(to, item) }
+}
+
+/** The position in this list of the item that [arrived], given the same [to] and [mode], puts at [position]; null for the one that arrived. */
+fun <T> List<T>.arrivedFrom(position: Int, to: Int, mode: ReorderMode): Int? = when {
+    to !in 0..size -> position
+    position == to -> null
+    position < to || (mode == ReorderMode.Swap && to < size) -> position
+    else -> position - 1
+}
