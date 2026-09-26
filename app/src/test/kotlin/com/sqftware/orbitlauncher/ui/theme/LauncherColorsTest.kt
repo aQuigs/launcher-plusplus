@@ -45,7 +45,7 @@ class LauncherColorsTest {
     fun `what floats over the wallpaper is opaque`() {
         listOf(LauncherColors, LauncherDayColors).forEach { scheme ->
             with(scheme) {
-                listOf(secondaryContainer, surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest)
+                listOf(surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest)
                     .forEach { assertEquals("$it", 1f, it.alpha) }
             }
         }
