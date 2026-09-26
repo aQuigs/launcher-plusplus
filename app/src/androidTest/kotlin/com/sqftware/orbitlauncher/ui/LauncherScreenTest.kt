@@ -1104,6 +1104,50 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun theRingMakesWayBetweenItsAppsForAnAppOutOfItsFolderAndItLandsThere() {
+        val three = alphabet.take(3)
+        apps = listOf(clock) + three
+        homeApps = HomeApps(ring = Ring(three.map { RingSlot.App(it.key) } + folderOf(clock)))
+        show()
+        compose.folderSlot(3).performClick()
+
+        pickUp(compose.ringSlot(clock))
+        dragTo(centreOf(compose.closeFolder()))
+        rest(MAKE_WAY_MILLIS)
+        // On the ring between the first two apps, nearer the second, and farther than an icon from either.
+        val centre = centreOf(compose.emblem())
+        val (first, second) = three.take(2).map { centreOf(compose.ringSlot(it)) - centre }
+        val towards = first * 0.4f + second * 0.6f
+        dragTo(centre + towards * (first.getDistance() / towards.getDistance()))
+        compose.ringSlot(clock).assertDoesNotExist()
+        rest(MAKE_WAY_MILLIS)
+        compose.ringSlot(clock).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, homeAppsChanges) }
+        letGo()
+
+        compose.runOnIdle { assertEquals(ringOf(three[0], clock, three[1], three[2]), homeApps.ring) }
+    }
+
+    @Test
+    fun anAppOutOfItsFolderLandsBeforeItWhereTheRingMadeWay() {
+        val (first, second) = alphabet.take(2)
+        apps = listOf(clock, mail, first, second)
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(first.key), work, RingSlot.App(second.key))))
+        show()
+        compose.folderSlot(1).performClick()
+
+        pickUp(compose.ringSlot(clock))
+        dragTo(centreOf(compose.closeFolder()))
+        rest(MAKE_WAY_MILLIS)
+        dragTo(edgeOf(compose.folderSlot(1)))
+        rest(MAKE_WAY_MILLIS)
+        compose.ringSlot(clock).assertIsDisplayed()
+        letGo()
+
+        compose.runOnIdle { assertEquals(Ring(listOf(RingSlot.App(first.key), RingSlot.App(clock.key), folderOf(mail), RingSlot.App(second.key))), homeApps.ring) }
+    }
+
+    @Test
     fun anAppDraggedOutOfItsFolderAndLetGoOffTheRingAndTheDockStaysInIt() {
         homeApps = HomeApps(ring = Ring(listOf(work)))
         show()

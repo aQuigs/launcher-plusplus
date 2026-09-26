@@ -123,7 +123,8 @@ private val DOCK_FOLDER_ORIGIN = 0f to 1f
  * With [rearrange], a long press that moves on picks up what is in a slot to move it round the ring, or round the open
  * folder; while one is on the move, the slots show where everything would be if it were dropped. The item at
  * [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of a folder that has
- * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends. The emblem's
+ * closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag ends or the ring
+ * makes way for it, showing where it would land as an app from another place does. The emblem's
  * sky and spark turn slowly while the ring is [inSight], and hold still otherwise. The [dock]'s items are where a dock
  * folder that closes is still found.
  */
@@ -153,7 +154,9 @@ fun HomeRing(
     val fold = rememberFold(openFolder, animate = held == null && inSight, ::folderAt)
     val closing = if (openFolder == null) fold.closing else null
     val shown = openFolder ?: closing
-    val slots = shown?.apps?.size ?: ring.size
+    val arriving = rearrange?.arriving
+    val making = if (shown == null) arriving?.preview(ring) else null
+    val slots = shown?.apps?.size ?: making?.size ?: ring.size
     // By its place in the list, which skips the stored slots of missing apps, not by its stored slot.
     val origin = shown?.at?.let { at ->
         if (at.holder != HomePlace.Ring) return@let DOCK_FOLDER_ORIGIN
@@ -189,12 +192,14 @@ fun HomeRing(
                 Emblem(showHint = showHint, skyAngle = { skyTurn.value }, sparkAngle = { spark.value }, onClick = onEdit)
             }
             // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a
-            // gesture moving it, while it moves round and while the folder it is dragged out of closes under the finger.
-            val items = if (shown != null) {
-                moving.shown(shown.apps).map(RingItem::App)
-            } else {
-                moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
+            // gesture moving it, while it moves round, while the folder it is dragged out of closes under the finger, and
+            // while the ring makes way for it.
+            val items = when {
+                shown != null -> moving.shown(shown.apps).map(RingItem::App)
+                making != null -> making
+                else -> moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
             }
+            val landsAt = arriving?.to ?: moving?.at
             val appMenu = if (shown != null) folderAppMenu else menu
             val folding = if (origin == null) {
                 Modifier
@@ -214,7 +219,7 @@ fun HomeRing(
                         Modifier
                             .testTag(item.tag)
                             .then(folding)
-                            .reorderSlot(rearrange, index, moving?.at == index)
+                            .reorderSlot(rearrange, index, landsAt == index)
                             .foldTarget(index == foldTarget && closing == null, marks.lit)
                     } else {
                         Modifier.alpha(0f)

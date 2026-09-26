@@ -123,7 +123,7 @@ class HomeAppsTest {
     }
 
     @Test
-    fun `an app lands at the ring's end without a target, and by the folder it left changes nothing`() {
+    fun `an app lands at the ring's end without a target, and before the folder it left, which it empties`() {
         val homeApps = HomeApps(ring = Ring(listOf(folder(clock, mail), RingSlot.App(maps.key))), dock = ringOf(music))
         val (work) = homeApps.ring.resolve(listOf(clock, mail, maps), HomePlace.Ring)
 
@@ -135,7 +135,10 @@ class HomeAppsTest {
             HomeApps(ring = ringOf(maps)),
             HomeApps(dock = ringOf(maps)).move(maps, HomePlace.Dock, Landing.At(HomePlace.Ring, null, ReorderMode.Insert), installed),
         )
-        assertEquals(homeApps, homeApps.move(clock, HomePlace.Folder(HomePlace.Ring, 0), Landing.At(HomePlace.Ring, work, ReorderMode.Swap), installed))
+        assertEquals(
+            HomeApps(ring = Ring(listOf(RingSlot.App(clock.key), folder(mail), RingSlot.App(maps.key))), dock = homeApps.dock),
+            homeApps.move(clock, HomePlace.Folder(HomePlace.Ring, 0), Landing.At(HomePlace.Ring, work, ReorderMode.Swap), installed),
+        )
     }
 
     @Test

@@ -21,8 +21,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
+import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ReorderMode
+import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.arrived
+import com.sqftware.orbitlauncher.domain.arrivedFrom
 import com.sqftware.orbitlauncher.domain.reordered
 import com.sqftware.orbitlauncher.domain.reorderedFrom
 
@@ -48,7 +52,8 @@ private const val MIDDLE = 0.35f
  * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that moves
  * on, or the press itself with [startOnPress], picks up the item at a position, and the finger then goes as in an
  * [ItemDrag]. The place marks each position with [reorderSlot], so the finger can be told which one it is over, and
- * shows its items as [moving] says while one of them is on the move.
+ * shows its items as [moving] says while one of them is on the move, or as [arriving] says while an app from another
+ * place is.
  */
 class Rearrange(
     private val onStart: Rearrange.(index: Int, Offset) -> Boolean,
@@ -57,6 +62,7 @@ class Rearrange(
     private val onCancel: () -> Unit,
     private val startOnPress: Boolean = false,
     private val movingIn: (Rearrange) -> Moving?,
+    private val arrivingIn: (Rearrange) -> Arriving? = { null },
 ) {
     // The positions' coordinates rather than their bounds: a page scrolling past would otherwise write them every frame,
     // while they are only read as the finger moves.
@@ -65,6 +71,9 @@ class Rearrange(
 
     /** The item of this place on the move, if it is one of this place's; read in composition, it follows the finger. */
     val moving: Moving? get() = movingIn(this)
+
+    /** The app from another place this one makes way for, if any; read in composition, it follows the finger. */
+    val arriving: Arriving? get() = arrivingIn(this)
 
     /** What picks up the item at [index]. */
     fun drag(index: Int): ItemDrag<Any?> =
@@ -85,10 +94,13 @@ class Rearrange(
     /** The position nearest [finger], in root coordinates, if the finger is within that position's size of its centre. */
     fun at(finger: Offset): Int? = hit(finger)?.index
 
-    /** The position [at] finds, and whether the finger is on its middle. Asked on every move of the finger, in one pass. */
-    fun hit(finger: Offset): Hit? {
+    /**
+     * The position [at] finds, or the nearest within [reach] times its size, and whether the finger is on its middle.
+     * Asked on every move of the finger, in one pass.
+     */
+    fun hit(finger: Offset, reach: Float = 1f): Hit? {
         var nearest = -1
-        var nearestDistance = 1f
+        var nearestDistance = reach
         placed.forEach { (index, coordinates) ->
             val centre = coordinates.localToRoot(coordinates.size.center.toOffset())
             val distance = (centre - finger).getDistance() / maxOf(coordinates.size.width, coordinates.size.height)
@@ -154,6 +166,22 @@ data class Moving(val from: Int, val to: Int?, val mode: ReorderMode) {
 
     /** Where in [items] the one that would show at [position] if the item were dropped now is, without reordering them. */
     fun <T> sourceOf(items: List<T>, position: Int): Int = if (to == null) position else items.reorderedFrom(position, from, to, mode)
+}
+
+/** An app from another place that position [to] of the ring or the dock makes way for, as [mode] says. */
+data class Arriving(val app: AppEntry, val to: Int, val mode: ReorderMode) {
+    /**
+     * Whether [items] make way for it. Swapped in, it leaves as many slots, so the one under the finger stays there. A
+     * folder never leaves its place, so an app swapped onto one lands in before it instead: showing that would add a
+     * slot and slide the folder off the finger, which would then rest on the app next along, and back again.
+     */
+    fun showsAmong(items: List<RingItem>) = mode == ReorderMode.Insert || items.getOrNull(to) !is RingItem.Folder
+
+    /** [items] as they would be if the app were dropped now. */
+    fun preview(items: List<RingItem>): List<RingItem> = items.arrived(RingItem.App(app), to, mode)
+
+    /** Where in [items] the one that would show at [position] is, or null for the app arriving there. */
+    fun sourceOf(items: List<RingItem>, position: Int): Int? = items.arrivedFrom(position, to, mode)
 }
 
 /** How long the item on the move rests on the switch's other half before it flips, so passing over it does not. */

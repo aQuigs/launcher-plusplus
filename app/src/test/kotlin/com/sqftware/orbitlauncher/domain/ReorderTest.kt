@@ -40,4 +40,24 @@ class ReorderTest {
             }
         }
     }
+
+    @Test
+    fun `an item from elsewhere goes in before the target, takes its stead, or joins the end`() {
+        assertEquals(listOf("a", "x", "b", "c", "d", "e"), list.arrived("x", 1, Insert))
+        assertEquals(listOf("a", "x", "c", "d", "e"), list.arrived("x", 1, Swap))
+        ReorderMode.entries.forEach { mode ->
+            assertEquals(list + "x", list.arrived("x", 5, mode))
+            assertEquals(list, list.arrived("x", 6, mode))
+        }
+    }
+
+    @Test
+    fun `each position after an arrival traces back to where its item was, or to none for the one that arrived`() {
+        ReorderMode.entries.forEach { mode ->
+            (-1..6).forEach { to ->
+                val arrived = list.arrived("x", to, mode)
+                arrived.indices.forEach { assertEquals(arrived[it], list.arrivedFrom(it, to, mode)?.let(list::get) ?: "x") }
+            }
+        }
+    }
 }
