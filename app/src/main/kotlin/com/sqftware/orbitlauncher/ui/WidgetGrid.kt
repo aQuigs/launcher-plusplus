@@ -132,14 +132,22 @@ private class HeldWidget {
     }
 
     /**
-     * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged, a cell
-     * and its gap being [pitch] across and down. It stays within [pageRows], or the rows the page already reaches down
-     * to, so no drag takes it under the button.
+     * How far [widget] is dragged, kept within the columns and the first [rows] rows, a cell and its gap being [pitch]
+     * across and down, so it is never drawn under the button or off the page.
+     */
+    fun shift(widget: HostedWidget, pitch: Offset, rows: Int) = Offset(
+        offset.x.coerceIn(-widget.column * pitch.x, (WIDGET_COLUMNS - widget.end) * pitch.x),
+        offset.y.coerceIn(-widget.row * pitch.y, (rows - widget.bottom) * pitch.y),
+    )
+
+    /**
+     * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged. It
+     * stays within [pageRows], or the rows the page already reaches down to, so no drag takes it under the button.
      */
     fun preview(page: WidgetPage, pitch: Offset, pageRows: Int): WidgetPage {
         val widget = page.widgets.find { it.id == id } ?: return page
-        val row = nearestCells(widget.row, offset.y, pitch.y).coerceAtMost(maxOf(pageRows, page.rows) - widget.rows)
-        return page.move(widget.id, row, nearestCells(widget.column, offset.x, pitch.x))
+        val shift = shift(widget, pitch, reach(page, pageRows))
+        return page.move(widget.id, nearestCells(widget.row, shift.y, pitch.y), nearestCells(widget.column, shift.x, pitch.x))
     }
 }
 
@@ -229,7 +237,7 @@ fun WidgetGrid(
                 page.widgets.forEach { widget ->
                     key(widget.id) {
                         val at = if (held.id == widget.id) widget else places[widget.id] ?: widget
-                        Widget(widget, at, columnWidth, actions, pageRows, editing, onEditingChange, held, release)
+                        Widget(widget, at, columnWidth, pitch, reach(page, pageRows), actions, pageRows, editing, onEditingChange, held, release)
                     }
                 }
             }
@@ -255,19 +263,24 @@ fun WidgetGrid(
     }
 }
 
+/** The rows a widget may be dragged down to: the page's, above the button, or more if the page already reaches further. */
+private fun reach(page: WidgetPage, pageRows: Int) = maxOf(pageRows, page.rows)
+
 /** Where the top-left cell of [widget] is, on a grid of columns [columnWidth] wide. */
 private fun Density.cellOffset(widget: HostedWidget, columnWidth: Dp) =
     IntOffset(((columnWidth + GAP) * widget.column).roundToPx(), ((ROW_HEIGHT + GAP) * widget.row).roundToPx())
 
 /**
- * The [widget] as stored, shown in the cells of [at], which [held] drags about the page; [release] lets it go, moving it
- * to the cells it is over if the finger lifted.
+ * The [widget] as stored, shown in the cells of [at], which [held] drags about the page's first [reach] rows, a cell and
+ * its gap being [pitch]; [release] lets it go, moving it to the cells it is over if the finger lifted.
  */
 @Composable
 private fun Widget(
     widget: HostedWidget,
     at: HostedWidget,
     columnWidth: Dp,
+    pitch: Offset,
+    reach: Int,
     actions: WidgetActions,
     pageRows: Int,
     editing: Int?,
@@ -300,8 +313,9 @@ private fun Widget(
             .zIndex(if (dragged) 2f else if (edited) 1f else 0f)
             .graphicsLayer {
                 if (dragged) {
-                    translationX = held.offset.x
-                    translationY = held.offset.y
+                    val shift = held.shift(widget, pitch, reach)
+                    translationX = shift.x
+                    translationY = shift.y
                 }
             }
             .size(span(maxOf(columns, widget.columns), columnWidth), span(maxOf(rows, widget.rows), ROW_HEIGHT))

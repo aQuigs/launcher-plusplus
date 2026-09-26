@@ -256,21 +256,26 @@ class WidgetGridTest {
     }
 
     @Test
-    fun aWidgetDraggedTowardTheButtonStopsInTheRowAboveIt() {
-        page = WidgetPage(listOf(game))
+    fun aWidgetDraggedPastTheButtonAndThePagesEdgeStopsInTheCornerAboveTheButton() {
+        val small = game.copy(columns = 2)
+        page = WidgetPage(listOf(small))
         show()
         val pageRows = pageRows()
-        compose.longPressWidget(game)
+        val button = compose.addWidgetButton().getUnclippedBoundsInRoot()
+        compose.longPressWidget(small)
 
-        compose.widget(game).performTouchInput { down(center) }
+        compose.widget(small).performTouchInput { down(center) }
         compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
-        compose.widget(game).performTouchInput {
-            repeat(4) { moveBy(Offset(0f, rowPx() * 5)) }
-            up()
-        }
+        compose.widget(small).performTouchInput { repeat(4) { moveBy(Offset(columnPx(), rowPx() * 5)) } }
+        compose.mainClock.advanceTimeBy(1_000)
+        val landing = compose.onNodeWithTag(WidgetTags.LANDING).getUnclippedBoundsInRoot()
+        assertNear(landing.bottom, bounds(small).bottom)
+        assertNear(landing.right, bounds(small).right)
+        assertTrue("it is held above the button", bounds(small).bottom <= button.top)
+        compose.widget(small).performTouchInput { up() }
 
-        compose.runOnIdle { assertEquals(listOf(Triple(game.id, pageRows - game.rows, 0)), moved) }
-        assertTrue("it is above the button", bounds(game).bottom <= compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+        compose.runOnIdle { assertEquals(listOf(Triple(small.id, pageRows - small.rows, WIDGET_COLUMNS - small.columns)), moved) }
+        assertTrue("it lands above the button", bounds(small).bottom <= button.top)
     }
 
     @Test
