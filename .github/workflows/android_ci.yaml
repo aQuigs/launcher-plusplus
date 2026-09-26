@@ -9,6 +9,9 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # Maven Central answers bursts with 429, and after 3 tries Gradle disables the repository for the rest of the build.
+    env:
+      GRADLE_OPTS: -Dorg.gradle.internal.repository.max.tentatives=8 -Dorg.gradle.internal.repository.initial.backoff=2000
     steps:
       - uses: actions/checkout@v7
 

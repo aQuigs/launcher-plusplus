@@ -1,6 +1,7 @@
 # Shared workflow: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
-# Publishes to the Play internal track, or skips when any of these secrets is unset: PLAY_UPLOAD_KEYSTORE (base64 .jks,
-# key alias "upload"), PLAY_UPLOAD_KEY_PASSWORD (store and key) and PLAY_SERVICE_ACCOUNT_JSON.
+# Publishes to the Play internal track, and to the closed testing track ("alpha") once it has a release, or skips when any of
+# these secrets is unset: PLAY_UPLOAD_KEYSTORE (base64 .jks, key alias "upload"), PLAY_UPLOAD_KEY_PASSWORD (store and key)
+# and PLAY_SERVICE_ACCOUNT_JSON.
 # Plain curl and openssl rather than a publishing action, so no third party ever holds the publish key.
 name: play-internal
 on:
@@ -37,6 +38,9 @@ jobs:
     needs: check-secrets
     if: needs.check-secrets.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    # Maven Central answers bursts with 429, and after 3 tries Gradle disables the repository for the rest of the build
+    env:
+      GRADLE_OPTS: -Dorg.gradle.internal.repository.max.tentatives=8 -Dorg.gradle.internal.repository.initial.backoff=2000
     steps:
       - uses: actions/checkout@v7
         with:
@@ -86,26 +90,45 @@ jobs:
           }' <<< "$PLAY_SERVICE_ACCOUNT_JSON" | b64url)
           signature=$(echo -n "$header.$claims" | openssl dgst -sha256 -sign <(echo "$key") | b64url)
 
-          # Printed only on failure, since a success carries the token
-          response=$(curl -sS --fail-with-body https://oauth2.googleapis.com/token \
+          # Printed only on failure, since a success carries the token. A file rather than stdout, because a retry
+          # truncates a file but appends to stdout, which would put the failed attempt's body next to the token.
+          curl -sS --retry 5 --fail-with-body -o "$RUNNER_TEMP/token.json" https://oauth2.googleapis.com/token \
             -d grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer \
-            -d assertion="$header.$claims.$signature") || { echo "$response"; exit 1; }
-          token=$(jq -er .access_token <<< "$response")
+            -d assertion="$header.$claims.$signature" || { cat "$RUNNER_TEMP/token.json"; exit 1; }
+          token=$(jq -er .access_token "$RUNNER_TEMP/token.json")
           echo "::add-mask::$token"
           echo "PLAY_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Publish to the internal track
+      - name: Publish to the internal and closed testing tracks
         run: |
           package=$(sed -n 's/.*applicationId *= *"\(.*\)".*/\1/p' app/build.gradle.kts)
           api=https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$package
           upload_api=https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$package
           aab=app/build/outputs/bundle/release/app-release.aab
-          # Logs every response to stderr, so a failed call shows Google's reason
-          play() { curl -sS --fail-with-body -H "Authorization: Bearer $PLAY_TOKEN" "$@" | tee /dev/stderr; }
+          # Logs every response to stderr, so a failed call shows Google's reason. Through a file, like the token call,
+          # so a retried call hands jq only the last attempt's body.
+          play() {
+            local status=0
+            : > "$RUNNER_TEMP/play.json"
+            curl -sS --retry 5 --fail-with-body -o "$RUNNER_TEMP/play.json" -H "Authorization: Bearer $PLAY_TOKEN" "$@" || status=$?
+            tee /dev/stderr < "$RUNNER_TEMP/play.json"
+            return "$status"
+          }
 
           edit=$(play -X POST "$api/edits" | jq -er .id)
           version=$(play -H 'Content-Type: application/octet-stream' --data-binary @"$aab" \
             "$upload_api/edits/$edit/bundles?uploadType=media" | jq -er .versionCode)
           track=$(jq -n --arg version "$version" '{releases: [{versionCodes: [$version], status: "completed"}]}')
           play -X PUT --json "$track" "$api/edits/$edit/tracks/internal" > /dev/null
+
+          # Testers who joined through the closed test link install from alpha, so it must not lag internal. Only a live
+          # alpha release is followed: publishing to an app with no closed test would start one, and replacing a draft or
+          # halted release would override what was chosen in Play Console.
+          # Run outside the if, where a failed call would read as false instead of failing the step
+          tracks=$(play "$api/edits/$edit/tracks")
+          closed_test=$(jq -r 'any(.tracks[] | select(.track == "alpha") | .releases[]?; .status == "completed" or .status == "inProgress")' <<< "$tracks")
+          if [ "$closed_test" = true ]; then
+            play -X PUT --json "$track" "$api/edits/$edit/tracks/alpha" > /dev/null
+          fi
+
           play -X POST "$api/edits/$edit:commit" > /dev/null
