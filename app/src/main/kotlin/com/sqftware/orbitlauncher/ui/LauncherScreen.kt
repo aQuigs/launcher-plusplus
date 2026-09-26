@@ -837,6 +837,7 @@ fun LauncherScreen(
                                         foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                         held = (dragged as? Drag.OutOfFolder)?.app,
                                         inSight = homeInSight,
+                                        dock = dock,
                                     )
                                     // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                     // the ring, which sizes itself to the room left, so the two can never overlap.

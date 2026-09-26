@@ -199,4 +199,51 @@ class HomeRingTest {
 
         assertEquals(1, closes)
     }
+
+    @Test
+    fun aFolderOpensOutOfItsSlotAndFoldsBackIn() {
+        // Stored after a missing app's slot, so its slot number is not its place on the ring.
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 2), listOf(mail, alphabet[0]))
+        showItems(listOf(RingItem.App(clock), work))
+        val slotOfClock = compose.ringSlot(clock).getUnclippedBoundsInRoot()
+        val slotOfFolder = compose.folderSlot(2).getUnclippedBoundsInRoot()
+        compose.mainClock.autoAdvance = false
+
+        openFolder = work
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+
+        assertTrue("the first app starts out at the folder's slot", compose.ringSlot(mail).getUnclippedBoundsInRoot().top > slotOfClock.bottom)
+
+        compose.mainClock.advanceTimeBy(UNFOLD_WAIT_MILLIS)
+        assertEquals("then takes the top slot", slotOfClock, compose.ringSlot(mail).getUnclippedBoundsInRoot())
+
+        openFolder = null
+        compose.mainClock.advanceTimeBy(HALFWAY_MILLIS)
+
+        compose.folderSlot(2).assertDoesNotExist()
+        assertTrue("closed, the apps fold back in", compose.ringSlot(mail).getUnclippedBoundsInRoot().top > slotOfClock.bottom)
+
+        compose.mainClock.advanceTimeBy(UNFOLD_WAIT_MILLIS)
+        compose.ringSlot(mail).assertDoesNotExist()
+        assertEquals("before the folder comes back", slotOfFolder, compose.folderSlot(2).getUnclippedBoundsInRoot())
+    }
+
+    @Test
+    fun aFolderThatGoesWhileOpenClosesAtOnce() {
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail))
+        openFolder = work
+        showItems(listOf(RingItem.App(clock), work))
+        compose.mainClock.autoAdvance = false
+
+        openFolder = null
+        ring = listOf(RingItem.App(clock))
+        compose.mainClock.advanceTimeByFrame()
+
+        compose.ringSlot(mail).assertDoesNotExist()
+        compose.ringSlot(clock).assertIsDisplayed()
+    }
 }
+
+private const val HALFWAY_MILLIS = 120L
+private const val UNFOLD_WAIT_MILLIS = 400L
