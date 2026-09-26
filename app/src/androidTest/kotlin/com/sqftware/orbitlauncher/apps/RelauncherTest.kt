@@ -36,7 +36,7 @@ class RelauncherTest {
         SharedPreferencesCollectionsStore(context).save(CollectionsPage(emptyList()))
         val widgetStore = SharedPreferencesWidgetPageStore(context)
         widgetStore.save(WidgetPage(listOf(HostedWidget(12, row = 0, column = 0, rows = 2, columns = 4))))
-        widgetStore.savePick(WidgetPick(14, pageRows = 9, columnWidthDp = 90, rowHeightDp = 84))
+        widgetStore.savePick(WidgetPick(14, pageRows = 9, columnWidthDp = 90.5f, rowHeightDp = 84.25f))
         SharedPreferencesHourStyleStore(context).save(twentyFourHour = true)
         // A store added later, which no one told the reset about.
         context.getSharedPreferences("later", Context.MODE_PRIVATE).edit(commit = true) { putString("key", "value") }

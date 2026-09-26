@@ -6,7 +6,7 @@ import kotlin.math.roundToInt
 /** The columns across the widget page. */
 const val WIDGET_COLUMNS = 4
 
-/** The height of one row of the widget page, in dp. */
+/** The least height of a row of the widget page, in dp: the rows stretch to share the page's height. */
 const val WIDGET_ROW_HEIGHT_DP = 80
 
 /** The space between two cells of the widget page, in dp, which a widget spanning both covers too. */
@@ -94,6 +94,18 @@ fun widgetCells(minDp: Int, cellDp: Float, most: Int): Int =
 
 /** The most cells, [cellDp] each with a gap between two, that fit in [dp]. */
 fun cellsWithin(dp: Float, cellDp: Float): Int = ((dp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt()
+
+/** The rows the widget page shows, and how tall each is, in dp. */
+data class WidgetRows(val count: Int, val heightDp: Float)
+
+/**
+ * The rows of at least [WIDGET_ROW_HEIGHT_DP] that fit in [dp], at least one, each stretched so that with the gaps
+ * between them they fill it, and no strip of the page is left over.
+ */
+fun widgetRowsWithin(dp: Float): WidgetRows {
+    val count = cellsWithin(dp, WIDGET_ROW_HEIGHT_DP.toFloat()).coerceAtLeast(1)
+    return WidgetRows(count, maxOf((dp + WIDGET_GAP_DP) / count - WIDGET_GAP_DP, WIDGET_ROW_HEIGHT_DP.toFloat()))
+}
 
 /**
  * How a widget's provider lets it be resized along one axis, in dp: whether it stretches that way at all, its minimum,

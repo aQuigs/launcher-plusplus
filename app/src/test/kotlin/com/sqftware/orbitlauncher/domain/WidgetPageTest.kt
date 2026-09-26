@@ -108,6 +108,13 @@ class WidgetPageTest {
     }
 
     @Test
+    fun `the page shows the whole rows that fit, stretched to fill it, and at least one`() {
+        assertEquals(WidgetRows(3, 80f), widgetRowsWithin(256f))
+        assertEquals(WidgetRows(3, 94f), widgetRowsWithin(298f))
+        assertEquals(WidgetRows(1, 80f), widgetRowsWithin(50f))
+    }
+
+    @Test
     fun `a dragged edge snaps to the nearest whole cell`() {
         assertEquals(3, nearestCells(cells = 3, dragDp = 43f, pitchDp = 88f))
         assertEquals(4, nearestCells(cells = 3, dragDp = 45f, pitchDp = 88f))

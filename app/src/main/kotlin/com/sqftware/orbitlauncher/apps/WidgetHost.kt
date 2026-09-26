@@ -38,7 +38,7 @@ interface WidgetHost {
      * Lets the user pick a widget for the page, where it takes the cells its provider asks for, up to [pageRows] rows
      * and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall.
      */
-    fun add(pageRows: Int, columnWidthDp: Int, rowHeightDp: Int)
+    fun add(pageRows: Int, columnWidthDp: Float, rowHeightDp: Float)
 
     /** Takes the widget [id] off the page and gives its id back to the system. */
     fun remove(id: Int)
@@ -110,7 +110,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
 
     override fun updates(): Flow<WidgetPage> = page.onStart { host.startListening() }.onCompletion { host.stopListening() }
 
-    override fun add(pageRows: Int, columnWidthDp: Int, rowHeightDp: Int) {
+    override fun add(pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) {
         val inProgress = pending
         if (inProgress != null) {
             // Only a pick from before the process started can still be waiting once the user is back to ask again.
@@ -173,8 +173,8 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         set(
             page.value.add(
                 pick.id,
-                rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp.toFloat(), pick.pageRows),
-                columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp.toFloat(), WIDGET_COLUMNS),
+                rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp, pick.pageRows),
+                columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp, WIDGET_COLUMNS),
             ),
         )
     }

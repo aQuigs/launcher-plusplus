@@ -2114,7 +2114,8 @@ class LauncherScreenTest {
             moveBy(Offset(0f, row.toPx() * 1.7f))
             repeat(10) { moveBy(Offset(-width / 20f, 0f)) }
         }
-        assertEquals(widgetSpan(3, row), compose.widgetHeight(search))
+        // Within a pixel, as a stretched row need not be a whole one.
+        assertEquals(widgetSpan(3, row).value, compose.widgetHeight(search).value, 1f)
         compose.onRoot().performTouchInput { up() }
 
         assertSettledOn(LauncherPage.Widgets)
@@ -2184,7 +2185,7 @@ class LauncherScreenTest {
             down(center)
             moveBy(Offset(0f, row.toPx() * 1.7f))
         }
-        assertEquals(widgetSpan(3, row), compose.widgetHeight(search))
+        assertEquals(widgetSpan(3, row).value, compose.widgetHeight(search).value, 1f)
         Espresso.pressBack()
 
         compose.widgetEditFrame().assertDoesNotExist()

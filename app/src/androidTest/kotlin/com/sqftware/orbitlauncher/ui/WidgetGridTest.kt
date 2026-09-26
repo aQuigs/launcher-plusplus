@@ -3,7 +3,6 @@ package com.sqftware.orbitlauncher.ui
 import android.graphics.Color
 import android.view.View
 import android.view.ViewConfiguration
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -33,6 +32,7 @@ import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
 import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
+import com.sqftware.orbitlauncher.domain.widgetRowsWithin
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetResize
 import com.sqftware.orbitlauncher.domain.WidgetSizing
@@ -43,7 +43,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class WidgetGridTest {
@@ -54,7 +53,7 @@ class WidgetGridTest {
     private val game = HostedWidget(id = 8, row = 1, column = 0, rows = 2, columns = 4)
     private val inert = HostedWidget(id = 5, row = 0, column = 0, rows = 1, columns = 4)
     private var page by mutableStateOf(WidgetPage())
-    private val added = mutableListOf<Triple<Int, Int, Int>>()
+    private val added = mutableListOf<Triple<Int, Float, Float>>()
     private val removed = mutableListOf<Int>()
     private val shown = mutableListOf<Int>()
     private val tapped = mutableListOf<Int>()
@@ -97,17 +96,14 @@ class WidgetGridTest {
     /** The part of the page that scrolls, above the add button. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
-    // The add button's touch target, in which it draws a shorter pill.
-    private val buttonTarget = 48.dp
-    private val pillInset = (buttonTarget - ButtonDefaults.MinHeight) / 2
+    // Inside the page's padding, down to the gap above the add button.
+    private fun rows() = widgetRowsWithin(
+        (compose.addWidgetButton().getUnclippedBoundsInRoot().top - gap - scroller().getUnclippedBoundsInRoot().top - 16.dp).value,
+    )
 
-    // Inside the page's padding, less the add button's touch target and the gap above it.
-    private fun rowsHeight() = scroller().getUnclippedBoundsInRoot().height - 32.dp - buttonTarget - gap
+    private fun pageRows() = rows().count
 
-    private fun pageRows() = ((rowsHeight() + gap) / (WIDGET_ROW_HEIGHT_DP.dp + gap)).toInt()
-
-    // The rows share the height between them.
-    private fun row() = (rowsHeight() + gap) / pageRows() - gap
+    private fun row() = rows().heightDp.dp
 
     private fun columnWidth() = (scroller().getUnclippedBoundsInRoot().width - 32.dp - gap * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS
 
@@ -125,7 +121,7 @@ class WidgetGridTest {
     // Inside the page's padding.
     private fun assertAddButtonAtTheBottom() {
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
-        assertNear(screen.bottom - 16.dp - pillInset, compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot().bottom)
+        assertNear(screen.bottom - 16.dp, compose.addWidgetButton().assertIsDisplayed().getUnclippedBoundsInRoot().bottom)
     }
 
     @Test
@@ -148,7 +144,10 @@ class WidgetGridTest {
 
         compose.addWidgetButton().performClick()
 
-        compose.runOnIdle { assertEquals(listOf(Triple(pageRows, columnWidth.value.roundToInt(), row.value.roundToInt())), added) }
+        val (rows, width, height) = compose.runOnIdle { added.single() }
+        assertEquals(pageRows, rows)
+        assertNear(columnWidth, width.dp)
+        assertNear(row, height.dp)
         assertTrue("$pageRows rows fit the page", pageRows >= 4)
     }
 
@@ -159,8 +158,8 @@ class WidgetGridTest {
         val last = HostedWidget(id = 12, row = pageRows() - 1, column = 0, rows = 1, columns = 1)
         page = WidgetPage(listOf(search, last))
 
-        assertNear(compose.addWidgetButton().getUnclippedBoundsInRoot().top - pillInset - gap, bounds(last).bottom)
-        assertTrue("${row()} rows are no shorter than a row", row() >= WIDGET_ROW_HEIGHT_DP.dp)
+        assertNear(compose.addWidgetButton().getUnclippedBoundsInRoot().top - gap, bounds(last).bottom)
+        assertTrue("${bounds(last).height} is shorter than a row", bounds(last).height >= WIDGET_ROW_HEIGHT_DP.dp)
     }
 
     @Test
