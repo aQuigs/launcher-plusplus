@@ -158,6 +158,29 @@ fun mostUsed(apps: List<AppEntry>, time: ForegroundTime, limit: Int = BUILT_IN_C
         .sortedByDescending { time.byPackage[it.packageName] }
         .take(limit)
 
+// Popular apps whose names give nothing away, or point the wrong way, filed where the Play Store files them. They come
+// before an app's declared category, as that knows only a few coarse kinds (WhatsApp and LinkedIn call themselves social)
+// and none for business.
+private val categoryPackages: Map<String, AppCategory> = mapOf(
+    "com.Slack" to AppCategory.Business,
+    "com.microsoft.teams" to AppCategory.Business,
+    "us.zoom.videomeetings" to AppCategory.Business,
+    "com.cisco.wx2.android" to AppCategory.Business,
+    "com.linkedin.android" to AppCategory.Business,
+    "com.indeed.android.jobsearch" to AppCategory.Business,
+    "com.whatsapp" to AppCategory.Communication,
+    "com.whatsapp.w4b" to AppCategory.Communication,
+    "org.thoughtcrime.securesms" to AppCategory.Communication,
+    "org.telegram.messenger" to AppCategory.Communication,
+    "com.facebook.orca" to AppCategory.Communication,
+    "com.discord" to AppCategory.Communication,
+    "com.viber.voip" to AppCategory.Communication,
+    "com.skype.raider" to AppCategory.Communication,
+    "jp.naver.line.android" to AppCategory.Communication,
+    "com.tencent.mm" to AppCategory.Communication,
+    "com.google.android.apps.tachyon" to AppCategory.Communication,
+)
+
 // Words that give a package's category away, matched inside each part of its name: "deskclock" holds "clock". Only the
 // obvious ones, since a wrong guess puts an app in a card the user did not expect; for the same reason a word of two or
 // three letters must be a whole part, as "gm" is Gmail's last part but also sits inside "sigma".
@@ -176,6 +199,7 @@ private val categoryWords: Map<String, AppCategory> = mapOf(
     "contacts" to AppCategory.Communication,
     "gm" to AppCategory.Communication,
     "meet" to AppCategory.Communication,
+    "mail" to AppCategory.Communication,
     "maps" to AppCategory.Transport,
     "calendar" to AppCategory.Productivity,
     "docs" to AppCategory.Productivity,
@@ -188,11 +212,12 @@ private val categoryWords: Map<String, AppCategory> = mapOf(
 )
 
 /**
- * The category [AppEntry] belongs in when a category card is made: the one its package declares, else the one a telling
- * word in its package name points to. The name is read from its last part back, so "youtube.music" is music, not video.
+ * The category [AppEntry] belongs in when a category card is made: a well-known app's, else the one its package declares,
+ * else the one a telling word in its package name points to. The name is read from its last part back, so
+ * "youtube.music" is music, not video.
  */
 val AppEntry.suggestedCategory: AppCategory?
-    get() = category ?: packageName.split('.').asReversed().firstNotNullOfOrNull { part ->
+    get() = categoryPackages[packageName] ?: category ?: packageName.split('.').asReversed().firstNotNullOfOrNull { part ->
         val lower = part.lowercase()
         categoryWords.entries.firstOrNull { (word, _) -> if (word.length < 4) lower == word else word in lower }?.value
     }
