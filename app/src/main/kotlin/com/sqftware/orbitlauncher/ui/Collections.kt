@@ -95,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.CREATE_YOUR_OWN
 import com.sqftware.orbitlauncher.domain.CollectionCard
@@ -156,8 +157,8 @@ private const val NOTICE_MILLIS = 2_000L
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
  * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
  * chevron that calls [onToggleExpanded]: a compact card shows one row of its first apps, an expanded one every app with
- * its label. The built-in cards work their apps out from [apps] and [foregroundTime], and Most Used asks for the usage
- * access it lacks with a body that calls [onOpenUsageSettings]. A tap launches an app; a long press on a hand-picked
+ * its label. The built-in cards work their apps out from [apps] and [foregroundTime], less those the [settings] leave off
+ * them, and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches an app; a long press on a hand-picked
  * card's app lifts it through that card's [rearrange], to move it among the card's apps or, while the [bin] sits at the
  * bottom of the page, to drop it there. While one of its apps is on the move, a card shows where they would be if it
  * were dropped. Apps wear their [unread] counts.
@@ -177,10 +178,12 @@ fun CollectionsColumn(
     modifier: Modifier = Modifier,
     rearrange: (CollectionKind.HandPicked) -> Rearrange? = { null },
     bin: BinTarget? = null,
+    settings: AppSettings = AppSettings(),
     unread: UnreadCounts = UnreadCounts(),
 ) {
-    val newApps = remember(apps) { newApps(apps) }
-    val mostUsed = remember(apps, foregroundTime) { foregroundTime?.let { mostUsed(apps, it) } }
+    val builtInApps = remember(apps, settings) { settings.forBuiltInCards(apps) }
+    val newApps = remember(builtInApps) { newApps(builtInApps) }
+    val mostUsed = remember(builtInApps, foregroundTime) { foregroundTime?.let { mostUsed(builtInApps, it) } }
     val gap = with(LocalDensity.current) { CARD_GAP.toPx() }
     val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }

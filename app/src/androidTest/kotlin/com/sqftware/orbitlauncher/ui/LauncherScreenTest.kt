@@ -50,6 +50,7 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
@@ -114,6 +115,7 @@ class LauncherScreenTest {
     private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
     private val started = mutableListOf<AppShortcut>()
     private val infoOpened = mutableListOf<AppEntry>()
+    private val storePagesOpened = mutableListOf<AppEntry>()
     private val uninstalled = mutableListOf<AppEntry>()
     private var shortcutsLoaded = CompletableDeferred(Unit)
     private val search = HostedWidget(id = 3, row = 0, column = 0, rows = 1, columns = 4)
@@ -134,6 +136,7 @@ class LauncherScreenTest {
     private var unread by mutableStateOf(UnreadCounts())
     private var badgesEnabled by mutableStateOf(false)
     private var badgeSettingsOpened = 0
+    private var appSettings by mutableStateOf(AppSettings())
     private var notificationsOpened = 0
     private var restarts = 0
     private var resets = 0
@@ -142,11 +145,12 @@ class LauncherScreenTest {
         launch = launched::add,
         shortcuts = {
             shortcutsLoaded.await()
-            if (it == mail) listOf(composeMail) else emptyList()
+            if (it.key == mail.key) listOf(composeMail) else emptyList()
         },
         shortcutIcon = { null },
         startShortcut = started::add,
         openAppInfo = infoOpened::add,
+        openStorePage = storePagesOpened::add,
         uninstall = uninstalled::add,
     )
 
@@ -192,6 +196,8 @@ class LauncherScreenTest {
             unread = unread,
             badgesEnabled = badgesEnabled,
             onOpenBadgeSettings = { badgeSettingsOpened++ },
+            appSettings = appSettings,
+            onAppSettingsChange = { appSettings = it },
             onOpenNotifications = { notificationsOpened++ },
             onRestart = { restarts++ },
             onReset = { resets++ },
@@ -580,11 +586,12 @@ class LauncherScreenTest {
 
         compose.ringSlot(mail).performTouchInput { longClick() }
 
-        val tops = listOf("Compose", "Remove from the ring", "New folder", "App info", "Uninstall").map {
+        val tops = listOf("Compose", "Remove from the ring", "New folder", "Hide from New & Most Used", "App info", "Uninstall").map {
             compose.onNodeWithText(it).assertIsDisplayed().getUnclippedBoundsInRoot().top
         }
         assertEquals(tops.sorted(), tops)
         compose.onNodeWithText("Remove from the dock").assertDoesNotExist()
+        compose.onNodeWithText("Add to the ring").assertDoesNotExist()
     }
 
     @Test
@@ -821,11 +828,13 @@ class LauncherScreenTest {
 
     @Test
     fun theMenuStartsShortcutsAndHandsTheOptionsToTheSystem() {
+        val storeMail = mail.copy(fromPlayStore = true)
+        apps = listOf(clock, storeMail)
         show()
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
 
-        for (item in listOf("Compose", "App info", "Uninstall")) {
+        for (item in listOf("Compose", "Open in Play Store", "App info", "Uninstall")) {
             compose.onNodeWithText("Mail").performTouchInput { longClick() }
             compose.onNodeWithText(item).performClick()
             compose.appOptionsMenu().assertDoesNotExist()
@@ -833,10 +842,75 @@ class LauncherScreenTest {
 
         compose.runOnIdle {
             assertEquals(listOf(composeMail), started)
-            assertEquals(listOf(mail), infoOpened)
-            assertEquals(listOf(mail), uninstalled)
+            assertEquals(listOf(storeMail), storePagesOpened)
+            assertEquals(listOf(storeMail), infoOpened)
+            assertEquals(listOf(storeMail), uninstalled)
             assertEquals(emptyList<AppEntry>(), launched)
         }
+    }
+
+    @Test
+    fun theDrawerMenuAddsAnAppToEachHomePlaceItIsNotIn() {
+        show()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Add to the ring").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
+
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Add to the ring").assertDoesNotExist()
+        compose.onNodeWithText("Add to the dock").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail), dock = ringOf(mail)), homeApps) }
+
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Add to the dock").assertDoesNotExist()
+    }
+
+    @Test
+    fun anAppsMenuTurnsItsBadgeOffAndOnWhileTheBadgesAreEnabled() {
+        homeApps = HomeApps(ring = ringOf(clock, mail))
+        unread = UnreadCounts(mapOf(clock.packageName to 3, mail.packageName to 7))
+        show()
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Hide badge").assertDoesNotExist()
+        Espresso.pressBack()
+        badgesEnabled = true
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Hide badge").performClick()
+
+        compose.ringSlot(mail).assertContentDescriptionEquals("Mail")
+        compose.badgeOn(HomeRingTags.slot(mail)).assertDoesNotExist()
+        compose.ringSlot(clock).assertContentDescriptionEquals("Clock, 3 unread")
+
+        compose.ringSlot(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Show badge").performClick()
+
+        compose.ringSlot(mail).assertContentDescriptionEquals("Mail, 7 unread")
+        compose.runOnIdle { assertEquals(AppSettings(), appSettings) }
+    }
+
+    @Test
+    fun anAppsMenuLeavesItOffTheBuiltInCardsAndPutsItBack() {
+        collections = CollectionsPage(listOf(CollectionCard(NewApps)))
+        show()
+        compose.collectionApp(NewApps, mail).assertExists()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Hide from New & Most Used").performClick()
+
+        compose.collectionApp(NewApps, mail).assertDoesNotExist()
+        compose.collectionApp(NewApps, clock).assertExists()
+
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Show in New & Most Used").performClick()
+
+        compose.collectionApp(NewApps, mail).assertExists()
+        compose.runOnIdle { assertEquals(AppSettings(), appSettings) }
     }
 
     @Test

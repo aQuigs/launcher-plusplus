@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -117,6 +121,13 @@ private val AppOption.label
             is HomePlace.Folder -> "Remove from folder"
         }
         AppOption.NewFolder -> "New folder"
+        is AppOption.AddTo -> when (place) {
+            HomePlace.Ring -> "Add to the ring"
+            HomePlace.Dock -> "Add to the dock"
+        }
+        is AppOption.Badge -> if (isOff) "Show badge" else "Hide badge"
+        is AppOption.BuiltInCards -> if (isOff) "Show in New & Most Used" else "Hide from New & Most Used"
+        AppOption.PlayStore -> "Open in Play Store"
         AppOption.AppInfo -> "App info"
         AppOption.Uninstall -> "Uninstall"
     }
@@ -125,6 +136,10 @@ private val AppOption.icon
     get() = when (this) {
         is AppOption.Remove -> Icons.Default.Close
         AppOption.NewFolder -> FolderGlyph
+        is AppOption.AddTo -> Icons.Default.Add
+        is AppOption.Badge -> Icons.Default.Notifications
+        is AppOption.BuiltInCards -> Icons.Default.Star
+        AppOption.PlayStore -> Icons.Default.ShoppingCart
         AppOption.AppInfo -> Icons.Default.Info
         AppOption.Uninstall -> Icons.Default.Delete
     }

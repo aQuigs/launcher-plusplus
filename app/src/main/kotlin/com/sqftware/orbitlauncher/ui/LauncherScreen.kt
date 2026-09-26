@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
+import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -126,8 +127,10 @@ data class HomePress(val launcherInFront: Boolean)
  * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
  * as it was. An app goes between the ring and the dock the same way, and one held over the middle of its open folder
  * closes it and goes on to either, where the others make way for it too, on the ring even between slots set far apart. An app, from the drawer too, resting on the middle of an app or folder on the ring or
- * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts; a long
- * press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
+ * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts,
+ * but for those whose badge the [appSettings] turn off. An app's menu turns its badge off or on, leaves it off the
+ * built-in collection cards or puts it back ([onAppSettingsChange]), opens its Play Store page, and in the drawer adds it
+ * to the ring or the dock. A long press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog
  * ([onFolderLookChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -171,6 +174,8 @@ fun LauncherScreen(
     unread: UnreadCounts,
     badgesEnabled: Boolean,
     onOpenBadgeSettings: () -> Unit,
+    appSettings: AppSettings,
+    onAppSettingsChange: (AppSettings) -> Unit,
     onOpenNotifications: () -> Unit,
     onRestart: () -> Unit,
     onReset: () -> Unit,
@@ -198,6 +203,9 @@ fun LauncherScreen(
     val latestOnCollectionsChange by rememberUpdatedState(onCollectionsChange)
     val latestBadgesEnabled by rememberUpdatedState(badgesEnabled)
     val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
+    val latestAppSettings by rememberUpdatedState(appSettings)
+    val latestOnAppSettingsChange by rememberUpdatedState(onAppSettingsChange)
+    val badges = remember(unread, appSettings) { appSettings.badges(unread) }
     val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestFolderLook by rememberUpdatedState(folderLook)
@@ -464,7 +472,7 @@ fun LauncherScreen(
                 AppOptionsMenu(
                     expanded = shown.expanded,
                     shortcuts = shown.shortcuts,
-                    options = appOptions(app, place),
+                    options = appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled),
                     shortcutIcon = actions.shortcutIcon,
                     onShortcut = actions.startShortcut,
                     onOption = { option ->
@@ -477,6 +485,10 @@ fun LauncherScreen(
                                     pickFor(HomePlace.Folder(holder, slot))
                                 }
                             }
+                            is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
+                            is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(app))
+                            is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
+                            AppOption.PlayStore -> actions.openStorePage(app)
                             AppOption.AppInfo -> actions.openAppInfo(app)
                             AppOption.Uninstall -> actions.uninstall(app)
                         }
@@ -814,7 +826,7 @@ fun LauncherScreen(
                         drag = dragFromDrawer,
                         query = query,
                         onQueryChange = { query = it },
-                        unread = unread,
+                        unread = badges,
                         picking = picking?.let { place ->
                             val picked = homeApps[place]
                             Picking(
@@ -889,7 +901,7 @@ fun LauncherScreen(
                                             menu = ringMenu,
                                             folderMenu = folderMenu,
                                             folderAppMenu = folderAppMenu,
-                                            unread = unread,
+                                            unread = badges,
                                             rearrange = if (open != null) folderRearrange else ringRearrange,
                                             foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                             held = (dragged as? Drag.OutOfFolder)?.app,
@@ -924,7 +936,7 @@ fun LauncherScreen(
                                         highlighted = dropPlace == HomePlace.Dock,
                                         menu = dockMenu,
                                         folderMenu = folderMenu,
-                                        unread = unread,
+                                        unread = badges,
                                         rearrange = dockRearrange,
                                         foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Dock }?.index,
                                     )
@@ -948,7 +960,8 @@ fun LauncherScreen(
                                 onOpenUsageSettings = onOpenUsageSettings,
                                 rearrange = cardRearrange,
                                 bin = if (binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
-                                unread = unread,
+                                settings = appSettings,
+                                unread = badges,
                             )
                         }
                     }

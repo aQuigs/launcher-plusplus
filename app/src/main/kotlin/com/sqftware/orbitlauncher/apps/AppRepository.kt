@@ -35,6 +35,9 @@ interface AppRepository {
     /** Opens the system's details page for [app]. */
     fun openAppInfo(app: AppEntry)
 
+    /** Opens [app]'s page in the Play Store. */
+    fun openStorePage(app: AppEntry)
+
     /** Asks the system to uninstall [app], which confirms with the user first. */
     fun uninstall(app: AppEntry)
 

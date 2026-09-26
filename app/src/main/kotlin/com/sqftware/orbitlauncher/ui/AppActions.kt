@@ -12,5 +12,6 @@ class AppActions(
     val shortcutIcon: suspend (AppShortcut) -> ImageBitmap?,
     val startShortcut: (AppShortcut) -> Unit,
     val openAppInfo: (AppEntry) -> Unit,
+    val openStorePage: (AppEntry) -> Unit,
     val uninstall: (AppEntry) -> Unit,
 )
