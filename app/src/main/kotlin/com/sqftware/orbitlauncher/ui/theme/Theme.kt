@@ -25,6 +25,7 @@ private val Glass = Frost.copy(alpha = 0.1f)
 private val DayGlass = Frost.copy(alpha = 0.35f)
 private val DayGold = lerp(Gold, Sky, 0.5f)
 private val Mist = lerp(Starlight, Sky, 0.28f)
+private val DayStar = lerp(Sky, Star, 0.4f)
 
 /**
  * The home ring's marks that lie on the wallpaper (its track, the constellation's lines, the emblem's edge, the ring round
@@ -33,9 +34,19 @@ private val Mist = lerp(Starlight, Sky, 0.28f)
 class RingColors(val mark: Color, val starLine: Color, val lit: Color)
 
 private val NightRing = RingColors(mark = Frost, starLine = Star.copy(alpha = 0.7f), lit = Spark)
-private val DayRing = RingColors(mark = Sky, starLine = lerp(Sky, Star, 0.4f).copy(alpha = 0.7f), lit = DayGold)
+private val DayRing = RingColors(mark = Sky, starLine = DayStar.copy(alpha = 0.7f), lit = DayGold)
 
 val LocalRingColors = staticCompositionLocalOf { NightRing }
+
+private val NightDrawerStar = Starlight.copy(alpha = 0.5f)
+private val DayDrawerStar = DayStar.copy(alpha = 0.4f)
+
+/**
+ * The faint stars scattered over the drawer's veil, at their brightest; each is dimmer by its own share. Starlight on the
+ * night's sky veil, and on the day's frosted one the icon's star inked towards the sky, so they show without turning
+ * the drawer busy.
+ */
+val LocalDrawerStar = staticCompositionLocalOf { NightDrawerStar }
 
 // The emblem is a disc of the icon's own sky whatever the wallpaper, so what is drawn inside it keeps the night's colours.
 val RingSpark = Spark
@@ -228,12 +239,14 @@ val TonalEdge = Sky.copy(alpha = 0.5f)
 
 @Composable
 fun LauncherTheme(lightWallpaper: Boolean = false, content: @Composable () -> Unit) {
-    val (colors, ring) = if (lightWallpaper) LauncherDayColors to DayRing else LauncherColors to NightRing
+    val (colors, ring, drawerStar) =
+        if (lightWallpaper) Triple(LauncherDayColors, DayRing, DayDrawerStar) else Triple(LauncherColors, NightRing, NightDrawerStar)
     MaterialTheme(colorScheme = colors) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides colors.onBackground,
             LocalRingColors provides ring,
+            LocalDrawerStar provides drawerStar,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
             content = content,
