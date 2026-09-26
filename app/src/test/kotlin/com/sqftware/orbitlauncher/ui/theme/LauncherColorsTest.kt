@@ -41,6 +41,16 @@ class LauncherColorsTest {
         }
     }
 
+    @Test
+    fun `what floats over the wallpaper is opaque`() {
+        listOf(LauncherColors, LauncherDayColors).forEach { scheme ->
+            with(scheme) {
+                listOf(secondaryContainer, surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest)
+                    .forEach { assertEquals("$it", 1f, it.alpha) }
+            }
+        }
+    }
+
     // 3:1 is the WCAG floor for a control's edge; either scheme may be showing, so it cannot lean on the scheme's colours.
     @Test
     fun `a folder's edge stands out on a white and on a black wallpaper`() {
