@@ -212,7 +212,7 @@ fun LauncherScreen(
     // The open folder is named by its slot, so it closes once another folder may show there: a dock folder's neighbours
     // stay live while it is open, and one of them going or moving shifts the slots.
     fun changeHomeApps(change: HomeApps.() -> HomeApps) {
-        val changed = latestHomeApps.change().withPlanetsKept()
+        val changed = latestHomeApps.change()
         if (changed == latestHomeApps) return
         if (openFolder?.let { latestHomeApps.keeps(it, changed) } == false) openFolder = null
         latestOnHomeAppsChange(changed)

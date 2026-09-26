@@ -116,7 +116,8 @@ class MainActivity : ComponentActivity() {
             LauncherTheme(lightWallpaper = lightWallpaper) {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
-                // file holds a few keys.
+                // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
+                // as folders come and go.
                 var homeApps by remember { mutableStateOf(homeAppsStore.load().withPlanetsKept()) }
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
                 var folderLook by remember { mutableStateOf(folderLookStore.load()) }
@@ -171,8 +172,8 @@ class MainActivity : ComponentActivity() {
                     pinnedShortcuts = pinnedShortcuts,
                     homeApps = homeApps,
                     onHomeAppsChange = {
-                        homeApps = it
-                        homeAppsStore.save(it)
+                        homeApps = it.withPlanetsKept()
+                        homeAppsStore.save(homeApps)
                     },
                     actions = actions,
                     reorderMode = reorderMode,
