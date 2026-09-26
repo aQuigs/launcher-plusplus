@@ -46,7 +46,6 @@ import androidx.compose.material.icons.materialIcon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -215,7 +214,7 @@ fun CollectionsColumn(
                     )
                 }
             }
-            FilledTonalButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().testTag(CollectionTags.ADD)) {
+            TonalButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().testTag(CollectionTags.ADD)) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                 Text("Add Collection")
             }
@@ -451,7 +450,7 @@ private fun PermissionRequired(onClick: () -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
-        FilledTonalButton(onClick = onClick) { Text("Allow usage access") }
+        TonalButton(onClick = onClick) { Text("Allow usage access") }
     }
 }
 

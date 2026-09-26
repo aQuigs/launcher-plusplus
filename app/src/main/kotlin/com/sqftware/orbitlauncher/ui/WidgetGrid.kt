@@ -36,7 +36,6 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -260,7 +259,7 @@ fun WidgetGrid(
                 .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
                 .testTag(WidgetTags.ADD),
         ) {
-            FilledTonalButton(
+            TonalButton(
                 onClick = {
                     onEditingChange(null)
                     actions.add(pageRows, cell.width.value, cell.height.value)
