@@ -54,7 +54,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 - A passing test is not a passing feature: for UI changes, install on the emulator, screenshot, and look at the PNG before calling it done. That after shot is the one that goes in the PR.
 - Pre-commit runs hygiene checks, markdownlint, lint and the unit tests. Install with `pre-commit install`.
 - GitHub Actions run on every push: `android-ci` (build, lint, unit tests) and the pre-commit hooks. The emulator tests run locally only.
-- Every merge to `main` publishes to the Play Store internal testing track through the shared `play_internal.yaml`, versioned by commit count. Only listed testers can install it. The workflow header names the repo secrets it needs.
+- Every merge to `main` publishes to the Play Store internal testing track, and to closed testing (Alpha) while it has a live release, through the shared `play_internal.yaml`, versioned by commit count. Only listed testers can install it. The workflow header names the repo secrets it needs.
 
 ## Conventions
 
