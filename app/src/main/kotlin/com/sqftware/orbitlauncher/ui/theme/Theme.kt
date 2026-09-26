@@ -122,8 +122,9 @@ val GlyphFill = Color.Black
  * icon's sky. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
  * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) ask for the veil of
  * `surfaceDim` by name, so a container on one never stacks a second veil. What floats over other content (menus, dialogs,
- * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit sky, or the icons beneath would
- * show through. Content colours are all opaque, so their contrast does not hang on the wallpaper.
+ * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, and a tonal button `secondaryContainer`, all opaque
+ * lit sky, or the icons beneath would show through. Content colours are all opaque, so their contrast does not hang on
+ * the wallpaper.
  */
 val LauncherColors = ColorScheme(
     primary = Star,
@@ -133,7 +134,7 @@ val LauncherColors = ColorScheme(
     inversePrimary = lerp(Star, Sky, 0.5f),
     secondary = Mist,
     onSecondary = Sky,
-    secondaryContainer = Glass,
+    secondaryContainer = lerp(Sky, Star, 0.35f),
     onSecondaryContainer = Starlight,
     tertiary = Gold,
     onTertiary = Sky,
