@@ -13,6 +13,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -150,6 +151,22 @@ class WidgetGridTest {
         assertNear(columnWidth, width.dp)
         assertNear(row, height.dp)
         assertTrue("$pageRows rows fit the page", pageRows >= 4)
+    }
+
+    @Test
+    fun aLongPressWhereNoWidgetIsAsksForOneAndEndsEditing() {
+        page = WidgetPage(listOf(search))
+        show()
+        val pageRows = pageRows()
+        compose.longPressWidget(search)
+        compose.runOnIdle { assertEquals("a long press on a widget edits it", emptyList<Triple<Int, Float, Float>>(), added) }
+
+        scroller().performTouchInput { longClick(center) }
+
+        compose.runOnIdle {
+            assertEquals(pageRows, added.single().first)
+            assertNull(editing)
+        }
     }
 
     @Test
