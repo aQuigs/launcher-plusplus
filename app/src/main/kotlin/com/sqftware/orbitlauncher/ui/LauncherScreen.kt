@@ -460,7 +460,10 @@ fun LauncherScreen(
     fun appMenu(place: HomePlace?) = AppMenu(
         onOpen = { app ->
             openingMenu?.cancel()
-            openingMenu = scope.launch { openMenu = OpenMenu.App(app, place, actions.shortcuts(app)) }
+            openingMenu = scope.launch {
+                val shortcuts = actions.shortcuts(app)
+                openMenu = OpenMenu.App(app, place, shortcuts, appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled))
+            }
         },
         content = { app ->
             (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, place) }?.let { shown ->
@@ -472,7 +475,7 @@ fun LauncherScreen(
                 AppOptionsMenu(
                     expanded = shown.expanded,
                     shortcuts = shown.shortcuts,
-                    options = appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled),
+                    options = shown.options,
                     shortcutIcon = actions.shortcutIcon,
                     onShortcut = actions.startShortcut,
                     onOption = { option ->
@@ -1146,11 +1149,15 @@ private sealed interface OpenMenu {
 
     fun closed(): OpenMenu
 
-    /** [app]'s menu, where it was pressed (null for the drawer), and its shortcuts. */
+    /**
+     * [app]'s menu, where it was pressed (null for the drawer), its shortcuts and its options. The options are set as it
+     * opens, as the one chosen changes what they would be, and the menu keeps what it shows while it fades out.
+     */
     data class App(
         val app: AppEntry,
         val place: HomePlace?,
         val shortcuts: List<AppShortcut>,
+        val options: List<AppOption>,
         override val expanded: Boolean = true,
     ) : OpenMenu {
         // By key, so a reload that relabels the app keeps its menu.
