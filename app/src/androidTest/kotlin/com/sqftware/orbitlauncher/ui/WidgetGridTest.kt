@@ -96,7 +96,8 @@ class WidgetGridTest {
     /** The page, which scrolls, add button and all. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
-    // Inside the page's padding, down to the gap above the add button.
+    // Inside the page's padding, down to the gap above the add button: only while the page fits the screen, since the
+    // button follows the rows of a longer one.
     private fun rows() = widgetRowsWithin(
         (compose.addWidgetButton().getUnclippedBoundsInRoot().top - gap - scroller().getUnclippedBoundsInRoot().top - 16.dp).value,
     )
@@ -363,10 +364,9 @@ class WidgetGridTest {
         assertNear(columnSpan(3), bounds(top).width)
         assertTrue("the widget below makes way", bounds(top).bottom <= bounds(search).top)
 
+        val pageRows = pageRows()
         compose.widgetResizeHandle().performTouchInput { swipeDown(centerY, centerY + rowPx() * 50) }
-        val tallest = compose.runOnIdle { resized.last().second }
-        assertTrue("$tallest rows", tallest > 4)
-        assertTrue("the widget stops above the button", bounds(top).bottom <= compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+        compose.runOnIdle { assertEquals("the widget stops at the page's rows", pageRows, resized.last().second) }
     }
 
     @Test

@@ -212,17 +212,17 @@ fun WidgetGrid(
             .fillMaxSize()
             .then(if (editing != null) Modifier.pointerInput(onEditingChange) { detectTapGestures { onEditingChange(null) } } else Modifier),
     ) {
-        val area = Modifier
-            .fillMaxSize()
-            .onSizeChanged { size ->
-                with(density) {
-                    // The keyboard, raised for the drawer's search, squeezes this page too. Measured as if it were down,
-                    // the rows keep their height, so no widget is resized and redrawn by its provider meanwhile.
-                    val squeeze = (keyboard.getBottom(this) - bars.getBottom(this)).coerceAtLeast(0)
-                    area = DpSize(size.width.toDp(), (size.height + squeeze).toDp())                }
-            }
         Column(
-            area
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { size ->
+                    with(density) {
+                        // The keyboard, raised for the drawer's search, squeezes this page too. Measured as if it were
+                        // down, the rows keep their height, so no widget is resized and redrawn by its provider meanwhile.
+                        val squeeze = (keyboard.getBottom(this) - bars.getBottom(this)).coerceAtLeast(0)
+                        area = DpSize(size.width.toDp(), (size.height + squeeze).toDp())
+                    }
+                }
                 .verticalPageScroll()
                 .padding(PAGE_PADDING),
             verticalArrangement = Arrangement.spacedBy(GAP),
