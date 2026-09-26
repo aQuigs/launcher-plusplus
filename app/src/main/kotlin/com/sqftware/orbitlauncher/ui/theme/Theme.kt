@@ -37,6 +37,16 @@ private val DayRing = RingColors(mark = Sky, starLine = lerp(Sky, Star, 0.4f).co
 
 val LocalRingColors = staticCompositionLocalOf { NightRing }
 
+private val NightDrawerStar = Starlight.copy(alpha = 0.5f)
+private val DayDrawerStar = lerp(Sky, Star, 0.4f).copy(alpha = 0.4f)
+
+/**
+ * The faint stars scattered over the drawer's veil, at their brightest; each is dimmer by its own share. Starlight on the
+ * night's sky veil, and on the day's frosted one the icon's star inked towards the sky, so they show without turning
+ * the drawer busy.
+ */
+val LocalDrawerStar = staticCompositionLocalOf { NightDrawerStar }
+
 // The emblem is a disc of the icon's own sky whatever the wallpaper, so what is drawn inside it keeps the night's colours.
 val RingSpark = Spark
 val RingInk = Frost.copy(alpha = 0.9f)
@@ -225,11 +235,13 @@ val LauncherDayColors = LauncherColors.copy(
 @Composable
 fun LauncherTheme(lightWallpaper: Boolean = false, content: @Composable () -> Unit) {
     val (colors, ring) = if (lightWallpaper) LauncherDayColors to DayRing else LauncherColors to NightRing
+    val drawerStar = if (lightWallpaper) DayDrawerStar else NightDrawerStar
     MaterialTheme(colorScheme = colors) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides colors.onBackground,
             LocalRingColors provides ring,
+            LocalDrawerStar provides drawerStar,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
             content = content,

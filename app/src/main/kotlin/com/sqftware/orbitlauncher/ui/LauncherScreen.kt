@@ -80,6 +80,7 @@ import com.sqftware.orbitlauncher.domain.appOptions
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
+import com.sqftware.orbitlauncher.ui.theme.LocalDrawerStar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -750,6 +751,7 @@ fun LauncherScreen(
     // the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
     val panel = MaterialTheme.colorScheme.surfaceDim
+    val star = LocalDrawerStar.current
     val scrim = MaterialTheme.colorScheme.scrim
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
     // edge lines up with nothing of ours. It is in the scrim, the opposite of the navigation icons' ink, only to lift them
@@ -795,6 +797,8 @@ fun LauncherScreen(
                         val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
                         drawRect(panel.copy(alpha = panel.alpha * open), size = Size(size.width, strip))
                         drawRect(panel, Offset(0f, strip))
+                        // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
+                        drawStarField(star, alpha = open)
                     },
                 ) {
                     DrawerHandle(
