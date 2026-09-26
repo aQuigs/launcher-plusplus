@@ -51,11 +51,14 @@ class DiscEdge(val outer: Color, val inner: Color)
 
 val FolderEdge = DiscEdge(outer = Sky.copy(alpha = 0.5f), inner = Frost.copy(alpha = 0.5f))
 
+/** What rims a planet's moons and rings, so they show on a light wallpaper as the folder's edge does. */
+val PlanetShadow = Sky.copy(alpha = 0.6f)
+
 /** A moon on a folder's edge: a spark ringed in shade, so it too shows on any patch of wallpaper. */
-val FolderMoon = DiscEdge(outer = Sky.copy(alpha = 0.6f), inner = Spark)
+val FolderMoon = DiscEdge(outer = PlanetShadow, inner = Spark)
 
 /** The tilted ring across a Ringed planet's disc: gold, shadowed on its outer edge so it shows on a light wallpaper. */
-val PlanetRing = DiscEdge(outer = Sky.copy(alpha = 0.6f), inner = Gold.copy(alpha = 0.85f))
+val PlanetRing = DiscEdge(outer = PlanetShadow, inner = Gold.copy(alpha = 0.85f))
 
 /** The small planet at the heart of the Moons in orbit look, lit from the top left, and the track its moons follow. */
 val OrbitCoreLit = Color(0xFF4A5AA8)
@@ -75,9 +78,6 @@ class PlanetPaint(
     val features: List<Color> = emptyList(),
 )
 
-/** What rims a planet's moons and rings, so they show on a light wallpaper as the folder's edge does. */
-val PlanetShadow = Sky.copy(alpha = 0.6f)
-
 private fun tint(colour: Long) = Color(colour).copy(alpha = 0.3f)
 
 private val Forest = Color(0xFF3F9B4A).copy(alpha = 0.9f)
@@ -87,7 +87,7 @@ private val JupiterTan = Color(0xFFD6B284).copy(alpha = 0.6f)
 
 val PlanetPaints = mapOf(
     Planet.Mercury to PlanetPaint(tint(0xFFC9C4BB), accent = Color(0xFFFFD678), accent2 = Color(0x00FF8A3D)),
-    Planet.Venus to PlanetPaint(tint(0xFFF3DCA0), accent = Color(0xFFFFF0C8).copy(alpha = 0.55f)),
+    Planet.Venus to PlanetPaint(tint(0xFFF3DCA0), accent = Color(0xFFFFF0C8).copy(alpha = 0.9f)),
     Planet.Earth to PlanetPaint(
         tint(0xFF4B8FF0),
         moon = Color(0xFFD8D3CB),

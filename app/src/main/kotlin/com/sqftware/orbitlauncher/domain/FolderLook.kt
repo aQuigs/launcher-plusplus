@@ -18,8 +18,18 @@ enum class FolderLook(val label: String) {
     SolarSystem("Solar system"),
 }
 
-/** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. */
-enum class Planet { Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto }
+/** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */
+enum class Planet(val moves: Boolean = true) {
+    Mercury(moves = false),
+    Venus,
+    Earth,
+    Mars,
+    Jupiter,
+    Saturn(moves = false),
+    Uranus(moves = false),
+    Neptune,
+    Pluto,
+}
 
 /** Which planet a folder is in the Solar system: the first free one, a plain folder, or one the user picked. */
 sealed interface PlanetPick {

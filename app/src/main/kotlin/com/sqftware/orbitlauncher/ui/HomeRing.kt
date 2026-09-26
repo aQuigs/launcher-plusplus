@@ -206,22 +206,19 @@ fun HomeRing(
     // [planet] is the folder open, or last open until it is back in its slot.
     val spread = remember { Animatable(0f) }
     var planet by remember { mutableStateOf<RingItem.Folder?>(null) }
+    // Reopened on its way back, it turns round from where it is.
+    val reopening = openFolder != null && planet?.at == openFolder.at
     SideEffect { if (openFolder != null) planet = openFolder }
-    // The folder that is out of its slot, if only part way; plain, as only the effect below reads it.
-    val spreading = remember { object { var at: HomePlace.Folder? = null } }
     // An app dragged out closes its folder under the finger, and the drag carries on from there, not from the planet; and
     // a folder that changed or went has its apps somewhere else to be.
     val folding = planet?.takeIf { openFolder == null && held == null && inSight && it == folderAt(it.at, ring, dock) }
     LaunchedEffect(openFolder?.at) {
         if (openFolder != null) {
-            // Reopened on its way back, it turns round from where it is.
-            if (spreading.at != openFolder.at) spread.snapTo(0f)
-            spreading.at = openFolder.at
+            if (!reopening) spread.snapTo(0f)
             if (inSight) spread.animateTo(1f, tween(SPREAD_MILLIS, easing = FastOutSlowInEasing)) else spread.snapTo(1f)
         } else {
             if (folding != null) spread.animateTo(0f, tween(FOLD_BACK_MILLIS, easing = FastOutSlowInEasing))
             spread.snapTo(0f)
-            spreading.at = null
             planet = null
         }
     }
@@ -232,9 +229,7 @@ fun HomeRing(
 
     val moving = rearrange?.moving
     // One keyed list for the ring and an open folder, keyed outside the branches, so an item keeps its node, and a gesture
-    // moving it, while it moves round and while the folder it is dragged out of closes under the finger. The ring's items
-    // stepping aside and a folder's apps going home are keyed the same, so each keeps its node, and its icon, from where
-    // it was before.
+    // moving it, while it moves round and while the folder it is dragged out of closes under the finger.
     val items = when {
         openFolder != null -> moving.shown(openFolder.apps).map(RingItem::App)
         making != null -> making
@@ -270,7 +265,6 @@ fun HomeRing(
             // going back into its planet while the ring returns and takes the touches.
             if (spreadingOut) {
                 ring.forEachIndexed { index, item ->
-                    if (item is RingItem.Folder && item.at == openFolder?.at) return@forEachIndexed
                     key(item.tag) {
                         SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Leaving(index)).inert(), null, null, unread, null)
                     }
@@ -307,8 +301,9 @@ fun HomeRing(
                 }
 
                 // An app on its way in from another place makes way for itself among the ring's.
-                val ringLines = constellation(making?.size ?: ring.size)
-                val ringRadius = layoutOn(size.minDimension, making?.size ?: ring.size).radius
+                val ringCount = making?.size ?: ring.size
+                val ringLines = constellation(ringCount)
+                val ringRadius = layoutOn(size.minDimension, ringCount).radius
                 val planetApps = centred?.apps?.size
                 val folderLines = planetApps?.let(::constellation)
                 val folderRadius = planetApps?.let { layoutOn(size.minDimension, it).radius }
@@ -326,7 +321,7 @@ fun HomeRing(
                 onDrawBehind {
                     val out = spread.value
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
-                    if (openFolder == null && folding == null) {
+                    if (centred == null) {
                         draw(ringLines, ringRadius, 1f)
                     } else {
                         val drift = 1f + DRIFT * out
@@ -339,8 +334,7 @@ fun HomeRing(
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
         val (radius, iconSize) = layoutOn(side, slots)
         val (ringRadius, ringIconSize) = layoutOn(side, ring.size)
-        val shownPlanet = centred
-        val (folderRadius, folderIconSize) = layoutOn(side, shownPlanet?.apps?.size ?: 1)
+        val (folderRadius, folderIconSize) = layoutOn(side, centred?.apps?.size ?: 1)
         val centreSize = (side * EMBLEM_FRACTION).roundToInt()
         val placeables = measurables.map { measurable ->
             val part = measurable.layoutId as Part
@@ -356,15 +350,12 @@ fun HomeRing(
         }
         // Where the planet's slot is, as an offset from the centre: on the ring, or below it for one in the dock. Found by
         // place, not by its stored slot, which counts apps that are missing from the ring.
-        val planetSlot = shownPlanet?.at?.let { at ->
-            val index = ring.indexOfFirst { it is RingItem.Folder && it.at == at }
-            when {
-                at.holder == HomePlace.Dock -> Offset(0f, constraints.maxHeight / 2f)
-                index >= 0 -> ringSlotOffset(index, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
-                else -> Offset.Zero
-            }
-        } ?: Offset.Zero
-        val planetIndex = shownPlanet?.at?.let { at -> ring.indexOfFirst { it is RingItem.Folder && it.at == at } }
+        val planetIndex = centred?.let(ring::indexOf) ?: -1
+        val planetSlot = when {
+            centred?.at?.holder == HomePlace.Dock -> Offset(0f, constraints.maxHeight / 2f)
+            planetIndex >= 0 -> ringSlotOffset(planetIndex, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
+            else -> Offset.Zero
+        }
 
         layout(constraints.maxWidth, constraints.maxHeight) {
             val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
@@ -395,7 +386,7 @@ fun HomeRing(
 
             placeables.forEach { (part, placeable) ->
                 when (part) {
-                    Part.Emblem -> if (shownPlanet == null) {
+                    Part.Emblem -> if (centred == null) {
                         placeable.placeAt(middle)
                     } else {
                         placeable.placeAt(middle) {
@@ -415,7 +406,7 @@ fun HomeRing(
                     }
                     Part.Held -> placeable.place(0, 0)
                     is Part.Leaving -> placeable.placeDrifting(part.index)
-                    is Part.Folding -> placeable.placeSpiralling(part.index, shownPlanet?.apps?.size ?: 1, folderRadius)
+                    is Part.Folding -> placeable.placeSpiralling(part.index, centred?.apps?.size ?: 1, folderRadius)
                     Part.Shield -> placeable.place(0, 0)
                 }
             }
@@ -503,7 +494,7 @@ private val Size.emblemRadius get() = minDimension / 2 * 0.96f
  * nobody sees does not redraw the window, and the angle holds, so what it turns never jumps.
  */
 @Composable
-private fun turnAngle(turning: Boolean, millis: Int): State<Float> {
+internal fun turnAngle(turning: Boolean, millis: Int): State<Float> {
     val rest = remember { mutableFloatStateOf(0f) }
     if (!turning) return rest
 

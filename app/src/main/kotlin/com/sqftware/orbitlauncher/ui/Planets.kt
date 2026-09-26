@@ -8,12 +8,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
@@ -74,27 +76,41 @@ fun PlanetFace(
     inner: () -> Float = { 1f },
 ) {
     val style = LocalFolderStyle.current
+    // A layer of its own, so what turns with the sky redraws only the planet, not the page round it.
+    val layered = modifier.graphicsLayer()
     if (style.look == FolderLook.Orbit) {
-        OrbitFace(folder, icon, style.minutes, inner, modifier)
+        OrbitFace(folder, icon, style.minutes, inner, layered)
         return
     }
 
     val planet = if (style.look == FolderLook.SolarSystem) style.planets[folder.at] else null
     val disc = planet.discFraction()
     val worn = when {
-        planet != null -> Modifier.drawWithContent {
+        planet != null -> Modifier.drawWithCache {
             val radius = size.minDimension / 2 * disc
-            drawPlanetTouch(planet, radius, style.minutes, behind = true)
-            drawContent()
-            drawPlanetTouch(planet, radius, style.minutes, behind = false)
+            val heart = heartPath(radius * 0.2f)
+            onDrawWithContent {
+                drawPlanetTouch(planet, radius, style.minutes, heart, behind = true)
+                drawContent()
+                drawPlanetTouch(planet, radius, style.minutes, heart, behind = false)
+            }
         }
         style.look == FolderLook.Ringed -> Modifier.tiltedRing()
         else -> Modifier
     }
-    val glass = if (planet != null) Modifier.drawBehind { drawPlanetGlass(planet, size.minDimension / 2, style.minutes) } else Modifier
+    val glass = if (planet == null) {
+        Modifier
+    } else {
+        Modifier.drawWithCache {
+            val radius = size.minDimension / 2
+            val disc = Path().apply { addOval(Rect(size.center, radius)) }
+            val band = Path()
+            onDrawBehind { drawPlanetGlass(planet, radius, style.minutes, disc, band) }
+        }
+    }
     val moons = if (style.look == FolderLook.Rim) Modifier.moons(folder.apps.size) else Modifier
 
-    Box(modifier.then(worn), contentAlignment = Alignment.Center) {
+    Box(layered.then(worn), contentAlignment = Alignment.Center) {
         // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into the wallpaper.
         IconDisc(presses, Modifier.fillMaxSize(disc).then(glass).edge(FolderEdge).then(moons), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, contentAlignment = Alignment.Center) {
@@ -139,15 +155,20 @@ private const val MOONS_START = 3 * PI / 4
 private fun Modifier.tiltedRing(): Modifier = drawWithContent {
     val r = size.minDimension / 2
     val ring = Size(r * 3f, r * 0.84f)
-    val topLeft = center - Offset(ring.width / 2, ring.height / 2)
-    fun half(from: Float) = rotate(RING_TILT, center) {
-        drawArc(PlanetRing.outer, from, 180f, useCenter = false, topLeft = topLeft, size = ring, style = Stroke(r * 0.13f + 2.dp.toPx()))
-        drawArc(PlanetRing.inner, from, 180f, useCenter = false, topLeft = topLeft, size = ring, style = Stroke(r * 0.13f))
+    fun half(behind: Boolean) = rotate(RING_TILT, center) {
+        halfRing(ring, r * 0.13f + 2.dp.toPx(), PlanetRing.outer, behind)
+        halfRing(ring, r * 0.13f, PlanetRing.inner, behind)
     }
-    half(180f)
+    half(behind = true)
     drawContent()
-    half(0f)
+    half(behind = false)
 }
+
+/** The far half of an [oval] ring round the centre if [behind], else the near half, in a line [width] wide. */
+private fun DrawScope.halfRing(oval: Size, width: Float, colour: Color, behind: Boolean) = drawArc(
+    colour, if (behind) 180f else 0f, 180f, useCenter = false,
+    topLeft = center - Offset(oval.width / 2, oval.height / 2), size = oval, style = Stroke(width),
+)
 
 private const val RING_TILT = -22f
 
@@ -167,7 +188,7 @@ private fun OrbitFace(
     Layout(
         content = {
             folder.apps.forEach { app ->
-                AppImage(app, icon, Modifier.clip(CircleShape).graphicsLayer { alpha = inner() })
+                AppImage(app, icon)
             }
         },
         modifier = modifier.drawBehind {
@@ -185,12 +206,16 @@ private fun OrbitFace(
         val moon = min(side * ORBIT_MOON, (PI * track / count.coerceAtLeast(1)).toFloat() * 1.2f).roundToInt().coerceAtLeast(1)
         val placeables = measurables.map { it.measure(Constraints.fixed(moon, moon)) }
         layout(constraints.maxWidth, constraints.maxHeight) {
-            val turn = 2 * PI * minutes() / ORBIT_MINUTES
+            // Placed once at the centre and moved by their layers, so the sky turning neither lays them out nor redraws them.
             placeables.forEachIndexed { index, placeable ->
-                val angle = turn + 2 * PI * index / count
-                val x = constraints.maxWidth / 2f + track * sin(angle).toFloat() - moon / 2f
-                val y = constraints.maxHeight / 2f - track * cos(angle).toFloat() - moon / 2f
-                placeable.place(x.roundToInt(), y.roundToInt())
+                placeable.placeWithLayer((constraints.maxWidth - moon) / 2, (constraints.maxHeight - moon) / 2) {
+                    val angle = 2 * PI * minutes() / ORBIT_MINUTES + 2 * PI * index / count
+                    translationX = track * sin(angle).toFloat()
+                    translationY = -track * cos(angle).toFloat()
+                    alpha = inner()
+                    shape = CircleShape
+                    clip = true
+                }
             }
         }
     }
@@ -217,9 +242,9 @@ private const val PLUTO_DISC = 0.78f
  * it, and Jupiter's bands roll, each at its own pace, with the Great Red Spot drifting across, round the far side and
  * back, as Jupiter spins faster than any other planet.
  */
-private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: () -> Float) {
+private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: () -> Float, disc: Path, band: Path) {
     val paint = PlanetPaints.getValue(planet)
-    clipPath(Path().apply { addOval(Rect(center, radius)) }) {
+    clipPath(disc) {
         drawCircle(paint.tint, radius, center)
         when (planet) {
             Planet.Earth -> {
@@ -240,13 +265,12 @@ private fun DrawScope.drawPlanetGlass(planet: Planet, radius: Float, minutes: ()
                     // Wavy edges that roll along as it spins, each band at its own pace, as Jupiter's winds do.
                     fun edge(x: Float, side: Float) =
                         center.y + (latitude + side) * radius + sin(x / radius * 5 + drift * (1 + index * 0.35f) + index) * radius * 0.035f
-                    val xs = (0..24).map { -radius + radius * it / 12 }
-                    val band = Path().apply {
-                        moveTo(center.x + xs.first(), edge(xs.first(), -height / 2))
-                        xs.forEach { lineTo(center.x + it, edge(it, -height / 2)) }
-                        xs.asReversed().forEach { lineTo(center.x + it, edge(it, height / 2)) }
-                        close()
-                    }
+                    fun x(step: Int) = -radius + 2 * radius * step / BAND_STEPS
+                    band.rewind()
+                    band.moveTo(center.x + x(0), edge(x(0), -height / 2))
+                    for (step in 0..BAND_STEPS) band.lineTo(center.x + x(step), edge(x(step), -height / 2))
+                    for (step in BAND_STEPS downTo 0) band.lineTo(center.x + x(step), edge(x(step), height / 2))
+                    band.close()
                     drawPath(band, paint.features[index])
                 }
                 val spot = drift * 0.6f
@@ -282,7 +306,7 @@ private val JUPITER_BANDS = listOf(
  * Mercury's sunlit edge, Venus's backwards haze, the Earth's Moon, Mars's rim and two moons, Saturn's ring, Uranus's
  * upright one, Neptune's rim and backwards Triton, and Pluto's heart turned to Charon.
  */
-private fun DrawScope.drawPlanetTouch(planet: Planet, radius: Float, minutes: () -> Float, behind: Boolean) {
+private fun DrawScope.drawPlanetTouch(planet: Planet, radius: Float, minutes: () -> Float, heart: Path, behind: Boolean) {
     val paint = PlanetPaints.getValue(planet)
     val line = 1.dp.toPx()
 
@@ -294,11 +318,6 @@ private fun DrawScope.drawPlanetTouch(planet: Planet, radius: Float, minutes: ()
         drawCircle(PlanetShadow, r + line, at)
         drawCircle(colour, r, at)
     }
-
-    fun halfRing(oval: Size, width: Float, colour: Color) = drawArc(
-        colour, if (behind) 180f else 0f, 180f, useCenter = false,
-        topLeft = center - Offset(oval.width / 2, oval.height / 2), size = oval, style = Stroke(width),
-    )
 
     fun rim() = drawCircle(paint.accent, radius * 0.94f, center, style = Stroke((radius * 0.08f).coerceAtLeast(1.5f * line)))
 
@@ -314,9 +333,9 @@ private fun DrawScope.drawPlanetTouch(planet: Planet, radius: Float, minutes: ()
         Planet.Venus -> if (behind) {
             val swirl = Math.toDegrees(orbitAngle(minutes, VENUS_SPIN).toDouble()).toFloat()
             val (haze, topLeft) = arcAround(1.13f)
+            val stroke = Stroke((radius * 0.13f).coerceAtLeast(2 * line), cap = StrokeCap.Round)
+            val shadow = Stroke(stroke.width + 2 * line, cap = StrokeCap.Round)
             repeat(3) { index ->
-                val stroke = Stroke((radius * 0.13f).coerceAtLeast(2 * line), cap = StrokeCap.Round)
-                val shadow = Stroke(stroke.width + 2 * line, cap = StrokeCap.Round)
                 drawArc(PlanetShadow, swirl + index * 120f, 69f, useCenter = false, topLeft = topLeft, size = haze, style = shadow)
                 drawArc(paint.accent, swirl + index * 120f, 69f, useCenter = false, topLeft = topLeft, size = haze, style = stroke)
             }
@@ -334,16 +353,16 @@ private fun DrawScope.drawPlanetTouch(planet: Planet, radius: Float, minutes: ()
         Planet.Saturn -> rotate(SATURN_TILT, center) {
             scale(1f, SATURN_TILT_SQUASH, center) {
                 fun band(scale: Float) = Size(radius * scale * 2, radius * scale * 2)
-                SATURN_EDGES.forEach { halfRing(band(it), 2 * line, PlanetShadow) }
-                SATURN_RINGS.forEachIndexed { index, (scale, width) -> halfRing(band(scale), radius * width, paint.features[index]) }
+                SATURN_EDGES.forEach { halfRing(band(it), 2 * line, PlanetShadow, behind) }
+                SATURN_RINGS.forEachIndexed { index, (scale, width) -> halfRing(band(scale), radius * width, paint.features[index], behind) }
             }
         }
         // Rolls on its side, so its ring stands upright.
         Planet.Uranus -> rotate(URANUS_TILT, center) {
             val oval = Size(radius * 2.9f, radius * 0.6f)
             val width = (radius * 0.07f).coerceAtLeast(1.5f * line)
-            halfRing(oval, width + 2 * line, PlanetShadow)
-            halfRing(oval, width, paint.accent)
+            halfRing(oval, width + 2 * line, PlanetShadow, behind)
+            halfRing(oval, width, paint.accent, behind)
         }
         Planet.Neptune -> {
             if (!behind) rim()
@@ -357,20 +376,26 @@ private fun DrawScope.drawPlanetTouch(planet: Planet, radius: Float, minutes: ()
             drawCircle(PlanetShadow, radius * 0.34f + line, charon)
             drawCircle(paint.moon, radius * 0.34f, charon)
             val at = center + towards * radius * 0.82f
-            val heart = radius * 0.2f
-            val path = Path().apply {
-                moveTo(at.x, at.y + heart * 0.9f)
-                cubicTo(at.x - heart * 1.4f, at.y - heart * 0.1f, at.x - heart * 0.6f, at.y - heart * 1.1f, at.x, at.y - heart * 0.35f)
-                cubicTo(at.x + heart * 0.6f, at.y - heart * 1.1f, at.x + heart * 1.4f, at.y - heart * 0.1f, at.x, at.y + heart * 0.9f)
-                close()
-            }
-            rotate(Math.toDegrees(angle.toDouble()).toFloat() - 90f, at) {
-                drawPath(path, paint.accent)
-                drawPath(path, PlanetShadow, style = Stroke(line))
+            translate(at.x, at.y) {
+                rotate(Math.toDegrees(angle.toDouble()).toFloat() - 90f, Offset.Zero) {
+                    drawPath(heart, paint.accent)
+                    drawPath(heart, PlanetShadow, style = Stroke(line))
+                }
             }
         }
     }
 }
+
+/** Pluto's heart, [size] from its middle, pointing down, round the origin. */
+private fun heartPath(size: Float) = Path().apply {
+    moveTo(0f, size * 0.9f)
+    cubicTo(-size * 1.4f, -size * 0.1f, -size * 0.6f, -size * 1.1f, 0f, -size * 0.35f)
+    cubicTo(size * 0.6f, -size * 1.1f, size * 1.4f, -size * 0.1f, 0f, size * 0.9f)
+    close()
+}
+
+/** How many steps each edge of one of Jupiter's bands takes across the disc. */
+private const val BAND_STEPS = 24
 
 /** Scale against the disc and width against its radius of Saturn's rings, in [PlanetPaint.features]' order. */
 private val SATURN_RINGS = listOf(1.26f to 0.12f, 1.44f to 0.2f, 1.57f to 0.04f, 1.7f to 0.14f)

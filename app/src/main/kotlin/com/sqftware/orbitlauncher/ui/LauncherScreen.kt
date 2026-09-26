@@ -2,7 +2,6 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,7 +24,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -300,27 +298,16 @@ fun LauncherScreen(
     // Every page stays composed, so the home page must be told when nobody can see it.
     val homeSettled by remember(pagerState, layout) { derivedStateOf { pagerState.settledPage == layout.homeIndex } }
     val homeInSight = homeSettled && !drawerOpen && !overlayOpen
-    // The minutes the planets have turned, which only go on while there are planets to see move. A gap between frames, as
-    // while an app is in front, adds no more than a frame, so they pick up where they were left; and they wrap on a period
-    // every orbit fits a whole number of times, so the angles keep their precision however long the launcher runs.
+    // The planets turn like the emblem's sky, only while there are some to see move, an hour to a turn: every orbit goes
+    // round a whole number of times in it, so none jumps as the turn starts over.
     val planets = remember(ring, dock) { planetsOf(ring, dock) }
-    val sky = remember { mutableFloatStateOf(0f) }
     val skyTurns = homeInSight && when (folderLook) {
-        FolderLook.SolarSystem -> planets.isNotEmpty()
+        FolderLook.SolarSystem -> planets.values.any(Planet::moves)
         FolderLook.Orbit -> (ring + dock).any { it is RingItem.Folder }
         else -> false
     }
-    LaunchedEffect(skyTurns) {
-        if (!skyTurns) return@LaunchedEffect
-        var last = withInfiniteAnimationFrameMillis { it }
-        while (true) {
-            withInfiniteAnimationFrameMillis { now ->
-                sky.floatValue = (sky.floatValue + (now - last).coerceAtMost(SKY_MAX_STEP_MILLIS) / 60_000f) % SKY_WRAP_MINUTES
-                last = now
-            }
-        }
-    }
-    val folderStyle = remember(folderLook, planets) { FolderStyle(folderLook, planets, sky::floatValue) }
+    val sky = rememberUpdatedState(turnAngle(skyTurns, FOLDER_SKY_TURN_MILLIS))
+    val folderStyle = remember(folderLook, planets) { FolderStyle(folderLook, planets) { sky.value.value / 360f * 60f } }
     LaunchedEffect(editing) {
         if (editing == null) {
             justPicked = emptySet()
@@ -514,11 +501,10 @@ fun LauncherScreen(
                     DisposableEffect(Unit) {
                         onDispose { if ((openMenu as? OpenMenu.Folder)?.at == folder.at) closeMenu() }
                     }
-                    // Only the Solar system gives each folder a planet of its own.
-                    val solarSystem = LocalFolderStyle.current.look == FolderLook.SolarSystem
                     FolderOptionsMenu(
                         expanded = shown.expanded,
-                        options = FolderOption.entries.filter { it != FolderOption.Planet || solarSystem },
+                        // Only the Solar system gives each folder a planet of its own.
+                        options = if (latestFolderLook == FolderLook.SolarSystem) FolderOption.entries else FolderOption.entries - FolderOption.Planet,
                         onOption = { option ->
                             when (option) {
                                 FolderOption.AddApps -> pickFor(folder.at)
@@ -1174,5 +1160,4 @@ private fun LayoutCoordinates.boundsIn(ancestor: LayoutCoordinates): Bounds {
     return Bounds(box.left, box.top, box.right, box.bottom)
 }
 
-private const val SKY_WRAP_MINUTES = 60f
-private const val SKY_MAX_STEP_MILLIS = 100L
+private const val FOLDER_SKY_TURN_MILLIS = 3_600_000
