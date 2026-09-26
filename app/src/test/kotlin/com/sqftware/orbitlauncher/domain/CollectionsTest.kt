@@ -68,7 +68,8 @@ class CollectionsTest {
     }
 
     @Test
-    fun `the package's own category wins, else a telling word in its name, else nothing`() {
+    fun `a well-known app's category wins, else the package's own, else a telling word in its name, else nothing`() {
+        assertEquals(AppCategory.Business, AppEntry("LinkedIn", "com.linkedin.android", "Main", category = AppCategory.Social).suggestedCategory)
         assertEquals(AppCategory.Games, AppEntry("Chess", "com.example.music", "Main", category = AppCategory.Games).suggestedCategory)
 
         val byPackage = mapOf(
@@ -86,6 +87,11 @@ class CollectionsTest {
             "com.google.android.contacts" to AppCategory.Communication,
             "com.google.android.gm" to AppCategory.Communication,
             "com.google.android.apps.meetings" to AppCategory.Communication,
+            "com.samsung.android.email.provider" to AppCategory.Communication,
+            "com.whatsapp" to AppCategory.Communication,
+            "org.thoughtcrime.securesms" to AppCategory.Communication,
+            "com.Slack" to AppCategory.Business,
+            "us.zoom.videomeetings" to AppCategory.Business,
             "com.google.android.apps.maps" to AppCategory.Transport,
             "com.google.android.calendar" to AppCategory.Productivity,
             "com.google.android.apps.docs" to AppCategory.Productivity,
