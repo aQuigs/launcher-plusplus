@@ -13,10 +13,12 @@ import android.util.SizeF
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
-import com.sqftware.orbitlauncher.domain.HostedWidget
+import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
+import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
+import com.sqftware.orbitlauncher.domain.WidgetResize
 import com.sqftware.orbitlauncher.domain.WidgetSizing
-import com.sqftware.orbitlauncher.domain.widgetRows
+import com.sqftware.orbitlauncher.domain.widgetCells
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onCompletion
@@ -33,17 +35,20 @@ interface WidgetHost {
      */
     fun updates(): Flow<WidgetPage>
 
-    /** Lets the user pick a widget for the page, where it takes the rows its provider asks for, up to [pageRows]. */
-    fun add(pageRows: Int)
+    /**
+     * Lets the user pick a widget for the page, where it takes the cells its provider asks for, up to [pageRows] rows
+     * and the page's width, with columns [columnWidthDp] wide.
+     */
+    fun add(pageRows: Int, columnWidthDp: Int)
 
     /** Takes the widget [id] off the page and gives its id back to the system. */
     fun remove(id: Int)
 
-    /** Makes the widget [id] [rows] tall. */
-    fun resize(id: Int, rows: Int)
+    /** Makes the widget [id] [rows] tall and [columns] wide. */
+    fun resize(id: Int, rows: Int, columns: Int)
 
-    /** Moves the widget [id] to place [to] on the page, top to bottom. */
-    fun move(id: Int, to: Int)
+    /** Moves the widget [id]'s top-left cell to [row] and [column]. */
+    fun move(id: Int, row: Int, column: Int)
 
     /** How the provider of the widget [id] lets it be resized. */
     fun sizing(id: Int): WidgetSizing
@@ -106,14 +111,14 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
 
     override fun updates(): Flow<WidgetPage> = page.onStart { host.startListening() }.onCompletion { host.stopListening() }
 
-    override fun add(pageRows: Int) {
+    override fun add(pageRows: Int, columnWidthDp: Int) {
         val inProgress = pending
         if (inProgress != null) {
             // Only a pick from before the process started can still be waiting once the user is back to ask again.
             if (inProgress != restored) return
             discard(inProgress)
         }
-        val pick = WidgetPick(host.allocateAppWidgetId(), pageRows)
+        val pick = WidgetPick(host.allocateAppWidgetId(), pageRows, columnWidthDp)
         pending = pick
         val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pick.id)
         if (!start("the widget picker") { picker.launch(intent) }) discard(pick)
@@ -125,19 +130,25 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         set(page.value.remove(id))
     }
 
-    override fun resize(id: Int, rows: Int) = set(page.value.resize(id, rows))
+    override fun resize(id: Int, rows: Int, columns: Int) = set(page.value.resize(id, rows, columns))
 
-    override fun move(id: Int, to: Int) = set(page.value.move(id, to))
+    override fun move(id: Int, row: Int, column: Int) = set(page.value.move(id, row, column))
 
     override fun sizing(id: Int): WidgetSizing {
-        val info = manager.getAppWidgetInfo(id) ?: return WidgetSizing(vertical = false)
-        val maxResizeHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) info.maxResizeHeight.takeIf { it > 0 } else null
+        val info = manager.getAppWidgetInfo(id) ?: return WidgetSizing(WidgetResize(resizable = false), WidgetResize(resizable = false))
+        val newer = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val maxResizeHeight = if (newer) info.maxResizeHeight else 0
+        val maxResizeWidth = if (newer) info.maxResizeWidth else 0
+        fun resize(mode: Int, min: Int, minResize: Int, maxResize: Int) = WidgetResize(
+            resizable = info.resizeMode and mode != 0,
+            minDp = min.toDp(),
+            minResizeDp = minResize.toDp(),
+            // Rounded down, so the cells it allows fit under it.
+            maxResizeDp = maxResize.takeIf { it > 0 }?.let { (it / activity.resources.displayMetrics.density).toInt() },
+        )
         return WidgetSizing(
-            vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0,
-            minHeightDp = info.minHeight.toDp(),
-            minResizeHeightDp = info.minResizeHeight.toDp(),
-            // Rounded down, so the rows it allows fit under it.
-            maxResizeHeightDp = maxResizeHeight?.let { (it / activity.resources.displayMetrics.density).toInt() },
+            vertical = resize(AppWidgetProviderInfo.RESIZE_VERTICAL, info.minHeight, info.minResizeHeight, maxResizeHeight),
+            horizontal = resize(AppWidgetProviderInfo.RESIZE_HORIZONTAL, info.minWidth, info.minResizeWidth, maxResizeWidth),
         )
     }
 
@@ -160,10 +171,16 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
 
     private fun place(pick: WidgetPick, info: AppWidgetProviderInfo) {
         pending = null
-        set(page.value.add(HostedWidget(pick.id, widgetRows(info.minHeight.toDp(), pick.pageRows))))
+        set(
+            page.value.add(
+                pick.id,
+                rows = widgetCells(info.minHeight.toDp(), WIDGET_ROW_HEIGHT_DP.toFloat(), pick.pageRows),
+                columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp.toFloat(), WIDGET_COLUMNS),
+            ),
+        )
     }
 
-    // Rounded up, so the rows made of it hold the widget.
+    // Rounded up, so the cells made of it hold the widget.
     private fun Int.toDp() = ceil(this / activity.resources.displayMetrics.density).toInt()
 
     private fun discard(pick: WidgetPick) {

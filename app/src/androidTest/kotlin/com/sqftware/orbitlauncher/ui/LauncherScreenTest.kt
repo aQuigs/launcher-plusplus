@@ -110,15 +110,15 @@ class LauncherScreenTest {
     private val infoOpened = mutableListOf<AppEntry>()
     private val uninstalled = mutableListOf<AppEntry>()
     private var shortcutsLoaded = CompletableDeferred(Unit)
-    private val search = HostedWidget(id = 3, rows = 1)
+    private val search = HostedWidget(id = 3, row = 0, column = 0, rows = 1, columns = 4)
     private var widgetPage by mutableStateOf(WidgetPage())
     private val widgetsAdded = mutableListOf<Int>()
     private val widgets = WidgetActions(
         view = { context, _ -> View(context) },
-        add = widgetsAdded::add,
+        add = { rows, _ -> widgetsAdded += rows },
         remove = {},
-        resize = { _, _ -> },
-        move = { _, _ -> },
+        resize = { _, _, _ -> },
+        move = { _, _, _ -> },
         sizing = { WidgetSizing() },
     )
     // Empty rather than the default page, so the built-in cards do not double the apps the other tests look for.
@@ -2014,7 +2014,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aResizeThatDriftsAcrossKeepsThePageAndTheRows() {
+    fun aResizeThatDriftsAcrossKeepsThePage() {
         widgetPage = WidgetPage(listOf(search))
         show()
         compose.swipePager { swipeRight() }
@@ -2027,7 +2027,7 @@ class LauncherScreenTest {
             moveBy(Offset(0f, WIDGET_ROW.toPx() * 1.7f))
             repeat(10) { moveBy(Offset(-width / 20f, 0f)) }
         }
-        assertEquals(WIDGET_ROW * 3, compose.widgetHeight(search))
+        assertEquals(widgetSpan(3), compose.widgetHeight(search))
         compose.onRoot().performTouchInput { up() }
 
         assertSettledOn(LauncherPage.Widgets)
@@ -2096,7 +2096,7 @@ class LauncherScreenTest {
             down(center)
             moveBy(Offset(0f, WIDGET_ROW.toPx() * 1.7f))
         }
-        assertEquals(WIDGET_ROW * 3, compose.widgetHeight(search))
+        assertEquals(widgetSpan(3), compose.widgetHeight(search))
         Espresso.pressBack()
 
         compose.widgetEditFrame().assertDoesNotExist()

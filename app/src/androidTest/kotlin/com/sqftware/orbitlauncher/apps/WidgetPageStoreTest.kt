@@ -22,8 +22,8 @@ class WidgetPageStoreTest {
     }
 
     @Test
-    fun thePageComesBackInOrder() {
-        val page = WidgetPage(listOf(HostedWidget(12, 2), HostedWidget(3, 1)))
+    fun thePageComesBackWithItsPlaces() {
+        val page = WidgetPage(listOf(HostedWidget(12, row = 0, column = 1, rows = 2, columns = 3), HostedWidget(3, row = 4, column = 0, rows = 1, columns = 2)))
 
         store.save(page)
 
@@ -32,8 +32,8 @@ class WidgetPageStoreTest {
 
     @Test
     fun thePickInProgressComesBackUntilItIsCleared() {
-        store.savePick(WidgetPick(id = 14, pageRows = 9))
-        assertEquals(WidgetPick(14, 9), SharedPreferencesWidgetPageStore(context).loadPick())
+        store.savePick(WidgetPick(id = 14, pageRows = 9, columnWidthDp = 90))
+        assertEquals(WidgetPick(14, 9, 90), SharedPreferencesWidgetPageStore(context).loadPick())
 
         store.savePick(null)
 

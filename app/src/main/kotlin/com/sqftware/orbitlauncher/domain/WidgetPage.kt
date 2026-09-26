@@ -3,80 +3,157 @@ package com.sqftware.orbitlauncher.domain
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-/** A widget on the page: the id the system knows it by and how many rows of the page it takes. */
-data class HostedWidget(val id: Int, val rows: Int)
+/** The columns across the widget page. */
+const val WIDGET_COLUMNS = 4
 
-/** The widgets on the widget page, top to bottom. */
+/** The height of one row of the widget page, in dp. */
+const val WIDGET_ROW_HEIGHT_DP = 80
+
+/** The space between two cells of the widget page, in dp, which a widget spanning both covers too. */
+const val WIDGET_GAP_DP = 8
+
+/**
+ * A widget on the page: the id the system knows it by, the row and column of its top-left cell, and the rows and
+ * columns it spans.
+ */
+data class HostedWidget(val id: Int, val row: Int, val column: Int, val rows: Int, val columns: Int) {
+    val bottom: Int get() = row + rows
+
+    val end: Int get() = column + columns
+
+    fun overlaps(other: HostedWidget): Boolean = row < other.bottom && other.row < bottom && column < other.end && other.column < end
+}
+
+/**
+ * The widgets on the widget page, each in cells of its own, top to bottom and then left to right. Cells no widget takes
+ * stay empty, so a widget keeps its place when another leaves or moves.
+ */
 data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
     val isEmpty: Boolean get() = widgets.isEmpty()
 
     val ids: Set<Int> get() = widgets.mapTo(mutableSetOf()) { it.id }
 
-    fun add(widget: HostedWidget): WidgetPage = WidgetPage(widgets + widget)
+    /** The rows down to the bottom of the lowest widget. */
+    val rows: Int get() = widgets.maxOfOrNull { it.bottom } ?: 0
+
+    /** The page with the widget [id] in the first free cells, from the top and then the left, that hold [rows] by [columns]. */
+    fun add(id: Int, rows: Int, columns: Int): WidgetPage {
+        val width = columns.coerceIn(1, WIDGET_COLUMNS)
+        val spot = generateSequence(0) { it + 1 }
+            .flatMap { row -> (0..WIDGET_COLUMNS - width).asSequence().map { HostedWidget(id, row, it, rows.coerceAtLeast(1), width) } }
+            .first { new -> widgets.none(new::overlaps) }
+        return WidgetPage((widgets + spot).sortedWith(PLACE))
+    }
 
     fun remove(id: Int): WidgetPage = WidgetPage(widgets.filter { it.id != id })
 
-    fun resize(id: Int, rows: Int): WidgetPage = WidgetPage(widgets.map { if (it.id == id) it.copy(rows = rows) else it })
+    /**
+     * The widget [id] made [rows] by [columns], no wider than the page leaves it from its column. The widgets it now
+     * covers move down out of its way.
+     */
+    fun resize(id: Int, rows: Int, columns: Int): WidgetPage =
+        change(id) { it.copy(rows = rows.coerceAtLeast(1), columns = columns.coerceIn(1, WIDGET_COLUMNS - it.column)) }
 
-    /** The page with the widget [id] taken out and put back at [to], the others closing up around it. */
-    fun move(id: Int, to: Int): WidgetPage = WidgetPage(widgets.reordered(widgets.indexOfFirst { it.id == id }, to, ReorderMode.Insert))
-}
+    /**
+     * The widget [id] with its top-left cell at [row] and [column], or as near as the page's edges let it. The widgets it
+     * now covers move down out of its way.
+     */
+    fun move(id: Int, row: Int, column: Int): WidgetPage =
+        change(id) { it.copy(row = row.coerceAtLeast(0), column = column.coerceIn(0, WIDGET_COLUMNS - it.columns)) }
 
-/** The height of one row of the widget page, in dp. */
-const val WIDGET_ROW_HEIGHT_DP = 80
+    private fun change(id: Int, change: (HostedWidget) -> HostedWidget): WidgetPage {
+        val changed = widgets.find { it.id == id }?.let(change) ?: return this
+        return WidgetPage(listOf(changed) + widgets.filter { it.id != id }).settled()
+    }
 
-/**
- * The rows a widget takes when its provider asks for at least [minHeightDp]: whole rows of [rowHeightDp], at least one,
- * and no more than the [pageRows] the page shows at once.
- */
-fun widgetRows(minHeightDp: Int, pageRows: Int, rowHeightDp: Int = WIDGET_ROW_HEIGHT_DP): Int =
-    ceil(minHeightDp / rowHeightDp.toDouble()).toInt().coerceIn(1, pageRows.coerceAtLeast(1))
-
-/**
- * How a widget's provider lets it be resized, in dp: whether it stretches up and down at all, its minimum height, the
- * lower one it may be resized to (0 when unset), and the most it may be resized to (null when unset).
- */
-data class WidgetSizing(
-    val vertical: Boolean = true,
-    val minHeightDp: Int = 0,
-    val minResizeHeightDp: Int = 0,
-    val maxResizeHeightDp: Int? = null,
-)
-
-/**
- * The rows a widget [rows] tall may be resized to: from the whole rows its minimum needs, at least one, up to the rows
- * that fit under its maximum and the [pageRows] the page shows at once. A minimum resize height only lowers the
- * minimum, as in the platform launcher. Its own rows are always in reach, so a widget stored taller than the page now
- * allows, or outside its provider's limits, does not jump when its handle is taken.
- */
-fun WidgetSizing.rowRange(rows: Int, pageRows: Int): IntRange {
-    val min = widgetRows(minResizeHeightDp.takeIf { it in 1..minHeightDp } ?: minHeightDp, pageRows)
-    val max = maxResizeHeightDp?.let { minOf(it / WIDGET_ROW_HEIGHT_DP, pageRows) } ?: pageRows
-    return minOf(min, rows)..maxOf(max.coerceAtLeast(min), rows)
-}
-
-/**
- * A drag of [dragDp] on the handle of a widget [rows] tall, held at the ends of [range], so a finger that overshoots
- * one moves the widget again as soon as it turns back.
- */
-fun heldDrag(rows: Int, dragDp: Float, range: IntRange): Float =
-    dragDp.coerceIn((range.first - rows) * WIDGET_ROW_HEIGHT_DP.toFloat(), (range.last - rows) * WIDGET_ROW_HEIGHT_DP.toFloat())
-
-/** The whole rows nearest a handle dragged [dragDp] down, or up when negative, from a widget [rows] tall. */
-fun resizedRows(rows: Int, dragDp: Float): Int = rows + (dragDp / WIDGET_ROW_HEIGHT_DP).roundToInt()
-
-/** The page as text, one line per widget: its id and its rows, tab-separated. */
-fun WidgetPage.encode(): String = widgets.joinToString(LINE) { "${it.id}$FIELD${it.rows}" }
-
-/**
- * A line that is not two positive whole numbers is skipped, and so is a second line for the same id, so a damaged file
- * loses that widget and keeps the rest.
- */
-fun decodeWidgetPage(text: String): WidgetPage = WidgetPage(
-    text.nonEmptyLines()
-        .mapNotNull { line ->
-            val fields = line.split(FIELD).map { it.toIntOrNull()?.takeIf { n -> n > 0 } }
-            if (fields.size == 2 && null !in fields) HostedWidget(fields[0]!!, fields[1]!!) else null
+    /**
+     * The page with each widget, in turn, where it is or, when an earlier one is there already, moved down to the first
+     * row where it fits.
+     */
+    internal fun settled(): WidgetPage {
+        val placed = mutableListOf<HostedWidget>()
+        widgets.forEach { widget ->
+            var at = widget
+            while (placed.any(at::overlaps)) at = at.copy(row = at.row + 1)
+            placed += at
         }
-        .distinctBy { it.id },
+        return WidgetPage(placed.sortedWith(PLACE))
+    }
+
+    internal companion object {
+        val PLACE = compareBy<HostedWidget>({ it.row }, { it.column })
+    }
+}
+
+/**
+ * The cells, [cellDp] each with a gap between two, that a widget needs to be at least [minDp] long: at least one, and
+ * no more than [most].
+ */
+fun widgetCells(minDp: Int, cellDp: Float, most: Int): Int =
+    ceil((minDp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt().coerceIn(1, most.coerceAtLeast(1))
+
+/** The most cells, [cellDp] each with a gap between two, that fit in [dp]. */
+fun cellsWithin(dp: Float, cellDp: Float): Int = ((dp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt()
+
+/**
+ * How a widget's provider lets it be resized along one axis, in dp: whether it stretches that way at all, its minimum,
+ * the lower one it may be resized to (0 when unset), and the most it may be resized to (null when unset).
+ */
+data class WidgetResize(
+    val resizable: Boolean = true,
+    val minDp: Int = 0,
+    val minResizeDp: Int = 0,
+    val maxResizeDp: Int? = null,
 )
+
+/** How a widget's provider lets it be resized up and down, and across. */
+data class WidgetSizing(val vertical: WidgetResize = WidgetResize(), val horizontal: WidgetResize = WidgetResize())
+
+/**
+ * The cells, [cellDp] each, that a widget [cells] long may be resized to along this axis: from those its minimum needs
+ * up to those that fit under its maximum, and no more than [most]. A minimum resize length only lowers the minimum, as
+ * in the platform launcher. One that does not stretch this way takes only the cells its minimum needs. Its own cells
+ * are always in reach too, so a widget stored larger than the page now allows, or outside its provider's limits, does
+ * not jump when its handle is taken, and one stored wider than it may be, as the page before places was, can go back.
+ */
+fun WidgetResize.cellRange(cells: Int, cellDp: Float, most: Int): IntRange {
+    val min = widgetCells(minResizeDp.takeIf { resizable && it in 1..minDp } ?: minDp, cellDp, most)
+    val max = if (!resizable) min else maxResizeDp?.let { minOf(cellsWithin(it.toFloat(), cellDp), most) } ?: most
+    return minOf(min, cells)..maxOf(max.coerceAtLeast(min), cells)
+}
+
+/**
+ * A drag of [dragDp] on the handle of a widget [cells] long, a cell and a gap being [pitchDp], held at the ends of
+ * [range], so a finger that overshoots one moves the widget again as soon as it turns back.
+ */
+fun heldDrag(cells: Int, dragDp: Float, range: IntRange, pitchDp: Float): Float =
+    dragDp.coerceIn((range.first - cells) * pitchDp, (range.last - cells) * pitchDp)
+
+/**
+ * [cells], and the whole cells nearest a drag of [dragDp] on from there, or back when negative: where a widget's edge
+ * or corner lands. A cell and its gap are [pitchDp].
+ */
+fun nearestCells(cells: Int, dragDp: Float, pitchDp: Float): Int = cells + (dragDp / pitchDp).roundToInt()
+
+/** The page as text, one line per widget: its id, row, column, rows and columns, tab-separated. */
+fun WidgetPage.encode(): String = widgets.joinToString(LINE) { listOf(it.id, it.row, it.column, it.rows, it.columns).joinToString(FIELD) }
+
+/**
+ * A line that is not a widget in the page's columns is skipped, and so is a second line for the same id, so a damaged
+ * file loses that widget and keeps the rest; widgets that overlap move down out of each other's way. A line of just an
+ * id and rows is from before widgets had places: those take the page's width at the top, so they stack down it in the
+ * order they come.
+ */
+fun decodeWidgetPage(text: String): WidgetPage {
+    val widgets = text.nonEmptyLines()
+        .mapNotNull { line ->
+            val fields = line.split(FIELD).map { it.toIntOrNull()?.takeIf { n -> n >= 0 } ?: return@mapNotNull null }
+            when (fields.size) {
+                2 -> HostedWidget(fields[0], 0, 0, fields[1], WIDGET_COLUMNS)
+                5 -> HostedWidget(fields[0], fields[1], fields[2], fields[3], fields[4])
+                else -> null
+            }?.takeIf { it.id > 0 && it.rows > 0 && it.columns > 0 && it.end <= WIDGET_COLUMNS }
+        }
+        .distinctBy { it.id }
+    return WidgetPage(widgets.sortedWith(WidgetPage.PLACE)).settled()
+}
