@@ -19,7 +19,9 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
@@ -156,8 +158,8 @@ private class HeldWidget {
 
 /**
  * The widgets on [page], on a grid of [WIDGET_COLUMNS] columns and rows of at least [WIDGET_ROW_HEIGHT_DP], each in its
- * own cells, scrolling under a button to add another, pinned below the rows the page shows, where no widget goes; an
- * empty page says so in the middle.
+ * own cells, and below them a button to add another, at the bottom of the screen or, once the widgets reach further,
+ * of the page, which then scrolls, so no widget is ever under it; an empty page says so in the middle.
  * Cells no widget takes stay empty. A long press on a widget puts it in edit mode, as in Arc: [editing] is its id, and
  * it wears an outline, a bin on the top-right corner that removes it, and, if its provider lets it stretch, a handle on
  * the bottom-right corner that drags its size a whole cell at a time, within what the provider allows, the rows the
@@ -179,8 +181,8 @@ fun WidgetGrid(
     val bars = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     var area by remember { mutableStateOf(DpSize.Zero) }
     var buttonHeight by remember { mutableStateOf(0.dp) }
-    // The rows the page shows are those of the scrolling part, above the button, and all they leave the button is its
-    // own height and a gap.
+    // The rows the page shows fill the screen but for the button below them and a gap, so a page no taller than the
+    // screen does not scroll.
     val rows = remember(area.height, buttonHeight) { widgetRowsWithin((area.height - PAGE_PADDING * 2 - buttonHeight - GAP).value) }
     val pageRows = rows.count
     val cell = DpSize(maxOf((area.width - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS, 0.dp), rows.heightDp.dp)
@@ -219,21 +221,27 @@ fun WidgetGrid(
                     val squeeze = (keyboard.getBottom(this) - bars.getBottom(this)).coerceAtLeast(0)
                     area = DpSize(size.width.toDp(), (size.height + squeeze).toDp())                }
             }
-        if (page.isEmpty) {
-            Box(area, contentAlignment = Alignment.Center) {
-                Text("No widgets yet", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(8.dp))
-            }
-        } else {
+        Column(
+            area
+                .verticalPageScroll()
+                .padding(PAGE_PADDING),
+            verticalArrangement = Arrangement.spacedBy(GAP),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             val places = shown.widgets.associateBy { it.id }
             Box(
-                area
-                    .verticalPageScroll()
-                    .padding(PAGE_PADDING)
-                    .padding(bottom = buttonHeight + GAP)
+                Modifier
                     .fillMaxWidth()
                     // At least the page, so a widget can be dropped anywhere in sight.
                     .height(span(maxOf(shown.rows, pageRows), cell.height)),
             ) {
+                if (page.isEmpty) {
+                    Text(
+                        "No widgets yet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.align(Alignment.Center).padding(8.dp),
+                    )
+                }
                 places[held.id]?.let { landing ->
                     Box(
                         Modifier
@@ -250,23 +258,21 @@ fun WidgetGrid(
                     }
                 }
             }
-        }
-        // Measured around the button, whose touch target is taller than the pill it draws.
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = PAGE_PADDING)
-                .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
-                .testTag(WidgetTags.ADD),
-        ) {
-            TonalButton(
-                onClick = {
-                    onEditingChange(null)
-                    actions.add(pageRows, cell.width.value, cell.height.value)
-                },
+            // Measured around the button, whose touch target is taller than the pill it draws.
+            Box(
+                Modifier
+                    .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
+                    .testTag(WidgetTags.ADD),
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Add widget")
+                TonalButton(
+                    onClick = {
+                        onEditingChange(null)
+                        actions.add(pageRows, cell.width.value, cell.height.value)
+                    },
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                    Text("Add widget")
+                }
             }
         }
     }

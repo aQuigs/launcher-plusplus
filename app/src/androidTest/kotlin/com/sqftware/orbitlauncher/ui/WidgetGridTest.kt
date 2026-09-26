@@ -93,7 +93,7 @@ class WidgetGridTest {
 
     private val gap = WIDGET_GAP_DP.dp
 
-    /** The part of the page that scrolls, above the add button. */
+    /** The page, which scrolls, add button and all. */
     private fun scroller() = compose.onNode(hasScrollAction())
 
     // Inside the page's padding, down to the gap above the add button.
@@ -160,6 +160,20 @@ class WidgetGridTest {
 
         assertNear(compose.addWidgetButton().getUnclippedBoundsInRoot().top - gap, bounds(last).bottom)
         assertTrue("${bounds(last).height} is shorter than a row", bounds(last).height >= WIDGET_ROW_HEIGHT_DP.dp)
+    }
+
+    @Test
+    fun aPageLongerThanTheScreenTakesTheAddButtonDownBelowItsLastWidget() {
+        page = WidgetPage(listOf(search))
+        show()
+        val below = HostedWidget(id = 12, row = pageRows(), column = 0, rows = 2, columns = 1)
+        page = WidgetPage(listOf(search, below))
+
+        assertNear(bounds(below).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+        val pageHeight = scroller().fetchSemanticsNode().size.height.toFloat()
+        scroller().performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, pageHeight) }
+        assertAddButtonAtTheBottom()
+        assertNear(bounds(below).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
     }
 
     @Test
