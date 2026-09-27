@@ -4,7 +4,7 @@
 # Boots this repo's emulator, creating its AVD on first use, and waits until Android is ready.
 # Uses the system image bootstrap.sh installed; this script never installs anything.
 # emulator-lock.sh runs it before and after device work; run it directly only to use the emulator yourself.
-# Usage: scripts/emulator.sh        (IMAGE_TAG=google_apis for the rootable image, HEADLESS=1 for no window)
+# Usage: scripts/emulator.sh        (IMAGE_TAG=google_apis for the rootable image, WINDOW=1 to show the emulator window)
 #        scripts/emulator.sh stop   stops it once no session is using it, saving the snapshot that makes the next boot quick
 
 set -e
@@ -93,9 +93,14 @@ if [[ ! -d $AVD_DIR ]]; then
   echo 'hw.keyboard=yes' >> "$AVD_DIR/config.ini"
 fi
 
+WINDOW_ARGS=(-no-window)
+if [[ -n $WINDOW ]]; then
+  WINDOW_ARGS=()
+fi
+
 echo "Booting $AVD_NAME, log at $LOG_FILE"
 # WebView, and so Google sign-in, aborts on the host GPU translator with an empty GL version; SwiftShader is the only renderer where it survives
-emulator -avd "$AVD_NAME" -gpu swiftshader_indirect -no-boot-anim ${HEADLESS:+-no-window} > "$LOG_FILE" 2>&1 &
+emulator -avd "$AVD_NAME" -gpu swiftshader_indirect -no-boot-anim $WINDOW_ARGS > "$LOG_FILE" 2>&1 &
 EMULATOR_PID=$!
 
 until [[ $(adb -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') == 1 ]]; do
