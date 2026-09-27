@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.systemGestureExclusion
@@ -405,6 +407,9 @@ private fun Widget(
     // snap would take a frame, in which the one let go would be back where it started.
     val place = with(density) { cellOffset(at, cell) }
     val sliding by animateIntOffsetAsState(place, if (held.id == null) snap() else spring(), label = "widget_place")
+    // A drag that took the page past the screen's edge leaves the widget partly off it; once it lands it shows in full.
+    val landed = remember { BringIntoViewRequester() }
+    LaunchedEffect(widget.row, widget.rows, edited) { if (edited && held.id == null) landed.bringIntoView() }
     // The cells the outline shows while the handle is dragged. The widget takes them only once they are stored, so its
     // provider redraws once per resize rather than at every cell; until then they hold, so the outline does not jump back.
     var rows by remember(widget.rows, edited) { mutableIntStateOf(widget.rows) }
@@ -429,7 +434,8 @@ private fun Widget(
             }
             .size(span(maxOf(columns, widget.columns), cell.width), span(maxOf(rows, widget.rows), cell.height))
             .semantics { contentDescription = "Widget" }
-            .testTag(WidgetTags.widget(widget.id)),
+            .testTag(WidgetTags.widget(widget.id))
+            .bringIntoViewRequester(landed),
     ) {
         // Made afresh from the id each time the widget is composed; the system keeps what it shows.
         AndroidView(

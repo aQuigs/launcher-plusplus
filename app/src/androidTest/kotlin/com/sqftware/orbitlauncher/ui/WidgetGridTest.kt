@@ -316,9 +316,9 @@ class WidgetGridTest {
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
         compose.longPressWidget(tall)
 
-        // Held by its lower edge and taken just inside the page's bottom edge: the finger alone would leave it a couple
-        // of rows short of the last one.
-        compose.widget(tall).performTouchInput { down(bottomCenter - Offset(0f, 10f)) }
+        // Held by its middle and taken just inside the page's bottom edge: the finger alone would leave it a row short of
+        // the last one, and its lower half past the screen.
+        compose.widget(tall).performTouchInput { down(center) }
         compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
         val edge = with(compose.density) { Offset(((bounds(tall).left + bounds(tall).right) / 2).toPx(), (screen.bottom - 20.dp).toPx()) }
         compose.onRoot().performTouchInput { moveTo(edge) }
@@ -330,6 +330,7 @@ class WidgetGridTest {
 
         compose.runOnIdle { assertEquals(listOf(Triple(tall.id, pageRows, 0)), moved) }
         assertNear(bounds(tall).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+        assertTrue("it shows in full once it lands", bounds(tall).bottom <= screen.bottom)
     }
 
     @Test
