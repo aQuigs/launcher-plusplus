@@ -158,4 +158,21 @@ class WidgetPageTest {
         assertEquals(528f, heldDrag(cells = 3, dragDp = 1000f, range = 1..9, pitchDp = 88f))
         assertEquals(50f, heldDrag(cells = 3, dragDp = 50f, range = 1..9, pitchDp = 88f))
     }
+
+    @Test
+    fun `a finger pulls the page only near an edge, harder the nearer it is`() {
+        assertEquals(0f, edgePull(y = 500f, height = 1000f, zone = 100f))
+        assertEquals(0.5f, edgePull(y = 950f, height = 1000f, zone = 100f))
+        assertEquals(1f, edgePull(y = 1200f, height = 1000f, zone = 100f))
+        assertEquals(-0.5f, edgePull(y = 50f, height = 1000f, zone = 100f))
+        assertEquals(-1f, edgePull(y = -20f, height = 1000f, zone = 100f))
+    }
+
+    @Test
+    fun `a move takes only the room left before the end it heads for`() {
+        assertEquals(30f, roomFor(by = 50f, at = 70f, low = -100f, high = 100f))
+        assertEquals(-50f, roomFor(by = -50f, at = 70f, low = -100f, high = 100f))
+        assertEquals(0f, roomFor(by = 50f, at = 120f, low = -100f, high = 100f))
+        assertEquals(-20f, roomFor(by = -20f, at = 120f, low = -100f, high = 100f))
+    }
 }

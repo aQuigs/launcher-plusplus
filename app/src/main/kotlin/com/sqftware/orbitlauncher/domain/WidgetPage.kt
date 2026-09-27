@@ -95,6 +95,16 @@ fun widgetCells(minDp: Int, cellDp: Float, most: Int): Int =
 /** The most cells, [cellDp] each with a gap between two, that fit in [dp]. */
 fun cellsWithin(dp: Float, cellDp: Float): Int = ((dp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt()
 
+/**
+ * How hard a finger at [y] on a page [height] long pulls it towards an edge, from -1 at the top to 1 at the bottom: not
+ * at all until it is within [zone] of one, then more the nearer it gets.
+ */
+fun edgePull(y: Float, height: Float, zone: Float): Float = when {
+    y > height - zone -> (y - height + zone) / zone
+    y < zone -> (y - zone) / zone
+    else -> 0f
+}.coerceIn(-1f, 1f)
+
 /** The rows the widget page shows, and how tall each is, in dp. */
 data class WidgetRows(val count: Int, val heightDp: Float)
 
@@ -140,6 +150,10 @@ fun WidgetResize.cellRange(cells: Int, cellDp: Float, most: Int): IntRange {
  */
 fun heldDrag(cells: Int, dragDp: Float, range: IntRange, pitchDp: Float): Float =
     dragDp.coerceIn((range.first - cells) * pitchDp, (range.last - cells) * pitchDp)
+
+/** The part of a move of [by] from [at] that stays within [low] to [high], none once [at] is past that end already. */
+fun roomFor(by: Float, at: Float, low: Float, high: Float): Float =
+    if (by > 0f) by.coerceAtMost(maxOf(high - at, 0f)) else by.coerceAtLeast(minOf(low - at, 0f))
 
 /**
  * [cells], and the whole cells nearest a drag of [dragDp] on from there, or back when negative: where a widget's edge

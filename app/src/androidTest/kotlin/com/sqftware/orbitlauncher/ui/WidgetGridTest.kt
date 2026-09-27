@@ -308,26 +308,66 @@ class WidgetGridTest {
     }
 
     @Test
-    fun aWidgetDraggedPastTheButtonAndThePagesEdgeStopsInTheCornerAboveTheButton() {
-        val small = game.copy(columns = 2)
-        page = WidgetPage(listOf(small))
+    fun aWidgetHeldAtTheBottomEdgeScrollsThePageAScreenFurtherAtMost() {
+        val tall = HostedWidget(id = 11, row = 0, column = 0, rows = 3, columns = 2)
+        page = WidgetPage(listOf(tall))
         show()
         val pageRows = pageRows()
-        val button = compose.addWidgetButton().getUnclippedBoundsInRoot()
-        compose.longPressWidget(small)
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        compose.longPressWidget(tall)
 
-        compose.widget(small).performTouchInput { down(center) }
+        // Held by its middle and taken just inside the page's bottom edge: the finger alone would leave it a row short of
+        // the last one, and its lower half past the screen.
+        compose.widget(tall).performTouchInput { down(center) }
         compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
-        compose.widget(small).performTouchInput { repeat(4) { moveBy(Offset(columnPx(), rowPx() * 5)) } }
-        compose.mainClock.advanceTimeBy(1_000)
+        val edge = with(compose.density) { Offset(((bounds(tall).left + bounds(tall).right) / 2).toPx(), (screen.bottom - 20.dp).toPx()) }
+        compose.onRoot().performTouchInput { moveTo(edge) }
+        compose.mainClock.advanceTimeBy(10_000)
         val landing = compose.onNodeWithTag(WidgetTags.LANDING).getUnclippedBoundsInRoot()
-        assertNear(landing.bottom, bounds(small).bottom)
-        assertNear(landing.right, bounds(small).right)
-        assertTrue("it is held above the button", bounds(small).bottom <= button.top)
-        compose.widget(small).performTouchInput { up() }
+        assertNear(landing.top, bounds(tall).top)
+        assertNear(bounds(tall).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+        compose.onRoot().performTouchInput { up() }
 
-        compose.runOnIdle { assertEquals(listOf(Triple(small.id, pageRows - small.rows, WIDGET_COLUMNS - small.columns)), moved) }
-        assertTrue("it lands above the button", bounds(small).bottom <= button.top)
+        compose.runOnIdle { assertEquals(listOf(Triple(tall.id, pageRows * 2 - tall.rows, 0)), moved) }
+        assertNear(bounds(tall).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
+        assertTrue("it shows in full once it lands", bounds(tall).bottom <= screen.bottom)
+    }
+
+    @Test
+    fun aLongPressAtTheBottomEdgeOfAPageThatScrollsMovesNothing() {
+        page = WidgetPage(listOf(search))
+        show()
+        val low = HostedWidget(id = 11, row = pageRows() - 1, column = 0, rows = 2, columns = 2)
+        page = WidgetPage(listOf(search, low))
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        compose.longPressWidget(low)
+
+        val press = with(compose.density) { (screen.bottom - 20.dp - bounds(low).top).toPx() }
+        compose.widget(low).performTouchInput { down(Offset(centerX, press)) }
+        compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 1_000L)
+        compose.widget(low).performTouchInput { up() }
+
+        compose.runOnIdle { assertEquals(emptyList<Triple<Int, Int, Int>>(), moved) }
+    }
+
+    @Test
+    fun theHandleHeldPastTheBottomScrollsThePageAndStretchesTheWidgetBelowIt() {
+        page = WidgetPage(listOf(search))
+        show()
+        val pageRows = pageRows()
+        val last = HostedWidget(id = 12, row = pageRows - 1, column = 0, rows = 1, columns = 2)
+        page = WidgetPage(listOf(search, last))
+        compose.longPressWidget(last)
+
+        compose.widgetResizeHandle().performTouchInput {
+            down(center)
+            moveBy(Offset(0f, rowPx() * 3))
+        }
+        compose.mainClock.advanceTimeBy(5_000)
+        compose.widgetResizeHandle().performTouchInput { up() }
+
+        compose.runOnIdle { assertEquals(listOf(Triple(last.id, pageRows, 2)), resized) }
+        assertNear(bounds(last).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
     }
 
     @Test
