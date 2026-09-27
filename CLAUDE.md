@@ -18,7 +18,7 @@ Custom Android home screen (launcher). Native Kotlin + Jetpack Compose, built an
 ./gradlew lintDebug                  # Android lint → app/build/reports/lint-results-debug.html (pre-commit runs it too)
 scripts/emulator-lock.sh <command>   # device work: boots the emulator under the shared lock, runs <command>, stops it
 scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest  # Compose UI + activity tests on the emulator
-scripts/emulator.sh [stop]           # boot (or stop) the AVD from the installed Play Store image by hand (IMAGE_TAG=google_apis for adb root, HEADLESS=1 for no window)
+scripts/emulator.sh [stop]           # boot (or stop) the AVD from the installed Play Store image by hand (headless unless WINDOW=1, IMAGE_TAG=google_apis for adb root)
 scripts/run.sh                       # install debug build, make it the home app, go home (VARIANT=Release for the minified build)
 scripts/screenshot.sh [name]         # adb screencap → screenshots/<name>.png (gitignored)
 scripts/record.sh [name] [seconds]   # adb screenrecord → screenshots/<name>.mp4 (gitignored)
@@ -49,6 +49,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 
 - Arc Launcher (`apptech.arc`, sideloaded on the project emulator) is the reference. Where it has a feature, mimic how it behaves and how it is laid out, in our own colours. Unsure how Arc does something? Open it on the emulator and look, do not guess. Where Arc has no such feature, use your judgement or ask.
 - Every change after the initial scaffold ships as a PR against `main`, using the PR template. Code changes get an adversarial-review pass and `/simplify` on the branch before handover; docs-only PRs skip those.
+- A PR that only refreshes shared files through `sync-common` can be merged by Claude once its checks pass, without waiting for the user. Any other change in it leaves the merge to the user.
 - User-visible changes carry before/after screenshots (or a recording) in the PR's "Screenshots / recording" section: capture the before shot on `main` and the after shot on the branch, publish them with `scripts/pr-media.sh`, one caption per file, and paste its table as is. Media is uploaded as GitHub attachments, never committed.
 - The emulator is the test target. Gradle auto-downloads the platform and build-tools for `compileSdk` on first build; system images come from the machine setup (toggles in `~/.zsh_toggles`); `scripts/emulator.sh` only creates an AVD from the installed Play Store image and names the toggle to set if it is missing. Never run `android sdk` (or the deprecated `sdkmanager`) installs from this repo.
 - Pure logic goes in `domain` with a unit test. UI behaviour gets a Compose test in `androidTest` that renders the composable with fake data. `MainActivityTest` is the one end-to-end smoke test against the real system.

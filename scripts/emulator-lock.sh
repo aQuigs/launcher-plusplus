@@ -8,7 +8,7 @@
 #   e.g. scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest
 #   KEEP_EMULATOR=1 leaves the emulator running for device work that follows right away; scripts/emulator.sh stop stops it later
 #   LOCK_WAIT_MINUTES (default 20) is how long to wait for another session's lock before failing; EMULATOR_LOCK overrides the lock path
-#   IMAGE_TAG and HEADLESS pass through to scripts/emulator.sh
+#   IMAGE_TAG and WINDOW pass through to scripts/emulator.sh
 
 set -e
 
