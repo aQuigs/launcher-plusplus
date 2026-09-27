@@ -25,16 +25,23 @@ private val FieldStars = Random(1790464006).let { random ->
     }
 }
 
-/** A faint scatter of stars over the whole draw area, in [colour] at its brightest. */
-fun DrawScope.drawStarField(colour: Color) {
+// A far sky drifts behind what scrolls over it at a fraction of its pace.
+private const val PARALLAX = 0.25f
+
+/**
+ * A faint scatter of stars over the whole draw area, in [colour] at its brightest, drifting up by a share of how far
+ * the content over it has [scrolled].
+ */
+fun DrawScope.drawStarField(colour: Color, scrolled: Float = 0f) {
     if (colour.alpha <= 0f) return
     val tileWidth = TILE_WIDTH.toPx()
     val tileHeight = TILE_HEIGHT.toPx()
+    val top = -(scrolled * PARALLAX).mod(tileHeight)
     repeat(ceil(size.width / tileWidth).toInt()) { column ->
-        repeat(ceil(size.height / tileHeight).toInt()) { row ->
+        repeat(ceil((size.height - top) / tileHeight).toInt()) { row ->
             FieldStars.forEach { star ->
-                val centre = Offset((column + star.x) * tileWidth, (row + star.y) * tileHeight)
-                if (centre.x < size.width && centre.y < size.height) {
+                val centre = Offset((column + star.x) * tileWidth, top + (row + star.y) * tileHeight)
+                if (centre.x < size.width && centre.y >= 0f && centre.y < size.height) {
                     drawCircle(colour.copy(alpha = colour.alpha * star.brightness), star.radius.dp.toPx(), centre)
                 }
             }

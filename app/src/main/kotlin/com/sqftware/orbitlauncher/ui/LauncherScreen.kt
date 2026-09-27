@@ -24,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +43,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -768,6 +772,17 @@ fun LauncherScreen(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val panel = MaterialTheme.colorScheme.surfaceDim
     val star = LocalDrawerStar.current
+    // How far the drawer's list has been dragged and flung, for the stars to follow. A jump by the letter rail is a cut,
+    // after which no one could tell where the stars ought to be, so it need not count.
+    val drawerScrolled = remember { mutableFloatStateOf(0f) }
+    val drawerScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                drawerScrolled.floatValue -= consumed.y
+                return Offset.Zero
+            }
+        }
+    }
     val scrim = MaterialTheme.colorScheme.scrim
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
     // edge lines up with nothing of ours. It is in the scrim, the opposite of the navigation icons' ink, only to lift them
@@ -814,8 +829,8 @@ fun LauncherScreen(
                         drawRect(panel.copy(alpha = panel.alpha * open), size = Size(size.width, strip))
                         drawRect(panel, Offset(0f, strip))
                         // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
-                        drawStarField(star.copy(alpha = star.alpha * open))
-                    },
+                        drawStarField(star.copy(alpha = star.alpha * open), drawerScrolled.floatValue)
+                    }.nestedScroll(drawerScroll),
                 ) {
                     DrawerHandle(
                         open = drawerOpen,
