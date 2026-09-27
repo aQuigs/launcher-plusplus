@@ -61,12 +61,13 @@ private class CoastingFling(
     override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
         stop()
         coast = scope.launch {
-            // The overscroll effect takes the finger's velocity, the opposite of the scroll's, and stretches the edge
-            // with what the coast leaves when it gets there.
+            // The overscroll effect takes the finger's velocity, the opposite of the scroll's, and wants back what the
+            // coast used up: it stretches the edge with the rest, so handing it the rest instead would stretch the edge
+            // whenever a coast runs out mid-page.
             if (overscroll == null) {
                 glide(initialVelocity)
             } else {
-                overscroll.applyToFling(Velocity(0f, -initialVelocity)) { Velocity(0f, -glide(-it.y)) }
+                overscroll.applyToFling(Velocity(0f, -initialVelocity)) { Velocity(0f, it.y + glide(-it.y)) }
             }
         }
         return 0f
