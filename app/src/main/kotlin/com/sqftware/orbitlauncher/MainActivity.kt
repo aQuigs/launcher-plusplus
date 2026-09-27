@@ -20,6 +20,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
+import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesFolderLookStore
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity() {
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
         val collectionsStore = SharedPreferencesCollectionsStore(this)
+        val appSettingsStore = SharedPreferencesAppSettingsStore(this)
         val appUsage = SystemAppUsage(this)
         val shade = StatusBarNotificationShade(this)
         val relauncher = SystemRelauncher(this)
@@ -100,6 +102,8 @@ class MainActivity : ComponentActivity() {
                 repository.startShortcut(it)
             },
             openAppInfo = repository::openAppInfo,
+            hasStorePage = repository::hasStorePage,
+            openStorePage = repository::openStorePage,
             uninstall = repository::uninstall,
         )
 
@@ -158,6 +162,7 @@ class MainActivity : ComponentActivity() {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
                 }
                 var collections by remember { mutableStateOf(collectionsStore.load()) }
+                var appSettings by remember { mutableStateOf(appSettingsStore.load()) }
                 // Usage access is granted in Settings, so each return to the front reads the grant and the week's usage
                 // again. The grant is read before the first frame, so a granted card does not ask for it while the usage
                 // loads.
@@ -206,9 +211,14 @@ class MainActivity : ComponentActivity() {
                     },
                     foregroundTime = foregroundTime,
                     onOpenUsageSettings = appUsage::openUsageSettings,
-                    unread = unread,
+                    unread = appSettings.badges(unread),
                     badgesEnabled = badgesEnabled,
                     onOpenBadgeSettings = badges::openSettings,
+                    appSettings = appSettings,
+                    onAppSettingsChange = {
+                        appSettings = it
+                        appSettingsStore.save(it)
+                    },
                     onOpenNotifications = shade::open,
                     onRestart = relauncher::restart,
                     onReset = relauncher::reset,

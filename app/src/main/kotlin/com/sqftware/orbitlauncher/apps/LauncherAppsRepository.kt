@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
 
 private const val TAG = "LauncherAppsRepository"
+private const val PLAY_STORE = "com.android.vending"
 private const val MAX_SHORTCUTS = 4
 // Room for a few hundred icons at the largest launcher size: every drawer row asks for its app's, and a cache the drawer
 // churns through would evict the ring's and the dock's, which would then come back blank on the way home.
@@ -148,6 +149,21 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     override fun openAppInfo(app: AppEntry) = startOrLog(TAG, "app info for ${app.key}") {
         launcherApps.startAppDetailsActivity(app.component, user, null, null)
+    }
+
+    // An app built into the system counts once the Play Store has updated it, as it then has a page there.
+    override suspend fun hasStorePage(app: AppEntry): Boolean = withContext(Dispatchers.IO) {
+        try {
+            context.packageManager.getInstallSourceInfo(app.packageName).installingPackageName == PLAY_STORE
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    override fun openStorePage(app: AppEntry) = startOrLog(TAG, "the Play Store page of ${app.packageName}") {
+        val page = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${app.packageName}")).setPackage(PLAY_STORE)
+        // In a task of its own, as when an app is launched, so HOME leaves it rather than clearing it off the launcher's.
+        context.startActivity(page.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     override fun uninstall(app: AppEntry) = startOrLog(TAG, "uninstall for ${app.key}") {

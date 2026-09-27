@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
+import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -126,8 +127,9 @@ data class HomePress(val launcherInFront: Boolean)
  * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
  * as it was. An app goes between the ring and the dock the same way, and one held over the middle of its open folder
  * closes it and goes on to either, where the others make way for it too, on the ring even between slots set far apart. An app, from the drawer too, resting on the middle of an app or folder on the ring or
- * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts; a long
- * press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
+ * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts.
+ * An app's menu turns its badge off or on, leaves it off the built-in collection cards or puts it back, as the
+ * [appSettings] say ([onAppSettingsChange]), opens its Play Store page, and in the drawer adds it to the ring or the dock. A long press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog
  * ([onFolderLookChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -171,6 +173,8 @@ fun LauncherScreen(
     unread: UnreadCounts,
     badgesEnabled: Boolean,
     onOpenBadgeSettings: () -> Unit,
+    appSettings: AppSettings,
+    onAppSettingsChange: (AppSettings) -> Unit,
     onOpenNotifications: () -> Unit,
     onRestart: () -> Unit,
     onReset: () -> Unit,
@@ -198,6 +202,9 @@ fun LauncherScreen(
     val latestOnCollectionsChange by rememberUpdatedState(onCollectionsChange)
     val latestBadgesEnabled by rememberUpdatedState(badgesEnabled)
     val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
+    val latestAppSettings by rememberUpdatedState(appSettings)
+    val latestOnAppSettingsChange by rememberUpdatedState(onAppSettingsChange)
+    val builtInApps = remember(apps, appSettings.offBuiltInCards) { apps.orEmpty().filterNot(appSettings::isOffBuiltInCards) }
     val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestFolderLook by rememberUpdatedState(folderLook)
@@ -452,7 +459,12 @@ fun LauncherScreen(
     fun appMenu(place: HomePlace?) = AppMenu(
         onOpen = { app ->
             openingMenu?.cancel()
-            openingMenu = scope.launch { openMenu = OpenMenu.App(app, place, actions.shortcuts(app)) }
+            openingMenu = scope.launch {
+                val shortcuts = actions.shortcuts(app)
+                val hasStorePage = actions.hasStorePage(app)
+                val options = appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled, hasStorePage)
+                openMenu = OpenMenu.App(app, place, shortcuts, options)
+            }
         },
         content = { app ->
             (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, place) }?.let { shown ->
@@ -464,7 +476,7 @@ fun LauncherScreen(
                 AppOptionsMenu(
                     expanded = shown.expanded,
                     shortcuts = shown.shortcuts,
-                    options = appOptions(app, place),
+                    options = shown.options,
                     shortcutIcon = actions.shortcutIcon,
                     onShortcut = actions.startShortcut,
                     onOption = { option ->
@@ -477,6 +489,10 @@ fun LauncherScreen(
                                     pickFor(HomePlace.Folder(holder, slot))
                                 }
                             }
+                            is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
+                            is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(app))
+                            is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
+                            AppOption.PlayStore -> actions.openStorePage(app)
                             AppOption.AppInfo -> actions.openAppInfo(app)
                             AppOption.Uninstall -> actions.uninstall(app)
                         }
@@ -938,6 +954,7 @@ fun LauncherScreen(
                             CollectionsColumn(
                                 page = collections,
                                 apps = apps.orEmpty(),
+                                builtInApps = builtInApps,
                                 foregroundTime = foregroundTime,
                                 icon = actions.icon,
                                 onLaunch = actions.launch,
@@ -1133,11 +1150,15 @@ private sealed interface OpenMenu {
 
     fun closed(): OpenMenu
 
-    /** [app]'s menu, where it was pressed (null for the drawer), and its shortcuts. */
+    /**
+     * [app]'s menu, where it was pressed (null for the drawer), its shortcuts and its options. The options are set as it
+     * opens, as the one chosen changes what they would be, and the menu keeps what it shows while it fades out.
+     */
     data class App(
         val app: AppEntry,
         val place: HomePlace?,
         val shortcuts: List<AppShortcut>,
+        val options: List<AppOption>,
         override val expanded: Boolean = true,
     ) : OpenMenu {
         // By key, so a reload that relabels the app keeps its menu.
