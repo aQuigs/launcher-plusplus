@@ -86,31 +86,20 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             awaitClose { launcherApps.unregisterCallback(callback) }
         }.conflate()
 
-    private fun loadApps(): List<AppEntry> {
-        val fromPlayStore = mutableMapOf<String, Boolean>()
-        return launcherApps.getActivityList(null, user)
+    private fun loadApps(): List<AppEntry> =
+        launcherApps.getActivityList(null, user)
             .map { info ->
-                val packageName = info.componentName.packageName
                 AppEntry(
                     label = info.label.toString(),
-                    packageName = packageName,
+                    packageName = info.componentName.packageName,
                     activityName = info.componentName.className,
                     // An app built into the system can only lose its updates, which its App info page offers.
                     canUninstall = info.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0,
                     installedAt = info.firstInstallTime,
                     category = categoryHint(info.applicationInfo.category),
-                    fromPlayStore = fromPlayStore.getOrPut(packageName) { installedByPlayStore(packageName) },
                 )
             }
             .sortedByLabel()
-    }
-
-    // An app built into the system counts once the Play Store has updated it, as it then has a page there.
-    private fun installedByPlayStore(packageName: String): Boolean = try {
-        context.packageManager.getInstallSourceInfo(packageName).installingPackageName == PLAY_STORE
-    } catch (_: PackageManager.NameNotFoundException) {
-        false
-    }
 
     override suspend fun icon(app: AppEntry): ImageBitmap? = icons.get(app.key)
         ?: draw(app.key) { density ->
@@ -160,6 +149,15 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     override fun openAppInfo(app: AppEntry) = startOrLog(TAG, "app info for ${app.key}") {
         launcherApps.startAppDetailsActivity(app.component, user, null, null)
+    }
+
+    // An app built into the system counts once the Play Store has updated it, as it then has a page there.
+    override suspend fun hasStorePage(app: AppEntry): Boolean = withContext(Dispatchers.IO) {
+        try {
+            context.packageManager.getInstallSourceInfo(app.packageName).installingPackageName == PLAY_STORE
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
     }
 
     override fun openStorePage(app: AppEntry) = startOrLog(TAG, "the Play Store page of ${app.packageName}") {

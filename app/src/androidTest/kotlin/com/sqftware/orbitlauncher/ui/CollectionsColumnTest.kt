@@ -47,6 +47,7 @@ class CollectionsColumnTest {
         CollectionsColumn(
             page = page,
             apps = apps,
+            builtInApps = apps,
             foregroundTime = foregroundTime,
             icon = { null },
             onLaunch = launched::add,

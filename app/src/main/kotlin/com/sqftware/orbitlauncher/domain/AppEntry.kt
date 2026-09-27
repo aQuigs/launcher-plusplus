@@ -4,7 +4,6 @@ package com.sqftware.orbitlauncher.domain
  * One launchable activity, or a shortcut an app pinned to the home screen, which has a [shortcutId] and belongs to its
  * app's [activityName]. [canUninstall] is false for an app built into the system. [installedAt] is when its package was
  * first installed, in epoch milliseconds, and [category] the kind of app its package says it is, if it says.
- * [fromPlayStore] says the Play Store installed it, so it has a page there.
  */
 data class AppEntry(
     val label: String,
@@ -14,7 +13,6 @@ data class AppEntry(
     val installedAt: Long = 0L,
     val category: AppCategory? = null,
     val shortcutId: String? = null,
-    val fromPlayStore: Boolean = false,
 ) {
     /** Identifies one activity or shortcut whatever its label, so it survives relabelling and reloads of the app list. */
     val key: String = if (shortcutId == null) "$packageName/$activityName" else shortcutKey(packageName, shortcutId)

@@ -35,6 +35,9 @@ interface AppRepository {
     /** Opens the system's details page for [app]. */
     fun openAppInfo(app: AppEntry)
 
+    /** Whether the Play Store installed [app]'s package, so has a page for it. */
+    suspend fun hasStorePage(app: AppEntry): Boolean
+
     /** Opens [app]'s page in the Play Store. */
     fun openStorePage(app: AppEntry)
 

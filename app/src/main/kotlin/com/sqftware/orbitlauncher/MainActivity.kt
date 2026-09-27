@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 repository.startShortcut(it)
             },
             openAppInfo = repository::openAppInfo,
+            hasStorePage = repository::hasStorePage,
             openStorePage = repository::openStorePage,
             uninstall = repository::uninstall,
         )
@@ -210,7 +211,7 @@ class MainActivity : ComponentActivity() {
                     },
                     foregroundTime = foregroundTime,
                     onOpenUsageSettings = appUsage::openUsageSettings,
-                    unread = unread,
+                    unread = appSettings.badges(unread),
                     badgesEnabled = badgesEnabled,
                     onOpenBadgeSettings = badges::openSettings,
                     appSettings = appSettings,

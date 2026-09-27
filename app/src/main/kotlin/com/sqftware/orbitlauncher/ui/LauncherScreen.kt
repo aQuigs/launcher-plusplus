@@ -127,10 +127,9 @@ data class HomePress(val launcherInFront: Boolean)
  * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
  * as it was. An app goes between the ring and the dock the same way, and one held over the middle of its open folder
  * closes it and goes on to either, where the others make way for it too, on the ring even between slots set far apart. An app, from the drawer too, resting on the middle of an app or folder on the ring or
- * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts,
- * but for those whose badge the [appSettings] turn off. An app's menu turns its badge off or on, leaves it off the
- * built-in collection cards or puts it back ([onAppSettingsChange]), opens its Play Store page, and in the drawer adds it
- * to the ring or the dock. A long press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
+ * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear their [unread] counts.
+ * An app's menu turns its badge off or on, leaves it off the built-in collection cards or puts it back, as the
+ * [appSettings] say ([onAppSettingsChange]), opens its Play Store page, and in the drawer adds it to the ring or the dock. A long press on the home page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog
  * ([onFolderLookChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
@@ -205,7 +204,7 @@ fun LauncherScreen(
     val latestOnOpenBadgeSettings by rememberUpdatedState(onOpenBadgeSettings)
     val latestAppSettings by rememberUpdatedState(appSettings)
     val latestOnAppSettingsChange by rememberUpdatedState(onAppSettingsChange)
-    val badges = remember(unread, appSettings) { appSettings.badges(unread) }
+    val builtInApps = remember(apps, appSettings.offBuiltInCards) { apps.orEmpty().filterNot(appSettings::isOffBuiltInCards) }
     val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestFolderLook by rememberUpdatedState(folderLook)
@@ -462,7 +461,9 @@ fun LauncherScreen(
             openingMenu?.cancel()
             openingMenu = scope.launch {
                 val shortcuts = actions.shortcuts(app)
-                openMenu = OpenMenu.App(app, place, shortcuts, appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled))
+                val hasStorePage = actions.hasStorePage(app)
+                val options = appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled, hasStorePage)
+                openMenu = OpenMenu.App(app, place, shortcuts, options)
             }
         },
         content = { app ->
@@ -829,7 +830,7 @@ fun LauncherScreen(
                         drag = dragFromDrawer,
                         query = query,
                         onQueryChange = { query = it },
-                        unread = badges,
+                        unread = unread,
                         picking = picking?.let { place ->
                             val picked = homeApps[place]
                             Picking(
@@ -904,7 +905,7 @@ fun LauncherScreen(
                                             menu = ringMenu,
                                             folderMenu = folderMenu,
                                             folderAppMenu = folderAppMenu,
-                                            unread = badges,
+                                            unread = unread,
                                             rearrange = if (open != null) folderRearrange else ringRearrange,
                                             foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                             held = (dragged as? Drag.OutOfFolder)?.app,
@@ -939,7 +940,7 @@ fun LauncherScreen(
                                         highlighted = dropPlace == HomePlace.Dock,
                                         menu = dockMenu,
                                         folderMenu = folderMenu,
-                                        unread = badges,
+                                        unread = unread,
                                         rearrange = dockRearrange,
                                         foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Dock }?.index,
                                     )
@@ -953,6 +954,7 @@ fun LauncherScreen(
                             CollectionsColumn(
                                 page = collections,
                                 apps = apps.orEmpty(),
+                                builtInApps = builtInApps,
                                 foregroundTime = foregroundTime,
                                 icon = actions.icon,
                                 onLaunch = actions.launch,
@@ -963,8 +965,7 @@ fun LauncherScreen(
                                 onOpenUsageSettings = onOpenUsageSettings,
                                 rearrange = cardRearrange,
                                 bin = if (binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
-                                settings = appSettings,
-                                unread = badges,
+                                unread = unread,
                             )
                         }
                     }

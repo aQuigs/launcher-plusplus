@@ -116,6 +116,7 @@ class LauncherScreenTest {
     private val started = mutableListOf<AppShortcut>()
     private val infoOpened = mutableListOf<AppEntry>()
     private val storePagesOpened = mutableListOf<AppEntry>()
+    private var hasStorePage = false
     private val uninstalled = mutableListOf<AppEntry>()
     private var shortcutsLoaded = CompletableDeferred(Unit)
     private val search = HostedWidget(id = 3, row = 0, column = 0, rows = 1, columns = 4)
@@ -150,6 +151,7 @@ class LauncherScreenTest {
         shortcutIcon = { null },
         startShortcut = started::add,
         openAppInfo = infoOpened::add,
+        hasStorePage = { hasStorePage },
         openStorePage = storePagesOpened::add,
         uninstall = uninstalled::add,
     )
@@ -828,8 +830,7 @@ class LauncherScreenTest {
 
     @Test
     fun theMenuStartsShortcutsAndHandsTheOptionsToTheSystem() {
-        val storeMail = mail.copy(fromPlayStore = true)
-        apps = listOf(clock, storeMail)
+        hasStorePage = true
         show()
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
@@ -842,9 +843,9 @@ class LauncherScreenTest {
 
         compose.runOnIdle {
             assertEquals(listOf(composeMail), started)
-            assertEquals(listOf(storeMail), storePagesOpened)
-            assertEquals(listOf(storeMail), infoOpened)
-            assertEquals(listOf(storeMail), uninstalled)
+            assertEquals(listOf(mail), storePagesOpened)
+            assertEquals(listOf(mail), infoOpened)
+            assertEquals(listOf(mail), uninstalled)
             assertEquals(emptyList<AppEntry>(), launched)
         }
     }
@@ -863,32 +864,20 @@ class LauncherScreenTest {
         compose.onNodeWithText("Add to the ring").assertDoesNotExist()
         compose.onNodeWithText("Add to the dock").performClick()
         compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail), dock = ringOf(mail)), homeApps) }
-
-        compose.onNodeWithText("Mail").performTouchInput { longClick() }
-        compose.onNodeWithText("Add to the dock").assertDoesNotExist()
     }
 
     @Test
-    fun anAppsMenuTurnsItsBadgeOffAndOnWhileTheBadgesAreEnabled() {
-        homeApps = HomeApps(ring = ringOf(clock, mail))
-        unread = UnreadCounts(mapOf(clock.packageName to 3, mail.packageName to 7))
-        show()
-        compose.ringSlot(mail).performTouchInput { longClick() }
-        compose.onNodeWithText("Hide badge").assertDoesNotExist()
-        Espresso.pressBack()
+    fun anAppsMenuTurnsItsBadgeOffAndOn() {
+        homeApps = HomeApps(ring = ringOf(mail))
         badgesEnabled = true
+        show()
 
         compose.ringSlot(mail).performTouchInput { longClick() }
         compose.onNodeWithText("Hide badge").performClick()
-
-        compose.ringSlot(mail).assertContentDescriptionEquals("Mail")
-        compose.badgeOn(HomeRingTags.slot(mail)).assertDoesNotExist()
-        compose.ringSlot(clock).assertContentDescriptionEquals("Clock, 3 unread")
+        compose.runOnIdle { assertEquals(AppSettings(badgeOff = setOf(mail.packageName)), appSettings) }
 
         compose.ringSlot(mail).performTouchInput { longClick() }
         compose.onNodeWithText("Show badge").performClick()
-
-        compose.ringSlot(mail).assertContentDescriptionEquals("Mail, 7 unread")
         compose.runOnIdle { assertEquals(AppSettings(), appSettings) }
     }
 
