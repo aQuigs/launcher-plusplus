@@ -37,9 +37,9 @@ object DragTags {
 
 /**
  * Dragging an item, an app or a folder, away from the row or icon holding it: [onStart] once the finger holding it has
- * moved off it; [onMove] as it goes; then [onDrop] where it lets go, or
- * [onCancel] when the gesture is taken away or the item's node goes. Positions are in the root's coordinates. [onStart]
- * says whether the drag may begin: one refused, as while another finger drags something, hears nothing more.
+ * moved off it; [onMove] as it goes; then [onDrop] where it lets go, or [onCancel] when the gesture is taken away or the
+ * item's node goes. Positions are in the root's coordinates. [onStart] says whether the drag may begin: one refused, as
+ * while another finger drags something, hears nothing more.
  */
 class ItemDrag<in T>(
     val onStart: (T, Offset) -> Boolean,
@@ -87,9 +87,6 @@ private class ItemDragNode<T>(var item: T, var drag: ItemDrag<T>) : DelegatingNo
                     // A refused drag still takes the finger's moves to their end, so no pager under it pages instead.
                     var started = false
                     var refused = false
-                    fun start(position: Offset) {
-                        if (drag.onStart(item, position)) started = true else refused = true
-                    }
                     try {
                         while (true) {
                             // The finger is gone, or another gesture has taken the touch: a change already consumed, which
@@ -109,7 +106,7 @@ private class ItemDragNode<T>(var item: T, var drag: ItemDrag<T>) : DelegatingNo
                             if (started) {
                                 drag.onMove(position)
                             } else if (!refused && (position - origin).getDistance() > viewConfiguration.touchSlop) {
-                                start(position)
+                                if (drag.onStart(item, position)) started = true else refused = true
                             }
                         }
                         if (started) drag.onCancel()

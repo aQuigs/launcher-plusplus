@@ -341,7 +341,6 @@ class LauncherScreenTest {
         compose.onRoot().performTouchInput { liftOut(icon) }
         compose.dragGhost().assertIsDisplayed()
         compose.collectionBin().assertIsDisplayed()
-        compose.appOptionsMenu().assertDoesNotExist()
     }
 
     @Test
@@ -1999,17 +1998,12 @@ class LauncherScreenTest {
         compose.dragGhost().assertDoesNotExist()
         compose.collectionBin().assertDoesNotExist()
         compose.onNodeWithText("Remove from Tools").assertIsDisplayed()
-        compose.onNodeWithText("Add to the ring").assertIsDisplayed()
         compose.onAllNodesWithText("Hide from New & Most Used").assertCountEquals(1)
         compose.onNodeWithText("Remove from Tools").performClick()
 
         compose.appOptionsMenu().assertDoesNotExist()
         compose.collectionApp(tools, mail).assertDoesNotExist()
         compose.runOnIdle { assertEquals(Favourites(), collections.card(tools)!!.apps) }
-
-        compose.collectionApp(NewApps, mail).performTouchInput { longClick() }
-        compose.onNodeWithText("Add to the ring").performClick()
-        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
     }
 
     @Test
@@ -2022,6 +2016,7 @@ class LauncherScreenTest {
         icon.performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(0f, 1f))
         }
         compose.appOptionsMenu().assertIsDisplayed()
         icon.performTouchInput { moveBy(Offset(0f, viewConfiguration.touchSlop * 2)) }

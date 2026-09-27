@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
+import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -467,23 +468,23 @@ fun LauncherScreen(
         open()
     }
 
-    fun appMenu(place: HomePlace?, card: CollectionKind? = null) = AppMenu(
+    fun appMenu(spot: AppSpot) = AppMenu(
         onOpen = { app ->
             openMenuUnlessDragging {
                 openingMenu = scope.launch {
                     val shortcuts = actions.shortcuts(app)
                     val hasStorePage = actions.hasStorePage(app)
-                    val options = appOptions(app, place, card, latestHomeApps, latestAppSettings, latestBadgesEnabled, hasStorePage)
-                    openMenu = OpenMenu.App(app, place, card, shortcuts, options)
+                    val options = appOptions(app, spot, latestHomeApps, latestAppSettings, latestBadgesEnabled, hasStorePage)
+                    openMenu = OpenMenu.App(app, spot, shortcuts, options)
                 }
             }
         },
         content = { app ->
-            (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, place, card) }?.let { shown ->
+            (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, spot) }?.let { shown ->
                 // An app that leaves the screen takes its popup away undismissed; without closing here the menu would reopen
                 // by itself when the app returns, as after an update.
                 DisposableEffect(Unit) {
-                    onDispose { if ((openMenu as? OpenMenu.App)?.isFor(app, place, card) == true) closeMenu() }
+                    onDispose { if ((openMenu as? OpenMenu.App)?.isFor(app, spot) == true) closeMenu() }
                 }
                 AppOptionsMenu(
                     expanded = shown.expanded,
@@ -495,7 +496,7 @@ fun LauncherScreen(
                         when (option) {
                             is AppOption.Remove -> latestShown?.let { shown -> changeHomeApps { remove(option.place, app, shown) } }
                             is AppOption.RemoveFromCard -> changeCollections { removeApp(option.kind, app) }
-                            AppOption.NewFolder -> (place as? HomePlace.Slots)?.let { holder ->
+                            AppOption.NewFolder -> ((spot as? AppSpot.Home)?.place as? HomePlace.Slots)?.let { holder ->
                                 val slot = latestHomeApps.slots(holder).indexOf(app)
                                 if (slot >= 0) {
                                     changeHomeApps { change(holder) { newFolder(app) } }
@@ -516,16 +517,12 @@ fun LauncherScreen(
         },
     )
     // Built once, so the ring, the dock and the drawer can skip recomposing while only the page or the drawer moves.
-    val drawerMenu = remember(actions) { appMenu(place = null) }
-    val ringMenu = remember(actions) { appMenu(HomePlace.Ring) }
-    val dockMenu = remember(actions) { appMenu(HomePlace.Dock) }
-    val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(it.at) } }
-    // One per card, so an app on two cards, or in the drawer too, opens its menu only where it was pressed.
-    val cardMenu = remember(actions) {
-        val byKind = mutableMapOf<CollectionKind, AppMenu>()
-        val menuFor: (CollectionKind) -> AppMenu = { kind -> byKind.getOrPut(kind) { appMenu(place = null, card = kind) } }
-        menuFor
-    }
+    val drawerMenu = remember(actions) { appMenu(AppSpot.Drawer) }
+    val ringMenu = remember(actions) { appMenu(AppSpot.Home(HomePlace.Ring)) }
+    val dockMenu = remember(actions) { appMenu(AppSpot.Home(HomePlace.Dock)) }
+    val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(AppSpot.Home(it.at)) } }
+    // Built once for each card, as the others are.
+    val cardMenus = remember(actions) { mutableMapOf<CollectionKind, AppMenu>() }
     val folderMenu = remember {
         FolderMenu(
             onOpen = { folder -> openMenuUnlessDragging { openMenu = OpenMenu.Folder(folder.at) } },
@@ -990,7 +987,7 @@ fun LauncherScreen(
                                 onAdd = { pickingCollection = true },
                                 onOpenUsageSettings = onOpenUsageSettings,
                                 rearrange = cardRearrange,
-                                menu = cardMenu,
+                                menu = { kind -> cardMenus.getOrPut(kind) { appMenu(AppSpot.Card(kind)) } },
                                 bin = if (binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
                                 unread = unread,
                             )
@@ -1178,21 +1175,18 @@ private sealed interface OpenMenu {
     fun closed(): OpenMenu
 
     /**
-     * [app]'s menu, where it was pressed (neither a home place nor a card for the drawer), its shortcuts and its
-     * options. The options are set as it opens, as the one chosen changes what they would be, and the menu keeps what
+     * [app]'s menu, the [spot] it was pressed at, its shortcuts and its options. The options are set as it opens, as the one chosen changes what they would be, and the menu keeps what
      * it shows while it fades out.
      */
     data class App(
         val app: AppEntry,
-        val place: HomePlace?,
-        val card: CollectionKind?,
+        val spot: AppSpot,
         val shortcuts: List<AppShortcut>,
         val options: List<AppOption>,
         override val expanded: Boolean = true,
     ) : OpenMenu {
         // By key, so a reload that relabels the app keeps its menu.
-        fun isFor(app: AppEntry, place: HomePlace?, card: CollectionKind?) =
-            app.key == this.app.key && place == this.place && card == this.card
+        fun isFor(app: AppEntry, spot: AppSpot) = app.key == this.app.key && spot == this.spot
 
         override fun closed() = copy(expanded = false)
     }
