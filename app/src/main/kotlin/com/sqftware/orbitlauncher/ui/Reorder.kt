@@ -49,10 +49,10 @@ const val FOLD_MILLIS = 500L
 private const val MIDDLE = 0.35f
 
 /**
- * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that moves
- * on picks up the item at a position, and the finger then goes as in an [ItemDrag]. The place marks each position with [reorderSlot], so the finger can be told which one it is over, and
- * shows its items as [moving] says while one of them is on the move, or as [arriving] says while an app from another
- * place is.
+ * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that
+ * moves on picks up the item at a position, and the finger then goes as in an [ItemDrag]. The place marks each position
+ * with [reorderSlot], so the finger can be told which one it is over, and shows its items as [moving] says while one of
+ * them is on the move, or as [arriving] says while an app from another place is.
  */
 class Rearrange(
     private val onStart: Rearrange.(index: Int, Offset) -> Boolean,

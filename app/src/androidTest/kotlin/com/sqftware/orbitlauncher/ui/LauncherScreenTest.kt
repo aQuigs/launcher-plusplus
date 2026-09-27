@@ -1990,7 +1990,14 @@ class LauncherScreenTest {
         show()
         goToCollections()
 
-        compose.collectionApp(tools, mail).performTouchInput { longClick() }
+        compose.collectionApp(tools, mail).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(viewConfiguration.touchSlop / 2, 0f))
+            up()
+        }
+        compose.dragGhost().assertDoesNotExist()
+        compose.collectionBin().assertDoesNotExist()
         compose.onNodeWithText("Remove from Tools").assertIsDisplayed()
         compose.onNodeWithText("Add to the ring").assertIsDisplayed()
         compose.onAllNodesWithText("Hide from New & Most Used").assertCountEquals(1)
@@ -2003,6 +2010,26 @@ class LauncherScreenTest {
         compose.collectionApp(NewApps, mail).performTouchInput { longClick() }
         compose.onNodeWithText("Add to the ring").performClick()
         compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
+    }
+
+    @Test
+    fun movingOnFromACardAppsOpenMenuLiftsTheAppAndClosesTheMenu() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key, clock.key)))))
+        show()
+        goToCollections()
+        val icon = compose.collectionApp(tools, mail)
+
+        icon.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+        }
+        compose.appOptionsMenu().assertIsDisplayed()
+        icon.performTouchInput { moveBy(Offset(0f, viewConfiguration.touchSlop * 2)) }
+
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.dragGhost().assertIsDisplayed()
+        compose.collectionBin().assertIsDisplayed()
+        letGo()
     }
 
     @Test

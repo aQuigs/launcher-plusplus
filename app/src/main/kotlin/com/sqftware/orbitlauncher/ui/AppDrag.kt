@@ -51,9 +51,10 @@ class ItemDrag<in T>(
 typealias AppDrag = ItemDrag<AppEntry>
 
 /**
- * Lets a long press on [item] turn into a [drag] once the finger moves past touch slop. It reads the same touches as the node's own press handling, so a menu that opens on the long
- * press stays until the finger moves. From the start on, every move is consumed, so neither a list nor a pager under
- * the item reads the drag as a scroll, and so is the release, so a tap handler does not act on it too.
+ * Lets a long press on [item] turn into a [drag] once the finger moves past touch slop. It reads the same touches as
+ * the node's own press handling, so a menu that opens on the long press stays until the finger moves. From the start
+ * on, every move is consumed, so neither a list nor a pager under the item reads the drag as a scroll, and so is the
+ * release, so a tap handler does not act on it too.
  *
  * It must follow the click handling in the modifier chain. Being inner, it sees each touch first in the main pass; the
  * click handling consumes every touch after a long press, and seen the other way round that would read as another
