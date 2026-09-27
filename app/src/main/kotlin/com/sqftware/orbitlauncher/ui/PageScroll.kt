@@ -27,8 +27,7 @@ import kotlinx.coroutines.launch
  * on the down, before it has moved, and keeps it to its axis, so the pager never sees the move across.
  */
 @Composable
-fun Modifier.verticalPageScroll(): Modifier {
-    val state = rememberScrollState()
+fun Modifier.verticalPageScroll(state: ScrollState = rememberScrollState()): Modifier {
     val scope = rememberCoroutineScope()
     val overscroll = rememberOverscrollEffect()
     val stock = ScrollableDefaults.flingBehavior()
