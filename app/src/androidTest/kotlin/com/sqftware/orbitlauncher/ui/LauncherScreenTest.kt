@@ -18,6 +18,7 @@ import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -32,6 +33,7 @@ import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -333,16 +335,13 @@ class LauncherScreenTest {
         assertSettledOn(LauncherPage.Collections)
     }
 
-    /** Long-presses [app] on the Tools card, leaving the finger down: the app lifts at once, as nothing else answers there. */
+    /** Long-presses [app] on the Tools card and moves it off its place, leaving the finger down: the app is lifted. */
     private fun liftFromToolsCard(app: AppEntry) {
         val icon = centreOf(compose.collectionApp(tools, app))
-        compose.onRoot().performTouchInput {
-            down(icon)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            moveBy(Offset(0f, 1f))
-        }
+        compose.onRoot().performTouchInput { liftOut(icon) }
         compose.dragGhost().assertIsDisplayed()
         compose.collectionBin().assertIsDisplayed()
+        compose.appOptionsMenu().assertDoesNotExist()
     }
 
     @Test
@@ -1983,6 +1982,27 @@ class LauncherScreenTest {
             assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps)
             assertEquals(emptyList<AppEntry>(), launched)
         }
+    }
+
+    @Test
+    fun aLongPressOnACardsAppOpensItsMenuThereAlone() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key))), CollectionCard(NewApps)))
+        show()
+        goToCollections()
+
+        compose.collectionApp(tools, mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from Tools").assertIsDisplayed()
+        compose.onNodeWithText("Add to the ring").assertIsDisplayed()
+        compose.onAllNodesWithText("Hide from New & Most Used").assertCountEquals(1)
+        compose.onNodeWithText("Remove from Tools").performClick()
+
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.collectionApp(tools, mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Favourites(), collections.card(tools)!!.apps) }
+
+        compose.collectionApp(NewApps, mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Add to the ring").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(mail)), homeApps) }
     }
 
     @Test

@@ -10,11 +10,12 @@ class AppOptionsTest {
     private fun options(
         app: AppEntry = maps,
         place: HomePlace? = null,
+        card: CollectionKind? = null,
         home: HomeApps = HomeApps(),
         settings: AppSettings = AppSettings(),
         badgesEnabled: Boolean = false,
         hasStorePage: Boolean = false,
-    ) = appOptions(app, place, home, settings, badgesEnabled, hasStorePage)
+    ) = appOptions(app, place, card, home, settings, badgesEnabled, hasStorePage)
 
     @Test
     fun `the drawer adds the app to each home place it has no slot of its own in`() {
@@ -26,6 +27,13 @@ class AppOptionsTest {
             listOf(AppOption.AddTo(HomePlace.Ring), onCards, AppOption.AppInfo, AppOption.Uninstall),
             options(home = HomeApps(dock = ringOf(maps))),
         )
+    }
+
+    @Test
+    fun `a card offers what the drawer does, and a hand-picked one first takes the app off it`() {
+        assertEquals(options(), options(card = CollectionKind.NewApps))
+        val tools = CollectionKind.Category(AppCategory.Tools)
+        assertEquals(listOf(AppOption.RemoveFromCard(tools)) + options(), options(card = tools))
     }
 
     @Test

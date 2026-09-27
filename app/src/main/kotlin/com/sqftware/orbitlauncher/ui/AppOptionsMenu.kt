@@ -30,6 +30,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.title
 
 object AppOptionsTags {
     const val MENU = "app_options"
@@ -121,6 +122,7 @@ private val AppOption.label
             is HomePlace.Folder -> "Remove from folder"
         }
         AppOption.NewFolder -> "New folder"
+        is AppOption.RemoveFromCard -> "Remove from ${kind.title}"
         is AppOption.AddTo -> when (place) {
             HomePlace.Ring -> "Add to the ring"
             HomePlace.Dock -> "Add to the dock"
@@ -136,6 +138,7 @@ private val AppOption.icon
     get() = when (this) {
         is AppOption.Remove -> Icons.Default.Close
         AppOption.NewFolder -> FolderGlyph
+        is AppOption.RemoveFromCard -> Icons.Default.Close
         is AppOption.AddTo -> Icons.Default.Add
         is AppOption.Badge -> Icons.Default.Notifications
         is AppOption.BuiltInCards -> Icons.Default.Star

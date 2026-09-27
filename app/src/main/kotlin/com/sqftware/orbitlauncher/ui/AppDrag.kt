@@ -37,7 +37,7 @@ object DragTags {
 
 /**
  * Dragging an item, an app or a folder, away from the row or icon holding it: [onStart] once the finger holding it has
- * moved off it, or at the hold itself with [startOnPress]; [onMove] as it goes; then [onDrop] where it lets go, or
+ * moved off it; [onMove] as it goes; then [onDrop] where it lets go, or
  * [onCancel] when the gesture is taken away or the item's node goes. Positions are in the root's coordinates. [onStart]
  * says whether the drag may begin: one refused, as while another finger drags something, hears nothing more.
  */
@@ -46,14 +46,12 @@ class ItemDrag<in T>(
     val onMove: (Offset) -> Unit,
     val onDrop: () -> Unit,
     val onCancel: () -> Unit,
-    val startOnPress: Boolean = false,
 )
 
 typealias AppDrag = ItemDrag<AppEntry>
 
 /**
- * Lets a long press on [item] turn into a [drag]: once the finger moves past touch slop, or at the press itself when the
- * drag starts on press. It reads the same touches as the node's own press handling, so a menu that opens on the long
+ * Lets a long press on [item] turn into a [drag] once the finger moves past touch slop. It reads the same touches as the node's own press handling, so a menu that opens on the long
  * press stays until the finger moves. From the start on, every move is consumed, so neither a list nor a pager under
  * the item reads the drag as a scroll, and so is the release, so a tap handler does not act on it too.
  *
@@ -91,7 +89,6 @@ private class ItemDragNode<T>(var item: T, var drag: ItemDrag<T>) : DelegatingNo
                     fun start(position: Offset) {
                         if (drag.onStart(item, position)) started = true else refused = true
                     }
-                    if (drag.startOnPress) start(coordinates.localToRoot(press.position))
                     try {
                         while (true) {
                             // The finger is gone, or another gesture has taken the touch: a change already consumed, which

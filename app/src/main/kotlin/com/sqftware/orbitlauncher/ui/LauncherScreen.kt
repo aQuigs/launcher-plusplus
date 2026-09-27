@@ -52,7 +52,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -124,9 +123,9 @@ data class HomePress(val launcherInFront: Boolean)
  * out of view. The collections page shows the cards of [collections], the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
  * pencil opens an editor over the screen that adds apps to it, and the button under the cards opens the picker that adds
- * and removes cards, whose last tile opens a dialog naming a new custom collection. An app long-pressed on a hand-picked
- * card lifts off it, and dropping it on the bin takes it off the card. A long press that moves on picks up an app or a
- * folder on the ring, an app in the open folder or the dock, or, at once, an app on a hand-picked card, to move it among
+ * and removes cards, whose last tile opens a dialog naming a new custom collection. An app on a card opens its menu at a
+ * long press, as anywhere else; lifted off a hand-picked card, dropping it on the bin takes it off the card. A long press
+ * that moves on picks up an app or a folder on the ring, an app in the open folder, the dock or a hand-picked card, to move it among
  * its neighbours: they make way where the finger rests, and letting go over another's place puts it there, inserting it
  * or swapping the two as [reorderMode] says, which a switch at the top flips ([onReorderModeChange]) while an item is on
  * the move, at a second finger's tap or when the item rests on its other half. Letting go anywhere else leaves the order
@@ -187,7 +186,6 @@ fun LauncherScreen(
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
     val scope = rememberCoroutineScope()
-    val haptics = LocalHapticFeedback.current
     val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
     // The drawer, search and the collections list the installed apps alone; home keeps shortcuts too. It waits for both,
@@ -461,22 +459,22 @@ fun LauncherScreen(
         openMenu = openMenu?.closed()
     }
 
-    fun appMenu(place: HomePlace?) = AppMenu(
+    fun appMenu(place: HomePlace?, card: CollectionKind? = null) = AppMenu(
         onOpen = { app ->
             openingMenu?.cancel()
             openingMenu = scope.launch {
                 val shortcuts = actions.shortcuts(app)
                 val hasStorePage = actions.hasStorePage(app)
-                val options = appOptions(app, place, latestHomeApps, latestAppSettings, latestBadgesEnabled, hasStorePage)
-                openMenu = OpenMenu.App(app, place, shortcuts, options)
+                val options = appOptions(app, place, card, latestHomeApps, latestAppSettings, latestBadgesEnabled, hasStorePage)
+                openMenu = OpenMenu.App(app, place, card, shortcuts, options)
             }
         },
         content = { app ->
-            (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, place) }?.let { shown ->
+            (openMenu as? OpenMenu.App)?.takeIf { it.isFor(app, place, card) }?.let { shown ->
                 // An app that leaves the screen takes its popup away undismissed; without closing here the menu would reopen
                 // by itself when the app returns, as after an update.
                 DisposableEffect(Unit) {
-                    onDispose { if ((openMenu as? OpenMenu.App)?.isFor(app, place) == true) closeMenu() }
+                    onDispose { if ((openMenu as? OpenMenu.App)?.isFor(app, place, card) == true) closeMenu() }
                 }
                 AppOptionsMenu(
                     expanded = shown.expanded,
@@ -487,6 +485,7 @@ fun LauncherScreen(
                     onOption = { option ->
                         when (option) {
                             is AppOption.Remove -> latestShown?.let { shown -> changeHomeApps { remove(option.place, app, shown) } }
+                            is AppOption.RemoveFromCard -> changeCollections { removeApp(option.kind, app) }
                             AppOption.NewFolder -> (place as? HomePlace.Slots)?.let { holder ->
                                 val slot = latestHomeApps.slots(holder).indexOf(app)
                                 if (slot >= 0) {
@@ -512,6 +511,12 @@ fun LauncherScreen(
     val ringMenu = remember(actions) { appMenu(HomePlace.Ring) }
     val dockMenu = remember(actions) { appMenu(HomePlace.Dock) }
     val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(it.at) } }
+    // One per card, so an app on two cards, or in the drawer too, opens its menu only where it was pressed.
+    val cardMenu = remember(actions) {
+        val byKind = mutableMapOf<CollectionKind, AppMenu>()
+        val menuFor: (CollectionKind) -> AppMenu = { kind -> byKind.getOrPut(kind) { appMenu(place = null, card = kind) } }
+        menuFor
+    }
     val folderMenu = remember {
         FolderMenu(
             onOpen = { folder ->
@@ -616,7 +621,6 @@ fun LauncherScreen(
         move: (T, T, ReorderMode) -> Unit,
         remove: ((T) -> Unit)? = null,
         label: ((T) -> String)? = null,
-        startOnPress: Boolean = false,
         arrivingIn: (Rearrange) -> Arriving? = { null },
     ): Rearrange = Rearrange(
             onStart = { index, position ->
@@ -634,16 +638,11 @@ fun LauncherScreen(
                         current = { items() == listed },
                     )
                 }
-                val started = within != null && beginDrag(within, position)
-                // Lifted at the press, the lift is the answer to the long press, as the menu is elsewhere, so it gets the
-                // same nudge.
-                if (started && startOnPress) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                started
+                within != null && beginDrag(within, position)
             },
             onMove = { finger = it },
             onDrop = ::drop,
             onCancel = { dragged = null },
-            startOnPress = startOnPress,
             arrivingIn = arrivingIn,
             movingIn = { place ->
                 (dragged as? Drag.Within)?.takeIf { it.place === place }?.let {
@@ -683,7 +682,6 @@ fun LauncherScreen(
                     move = { app, target, mode -> changeCollections { moveApp(kind, app, target, mode) } },
                     remove = { app -> changeCollections { removeApp(kind, app) } },
                     label = AppEntry::label,
-                    startOnPress = true,
                 )
             }
         }
@@ -989,6 +987,7 @@ fun LauncherScreen(
                                 onAdd = { pickingCollection = true },
                                 onOpenUsageSettings = onOpenUsageSettings,
                                 rearrange = cardRearrange,
+                                menu = cardMenu,
                                 bin = if (binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
                                 unread = unread,
                             )
@@ -1176,18 +1175,19 @@ private sealed interface OpenMenu {
     fun closed(): OpenMenu
 
     /**
-     * [app]'s menu, where it was pressed (null for the drawer), its shortcuts and its options. The options are set as it
+     * [app]'s menu, where it was pressed (neither a home place nor a card for the drawer), its shortcuts and its options. The options are set as it
      * opens, as the one chosen changes what they would be, and the menu keeps what it shows while it fades out.
      */
     data class App(
         val app: AppEntry,
         val place: HomePlace?,
+        val card: CollectionKind?,
         val shortcuts: List<AppShortcut>,
         val options: List<AppOption>,
         override val expanded: Boolean = true,
     ) : OpenMenu {
         // By key, so a reload that relabels the app keeps its menu.
-        fun isFor(app: AppEntry, place: HomePlace?) = app.key == this.app.key && place == this.place
+        fun isFor(app: AppEntry, place: HomePlace?, card: CollectionKind?) = app.key == this.app.key && place == this.place && card == this.card
 
         override fun closed() = copy(expanded = false)
     }

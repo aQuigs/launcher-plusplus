@@ -9,6 +9,8 @@ sealed interface AppOption {
 
     data object NewFolder : AppOption
 
+    data class RemoveFromCard(val kind: CollectionKind.HandPicked) : AppOption
+
     data class AddTo(val place: HomePlace.Slots) : AppOption
 
     /** Turns the app's unread badge off, or back on when it [isOff]. */
@@ -25,14 +27,15 @@ sealed interface AppOption {
 }
 
 /**
- * The options for [app] long-pressed in [place], or in the drawer when [place] is null, in menu order, given the [home]
- * apps, the [settings] made for apps, whether the badges are enabled and whether the app [hasStorePage]. The drawer adds
- * to the ring or the dock where the app has no slot of its own yet. A pinned shortcut wears no badge and is on no card,
- * so offers neither setting.
+ * The options for [app] long-pressed in [place], or on the [card] of that kind, or in the drawer when neither is given,
+ * in menu order, given the [home] apps, the [settings] made for apps, whether the badges are enabled and whether the app
+ * [hasStorePage]. The drawer and the cards add to the ring or the dock where the app has no slot of its own yet, and a
+ * hand-picked card takes the app off. A pinned shortcut wears no badge and is on no card, so offers neither setting.
  */
 fun appOptions(
     app: AppEntry,
     place: HomePlace?,
+    card: CollectionKind?,
     home: HomeApps,
     settings: AppSettings,
     badgesEnabled: Boolean,
@@ -41,6 +44,7 @@ fun appOptions(
     val isApp = app.shortcutId == null
     if (place != null) add(AppOption.Remove(place))
     if (place is HomePlace.Slots) add(AppOption.NewFolder)
+    if (card is CollectionKind.HandPicked) add(AppOption.RemoveFromCard(card))
     if (place == null) listOf(HomePlace.Ring, HomePlace.Dock).filter { app !in home[it] }.forEach { add(AppOption.AddTo(it)) }
     if (isApp && badgesEnabled) add(AppOption.Badge(settings.isBadgeOff(app)))
     if (isApp) add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
