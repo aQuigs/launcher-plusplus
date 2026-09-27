@@ -44,7 +44,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -161,8 +160,17 @@ private class HeldWidget {
      */
     fun shift(widget: HostedWidget, pitch: Offset, rows: Int) = Offset(
         offset.x.coerceIn(-widget.column * pitch.x, (WIDGET_COLUMNS - widget.end) * pitch.x),
-        (offset.y + scrolled).coerceIn(-widget.row * pitch.y, (rows - widget.row) * pitch.y),
+        (offset.y + scrolled).coerceIn(drop(widget, pitch, rows)),
     )
+
+    /** How much of a scroll of [px] the held [widget] can still follow, once the finger has dragged it at all. */
+    fun room(px: Float, widget: HostedWidget, pitch: Offset, rows: Int, slop: Float): Float {
+        if (offset.getDistance() <= slop) return 0f
+        val drop = drop(widget, pitch, rows)
+        return roomFor(px, offset.y + scrolled, drop.start, drop.endInclusive)
+    }
+
+    private fun drop(widget: HostedWidget, pitch: Offset, rows: Int) = -widget.row * pitch.y..(rows - widget.row) * pitch.y
 
     /**
      * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged. Its top
@@ -179,10 +187,10 @@ private class HeldWidget {
 /** A drag the page scrolls under: how much of a scroll of so many pixels it can still follow, and following one. */
 private class Follower(val room: (px: Float) -> Float, val follow: (px: Float) -> Unit)
 
-/** Where a finger is on the page while one is down, and the resize handle's drag, which follows the page's scroll too. */
+/** The resize handle's drag, which follows the page's scroll too, and the row its outline reaches down to meanwhile. */
 private class EdgeScroll {
-    var finger by mutableStateOf<Offset?>(null)
     var stretch by mutableStateOf<Follower?>(null)
+    var outlineBottom by mutableIntStateOf(0)
 }
 
 /**
@@ -220,9 +228,8 @@ fun WidgetGrid(
     val held = remember { HeldWidget() }
     val edge = remember { EdgeScroll() }
     val scroll = rememberScrollState()
-    var viewport by remember { mutableIntStateOf(0) }
-    // The bottom of the edited widget's outline, which the page reaches down to while its handle is dragged.
-    var outlineBottom by remember { mutableIntStateOf(0) }
+    // How far down the page a finger is while one is down; not a number otherwise.
+    var finger by remember { mutableFloatStateOf(Float.NaN) }
     val pitch = with(density) { Offset((cell.width + GAP).toPx(), (cell.height + GAP).toPx()) }
     // Only a drag that reaches other cells changes the page shown.
     val shown by remember(page, pitch, pageRows) { derivedStateOf(structuralEqualityPolicy()) { held.preview(page, pitch, pageRows) } }
@@ -251,12 +258,12 @@ fun WidgetGrid(
     val latestOnEditingChange by rememberUpdatedState(onEditingChange)
     val haptics = LocalHapticFeedback.current
     val slop = LocalViewConfiguration.current.touchSlop
+    // A widget pressed near an edge and not yet dragged is only being long pressed, so it follows no scroll.
     val heldFollower = remember(held) {
         Follower(
             room = room@{ px ->
                 val widget = latestPage.widgets.find { it.id == held.id } ?: return@room 0f
-                val top = reach(latestPage, latestPageRows)
-                roomFor(px, held.offset.y + held.scrolled, -widget.row * latestPitch.y, (top - widget.row) * latestPitch.y)
+                held.room(px, widget, latestPitch, reach(latestPage, latestPageRows), slop)
             },
             follow = { held.scrolled += it },
         )
@@ -265,11 +272,9 @@ fun WidgetGrid(
     LaunchedEffect(dragging) {
         if (!dragging) return@LaunchedEffect
         val follower = edge.stretch ?: heldFollower
-        // A widget pressed near an edge and not yet dragged is only being long pressed.
-        if (follower === heldFollower) snapshotFlow { held.offset.getDistance() > slop }.first { it }
         val zone = with(density) { EDGE_ZONE.toPx() }
         val speed = with(density) { EDGE_SPEED.toPx() }
-        fun pull() = edge.finger?.let { edgePull(it.y, viewport.toFloat(), zone) } ?: 0f
+        fun pull() = edgePull(finger, scroll.viewportSize.toFloat(), zone)
         fun canScroll() = pull().let { it != 0f && follower.room(it) != 0f && if (it > 0f) scroll.canScrollForward else scroll.canScrollBackward }
         // Frames run only while there is somewhere to scroll to, so a widget held still leaves the page idle.
         while (true) {
@@ -286,11 +291,10 @@ fun WidgetGrid(
     Box(
         modifier
             .fillMaxSize()
-            .onSizeChanged { viewport = it.height }
             // Watched ahead of the widgets and their views, which take the touches they drag with.
-            .pointerInput(edge) {
+            .pointerInput(Unit) {
                 awaitPointerEventScope {
-                    while (true) edge.finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position
+                    while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.y ?: Float.NaN
                 }
             }
             // Keyed on nothing that a long press changes, so ending edit mode does not restart the gesture while the
@@ -326,7 +330,7 @@ fun WidgetGrid(
                 Modifier
                     .fillMaxWidth()
                     // At least the page, so a widget can be dropped anywhere in sight.
-                    .height(span(maxOf(shown.rows, pageRows, if (editing != null) outlineBottom else 0), cell.height)),
+                    .height(span(maxOf(shown.rows, pageRows, edge.outlineBottom), cell.height)),
             ) {
                 if (page.isEmpty) {
                     Text(
@@ -347,9 +351,7 @@ fun WidgetGrid(
                 page.widgets.forEach { widget ->
                     key(widget.id) {
                         val at = if (held.id == widget.id) widget else places[widget.id] ?: widget
-                        Widget(widget, at, cell, pitch, reach(page, pageRows), actions, pageRows, editing, onEditingChange, held, release, edge) {
-                            outlineBottom = it
-                        }
+                        Widget(widget, at, cell, pitch, reach(page, pageRows), actions, pageRows, editing, onEditingChange, held, release, edge)
                     }
                 }
             }
@@ -378,7 +380,7 @@ private fun Density.cellOffset(widget: HostedWidget, cell: DpSize) =
 /**
  * The [widget] as stored, shown in the cells of [at], which [held] drags about the page with its top above row [reach],
  * a cell and its gap being [pitch]; [release] lets it go, moving it to the cells it is over if the finger lifted. While
- * it is edited, [onOutline] hears the row its outline reaches down to, and [edge] scrolls the page under its handle.
+ * it is edited, [edge] scrolls the page under its handle.
  */
 @Composable
 private fun Widget(
@@ -394,7 +396,6 @@ private fun Widget(
     held: HeldWidget,
     release: (id: Int, lifted: Boolean) -> Unit,
     edge: EdgeScroll,
-    onOutline: (bottom: Int) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
@@ -408,7 +409,6 @@ private fun Widget(
     // provider redraws once per resize rather than at every cell; until then they hold, so the outline does not jump back.
     var rows by remember(widget.rows, edited) { mutableIntStateOf(widget.rows) }
     var columns by remember(widget.columns, edited) { mutableIntStateOf(widget.columns) }
-    if (edited) SideEffect { onOutline(widget.row + rows) }
     val onLongPress = {
         if (held.pickUp(widget.id)) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -486,6 +486,7 @@ private fun Widget(
                             onDrag = { newRows, newColumns ->
                                 rows = newRows
                                 columns = newColumns
+                                edge.outlineBottom = widget.row + newRows
                             },
                             onRelease = { newRows, newColumns ->
                                 if (newRows != widget.rows || newColumns != widget.columns) actions.resize(widget.id, newRows, newColumns)
@@ -523,7 +524,7 @@ private data class Stretch(val cells: Int, val range: IntRange, val pitchDp: Flo
     fun cellsAt(pulledDp: Float) = nearestCells(cells, pulledDp, pitchDp)
 
     /** How much of a move of [byDp] the pull [pulledDp] can still take within [range]. */
-    fun room(pulledDp: Float, byDp: Float) = roomFor(byDp, pulledDp, (range.first - cells) * pitchDp, (range.last - cells) * pitchDp)
+    fun room(pulledDp: Float, byDp: Float) = pull(pulledDp, byDp) - pulledDp
 }
 
 /**
@@ -572,6 +573,7 @@ private fun Modifier.resizeHandle(
         } finally {
             edge.stretch = null
             if (!released) onDrag(down.cells, across.cells)
+            edge.outlineBottom = 0
         }
     }
 }
