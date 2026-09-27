@@ -22,13 +22,13 @@ class FolderLookStoreTest {
     fun forgetTheChoice() = prefs.edit(commit = true) { clear() }
 
     @Test
-    fun theSolarSystemUntilAnotherIsChosenAndAnUnknownLookFallsBackToIt() {
-        assertEquals(FolderLook.SolarSystem, store.load())
+    fun moonsOnTheRimUntilAnotherIsChosenAndAnUnknownLookFallsBackToThem() {
+        assertEquals(FolderLook.Rim, store.load())
 
         store.save(FolderLook.Ringed)
         assertEquals(FolderLook.Ringed, SharedPreferencesFolderLookStore(context).load())
 
         prefs.edit(commit = true) { putString("look", "Nebula") }
-        assertEquals(FolderLook.SolarSystem, store.load())
+        assertEquals(FolderLook.Rim, store.load())
     }
 }

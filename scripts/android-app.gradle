@@ -26,11 +26,9 @@ android {
 def syncCommon = System.getenv('PATH')?.tokenize(File.pathSeparator)
     ?.collect { new File(it, 'sync-common') }
     ?.find { it.isFile() && it.canExecute() }
-def syncShared = [syncSharedDotfiles: '.', syncSharedScripts: 'scripts', syncSharedWorkflows: '.github/workflows'].collect { name, dir ->
-    tasks.register(name, Exec) {
-        enabled = syncCommon != null
-        workingDir = rootDir
-        commandLine(syncCommon?.path ?: 'sync-common', dir)
-    }
+def syncShared = tasks.register('syncShared', Exec) {
+    enabled = syncCommon != null
+    workingDir = rootDir
+    commandLine(syncCommon?.path ?: 'sync-common')
 }
 tasks.named('preBuild') { dependsOn(syncShared) }
