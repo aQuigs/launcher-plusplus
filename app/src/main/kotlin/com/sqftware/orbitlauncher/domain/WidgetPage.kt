@@ -151,6 +151,10 @@ fun WidgetResize.cellRange(cells: Int, cellDp: Float, most: Int): IntRange {
 fun heldDrag(cells: Int, dragDp: Float, range: IntRange, pitchDp: Float): Float =
     dragDp.coerceIn((range.first - cells) * pitchDp, (range.last - cells) * pitchDp)
 
+/** The part of a move of [by] from [at] that stays within [low] to [high], none once [at] is past that end already. */
+fun roomFor(by: Float, at: Float, low: Float, high: Float): Float =
+    if (by > 0f) by.coerceAtMost(maxOf(high - at, 0f)) else by.coerceAtLeast(minOf(low - at, 0f))
+
 /**
  * [cells], and the whole cells nearest a drag of [dragDp] on from there, or back when negative: where a widget's edge
  * or corner lands. A cell and its gap are [pitchDp].

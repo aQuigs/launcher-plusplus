@@ -18,7 +18,6 @@ import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,6 +72,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -93,8 +93,8 @@ import com.sqftware.orbitlauncher.domain.cellRange
 import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.heldDrag
 import com.sqftware.orbitlauncher.domain.nearestCells
+import com.sqftware.orbitlauncher.domain.roomFor
 import com.sqftware.orbitlauncher.domain.widgetRowsWithin
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 
@@ -176,10 +176,13 @@ private class HeldWidget {
     }
 }
 
-/** Where a finger is on the page while one is down, and the resize handle's drag, which takes the page's scroll too. */
+/** A drag the page scrolls under: how much of a scroll of so many pixels it can still follow, and following one. */
+private class Follower(val room: (px: Float) -> Float, val follow: (px: Float) -> Unit)
+
+/** Where a finger is on the page while one is down, and the resize handle's drag, which follows the page's scroll too. */
 private class EdgeScroll {
     var finger by mutableStateOf<Offset?>(null)
-    var stretch by mutableStateOf<((scrolledPx: Float) -> Unit)?>(null)
+    var stretch by mutableStateOf<Follower?>(null)
 }
 
 /**
@@ -247,25 +250,35 @@ fun WidgetGrid(
     val latestEditing by rememberUpdatedState(editing)
     val latestOnEditingChange by rememberUpdatedState(onEditingChange)
     val haptics = LocalHapticFeedback.current
+    val slop = LocalViewConfiguration.current.touchSlop
+    val heldFollower = remember(held) {
+        Follower(
+            room = room@{ px ->
+                val widget = latestPage.widgets.find { it.id == held.id } ?: return@room 0f
+                val top = reach(latestPage, latestPageRows)
+                roomFor(px, held.offset.y + held.scrolled, -widget.row * latestPitch.y, (top - widget.row) * latestPitch.y)
+            },
+            follow = { held.scrolled += it },
+        )
+    }
     val dragging = held.id != null || edge.stretch != null
     LaunchedEffect(dragging) {
         if (!dragging) return@LaunchedEffect
+        val follower = edge.stretch ?: heldFollower
+        // A widget pressed near an edge and not yet dragged is only being long pressed.
+        if (follower === heldFollower) snapshotFlow { held.offset.getDistance() > slop }.first { it }
         val zone = with(density) { EDGE_ZONE.toPx() }
         val speed = with(density) { EDGE_SPEED.toPx() }
         fun pull() = edge.finger?.let { edgePull(it.y, viewport.toFloat(), zone) } ?: 0f
-        fun canScroll() = if (pull() > 0f) scroll.canScrollForward else scroll.canScrollBackward
+        fun canScroll() = pull().let { it != 0f && follower.room(it) != 0f && if (it > 0f) scroll.canScrollForward else scroll.canScrollBackward }
         // Frames run only while there is somewhere to scroll to, so a widget held still leaves the page idle.
-        snapshotFlow { pull() != 0f }.collectLatest { near ->
-            if (!near) return@collectLatest
-            while (true) {
-                snapshotFlow { canScroll() }.first { it }
-                var last = withFrameNanos { it }
-                while (canScroll()) {
-                    val now = withFrameNanos { it }
-                    val scrolled = scroll.scrollBy(pull() * speed * (now - last) / 1_000_000_000f)
-                    held.id?.let { held.scrolled += scrolled } ?: edge.stretch?.invoke(scrolled)
-                    last = now
-                }
+        while (true) {
+            snapshotFlow { canScroll() }.first { it }
+            var last = withFrameNanos { it }
+            while (canScroll()) {
+                val now = withFrameNanos { it }
+                follower.follow(scroll.dispatchRawDelta(follower.room(pull() * speed * (now - last) / 1_000_000_000f)))
+                last = now
             }
         }
     }
@@ -508,6 +521,9 @@ private data class Stretch(val cells: Int, val range: IntRange, val pitchDp: Flo
     fun pull(pulledDp: Float, movedDp: Float) = heldDrag(cells, pulledDp + movedDp, range, pitchDp)
 
     fun cellsAt(pulledDp: Float) = nearestCells(cells, pulledDp, pitchDp)
+
+    /** How much of a move of [byDp] the pull [pulledDp] can still take within [range]. */
+    fun room(pulledDp: Float, byDp: Float) = roomFor(byDp, pulledDp, (range.first - cells) * pitchDp, (range.last - cells) * pitchDp)
 }
 
 /**
@@ -541,10 +557,13 @@ private fun Modifier.resizeHandle(
             // move is taken, or the pager would take the touch back the first time one went across.
             val start = awaitTouchSlopOrCancellation(press.id) { change, _ -> follow(change, change.position - press.position) }
             if (start != null) {
-                edge.stretch = { scrolled ->
-                    pulled = pulled.copy(y = down.pull(pulled.y, scrolled.toDp().value))
-                    onDrag(newRows(), newColumns())
-                }
+                edge.stretch = Follower(
+                    room = { px -> down.room(pulled.y, px.toDp().value).dp.toPx() },
+                    follow = { px ->
+                        pulled = pulled.copy(y = down.pull(pulled.y, px.toDp().value))
+                        onDrag(newRows(), newColumns())
+                    },
+                )
                 if (drag(start.id) { follow(it, it.positionChange()) }) {
                     onRelease(newRows(), newColumns())
                     released = true
