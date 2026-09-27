@@ -42,6 +42,7 @@ class CollectionsColumnTest {
     private val edited = mutableListOf<CollectionKind>()
     private var adds = 0
     private var usageSettingsOpened = 0
+    private val menusOpened = mutableListOf<Pair<CollectionKind, AppEntry>>()
 
     private fun show() = compose.setContent {
         CollectionsColumn(
@@ -56,6 +57,7 @@ class CollectionsColumnTest {
             onEdit = edited::add,
             onAdd = { adds++ },
             onOpenUsageSettings = { usageSettingsOpened++ },
+            menu = { kind -> AppMenu(onOpen = { menusOpened += kind to it }, content = {}) },
         )
     }
 
@@ -78,12 +80,13 @@ class CollectionsColumnTest {
     }
 
     @Test
-    fun aLongPressOnABuiltInCardsAppDoesNothing() {
+    fun aLongPressOnACardsAppOpensThatCardsMenuForIt() {
         show()
 
         compose.collectionApp(NewApps, recent[11]).performTouchInput { longClick() }
         compose.waitForIdle()
 
+        assertEquals(listOf(NewApps to recent[11]), menusOpened)
         assertTrue(launched.toString(), launched.isEmpty())
     }
 

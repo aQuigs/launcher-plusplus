@@ -157,9 +157,10 @@ private const val NOTICE_MILLIS = 2_000L
  * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
  * chevron that calls [onToggleExpanded]: a compact card shows one row of its first apps, an expanded one every app with
  * its label. The built-in cards work their apps out from [builtInApps] and [foregroundTime], the hand-picked ones from
- * [apps], and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches an app; a long press on a hand-picked
- * card's app lifts it through that card's [rearrange], to move it among the card's apps or, while the [bin] sits at the
- * bottom of the page, to drop it there. While one of its apps is on the move, a card shows where they would be if it
+ * [apps], and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
+ * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
+ * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
+ * to drop it there. While one of its apps is on the move, a card shows where they would be if it
  * were dropped. Apps wear their [unread] counts.
  */
 @Composable
@@ -177,6 +178,7 @@ fun CollectionsColumn(
     onOpenUsageSettings: () -> Unit,
     modifier: Modifier = Modifier,
     rearrange: (CollectionKind.HandPicked) -> Rearrange? = { null },
+    menu: (CollectionKind) -> AppMenu? = { null },
     bin: BinTarget? = null,
     unread: UnreadCounts = UnreadCounts(),
 ) {
@@ -210,6 +212,7 @@ fun CollectionsColumn(
                         onMove = onMove,
                         onEdit = if (handPicked != null) ({ onEdit(card.kind) }) else null,
                         rearrange = handPicked?.let(rearrange),
+                        menu = menu(card.kind),
                         onOpenUsageSettings = onOpenUsageSettings,
                         unread = unread,
                     )
@@ -236,6 +239,7 @@ private fun CollectionCardView(
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (() -> Unit)?,
     rearrange: Rearrange?,
+    menu: AppMenu?,
     onOpenUsageSettings: () -> Unit,
     unread: UnreadCounts,
 ) {
@@ -269,7 +273,7 @@ private fun CollectionCardView(
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings)
             } else {
-                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, rearrange, unread)
+                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, rearrange, menu, unread)
             }
         }
     }
@@ -367,6 +371,7 @@ private fun AppGrid(
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     rearrange: Rearrange?,
+    menu: AppMenu?,
     unread: UnreadCounts,
 ) {
     val moving = rearrange?.moving
@@ -396,6 +401,7 @@ private fun AppGrid(
                                 .size(CARD_ICON_SIZE)
                                 .testTag(CollectionTags.app(kind, app))
                                 .reorderSlot(rearrange, index, moving?.at == index),
+                            menu = menu,
                             drag = rearrange?.drag(index),
                             unread = unread[app],
                         )

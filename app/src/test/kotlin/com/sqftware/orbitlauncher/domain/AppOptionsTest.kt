@@ -9,12 +9,12 @@ class AppOptionsTest {
 
     private fun options(
         app: AppEntry = maps,
-        place: HomePlace? = null,
+        spot: AppSpot = AppSpot.Drawer,
         home: HomeApps = HomeApps(),
         settings: AppSettings = AppSettings(),
         badgesEnabled: Boolean = false,
         hasStorePage: Boolean = false,
-    ) = appOptions(app, place, home, settings, badgesEnabled, hasStorePage)
+    ) = appOptions(app, spot, home, settings, badgesEnabled, hasStorePage)
 
     @Test
     fun `the drawer adds the app to each home place it has no slot of its own in`() {
@@ -29,15 +29,22 @@ class AppOptionsTest {
     }
 
     @Test
+    fun `a card offers what the drawer does, and a hand-picked one first takes the app off it`() {
+        assertEquals(options(), options(spot = AppSpot.Card(CollectionKind.NewApps)))
+        val tools = CollectionKind.Category(AppCategory.Tools)
+        assertEquals(listOf(AppOption.RemoveFromCard(tools)) + options(), options(spot = AppSpot.Card(tools)))
+    }
+
+    @Test
     fun `a place on the home screen first offers to take the app out of it, and the ring and the dock a new folder`() {
         for (place in listOf(HomePlace.Ring, HomePlace.Dock)) {
             assertEquals(
                 listOf(AppOption.Remove(place), AppOption.NewFolder, onCards, AppOption.AppInfo, AppOption.Uninstall),
-                options(place = place),
+                options(spot = AppSpot.Home(place)),
             )
         }
         val folder = HomePlace.Folder(HomePlace.Dock, 2)
-        assertEquals(listOf(AppOption.Remove(folder), onCards, AppOption.AppInfo, AppOption.Uninstall), options(place = folder))
+        assertEquals(listOf(AppOption.Remove(folder), onCards, AppOption.AppInfo, AppOption.Uninstall), options(spot = AppSpot.Home(folder)))
     }
 
     @Test
@@ -46,11 +53,11 @@ class AppOptionsTest {
         val offCards = AppOption.BuiltInCards(isOff = true)
         assertEquals(
             listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder, offCards, AppOption.AppInfo, AppOption.Uninstall),
-            options(place = HomePlace.Ring, settings = settings),
+            options(spot = AppSpot.Home(HomePlace.Ring), settings = settings),
         )
         assertEquals(
             listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder, AppOption.Badge(isOff = true), offCards, AppOption.AppInfo, AppOption.Uninstall),
-            options(place = HomePlace.Ring, settings = settings, badgesEnabled = true),
+            options(spot = AppSpot.Home(HomePlace.Ring), settings = settings, badgesEnabled = true),
         )
     }
 
@@ -59,7 +66,7 @@ class AppOptionsTest {
         val shortcut = maps.copy(shortcutId = "home", canUninstall = false)
         assertEquals(
             listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder, AppOption.PlayStore, AppOption.AppInfo),
-            options(shortcut, HomePlace.Ring, badgesEnabled = true, hasStorePage = true),
+            options(shortcut, AppSpot.Home(HomePlace.Ring), badgesEnabled = true, hasStorePage = true),
         )
     }
 
@@ -67,7 +74,7 @@ class AppOptionsTest {
     fun `an app built into the system offers no uninstall`() {
         assertEquals(
             listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder, onCards, AppOption.AppInfo),
-            options(maps.copy(canUninstall = false), HomePlace.Ring),
+            options(maps.copy(canUninstall = false), AppSpot.Home(HomePlace.Ring)),
         )
     }
 }

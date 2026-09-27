@@ -18,6 +18,7 @@ import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -32,6 +33,7 @@ import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -333,14 +335,10 @@ class LauncherScreenTest {
         assertSettledOn(LauncherPage.Collections)
     }
 
-    /** Long-presses [app] on the Tools card, leaving the finger down: the app lifts at once, as nothing else answers there. */
+    /** Long-presses [app] on the Tools card and moves it off its place, leaving the finger down: the app is lifted. */
     private fun liftFromToolsCard(app: AppEntry) {
         val icon = centreOf(compose.collectionApp(tools, app))
-        compose.onRoot().performTouchInput {
-            down(icon)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            moveBy(Offset(0f, 1f))
-        }
+        compose.onRoot().performTouchInput { liftOut(icon) }
         compose.dragGhost().assertIsDisplayed()
         compose.collectionBin().assertIsDisplayed()
     }
@@ -1983,6 +1981,50 @@ class LauncherScreenTest {
             assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps)
             assertEquals(emptyList<AppEntry>(), launched)
         }
+    }
+
+    @Test
+    fun aLongPressOnACardsAppOpensItsMenuThereAlone() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key))), CollectionCard(NewApps)))
+        show()
+        goToCollections()
+
+        compose.collectionApp(tools, mail).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(viewConfiguration.touchSlop / 2, 0f))
+            up()
+        }
+        compose.dragGhost().assertDoesNotExist()
+        compose.collectionBin().assertDoesNotExist()
+        compose.onNodeWithText("Remove from Tools").assertIsDisplayed()
+        compose.onAllNodesWithText("Hide from New & Most Used").assertCountEquals(1)
+        compose.onNodeWithText("Remove from Tools").performClick()
+
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.collectionApp(tools, mail).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Favourites(), collections.card(tools)!!.apps) }
+    }
+
+    @Test
+    fun movingOnFromACardAppsOpenMenuLiftsTheAppAndClosesTheMenu() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key, clock.key)))))
+        show()
+        goToCollections()
+        val icon = compose.collectionApp(tools, mail)
+
+        icon.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(0f, 1f))
+        }
+        compose.appOptionsMenu().assertIsDisplayed()
+        icon.performTouchInput { moveBy(Offset(0f, viewConfiguration.touchSlop * 2)) }
+
+        compose.appOptionsMenu().assertDoesNotExist()
+        compose.dragGhost().assertIsDisplayed()
+        compose.collectionBin().assertIsDisplayed()
+        letGo()
     }
 
     @Test

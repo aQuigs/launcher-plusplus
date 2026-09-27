@@ -49,18 +49,16 @@ const val FOLD_MILLIS = 500L
 private const val MIDDLE = 0.35f
 
 /**
- * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that moves
- * on, or the press itself with [startOnPress], picks up the item at a position, and the finger then goes as in an
- * [ItemDrag]. The place marks each position with [reorderSlot], so the finger can be told which one it is over, and
- * shows its items as [moving] says while one of them is on the move, or as [arriving] says while an app from another
- * place is.
+ * Moving the items of one place, the ring, an open folder, the dock or a card, among themselves: a long press that
+ * moves on picks up the item at a position, and the finger then goes as in an [ItemDrag]. The place marks each position
+ * with [reorderSlot], so the finger can be told which one it is over, and shows its items as [moving] says while one of
+ * them is on the move, or as [arriving] says while an app from another place is.
  */
 class Rearrange(
     private val onStart: Rearrange.(index: Int, Offset) -> Boolean,
     private val onMove: (Offset) -> Unit,
     private val onDrop: () -> Unit,
     private val onCancel: () -> Unit,
-    private val startOnPress: Boolean = false,
     private val movingIn: (Rearrange) -> Moving?,
     private val arrivingIn: (Rearrange) -> Arriving? = { null },
 ) {
@@ -77,7 +75,7 @@ class Rearrange(
 
     /** What picks up the item at [index]. */
     fun drag(index: Int): ItemDrag<Any?> =
-        drags.getOrPut(index) { ItemDrag({ _, at -> onStart(index, at) }, onMove, onDrop, onCancel, startOnPress) }
+        drags.getOrPut(index) { ItemDrag({ _, at -> onStart(index, at) }, onMove, onDrop, onCancel) }
 
     private fun place(index: Int, coordinates: LayoutCoordinates) {
         placed[index] = coordinates
