@@ -159,7 +159,8 @@ private class HeldWidget {
 /**
  * The widgets on [page], on a grid of [WIDGET_COLUMNS] columns and rows of at least [WIDGET_ROW_HEIGHT_DP], each in its
  * own cells, and below them a button to add another, at the bottom of the screen or, once the widgets reach further,
- * of the page, which then scrolls, so no widget is ever under it; an empty page says so in the middle.
+ * of the page, which then scrolls, so no widget is ever under it; a long press on the page where no widget is asks for
+ * one too. An empty page says so in the middle.
  * Cells no widget takes stay empty. A long press on a widget puts it in edit mode, as in Arc: [editing] is its id, and
  * it wears an outline, a bin on the top-right corner that removes it, and, if its provider lets it stretch, a handle on
  * the bottom-right corner that drags its size a whole cell at a time, within what the provider allows, the rows the
@@ -206,11 +207,29 @@ fun WidgetGrid(
     }
     // Whatever ends edit mode, Back and HOME included, puts a held widget back.
     LaunchedEffect(editing == null) { if (editing == null) held.id?.let { release(it, false) } }
+    val add = {
+        onEditingChange(null)
+        actions.add(pageRows, cell.width.value, cell.height.value)
+    }
+    val latestAdd by rememberUpdatedState(add)
+    val latestEditing by rememberUpdatedState(editing)
+    val latestOnEditingChange by rememberUpdatedState(onEditingChange)
+    val haptics = LocalHapticFeedback.current
 
     Box(
         modifier
             .fillMaxSize()
-            .then(if (editing != null) Modifier.pointerInput(onEditingChange) { detectTapGestures { onEditingChange(null) } } else Modifier),
+            // Keyed on nothing that a long press changes, so ending edit mode does not restart the gesture while the
+            // finger is still down, leaving the rest of the press to scroll or turn the page.
+            .pointerInput(haptics) {
+                detectTapGestures(
+                    onTap = { if (latestEditing != null) latestOnEditingChange(null) },
+                    onLongPress = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        latestAdd()
+                    },
+                )
+            },
     ) {
         Column(
             Modifier
@@ -264,12 +283,7 @@ fun WidgetGrid(
                     .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
                     .testTag(WidgetTags.ADD),
             ) {
-                TonalButton(
-                    onClick = {
-                        onEditingChange(null)
-                        actions.add(pageRows, cell.width.value, cell.height.value)
-                    },
-                ) {
+                TonalButton(onClick = add) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                     Text("Add widget")
                 }
