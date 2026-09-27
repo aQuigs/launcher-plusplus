@@ -87,6 +87,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
@@ -772,7 +773,8 @@ fun LauncherScreen(
     // A faint shade from above the chevron down through the navigation bar, in place of the system's darker backing, whose
     // edge lines up with nothing of ours. It is in the scrim, the opposite of the navigation icons' ink, only to lift them
     // off the wallpaper, so it carries on below this box, which stops at the navigation bar. The drawer's panel fills in the navigation bar as
-    // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it.
+    // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it, and fills in under the
+    // drawer's bottom edge whenever that rises above the box's.
     val navigationBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(
         modifier
@@ -789,9 +791,17 @@ fun LauncherScreen(
                 )
                 drawRect(shade, Offset(0f, top), Size(size.width, bottom - top))
 
+                val offset = drawerState.requireOffset()
                 val travel = size.height - DRAWER_PEEK.toPx()
-                val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
-                drawRect(panel.copy(alpha = panel.alpha * open), Offset(0f, size.height), Size(size.width, bottom - size.height))
+                val open = if (travel > 0f) 1f - (offset / travel).coerceIn(0f, 1f) else 1f
+                // A fling into the end of the list settles the open sheet with a bounce past the top. The sheet is placed
+                // at its rounded offset, so the gap is rounded too, or the join shows a seam.
+                val lifted = (-offset.roundToInt()).coerceAtLeast(0)
+                drawRect(
+                    panel.copy(alpha = panel.alpha * open),
+                    Offset(0f, size.height - lifted),
+                    Size(size.width, bottom - size.height + lifted),
+                )
             },
     ) {
         BottomSheetScaffold(
