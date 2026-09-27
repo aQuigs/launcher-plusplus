@@ -1,14 +1,11 @@
 # launcher-plusplus
 
-Custom Android home screen (launcher). Native Kotlin + Jetpack Compose, built and tested entirely from the CLI.
+Custom Android home screen (launcher). Native Kotlin + Jetpack Compose, built and tested entirely from the CLI. The shared rules in `.claude/rules/` apply; this file holds what is specific to this repo.
 
 ## Stack
 
-- Kotlin + Jetpack Compose (Material 3), single `app` module
-- Android Gradle Plugin 9 with built-in Kotlin: do **not** apply `org.jetbrains.kotlin.android` to the module, only the Compose compiler plugin
-- Every version number lives in `gradle/libs.versions.toml` or the Gradle wrapper; keep them on current stable releases
+- Single `app` module. Every version number lives in `gradle/libs.versions.toml` or the Gradle wrapper; keep them on current stable releases
 - Tests: JUnit 4 unit tests on the JVM, Compose UI tests on the emulator
-- No Android Studio. Tooling (JDK 21, cmdline-tools, gradle, scrcpy) is installed by the machine setup, never by this repo
 
 ## Commands
 
@@ -25,8 +22,6 @@ scripts/record.sh [name] [seconds]   # adb screenrecord → screenshots/<name>.m
 scripts/pr-media.sh <file> <caption>... # upload shots as GitHub attachments, print the PR body's media table
 scrcpy                               # mirror the emulator interactively
 ```
-
-Files headed `Shared script:`, `Shared workflow:` or `Shared config:` are copies of files in a separate tooling checkout. When its `sync-common` is on PATH, every build overwrites them, matched by name. Edit them at the source, never here, and do not name a repo-owned file after a shared one. To adopt another shared file, create it once under the same name and let the build fill it. Build config every app needs goes in the shared `scripts/android-app.gradle`.
 
 ## Layout
 
@@ -48,27 +43,14 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 ## How we work
 
 - Arc Launcher (`apptech.arc`, sideloaded on the project emulator) is the reference. Where it has a feature, mimic how it behaves and how it is laid out, in our own colours. Unsure how Arc does something? Open it on the emulator and look, do not guess. Where Arc has no such feature, use your judgement or ask.
-- Every change after the initial scaffold ships as a PR against `main`, using the PR template. Code changes get an adversarial-review pass and `/simplify` on the branch before handover; docs-only PRs skip those.
 - A PR that only refreshes shared files through `sync-common` can be merged by Claude once its checks pass, without waiting for the user. Any other change in it leaves the merge to the user.
-- User-visible changes carry before/after screenshots (or a recording) in the PR's "Screenshots / recording" section: capture the before shot on `main` and the after shot on the branch, publish them with `scripts/pr-media.sh`, one caption per file, and paste its table as is. Media is uploaded as GitHub attachments, never committed.
-- The emulator is the test target. Gradle auto-downloads the platform and build-tools for `compileSdk` on first build; system images come from the machine setup (toggles in `~/.zsh_toggles`); `scripts/emulator.sh` only creates an AVD from the installed Play Store image and names the toggle to set if it is missing. Never run `android sdk` (or the deprecated `sdkmanager`) installs from this repo.
-- Pure logic goes in `domain` with a unit test. UI behaviour gets a Compose test in `androidTest` that renders the composable with fake data. `MainActivityTest` is the one end-to-end smoke test against the real system.
-- A passing test is not a passing feature: for UI changes, install on the emulator, screenshot, and look at the PNG before calling it done. That after shot is the one that goes in the PR.
-- Pre-commit runs hygiene checks, markdownlint, lint and the unit tests. Install with `pre-commit install`.
-- GitHub Actions run on every push: `android-ci` (build, lint, unit tests) and the pre-commit hooks. The emulator tests run locally only.
-- Every merge to `main` publishes to the Play Store internal testing track, and to closed testing (Alpha) while it has a live release, through the shared `play_internal.yaml`, versioned by commit count. Only listed testers can install it. The workflow header names the repo secrets it needs.
+- Pure logic goes in `domain` with a unit test. `MainActivityTest` is the one end-to-end smoke test against the real system.
 
 ## Conventions
 
-- Kotlin official code style, 4-space indent (`.editorconfig`). Terse over verbose.
-- Comments explain *why*, never *what*. Self-evident code gets no comment.
 - The look follows the wallpaper: a light one gets the day scheme and day ring colours. Colours come from the scheme's roles or `LocalRingColors`, never from an assumption that the launcher is dark.
 - Colours live in `ui/theme`: components take a `colorScheme` role or a theme token, never a literal or a surface alpha copy, and a look changes by changing its role there (held by the `theme-colours-only` hook and `LauncherColorsTest`).
-- Commit messages describe the change and the reason. No `Co-Authored-By` trailers.
-- PR template: check or uncheck items, never delete them.
 
 ## Don't
 
-- Add Android Studio-only files or workflows (`.idea/`, run configurations).
-- Put Android imports in `domain`, or system calls in `ui`.
-- Add libraries (DI, navigation, Hilt) before a feature needs them.
+- Put system calls in `ui`.
