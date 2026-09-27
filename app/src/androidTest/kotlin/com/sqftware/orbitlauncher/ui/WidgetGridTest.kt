@@ -308,7 +308,7 @@ class WidgetGridTest {
     }
 
     @Test
-    fun aWidgetHeldAtTheBottomEdgeScrollsThePageAndLandsBelowTheLastRow() {
+    fun aWidgetHeldAtTheBottomEdgeScrollsThePageAScreenFurtherAtMost() {
         val tall = HostedWidget(id = 11, row = 0, column = 0, rows = 3, columns = 2)
         page = WidgetPage(listOf(tall))
         show()
@@ -322,13 +322,13 @@ class WidgetGridTest {
         compose.mainClock.advanceTimeBy(ViewConfiguration.getLongPressTimeout() + 100L)
         val edge = with(compose.density) { Offset(((bounds(tall).left + bounds(tall).right) / 2).toPx(), (screen.bottom - 20.dp).toPx()) }
         compose.onRoot().performTouchInput { moveTo(edge) }
-        compose.mainClock.advanceTimeBy(3_000)
+        compose.mainClock.advanceTimeBy(10_000)
         val landing = compose.onNodeWithTag(WidgetTags.LANDING).getUnclippedBoundsInRoot()
         assertNear(landing.top, bounds(tall).top)
         assertNear(bounds(tall).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
         compose.onRoot().performTouchInput { up() }
 
-        compose.runOnIdle { assertEquals(listOf(Triple(tall.id, pageRows, 0)), moved) }
+        compose.runOnIdle { assertEquals(listOf(Triple(tall.id, pageRows * 2 - tall.rows, 0)), moved) }
         assertNear(bounds(tall).bottom + gap, compose.addWidgetButton().getUnclippedBoundsInRoot().top)
         assertTrue("it shows in full once it lands", bounds(tall).bottom <= screen.bottom)
     }

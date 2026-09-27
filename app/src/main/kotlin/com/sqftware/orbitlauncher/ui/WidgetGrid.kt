@@ -157,8 +157,8 @@ private class HeldWidget {
     }
 
     /**
-     * How far [widget] is dragged, and the page scrolled under it, kept within the columns and with its top no lower than
-     * the row just below the first [rows], a cell and its gap being [pitch] across and down.
+     * How far [widget] is dragged, and the page scrolled under it, kept within the columns and the first [rows] rows, a
+     * cell and its gap being [pitch] across and down.
      */
     fun shift(widget: HostedWidget, pitch: Offset, rows: Int) = Offset(
         offset.x.coerceIn(-widget.column * pitch.x, (WIDGET_COLUMNS - widget.end) * pitch.x),
@@ -172,12 +172,11 @@ private class HeldWidget {
         return roomFor(px, offset.y + scrolled, drop.start, drop.endInclusive)
     }
 
-    private fun drop(widget: HostedWidget, pitch: Offset, rows: Int) = -widget.row * pitch.y..(rows - widget.row) * pitch.y
+    private fun drop(widget: HostedWidget, pitch: Offset, rows: Int) = -widget.row * pitch.y..(rows - widget.bottom) * pitch.y
 
     /**
-     * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged. Its top
-     * stays within [pageRows], or the rows the page already reaches down to, so a drag lengthens the page by the
-     * widget's rows at most.
+     * [page] as it would be with the held widget let go now, in the cells nearest to where it has been dragged, within
+     * the rows it may be dragged down to.
      */
     fun preview(page: WidgetPage, pitch: Offset, pageRows: Int): WidgetPage {
         val widget = page.widgets.find { it.id == id } ?: return page
@@ -332,7 +331,9 @@ fun WidgetGrid(
                 Modifier
                     .fillMaxWidth()
                     // At least the page, so a widget can be dropped anywhere in sight.
-                    .height(span(maxOf(shown.rows, pageRows, edge.outlineBottom), cell.height)),
+                    .height(span(maxOf(shown.rows, pageRows, edge.outlineBottom), cell.height))
+                    // A widget dragged past the last row passes over the button on its way down.
+                    .zIndex(if (held.id != null) 1f else 0f),
             ) {
                 if (page.isEmpty) {
                     Text(
@@ -372,15 +373,18 @@ fun WidgetGrid(
     }
 }
 
-/** The rows below which a widget's top may be dragged: the page's, above the button, or more if it already reaches further. */
-private fun reach(page: WidgetPage, pageRows: Int) = maxOf(pageRows, page.rows)
+/**
+ * The rows a widget may be dragged down to: a screen's worth, [pageRows], past the page's end, or past the button's
+ * row when the widgets end above it, so one drag lengthens the page by a screen at most and a slip scrolls no further.
+ */
+private fun reach(page: WidgetPage, pageRows: Int) = maxOf(pageRows, page.rows) + pageRows
 
 /** Where the top-left cell of [widget] is, on a grid of [cell]s. */
 private fun Density.cellOffset(widget: HostedWidget, cell: DpSize) =
     IntOffset(((cell.width + GAP) * widget.column).roundToPx(), ((cell.height + GAP) * widget.row).roundToPx())
 
 /**
- * The [widget] as stored, shown in the cells of [at], which [held] drags about the page with its top above row [reach],
+ * The [widget] as stored, shown in the cells of [at], which [held] drags about the page's first [reach] rows,
  * a cell and its gap being [pitch]; [release] lets it go, moving it to the cells it is over if the finger lifted. While
  * it is edited, [edge] scrolls the page under its handle.
  */
