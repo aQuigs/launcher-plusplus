@@ -90,8 +90,28 @@ val CollectionKind.title: String
         is CollectionKind.Custom -> label
     }
 
-/** One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], and whether it shows them all with labels. */
-data class CollectionCard(val kind: CollectionKind, val apps: Favourites = Favourites(), val expanded: Boolean = false)
+/** How many apps a card shows in a row. */
+const val CARD_ROW_APPS = 5
+
+/** The rows of apps a compact card can be set to show. */
+val COLLAPSED_ROWS = 1..4
+
+/**
+ * One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], whether it shows them all with labels, and how
+ * many [rows] of apps it shows while it does not.
+ */
+data class CollectionCard(
+    val kind: CollectionKind,
+    val apps: Favourites = Favourites(),
+    val expanded: Boolean = false,
+    val rows: Int = COLLAPSED_ROWS.first,
+) {
+    /** How many apps it shows while compact. */
+    val compactApps: Int get() = rows * CARD_ROW_APPS
+
+    /** How many apps it works out if built in: enough to fill its compact rows, and never fewer than [BUILT_IN_CARD_APPS]. */
+    val builtInLimit: Int get() = maxOf(BUILT_IN_CARD_APPS, compactApps)
+}
 
 /** The cards on the collections page, top to bottom. A page never touched holds the two built-in cards, as Arc's does. */
 data class CollectionsPage(
@@ -117,8 +137,10 @@ data class CollectionsPage(
         listed.map { card(it.kind) ?: it } + cards.filter { it.kind is CollectionKind.Custom && listed.none { l -> l.kind == it.kind } }
 
     /** Adds a card of [kind] at the bottom, holding [apps], unless the page has one. */
-    fun add(kind: CollectionKind, apps: Favourites = Favourites()): CollectionsPage =
-        if (kind in this) this else CollectionsPage(cards + CollectionCard(kind, apps))
+    fun add(kind: CollectionKind, apps: Favourites = Favourites()): CollectionsPage = add(CollectionCard(kind, apps))
+
+    /** Adds [card] at the bottom as it is, unless the page has one of its kind. */
+    fun add(card: CollectionCard): CollectionsPage = if (card.kind in this) this else CollectionsPage(cards + card)
 
     /** Drops the card of [kind], and the apps it kept with it. */
     fun remove(kind: CollectionKind): CollectionsPage = CollectionsPage(cards.filterNot { it.kind == kind })
@@ -134,6 +156,9 @@ data class CollectionsPage(
 
     fun toggleExpanded(kind: CollectionKind): CollectionsPage = update(kind) { copy(expanded = !expanded) }
 
+    /** Sets how many rows the card of [kind] shows while compact, kept within [COLLAPSED_ROWS]. */
+    fun setRows(kind: CollectionKind, rows: Int): CollectionsPage = update(kind) { copy(rows = rows.coerceIn(COLLAPSED_ROWS)) }
+
     /** Moves the card at [from] to [to]; a position off the page changes nothing. */
     fun move(from: Int, to: Int): CollectionsPage = CollectionsPage(cards.reordered(from, to, ReorderMode.Insert))
 
@@ -141,7 +166,7 @@ data class CollectionsPage(
         CollectionsPage(cards.map { if (it.kind == kind) it.change() else it })
 }
 
-/** How many apps a built-in card lists. */
+/** How many apps a built-in card lists at least. */
 const val BUILT_IN_CARD_APPS = 10
 
 /** The most recently installed apps, newest first, one per package. */
@@ -229,28 +254,38 @@ val AppEntry.suggestedCategory: AppCategory?
 fun seedCategory(category: AppCategory, apps: List<AppEntry>): Favourites =
     Favourites(apps.filter { it.suggestedCategory == category }.map { it.key })
 
-/** The page as text, one line per card: its kind, 1 or 0 for expanded, then the keys it keeps, all tab-separated. */
+/**
+ * The page as text, one line per card: its kind, 1 or 0 for expanded with its compact rows after a comma unless it has
+ * one, then the keys it keeps, all tab-separated. A card of one row is written as before rows could be set.
+ */
 fun CollectionsPage.encode(): String = cards.joinToString(LINE) { card ->
-    (listOf(card.kind.name, if (card.expanded) "1" else "0") + card.apps.keys).joinToString(FIELD)
+    val expanded = if (card.expanded) "1" else "0"
+    val look = if (card.rows == COLLAPSED_ROWS.first) expanded else "$expanded$ROWS${card.rows}"
+    (listOf(card.kind.name, look) + card.apps.keys).joinToString(FIELD)
 }
+
+private const val ROWS = ","
 
 /**
  * A line whose kind is unknown (a custom name included that cleans to nothing or to a built-in's) or whose expanded flag
  * is not 0 or 1 is skipped, and so is a second line for a kind, so a damaged file loses that card and keeps the rest.
- * Empty text is an empty page: the defaults are for a page never stored.
+ * Rows missing or out of [COLLAPSED_ROWS] are one, and anything after them is ignored, so a card written by a later
+ * version keeps its apps. Empty text is an empty page: the defaults are for a page never stored.
  */
 fun decodeCollectionsPage(text: String): CollectionsPage = CollectionsPage(
     text.nonEmptyLines()
         .mapNotNull { line ->
             val fields = line.split(FIELD)
             val kind = CollectionKind.named(fields[0]) ?: return@mapNotNull null
-            val expanded = when (fields.getOrNull(1)) {
+            val look = fields.getOrNull(1)?.split(ROWS) ?: return@mapNotNull null
+            val expanded = when (look[0]) {
                 "1" -> true
                 "0" -> false
                 else -> return@mapNotNull null
             }
+            val rows = look.getOrNull(1)?.toIntOrNull()?.takeIf { it in COLLAPSED_ROWS } ?: COLLAPSED_ROWS.first
             val keys = if (kind is CollectionKind.HandPicked) fields.drop(2).filter(String::isNotEmpty) else emptyList()
-            CollectionCard(kind, Favourites(keys), expanded)
+            CollectionCard(kind, Favourites(keys), expanded, rows)
         }
         .distinctBy { it.kind },
 )

@@ -32,6 +32,7 @@ class CollectionsStoreTest {
     fun thePageComesBackAsItWent() {
         val page = CollectionsPage()
             .toggleExpanded(CollectionKind.NewApps)
+            .setRows(CollectionKind.MostUsed, 3)
             .add(CollectionKind.Category(AppCategory.Tools), Favourites(listOf("a/A", "b/B")))
 
         store.save(page)

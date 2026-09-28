@@ -1840,6 +1840,20 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aLongPressOnACardsTitleChoosesHowManyRowsItShowsCompact() {
+        collections = CollectionsPage()
+        show()
+        goToCollections()
+
+        compose.collectionTitle(MostUsed).performTouchInput { longClick() }
+        compose.onNodeWithTag(CollectionTags.ROWS_DIALOG).assertIsDisplayed()
+        compose.onNodeWithText("3 rows").performClick()
+
+        compose.onNodeWithTag(CollectionTags.ROWS_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(CollectionsPage().setRows(MostUsed, 3), collections) }
+    }
+
+    @Test
     fun createYourOwnNamesAnEmptyCardWhoseTileTakesItAwayForGoodOnceThePickerCloses() {
         collections = CollectionsPage()
         val finance = CollectionKind.Custom("Finance")

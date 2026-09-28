@@ -5,6 +5,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
@@ -96,6 +97,7 @@ import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
+import com.sqftware.orbitlauncher.domain.CARD_ROW_APPS
 import com.sqftware.orbitlauncher.domain.CREATE_YOUR_OWN
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
@@ -119,8 +121,11 @@ object CollectionTags {
     const val CREATE = "collection_create"
     const val CREATE_DIALOG = "collection_create_dialog"
     const val CREATE_NAME = "collection_create_name"
+    const val ROWS_DIALOG = "collection_rows_dialog"
 
     fun card(kind: CollectionKind) = "collection_${kind.name}"
+
+    fun title(kind: CollectionKind) = "collection_title_${kind.name}"
 
     fun handle(kind: CollectionKind) = "collection_handle_${kind.name}"
 
@@ -144,7 +149,6 @@ private val CollectionKind.emptyText: String
         is CollectionKind.HandPicked -> "Tap the pencil to add apps"
     }
 
-private const val APPS_PER_ROW = 5
 private val PAGE_PADDING = 16.dp
 private val CARD_GAP = 12.dp
 private val CARD_ICON_SIZE = 48.dp
@@ -155,9 +159,9 @@ private const val NOTICE_MILLIS = 2_000L
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
  * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
- * chevron that calls [onToggleExpanded]: a compact card shows one row of its first apps, an expanded one every app with
- * its label. The built-in cards work their apps out from [builtInApps] and [foregroundTime], the hand-picked ones from
- * [apps], and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
+ * chevron that calls [onToggleExpanded]: a compact card shows its set number of rows of its first apps, an expanded one
+ * every app with its label. A long press on the title calls [onChooseRows]. The built-in cards work their apps out
+ * from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
  * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
  * to drop it there. While one of its apps is on the move, a card shows where they would be if it
@@ -172,6 +176,7 @@ fun CollectionsColumn(
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: (CollectionKind) -> Unit,
+    onChooseRows: (CollectionKind) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (CollectionKind) -> Unit,
     onAdd: () -> Unit,
@@ -183,8 +188,6 @@ fun CollectionsColumn(
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
-    val newApps = remember(builtInApps) { newApps(builtInApps) }
-    val mostUsed = remember(builtInApps, foregroundTime) { foregroundTime?.let { mostUsed(builtInApps, it) } }
     val gap = with(LocalDensity.current) { CARD_GAP.toPx() }
     val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }
@@ -197,9 +200,12 @@ fun CollectionsColumn(
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
                     val handPicked = card.kind as? CollectionKind.HandPicked
+                    val limit = card.builtInLimit
                     val cardApps = when (card.kind) {
-                        CollectionKind.NewApps -> newApps
-                        CollectionKind.MostUsed -> mostUsed
+                        CollectionKind.NewApps -> remember(builtInApps, limit) { newApps(builtInApps, limit) }
+                        CollectionKind.MostUsed -> remember(builtInApps, foregroundTime, limit) {
+                            foregroundTime?.let { mostUsed(builtInApps, it, limit) }
+                        }
                         is CollectionKind.HandPicked -> remember(card.apps, apps) { card.apps.resolve(apps) }
                     }
                     CollectionCardView(
@@ -210,6 +216,7 @@ fun CollectionsColumn(
                         icon = icon,
                         onLaunch = onLaunch,
                         onToggleExpanded = { onToggleExpanded(card.kind) },
+                        onChooseRows = { onChooseRows(card.kind) },
                         onMove = onMove,
                         onEdit = if (handPicked != null) ({ onEdit(card.kind) }) else null,
                         rearrange = handPicked?.let(rearrange),
@@ -238,6 +245,7 @@ private fun CollectionCardView(
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: () -> Unit,
+    onChooseRows: () -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (() -> Unit)?,
     rearrange: Rearrange?,
@@ -272,11 +280,11 @@ private fun CollectionCardView(
             .testTag(CollectionTags.card(card.kind)),
     ) {
         Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
-            CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onEdit)
+            CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onChooseRows, onEdit)
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings)
             } else {
-                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, rearrange, menu, unread, onClearBadge)
+                AppGrid(card.kind, apps, card.expanded, card.compactApps, icon, onLaunch, rearrange, menu, unread, onClearBadge)
             }
         }
     }
@@ -290,6 +298,7 @@ private fun CardHeader(
     reorder: ListReorder,
     onMove: (from: Int, to: Int) -> Unit,
     onToggleExpanded: () -> Unit,
+    onChooseRows: () -> Unit,
     onEdit: (() -> Unit)?,
 ) {
     val latestOnMove by rememberUpdatedState(onMove)
@@ -299,7 +308,18 @@ private fun CardHeader(
         // Kept clear of the handle in the middle, which a long title on a narrow screen would otherwise run under.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.5f).padding(end = 28.dp),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth(0.5f)
+                .padding(end = 28.dp)
+                .combinedClickable(
+                    interactionSource = null,
+                    indication = null,
+                    onLongClickLabel = "Rows when collapsed",
+                    onLongClick = onChooseRows,
+                    onClick = {},
+                )
+                .testTag(CollectionTags.title(kind)),
         ) {
             Icon(kind.glyph, contentDescription = null, modifier = Modifier.size(22.dp))
             Text(
@@ -363,7 +383,7 @@ private fun CardHeader(
 }
 
 /**
- * The card's apps in rows of five: the first row alone when not [expanded], every row with labels when it is. One layout
+ * The card's apps in rows of five: the first [compactApps] alone when not [expanded], every row with labels when it is. One layout
  * holds every row, so an app on the move keeps its node, and the gesture, as it goes from row to row.
  */
 @Composable
@@ -371,6 +391,7 @@ private fun AppGrid(
     kind: CollectionKind,
     apps: List<AppEntry>,
     expanded: Boolean,
+    compactApps: Int,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     rearrange: Rearrange?,
@@ -380,7 +401,7 @@ private fun AppGrid(
 ) {
     val moving = rearrange?.moving
     val ordered = moving.shown(apps)
-    val shown = if (expanded) ordered else ordered.take(APPS_PER_ROW)
+    val shown = if (expanded) ordered else ordered.take(compactApps)
     val modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE)
 
     if (shown.isEmpty()) {
@@ -426,15 +447,15 @@ private fun AppGrid(
         },
         modifier = modifier,
     ) { measurables, constraints ->
-        val width = constraints.maxWidth / APPS_PER_ROW
-        val rows = measurables.map { it.measure(Constraints.fixedWidth(width)) }.chunked(APPS_PER_ROW)
-        val heights = rows.map { row -> row.maxOf { it.height } }
+        val width = constraints.maxWidth / CARD_ROW_APPS
+        val grid = measurables.map { it.measure(Constraints.fixedWidth(width)) }.chunked(CARD_ROW_APPS)
+        val heights = grid.map { row -> row.maxOf { it.height } }
         val gap = ROW_GAP.roundToPx()
-        val height = maxOf(heights.sum() + gap * (rows.size - 1), constraints.minHeight)
+        val height = maxOf(heights.sum() + gap * (grid.size - 1), constraints.minHeight)
 
         layout(constraints.maxWidth, height) {
             var top = 0
-            rows.forEachIndexed { row, cells ->
+            grid.forEachIndexed { row, cells ->
                 cells.forEachIndexed { column, cell -> cell.placeRelative(column * width, top) }
                 top += heights[row] + gap
             }

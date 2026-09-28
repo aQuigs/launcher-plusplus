@@ -53,6 +53,7 @@ class CollectionsColumnTest {
             icon = { null },
             onLaunch = launched::add,
             onToggleExpanded = { page = page.toggleExpanded(it) },
+            onChooseRows = {},
             onMove = { from, to -> page = page.move(from, to) },
             onEdit = edited::add,
             onAdd = { adds++ },
@@ -130,6 +131,19 @@ class CollectionsColumnTest {
 
         compose.onNodeWithText("R12").assertDoesNotExist()
         compose.collectionApp(NewApps, recent[2]).assertDoesNotExist()
+    }
+
+    @Test
+    fun aCompactCardOfThreeRowsShowsThatManyRowsOfItsApps() {
+        page = CollectionsPage().setRows(NewApps, 3)
+        show()
+
+        // Twelve apps fill two rows and part of a third, still without labels.
+        recent.forEach { compose.collectionApp(NewApps, it).assertIsDisplayed() }
+        compose.onNodeWithText("R12").assertDoesNotExist()
+        val first = compose.collectionApp(NewApps, recent[11]).getUnclippedBoundsInRoot()
+        val third = compose.collectionApp(NewApps, recent[1]).getUnclippedBoundsInRoot()
+        assertTrue("$first, $third", third.top > first.bottom && third.left == first.left)
     }
 
     @Test
