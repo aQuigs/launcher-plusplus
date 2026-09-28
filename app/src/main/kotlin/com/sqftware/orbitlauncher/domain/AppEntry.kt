@@ -15,11 +15,13 @@ data class AppEntry(
     val shortcutId: String? = null,
 ) {
     /** Identifies one activity or shortcut whatever its label, so it survives relabelling and reloads of the app list. */
-    val key: String = if (shortcutId == null) "$packageName/$activityName" else shortcutKey(packageName, shortcutId)
+    val key: String = if (shortcutId == null) activityKey(packageName, activityName) else shortcutKey(packageName, shortcutId)
 
     /** The label as a search sees it: lower case, without accents. Made once here rather than on every keystroke. */
     val searchableLabel: String = label.unaccented().lowercase()
 }
+
+fun activityKey(packageName: String, activityName: String) = "$packageName/$activityName"
 
 /**
  * The key of [packageName]'s shortcut [id]. Keys are stored, so it must never be an activity's: a package name holds

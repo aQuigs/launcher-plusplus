@@ -105,6 +105,7 @@ class LauncherScreenTest {
     private var accepts = 0
     private var homeApps by mutableStateOf(HomeApps())
     private var homeAppsChanges = 0
+    private var setUps = 0
     private val work = folderOf(clock, mail)
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
     private val hourStylesChosen = mutableListOf<Boolean>()
@@ -183,6 +184,7 @@ class LauncherScreenTest {
                 homeApps = it
                 homeAppsChanges++
             },
+            onSetUpHome = { setUps++ },
             actions = actions,
             reorderMode = reorderMode,
             onReorderModeChange = { reorderMode = it },
@@ -385,6 +387,20 @@ class LauncherScreenTest {
         isHomeApp = true
 
         compose.homeAppCard().assertDoesNotExist()
+    }
+
+    @Test
+    fun anEmptyHomeOffersToSetItselfUpOnceTheAppsHaveLoaded() {
+        apps = null
+        show()
+        compose.onNodeWithTag(LauncherTags.SET_UP_HOME).assertDoesNotExist()
+
+        apps = listOf(clock, mail)
+        compose.onNodeWithTag(LauncherTags.SET_UP_HOME).assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, setUps) }
+
+        homeApps = HomeApps(dock = ringOf(mail))
+        compose.onNodeWithTag(LauncherTags.SET_UP_HOME).assertDoesNotExist()
     }
 
     @Test

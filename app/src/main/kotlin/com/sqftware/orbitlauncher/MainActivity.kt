@@ -13,6 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
@@ -33,15 +35,19 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
 import com.sqftware.orbitlauncher.apps.SystemAppUsage
+import com.sqftware.orbitlauncher.apps.SystemDefaultAppFinder
 import com.sqftware.orbitlauncher.apps.SystemRelauncher
 import com.sqftware.orbitlauncher.apps.SystemRinger
 import com.sqftware.orbitlauncher.apps.SystemWallClock
 import com.sqftware.orbitlauncher.apps.SystemWallpaper
 import com.sqftware.orbitlauncher.apps.SystemWidgetHost
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
+import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
 import com.sqftware.orbitlauncher.ui.LauncherScreen
@@ -49,10 +55,16 @@ import com.sqftware.orbitlauncher.ui.PinRequest
 import com.sqftware.orbitlauncher.ui.WidgetActions
 import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+
+private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -85,6 +97,7 @@ class MainActivity : ComponentActivity() {
         val collectionsStore = SharedPreferencesCollectionsStore(this)
         val appSettingsStore = SharedPreferencesAppSettingsStore(this)
         val appUsage = SystemAppUsage(this)
+        val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
         val relauncher = SystemRelauncher(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
@@ -186,6 +199,38 @@ class MainActivity : ComponentActivity() {
                 val foregroundTime by produceState(remember { if (appUsage.isUsageAccessGranted()) ForegroundTime() else null }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { appUsage.foregroundTime().collect { value = it } }
                 }
+                fun changeHomeApps(changed: HomeApps) {
+                    homeApps = changed.withPlanetsKept()
+                    homeAppsStore.save(homeApps)
+                }
+                fun changeCollections(changed: CollectionsPage) {
+                    collections = changed
+                    collectionsStore.save(changed)
+                }
+
+                val scope = rememberCoroutineScope()
+                // Usage is read afresh rather than from foregroundTime, which may not have caught up yet with access just
+                // granted in Settings.
+                fun setUpHome() = scope.launch {
+                    val defaults = async { defaultApps.find() }
+                    val time = async { appUsage.foregroundTime().first() }
+                    val (found, used) = defaults.await() to time.await()
+                    // Read after the wait, so apps picked by hand meanwhile, or a second tap, keep what is there.
+                    val setup = suggestSetup(homeApps, collections, apps ?: return@launch, found, used) ?: return@launch
+                    changeHomeApps(setup.home)
+                    changeCollections(setup.collections)
+                }
+                // Asks for usage access first, which the guess leans on, then sets up once back from Settings, granted or
+                // not, or at once should Settings never open.
+                var askingUsage by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(askingUsage) {
+                    if (!askingUsage) return@LaunchedEffect
+                    withTimeoutOrNull(LEAVE_FOR_SETTINGS_MILLIS) { lifecycle.currentStateFlow.first { !it.isAtLeast(Lifecycle.State.RESUMED) } }
+                    lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+                    askingUsage = false
+                    setUpHome()
+                }
+
                 LauncherScreen(
                     layout = layout,
                     homePresses = homePresses,
@@ -193,9 +238,14 @@ class MainActivity : ComponentActivity() {
                     apps = apps,
                     pinnedShortcuts = pinnedShortcuts,
                     homeApps = homeApps,
-                    onHomeAppsChange = {
-                        homeApps = it.withPlanetsKept()
-                        homeAppsStore.save(homeApps)
+                    onHomeAppsChange = ::changeHomeApps,
+                    onSetUpHome = {
+                        if (appUsage.isUsageAccessGranted()) {
+                            setUpHome()
+                        } else {
+                            askingUsage = true
+                            appUsage.openUsageSettings()
+                        }
                     },
                     actions = actions,
                     reorderMode = reorderMode,
@@ -239,10 +289,7 @@ class MainActivity : ComponentActivity() {
                     widgetPage = widgetPage,
                     widgets = widgetActions,
                     collections = collections,
-                    onCollectionsChange = {
-                        collections = it
-                        collectionsStore.save(it)
-                    },
+                    onCollectionsChange = ::changeCollections,
                     foregroundTime = foregroundTime,
                     onOpenUsageSettings = appUsage::openUsageSettings,
                     unread = appSettings.badges(unread),

@@ -17,6 +17,7 @@ import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
@@ -97,6 +98,7 @@ import kotlin.math.roundToInt
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
+    const val SET_UP_HOME = "set_up_home"
 
     fun page(page: LauncherPage) = "page_${page.name}"
 }
@@ -114,7 +116,8 @@ data class HomePress(val launcherInFront: Boolean)
  * shows the [clock] over the ring from [homeApps], with the dock at its foot: the time and the date open the clock app
  * and the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
- * [updateAvailable], a button calls [onOpenUpdate]. Until [isHomeApp],
+ * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, a button under the ring
+ * offers to fill them with a guess ([onSetUpHome]). Until [isHomeApp],
  * a strip over the dock says so and offers [onBecomeHomeApp]. From anywhere on the home page, dock included, a swipe down
  * pulls down the notification shade ([onOpenNotifications]) and a swipe up opens the drawer. Long-pressing an app
  * anywhere opens its menu of shortcuts and
@@ -165,6 +168,7 @@ fun LauncherScreen(
     pinnedShortcuts: List<AppEntry>?,
     homeApps: HomeApps,
     onHomeAppsChange: (HomeApps) -> Unit,
+    onSetUpHome: () -> Unit,
     actions: AppActions,
     reorderMode: ReorderMode,
     onReorderModeChange: (ReorderMode) -> Unit,
@@ -990,6 +994,13 @@ fun LauncherScreen(
                                             dock = dock,
                                             dockSlot = { dockRearrange.boundsOf(it, dock) },
                                         )
+                                        // Once the apps have loaded, so it does not flash before stored slots resolve. Under the ring,
+                                        // as the emblem already asks to pick apps by hand.
+                                        if (apps != null && homeApps.isEmpty) {
+                                            TonalButton(onClick = onSetUpHome, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.SET_UP_HOME)) {
+                                                Text("Set up home")
+                                            }
+                                        }
                                         // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                         // the ring, which sizes itself to the room left, so the two can never overlap.
                                         if (!isHomeApp) {
