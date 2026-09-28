@@ -265,7 +265,8 @@ fun AppDrawer(
                         }
                         if (mostUsedApps.isNotEmpty()) {
                             fullWidth(key = "most_used", contentType = "most_used") {
-                                MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail)
+                                // A letter's header follows it in the A to Z list; elsewhere the rest needs a heading of its own.
+                                MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail, headsTheRest = !(alphabetical && headed))
                             }
                         }
                         if (alphabetical) {
@@ -422,15 +423,21 @@ private data class DrawerEntry(
     }
 }
 
-/** The [apps] used most, a grid row of them under their own heading, whatever the drawer's layout. */
+/**
+ * The [apps] used most, a grid row of them under their own heading, whatever the drawer's layout, and if it [headsTheRest]
+ * a heading for all the apps after it.
+ */
 @Composable
-private fun MostUsedRow(apps: List<AppEntry>, entry: DrawerEntry, detail: (AppEntry) -> String?) {
-    Column(Modifier.testTag(AppDrawerTags.MOST_USED)) {
-        Heading("Most used")
-        Row {
-            apps.forEach { app -> AppCell(app, detail(app), entry, Modifier.weight(1f)) }
-            repeat(GRID_COLUMNS - apps.size) { Spacer(Modifier.weight(1f)) }
+private fun MostUsedRow(apps: List<AppEntry>, entry: DrawerEntry, detail: (AppEntry) -> String?, headsTheRest: Boolean) {
+    Column {
+        Column(Modifier.testTag(AppDrawerTags.MOST_USED)) {
+            Heading("Most used")
+            Row {
+                apps.forEach { app -> AppCell(app, detail(app), entry, Modifier.weight(1f)) }
+                repeat(GRID_COLUMNS - apps.size) { Spacer(Modifier.weight(1f)) }
+            }
         }
+        if (headsTheRest) Heading("All apps")
     }
 }
 
