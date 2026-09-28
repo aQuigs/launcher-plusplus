@@ -1840,12 +1840,13 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aLongPressOnACardsTitleChoosesHowManyRowsItShowsCompact() {
+    fun aLongPressOnACardsHeaderChoosesHowManyRowsItShowsCompact() {
         collections = CollectionsPage()
         show()
         goToCollections()
 
-        compose.collectionTitle(MostUsed).performTouchInput { longClick() }
+        // Clear of the handle in the middle.
+        compose.collectionHeader(MostUsed).performTouchInput { longClick(Offset(width * 0.7f, centerY)) }
         compose.onNodeWithTag(CollectionTags.ROWS_DIALOG).assertIsDisplayed()
         compose.onNodeWithText("3 rows").performClick()
 

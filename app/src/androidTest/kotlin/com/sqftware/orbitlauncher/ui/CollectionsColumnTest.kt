@@ -43,6 +43,7 @@ class CollectionsColumnTest {
     private var adds = 0
     private var usageSettingsOpened = 0
     private val menusOpened = mutableListOf<Pair<CollectionKind, AppEntry>>()
+    private val rowsChosen = mutableListOf<CollectionKind>()
 
     private fun show() = compose.setContent {
         CollectionsColumn(
@@ -53,7 +54,7 @@ class CollectionsColumnTest {
             icon = { null },
             onLaunch = launched::add,
             onToggleExpanded = { page = page.toggleExpanded(it) },
-            onChooseRows = {},
+            onChooseRows = rowsChosen::add,
             onMove = { from, to -> page = page.move(from, to) },
             onEdit = edited::add,
             onAdd = { adds++ },
@@ -89,6 +90,20 @@ class CollectionsColumnTest {
 
         assertEquals(listOf(NewApps to recent[11]), menusOpened)
         assertTrue(launched.toString(), launched.isEmpty())
+    }
+
+    @Test
+    fun aLongPressAnywhereOnAHeaderButItsButtonsAsksForRows() {
+        show()
+
+        compose.collectionHeader(MostUsed).performTouchInput {
+            longClick(centerLeft + Offset(24.dp.toPx(), 0f))
+            longClick(Offset(width * 0.7f, centerY))
+        }
+        compose.collectionChevron(MostUsed).performTouchInput { longClick() }
+        compose.waitForIdle()
+
+        assertEquals(List(2) { MostUsed }, rowsChosen)
     }
 
     @Test
@@ -187,5 +202,26 @@ class CollectionsColumnTest {
 
         compose.runOnIdle { assertEquals(listOf(tools, NewApps, MostUsed), page.cards.map { it.kind }) }
         assertTrue("Tools now on top", topOf(compose.collectionCard(tools)) < topOf(compose.collectionCard(NewApps)))
+    }
+
+    @Test
+    fun holdingAHandleBeforeDraggingStillReordersRatherThanAskingForRows() {
+        page = CollectionsPage().add(tools)
+        show()
+        val distance = topOf(compose.collectionCard(tools)) - topOf(compose.collectionCard(NewApps))
+        val handle = compose.collectionHandle(tools).fetchSemanticsNode().boundsInRoot.center
+
+        compose.onRoot().performTouchInput {
+            down(handle)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis * 2)
+            moveBy(Offset(0f, -viewConfiguration.touchSlop * 2))
+            repeat(10) { moveBy(Offset(0f, -(distance + 20.dp).toPx() / 10)) }
+            up()
+        }
+
+        compose.runOnIdle {
+            assertEquals(listOf(tools, NewApps, MostUsed), page.cards.map { it.kind })
+            assertTrue(rowsChosen.toString(), rowsChosen.isEmpty())
+        }
     }
 }

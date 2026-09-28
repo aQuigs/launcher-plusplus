@@ -165,7 +165,7 @@ fun SemanticsNodeInteractionsProvider.collectionChevron(kind: CollectionKind) = 
 
 fun SemanticsNodeInteractionsProvider.collectionEditButton(kind: CollectionKind) = onNodeWithTag(CollectionTags.edit(kind))
 
-fun SemanticsNodeInteractionsProvider.collectionTitle(kind: CollectionKind) = onNodeWithTag(CollectionTags.title(kind))
+fun SemanticsNodeInteractionsProvider.collectionHeader(kind: CollectionKind) = onNodeWithTag(CollectionTags.header(kind))
 
 fun SemanticsNodeInteractionsProvider.collectionHandle(kind: CollectionKind) = onNodeWithTag(CollectionTags.handle(kind))
 

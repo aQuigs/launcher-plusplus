@@ -136,7 +136,7 @@ data class HomePress(val launcherInFront: Boolean)
  * their [unread] counts. An app's menu turns its badge off or on, leaves it off the built-in collection cards or puts
  * it back, as the [appSettings] say ([onAppSettingsChange]), opens its Play Store page, and in the drawer or on a card
  * adds it to the ring or the dock; on a hand-picked card it also takes the app off the card. A long press on a card's
- * title asks in a dialog how many rows it shows while compact. A long press on the home
+ * header asks in a dialog how many rows it shows while compact. A long press on the home
  * page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog

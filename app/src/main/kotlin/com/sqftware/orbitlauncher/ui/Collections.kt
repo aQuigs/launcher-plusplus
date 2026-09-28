@@ -125,7 +125,7 @@ object CollectionTags {
 
     fun card(kind: CollectionKind) = "collection_${kind.name}"
 
-    fun title(kind: CollectionKind) = "collection_title_${kind.name}"
+    fun header(kind: CollectionKind) = "collection_header_${kind.name}"
 
     fun handle(kind: CollectionKind) = "collection_handle_${kind.name}"
 
@@ -160,7 +160,7 @@ private const val NOTICE_MILLIS = 2_000L
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
  * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
  * chevron that calls [onToggleExpanded]: a compact card shows its set number of rows of its first apps, an expanded one
- * every app with its label. A long press on the title calls [onChooseRows]. The built-in cards work their apps out
+ * every app with its label. A long press anywhere on the header but its buttons calls [onChooseRows]. The built-in cards work their apps out
  * from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
  * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
@@ -304,22 +304,24 @@ private fun CardHeader(
     val latestOnMove by rememberUpdatedState(onMove)
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
-    Box(Modifier.fillMaxWidth().height(48.dp)) {
+    // The handle, the pencil and the chevron take their own presses, so the header has the rest.
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .combinedClickable(
+                interactionSource = null,
+                indication = null,
+                onLongClickLabel = "Rows when collapsed",
+                onLongClick = onChooseRows,
+                onClick = {},
+            )
+            .testTag(CollectionTags.header(kind)),
+    ) {
         // Kept clear of the handle in the middle, which a long title on a narrow screen would otherwise run under.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .fillMaxWidth(0.5f)
-                .padding(end = 28.dp)
-                .combinedClickable(
-                    interactionSource = null,
-                    indication = null,
-                    onLongClickLabel = "Rows when collapsed",
-                    onLongClick = onChooseRows,
-                    onClick = {},
-                )
-                .testTag(CollectionTags.title(kind)),
+            modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.5f).padding(end = 28.dp),
         ) {
             Icon(kind.glyph, contentDescription = null, modifier = Modifier.size(22.dp))
             Text(
@@ -338,7 +340,8 @@ private fun CardHeader(
                 .size(48.dp)
                 .pointerInput(index) {
                     awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
+                        // Taken, so a hold before the drag, as elsewhere in the launcher, is not the header's long press.
+                        val down = awaitFirstDown(requireUnconsumed = false).apply { consume() }
                         var overSlop = 0f
                         val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over ->
                             change.consume()
@@ -360,7 +363,8 @@ private fun CardHeader(
                         }
                     }
                 }
-                .semantics { contentDescription = "Reorder ${kind.title}" }
+                // A control of its own, not merged into the header that holds it.
+                .semantics(mergeDescendants = true) { contentDescription = "Reorder ${kind.title}" }
                 .testTag(CollectionTags.handle(kind)),
         ) {
             Icon(DragHandleGlyph, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
