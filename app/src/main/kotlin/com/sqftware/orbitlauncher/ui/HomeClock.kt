@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ object HomeClockTags {
     const val TIME = "clock_time"
     const val DATE = "clock_date"
     const val RINGER = "clock_ringer"
+    const val UPDATE = "clock_update"
 }
 
 /** The home clock's [face]. Tap the time for the clock app and the date for the calendar. */
@@ -60,11 +62,9 @@ fun HomeClock(face: ClockFace, onTimeClick: () -> Unit, onDateClick: () -> Unit,
 /** The ringer's [mode], for under the clock's date. A tap calls [onClick]. */
 @Composable
 fun RingerSwitch(mode: RingerMode, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val style = MaterialTheme.typography.titleSmall
-    // In sp, so the glyph grows with the word at a large font scale.
-    val glyph = with(LocalDensity.current) { style.lineHeight.toDp() }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    GlyphLabel(
+        glyph = R.drawable.ic_ringer,
+        label = mode.name,
         modifier = modifier
             .target("Switch the ringer", onClick)
             .testTag(HomeClockTags.RINGER)
@@ -73,9 +73,27 @@ fun RingerSwitch(mode: RingerMode, onClick: () -> Unit, modifier: Modifier = Mod
                 contentDescription = "Ringer"
                 stateDescription = mode.name
             },
-    ) {
-        Icon(painterResource(R.drawable.ic_ringer), contentDescription = null, modifier = Modifier.padding(end = 6.dp).size(glyph))
-        Text(text = mode.name, style = style)
+    )
+}
+
+/** Says a newer launcher is out, beside the ringer. A tap calls [onClick]. */
+@Composable
+fun UpdateButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    GlyphLabel(
+        glyph = R.drawable.ic_update,
+        label = "Update",
+        modifier = modifier.target("Open the update", onClick).testTag(HomeClockTags.UPDATE),
+    )
+}
+
+@Composable
+private fun GlyphLabel(@DrawableRes glyph: Int, label: String, modifier: Modifier) {
+    val style = MaterialTheme.typography.titleSmall
+    // In sp, so the glyph grows with the word at a large font scale.
+    val size = with(LocalDensity.current) { style.lineHeight.toDp() }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+        Icon(painterResource(glyph), contentDescription = null, modifier = Modifier.padding(end = 6.dp).size(size))
+        Text(text = label, style = style)
     }
 }
 

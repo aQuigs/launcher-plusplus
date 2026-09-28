@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -112,7 +113,8 @@ data class HomePress(val launcherInFront: Boolean)
  * The whole launcher: a horizontal pager over [layout] and the app drawer peeking below as a chevron. The home page
  * shows the [clock] over the ring from [homeApps], with the dock at its foot: the time and the date open the clock app
  * and the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
- * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs. Until [isHomeApp],
+ * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
+ * [updateAvailable], a button calls [onOpenUpdate]. Until [isHomeApp],
  * a strip over the dock says so and offers [onBecomeHomeApp]. From anywhere on the home page, dock included, a swipe down
  * pulls down the notification shade ([onOpenNotifications]) and a swipe up opens the drawer. Long-pressing an app
  * anywhere opens its menu of shortcuts and
@@ -141,7 +143,8 @@ data class HomePress(val launcherInFront: Boolean)
  * page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog
- * ([onFolderLookChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
+ * ([onFolderLookChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * restart the launcher ([onRestart]), and reset it ([onReset]) once a
  * dialog has asked. The ring, the dock and folders hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all
  * that is open, as HOME in front does, and asks on the home page whether to add its shortcut, which goes at the end of
  * the ring once the system has pinned it. [apps] and [pinnedShortcuts] are null until they have loaded. The drawer lays
@@ -174,6 +177,10 @@ fun LauncherScreen(
     onOpenCalendar: () -> Unit,
     ringerMode: RingerMode,
     onRingerTap: () -> Unit,
+    updateAvailable: Boolean,
+    onOpenUpdate: () -> Unit,
+    checkForUpdates: Boolean,
+    onCheckForUpdatesChange: (Boolean) -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPage: WidgetPage,
@@ -220,6 +227,8 @@ fun LauncherScreen(
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestFolderLook by rememberUpdatedState(folderLook)
     val latestOnRestart by rememberUpdatedState(onRestart)
+    val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
+    val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
 
     // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
     // through this screen's BackHandler.
@@ -716,6 +725,12 @@ fun LauncherScreen(
                                 onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
                             ),
                             LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
+                            LauncherMenuRow(
+                                "Check for updates",
+                                on = latestCheckForUpdates,
+                                flips = true,
+                                onClick = { latestOnCheckForUpdatesChange(!latestCheckForUpdates) },
+                            ),
                             LauncherMenuRow("Restart launcher") { latestOnRestart() },
                             LauncherMenuRow("Reset launcher") { confirmingReset = true },
                         ),
@@ -933,7 +948,10 @@ fun LauncherScreen(
                                             onDateClick = onOpenCalendar,
                                             modifier = Modifier.padding(top = 24.dp),
                                         )
-                                        RingerSwitch(mode = ringerMode, onClick = onRingerTap)
+                                        Row {
+                                            RingerSwitch(mode = ringerMode, onClick = onRingerTap)
+                                            if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
+                                        }
                                         HomeRing(
                                             ring = ring,
                                             // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
