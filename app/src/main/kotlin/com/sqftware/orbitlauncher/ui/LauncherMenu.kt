@@ -136,7 +136,7 @@ fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Reset Orbit?") },
         text = {
-            Text("This clears the ring, the dock, folders, collections, widgets and the clock and folder choices, then restarts. Permissions stay.")
+            Text("This clears the ring, the dock, folders, collections, widgets and your settings, then restarts. Permissions stay.")
         },
         modifier = Modifier.testTag(LauncherMenuTags.RESET_DIALOG),
     )
