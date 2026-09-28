@@ -60,6 +60,8 @@ import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
+import com.sqftware.orbitlauncher.domain.DrawerLayout
+import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -107,6 +109,7 @@ class LauncherScreenTest {
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
     private val hourStylesChosen = mutableListOf<Boolean>()
     private var folderLook by mutableStateOf(FolderLook.SolarSystem)
+    private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
     private var ringerTaps = 0
@@ -186,6 +189,8 @@ class LauncherScreenTest {
             },
             folderLook = folderLook,
             onFolderLookChange = { folderLook = it },
+            drawerStyle = drawerStyle,
+            onDrawerStyleChange = { drawerStyle = it },
             onOpenClock = { opened += "clock" },
             onOpenCalendar = { opened += "calendar" },
             ringerMode = ringerMode,
@@ -1660,6 +1665,20 @@ class LauncherScreenTest {
         compose.runOnIdle { assertEquals(FolderLook.Orbit, folderLook) }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Folder look").assert(hasText("Moons in orbit"))
+    }
+
+    @Test
+    fun theDrawersButtonsChangeItsStyleAndHomeClosesItsSortMenu() {
+        show()
+        compose.drawerHandle().performClick()
+        compose.onNodeWithContentDescription("Grid view").performClick()
+        compose.runOnIdle { assertEquals(DrawerLayout.Grid, drawerStyle.layout) }
+
+        compose.onNodeWithContentDescription("Sort apps").performClick()
+        compose.onNodeWithTag(AppDrawerTags.SORT_MENU).assertIsDisplayed()
+        pressHome(launcherInFront = true)
+
+        compose.onNodeWithTag(AppDrawerTags.SORT_MENU).assertDoesNotExist()
     }
 
     @Test

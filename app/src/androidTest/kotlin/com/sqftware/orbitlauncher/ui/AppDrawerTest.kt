@@ -1,6 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,10 +15,13 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -29,6 +32,10 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.DrawerLayout
+import com.sqftware.orbitlauncher.domain.DrawerOrder
+import com.sqftware.orbitlauncher.domain.DrawerStyle
+import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.OTHER_INITIAL
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import org.junit.Assert.assertEquals
@@ -42,7 +49,7 @@ class AppDrawerTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val listState = LazyListState()
+    private val gridState = LazyGridState()
 
     // Each letter of the alphabet fixture is one header row followed by its apps.
     private val itemsPerLetter = APPS_PER_LETTER + 1
@@ -52,9 +59,106 @@ class AppDrawerTest {
         onLaunch: (AppEntry) -> Unit = {},
         picking: Picking? = null,
         unread: UnreadCounts = UnreadCounts(),
+        style: DrawerStyle = DrawerStyle(),
+        onStyleChange: (DrawerStyle) -> Unit = {},
+        foregroundTime: ForegroundTime? = null,
+        onOpenUsageSettings: () -> Unit = {},
     ) = compose.setContent {
         var query by remember { mutableStateOf("") }
-        AppDrawer(apps, icon = { null }, onLaunch, picking = picking, listState = listState, query = query, onQueryChange = { query = it }, unread = unread)
+        var sorting by remember { mutableStateOf(false) }
+        AppDrawer(
+            apps,
+            icon = { null },
+            onLaunch,
+            picking = picking,
+            gridState = gridState,
+            query = query,
+            onQueryChange = { query = it },
+            unread = unread,
+            controls = DrawerControls(style, onStyleChange, sorting, onSortingChange = { sorting = it }),
+            foregroundTime = foregroundTime,
+            onOpenUsageSettings = onOpenUsageSettings,
+        )
+    }
+
+    private fun top(label: String) = compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot.top
+
+    @Test
+    fun theGridSetsAppsSideBySideWithoutHeadersAndTheRailFindsTheirFirstApp() {
+        val launched = mutableListOf<AppEntry>()
+        show(alphabet, onLaunch = launched::add, style = DrawerStyle(layout = DrawerLayout.Grid))
+
+        assertEquals(top("A1"), top("A3"))
+        assertTrue(top("B2") > top("A1"))
+        compose.sectionHeader('A').assertDoesNotExist()
+
+        compose.railLetter('T').performClick()
+
+        compose.runOnIdle { assertEquals(('T' - 'A') * APPS_PER_LETTER, gridState.firstVisibleItemIndex) }
+        compose.onNodeWithText("T1").performClick()
+        assertEquals("T1", launched.single().label)
+    }
+
+    @Test
+    fun theHeaderButtonsSetTheLayoutAndTheSortMenuTheOrderAndTheMostUsedRow() {
+        val changes = mutableListOf<DrawerStyle>()
+        show(listOf(clock, mail), onStyleChange = changes::add)
+
+        compose.onNodeWithContentDescription("List view").assertIsSelected()
+        compose.onNodeWithContentDescription("Grid view").performClick()
+        compose.onNodeWithContentDescription("Sort apps").performClick()
+        compose.onNodeWithText("A to Z").assertIsSelected()
+        compose.onNodeWithText("Date added").performClick()
+        compose.onNodeWithTag(AppDrawerTags.SORT_MENU).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Sort apps").performClick()
+        compose.onNodeWithText("Most used row").assertIsOff().performClick()
+
+        assertEquals(
+            listOf(
+                DrawerStyle(layout = DrawerLayout.Grid),
+                DrawerStyle(order = DrawerOrder.Newest),
+                DrawerStyle(mostUsedRow = true),
+            ),
+            changes,
+        )
+    }
+
+    @Test
+    fun anotherOrderListsTheAppsInOneRunWithoutSectionsOrRail() {
+        val old = AppEntry("Aardvark", "com.example.old", "Main", installedAt = 1)
+        val new = AppEntry("Zebra", "com.example.new", "Main", installedAt = 2)
+        show(listOf(old, new), style = DrawerStyle(order = DrawerOrder.Newest))
+
+        assertTrue(top("Zebra") < top("Aardvark"))
+        compose.sectionHeader('A').assertDoesNotExist()
+        compose.railLetter('A').assertDoesNotExist()
+    }
+
+    @Test
+    fun theMostUsedRowHeadsTheListAndTheRailStillFindsItsSections() {
+        val time = ForegroundTime(mapOf("com.example.b2" to 20L, "com.example.t1" to 10L))
+        show(alphabet, style = DrawerStyle(mostUsedRow = true), foregroundTime = time)
+
+        val inRow = hasAnyAncestor(hasTestTag(AppDrawerTags.MOST_USED))
+        val b2 = compose.onNode(hasText("B2") and inRow).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val t1 = compose.onNode(hasText("T1") and inRow).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(b2.left < t1.left)
+        assertTrue(t1.bottom <= compose.sectionHeader('A').fetchSemanticsNode().boundsInRoot.top)
+
+        compose.railLetter('T').performClick()
+
+        compose.runOnIdle { assertEquals(1 + ('T' - 'A') * itemsPerLetter, gridState.firstVisibleItemIndex) }
+    }
+
+    @Test
+    fun withoutUsageAccessTheDrawerAsksForIt() {
+        var opened = 0
+        show(listOf(clock, mail), style = DrawerStyle(mostUsedRow = true), onOpenUsageSettings = { opened++ })
+
+        compose.onNodeWithTag(AppDrawerTags.MOST_USED).assertDoesNotExist()
+        compose.onNodeWithTag(AppDrawerTags.USAGE_ACCESS).performClick()
+
+        assertEquals(1, opened)
     }
 
     @Test
@@ -197,7 +301,7 @@ class AppDrawerTest {
         compose.onNodeWithText("T1").assertIsDisplayed()
         compose.onNodeWithText("A1").assertIsNotDisplayed()
         compose.railLetter('T').assertIsSelected()
-        compose.runOnIdle { assertEquals(('T' - 'A') * itemsPerLetter, listState.firstVisibleItemIndex) }
+        compose.runOnIdle { assertEquals(('T' - 'A') * itemsPerLetter, gridState.firstVisibleItemIndex) }
     }
 
     @Test
@@ -228,7 +332,7 @@ class AppDrawerTest {
         compose.onRoot().performTouchInput { swipe(start = a, end = m) }
 
         compose.runOnIdle {
-            assertTrue("scrolled to item ${listState.firstVisibleItemIndex}", listState.firstVisibleItemIndex >= 10 * itemsPerLetter)
+            assertTrue("scrolled to item ${gridState.firstVisibleItemIndex}", gridState.firstVisibleItemIndex >= 10 * itemsPerLetter)
         }
         compose.onNodeWithText("A1").assertIsNotDisplayed()
         compose.railLetter('M').assertIsSelected()

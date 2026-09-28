@@ -17,23 +17,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,18 +66,28 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.DrawerLayout
+import com.sqftware.orbitlauncher.domain.DrawerOrder
+import com.sqftware.orbitlauncher.domain.DrawerStyle
+import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.inOrder
 import com.sqftware.orbitlauncher.domain.keysWithSharedLabels
 import com.sqftware.orbitlauncher.domain.matching
+import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.sectionsByInitial
 import kotlinx.coroutines.launch
 
@@ -75,6 +95,9 @@ object AppDrawerTags {
     const val HANDLE = "drawer_handle"
     const val LIST = "app_list"
     const val SEARCH = "app_search"
+    const val MOST_USED = "drawer_most_used"
+    const val USAGE_ACCESS = "drawer_usage_access"
+    const val SORT_MENU = "drawer_sort_menu"
 
     fun section(initial: Char) = "section_$initial"
 
@@ -122,12 +145,27 @@ class Picking(
 )
 
 /**
- * Every app, as its [icon] and its name, in sections headed by their initial, with a rail of those initials down the end
- * edge to jump by. An app whose name an app from another package shares also shows its package name, to tell them
- * apart. A tap launches the app and a long press opens its [menu], unless the drawer is [picking]; a long press that
- * moves on becomes a [drag]. A search field heads the list: with a [query] the list holds only the matching
- * apps, without sections or rail, and the keyboard's search key acts on the first of them as a tap would. An app with
- * [unread] notifications shows their number at the end of its row, in full, since a row has the room a badge lacks.
+ * The drawer's own controls beside its search field, as Arc has them: a button for each [DrawerLayout], the one the
+ * [style] has lit, and a button opening the sort menu, shown while [sorting], of the orders and the row of the most used
+ * apps. A choice goes to [onStyleChange]; opening and closing the menu to [onSortingChange].
+ */
+class DrawerControls(
+    val style: DrawerStyle,
+    val onStyleChange: (DrawerStyle) -> Unit,
+    val sorting: Boolean,
+    val onSortingChange: (Boolean) -> Unit,
+)
+
+/**
+ * Every app, as its [icon] and its name, laid out and ordered as the [controls]' style says: a row per app or a grid of
+ * them, and by name with a rail of initials down the end edge to jump by, the list in sections headed by those initials,
+ * or else in one run, the most used ([foregroundTime]) or the newest first. The style can head the list with a row of the
+ * most used apps; what needs usage access asks for it ([onOpenUsageSettings]) until it is granted. An app whose name an app from
+ * another package shares also shows its package name, to tell them apart. A tap launches the app and a long press opens
+ * its [menu], unless the drawer is [picking]; a long press that moves on becomes a [drag]. A search field heads the
+ * list: with a [query] the list holds only the matching apps, without sections or rail, and the keyboard's search key
+ * acts on the first of them as a tap would. An app with [unread] notifications shows their number, in full at the end of
+ * its row, since a row has the room a badge lacks, or as a badge on its icon in the grid.
  */
 @Composable
 fun AppDrawer(
@@ -136,77 +174,109 @@ fun AppDrawer(
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     picking: Picking? = null,
-    listState: LazyListState = rememberLazyListState(),
+    gridState: LazyGridState = rememberLazyGridState(),
     menu: AppMenu? = null,
     drag: AppDrag? = null,
     query: String,
     onQueryChange: (String) -> Unit,
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
+    controls: DrawerControls? = null,
+    foregroundTime: ForegroundTime? = null,
+    onOpenUsageSettings: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
-    val rowMenu = menu.takeIf { picking == null }
-    val rowDrag = drag.takeIf { picking == null }
+    val style = controls?.style ?: DrawerStyle()
     val searching = query.isNotBlank()
     val matches = remember(apps, query) { if (searching) apps.matching(query) else emptyList() }
     // The matches scroll on their own, so the sections come back where they were and a match does not become the top of
     // the sections' list because it was the first thing on screen when the search ended. Each new query starts at its top.
-    val matchesState = rememberLazyListState()
+    val matchesState = rememberLazyGridState()
     LaunchedEffect(matches) { matchesState.scrollToItem(0) }
-    val sections = remember(apps) { apps.sectionsByInitial() }
+    val alphabetical = style.order == DrawerOrder.Alphabetical
+    val ordered = remember(apps, style.order, foregroundTime) { apps.inOrder(style.order, foregroundTime) }
+    val sections = remember(ordered, alphabetical) { if (alphabetical) ordered.sectionsByInitial() else emptyList() }
+    val askForUsage = picking == null && style.readsUsage && foregroundTime == null
+    val mostUsedApps = remember(apps, style.mostUsedRow, foregroundTime) {
+        if (style.mostUsedRow && foregroundTime != null) mostUsed(apps, foregroundTime, GRID_COLUMNS) else emptyList()
+    }.takeIf { picking == null }.orEmpty()
     val sharingALabel = remember(apps) { apps.keysWithSharedLabels() }
     val detail = { app: AppEntry -> app.packageName.takeIf { app.key in sharingALabel } }
     val initials = remember(sections) { sections.map { it.initial } }
-    // Each section is one header item followed by its apps, so the rail's targets are the running item counts.
-    val headerIndices = remember(sections) {
-        sections.runningFold(0) { index, section -> index + 1 + section.apps.size }.dropLast(1)
+    val leading = listOf(askForUsage, mostUsedApps.isNotEmpty()).count { it }
+    // The grid has no headers, as Arc's has none, so there the rail jumps to a section's first app.
+    val headed = style.layout == DrawerLayout.List
+    // The rail's targets are the running item counts: each section is its header, if it has one, then its apps.
+    val headerIndices = remember(sections, leading, headed) {
+        val header = if (headed) 1 else 0
+        sections.runningFold(leading) { index, section -> index + header + section.apps.size }.dropLast(1)
     }
     var lastSelected by remember { mutableStateOf<Int?>(null) }
     // The chosen letter stays lit while its header is on screen: near the end of the list the scroll stops short, and
     // the section at the top is then an earlier one.
-    val highlighted by remember(headerIndices, listState) {
+    val highlighted by remember(headerIndices, gridState) {
         derivedStateOf {
             val chosenHeader = lastSelected?.let(headerIndices::getOrNull)
-            lastSelected.takeIf { chosenHeader != null && listState.layoutInfo.visibleItemsInfo.any { it.index == chosenHeader } }
-                ?: headerIndices.indexOfLast { it <= listState.firstVisibleItemIndex }
+            lastSelected.takeIf { chosenHeader != null && gridState.layoutInfo.visibleItemsInfo.any { it.index == chosenHeader } }
+                ?: headerIndices.indexOfLast { it <= gridState.firstVisibleItemIndex }
         }
     }
+    val showsRail = !searching && alphabetical
+    val entry = DrawerEntry(
+        layout = style.layout,
+        icon = icon,
+        onLaunch = onLaunch,
+        picking = picking,
+        menu = menu.takeIf { picking == null },
+        drag = drag.takeIf { picking == null },
+        unread = unread,
+        onClearBadge = onClearBadge,
+    )
 
     Column(modifier.fillMaxSize()) {
         picking?.header?.invoke()
-        SearchField(
-            query = query,
-            onQueryChange = onQueryChange,
-            onSearch = { matches.firstOrNull()?.let(picking?.onToggle ?: onLaunch) },
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SearchField(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSearch = { matches.firstOrNull()?.let(picking?.onToggle ?: onLaunch) },
+                modifier = Modifier.weight(1f).padding(end = if (controls == null) 24.dp else 4.dp),
+            )
+            controls?.let { StyleButtons(it) }
+        }
         Box(Modifier.weight(1f)) {
-            LazyColumn(
-                state = if (searching) matchesState else listState,
-                contentPadding = PaddingValues(end = if (searching) 0.dp else RAIL_WIDTH),
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(if (style.layout == DrawerLayout.Grid) GRID_COLUMNS else 1),
+                state = if (searching) matchesState else gridState,
+                contentPadding = PaddingValues(end = if (showsRail) RAIL_WIDTH else 0.dp),
                 modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
             ) {
-                if (!searching) {
-                    sections.forEach { section ->
-                        item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
-                        items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                            AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app], unread.clearing(app, onClearBadge))
+                when {
+                    searching && matches.isEmpty() -> fullWidth(contentType = "empty") { NoMatches() }
+                    searching -> apps(matches, entry, detail)
+                    else -> {
+                        if (askForUsage) fullWidth(key = "usage", contentType = "usage") { UsageAccess(onOpenUsageSettings) }
+                        if (mostUsedApps.isNotEmpty()) {
+                            fullWidth(key = "most_used", contentType = "most_used") { MostUsedRow(mostUsedApps, entry, detail) }
                         }
-                    }
-                } else if (matches.isEmpty()) {
-                    item(contentType = "empty") { NoMatches() }
-                } else {
-                    items(matches, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app], unread.clearing(app, onClearBadge))
+                        if (alphabetical) {
+                            sections.forEach { section ->
+                                if (headed) fullWidth(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                                apps(section.apps, entry, detail)
+                            }
+                        } else {
+                            apps(ordered, entry, detail)
+                        }
                     }
                 }
             }
-            if (!searching) {
+            if (showsRail) {
                 LetterRail(
                     initials = initials,
                     highlighted = highlighted,
                     onSelect = { section ->
                         lastSelected = section
-                        scope.launch { listState.scrollToItem(headerIndices[section]) }
+                        scope.launch { gridState.scrollToItem(headerIndices[section]) }
                     },
                     modifier = Modifier.align(Alignment.CenterEnd),
                 )
@@ -216,7 +286,7 @@ fun AppDrawer(
 }
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -231,13 +301,72 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
         shape = CircleShape,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+        modifier = modifier
+            .padding(start = 24.dp, top = 8.dp, bottom = 8.dp)
             // The placeholder goes once there is text, and a screen reader should still say what the field is for.
             .semantics { contentDescription = "Search apps" }
             .testTag(AppDrawerTags.SEARCH),
     )
+}
+
+@Composable
+private fun StyleButtons(controls: DrawerControls) {
+    val style = controls.style
+
+    DrawerLayout.entries.forEach { layout ->
+        val lit = layout == style.layout
+        IconButton(
+            onClick = { controls.onStyleChange(style.copy(layout = layout)) },
+            modifier = Modifier.semantics { selected = lit },
+        ) {
+            Icon(
+                imageVector = if (layout == DrawerLayout.List) Icons.AutoMirrored.Filled.List else GridGlyph,
+                contentDescription = "${layout.label} view",
+                tint = if (lit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    Box(Modifier.padding(end = 8.dp)) {
+        IconButton(onClick = { controls.onSortingChange(true) }) {
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Sort apps")
+        }
+        SortMenu(controls)
+    }
+}
+
+/** The orders the drawer can list its apps in, the one chosen checked, and the switch for the most used apps' row. */
+@Composable
+private fun SortMenu(controls: DrawerControls) {
+    val style = controls.style
+    val close = { controls.onSortingChange(false) }
+    fun choose(changed: DrawerStyle) = chooseFrom(controls.sorting, close) { controls.onStyleChange(changed) }
+
+    DropdownMenu(expanded = controls.sorting, onDismissRequest = close, modifier = Modifier.testTag(AppDrawerTags.SORT_MENU)) {
+        DrawerOrder.entries.forEach { order ->
+            val chosen = order == style.order
+            DropdownMenuItem(
+                text = { Text(order.label) },
+                trailingIcon = if (chosen) {
+                    { Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                } else {
+                    null
+                },
+                onClick = { choose(style.copy(order = order)) },
+                modifier = Modifier.semantics { selected = chosen },
+            )
+        }
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text("Most used row") },
+            // The switch only shows the state: the row is the control.
+            trailingIcon = { Switch(checked = style.mostUsedRow, onCheckedChange = null) },
+            onClick = { choose(style.copy(mostUsedRow = !style.mostUsedRow)) },
+            modifier = Modifier.semantics {
+                role = Role.Switch
+                toggleableState = ToggleableState(style.mostUsedRow)
+            },
+        )
+    }
 }
 
 @Composable
@@ -252,50 +381,98 @@ private fun NoMatches() {
 
 private val RAIL_WIDTH = 28.dp
 private val ROW_ICON_SIZE = 40.dp
+private val GRID_ICON_SIZE = 52.dp
+private const val GRID_COLUMNS = 4
 
+private fun LazyGridScope.fullWidth(key: Any? = null, contentType: Any? = null, content: @Composable () -> Unit) =
+    item(key = key, span = { GridItemSpan(maxLineSpan) }, contentType = contentType) { content() }
+
+private fun LazyGridScope.apps(apps: List<AppEntry>, entry: DrawerEntry, detail: (AppEntry) -> String?) =
+    items(apps, key = { it.key }, contentType = { "app" }) { app -> entry.Show(app, detail(app)) }
+
+/** What every app in the drawer is shown with, in its [layout]: a row, or a cell of the grid. */
+private class DrawerEntry(
+    val layout: DrawerLayout,
+    val icon: suspend (AppEntry) -> ImageBitmap?,
+    val onLaunch: (AppEntry) -> Unit,
+    val picking: Picking?,
+    val menu: AppMenu?,
+    val drag: AppDrag?,
+    val unread: UnreadCounts,
+    val onClearBadge: ((AppEntry) -> Unit)?,
+) {
+    @Composable
+    fun Show(app: AppEntry, detail: String?) = when (layout) {
+        DrawerLayout.List -> AppRow(app, detail, this)
+        DrawerLayout.Grid -> AppCell(app, detail, this)
+    }
+
+    fun action(app: AppEntry): Modifier = when {
+        // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
+        picking == null -> Modifier.launchable(app, onLaunch, menu, onClearBadge = unread.clearing(app, onClearBadge)).itemDrag(app, drag)
+        picking.mark == PickMark.Check -> {
+            Modifier.toggleable(value = picking.isPicked(app), role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
+        }
+        else -> Modifier.clickable { picking.onToggle(app) }
+    }
+}
+
+/** Asks for usage access, which what the drawer's style shows first needs. The whole row opens the settings. */
 @Composable
-private fun SectionHeader(initial: Char) {
+private fun UsageAccess(onClick: () -> Unit) {
     Text(
-        text = initial.toString(),
-        style = MaterialTheme.typography.labelLarge,
+        text = "Allow usage access to see your most used apps",
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp)
-            .testTag(AppDrawerTags.section(initial)),
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .testTag(AppDrawerTags.USAGE_ACCESS),
+    )
+}
+
+/** The [apps] used most, a grid row of them under their own heading, whatever the drawer's layout. */
+@Composable
+private fun MostUsedRow(apps: List<AppEntry>, entry: DrawerEntry, detail: (AppEntry) -> String?) {
+    Column(Modifier.testTag(AppDrawerTags.MOST_USED)) {
+        Heading("Most used")
+        Row {
+            apps.forEach { app -> AppCell(app, detail(app), entry, Modifier.weight(1f)) }
+            repeat(GRID_COLUMNS - apps.size) { Spacer(Modifier.weight(1f)) }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(initial: Char) = Heading(initial.toString(), Modifier.testTag(AppDrawerTags.section(initial)))
+
+@Composable
+private fun Heading(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 6.dp),
     )
 }
 
 @Composable
-private fun AppRow(
-    app: AppEntry,
-    detail: String?,
-    icon: suspend (AppEntry) -> ImageBitmap?,
-    onLaunch: (AppEntry) -> Unit,
-    picking: Picking?,
-    menu: AppMenu?,
-    drag: AppDrag?,
-    unread: Int,
-    onClearBadge: ((AppEntry) -> Unit)?,
-) {
+private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
+    val picking = entry.picking
     val picked = picking?.isPicked(app) == true
-    val action = when {
-        // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
-        picking == null -> Modifier.launchable(app, onLaunch, menu, onClearBadge = onClearBadge).itemDrag(app, drag)
-        picking.mark == PickMark.Check -> {
-            Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
-        }
-        else -> Modifier.clickable { picking.onToggle(app) }
-    }
+    val unread = entry.unread[app]
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .then(action)
+            .then(entry.action(app))
             .padding(horizontal = 24.dp, vertical = 8.dp),
     ) {
-        IconDisc(modifier = Modifier.size(ROW_ICON_SIZE)) { AppImage(app, icon, Modifier.fillMaxSize()) }
+        IconDisc(modifier = Modifier.size(ROW_ICON_SIZE)) { AppImage(app, entry.icon, Modifier.fillMaxSize()) }
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
             Text(text = app.label, style = MaterialTheme.typography.titleMedium)
             if (detail != null) {
@@ -324,16 +501,70 @@ private fun AppRow(
                 else -> Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
         }
-        menu?.content?.invoke(app)
+        entry.menu?.content?.invoke(app)
+    }
+}
+
+/**
+ * An app as a cell of the grid: its icon, wearing its unread badge and the mark of a pick, over its name. The whole
+ * cell is the target.
+ */
+@Composable
+private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier: Modifier = Modifier) {
+    val picking = entry.picking
+    val unread = entry.unread[app]
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .then(entry.action(app))
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+    ) {
+        Box(Modifier.size(GRID_ICON_SIZE)) {
+            IconDisc(modifier = Modifier.fillMaxSize()) { AppImage(app, entry.icon, Modifier.fillMaxSize()) }
+            UnreadBadge(unread, Modifier.align(Alignment.TopEnd).clearAndSetSemantics { text = AnnotatedString("$unread unread") })
+            if (picking?.isPicked(app) == true) {
+                when (picking.mark) {
+                    PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))
+                    PickMark.Check -> Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                            .size(18.dp)
+                            .padding(2.dp),
+                    )
+                }
+            }
+            entry.menu?.content?.invoke(app)
+        }
+        Text(
+            text = app.label,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (detail != null) {
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.StartEllipsis,
+            )
+        }
     }
 }
 
 /** Marks a row whose app was just added: read as part of the row, like the unread count. */
 @Composable
-private fun Dot() {
+private fun Dot(modifier: Modifier = Modifier.padding(start = 12.dp)) {
     Box(
-        Modifier
-            .padding(start = 12.dp)
+        modifier
             .size(8.dp)
             .background(MaterialTheme.colorScheme.primary, CircleShape)
             .clearAndSetSemantics { text = AnnotatedString("added") },
