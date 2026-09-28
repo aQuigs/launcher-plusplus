@@ -47,11 +47,18 @@ class PlayAppUpdates(private val context: Context) : AppUpdates {
 
     override fun openStorePage() = context.openStorePage(context.packageName, TAG)
 
-    // Null when Play cannot say, as for a build it did not install, so a failed check keeps what the last one found.
+    // Null when Play cannot say, as for a build it did not install or before it has loaded what it offers, so such a check
+    // keeps what the last one found.
     private suspend fun check(): Boolean? = suspendCancellableCoroutine { done ->
         manager.appUpdateInfo.addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                done.resume(task.result.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE)
+                done.resume(
+                    when (task.result.updateAvailability()) {
+                        UpdateAvailability.UPDATE_AVAILABLE -> true
+                        UpdateAvailability.UPDATE_NOT_AVAILABLE -> false
+                        else -> null
+                    },
+                )
             } else {
                 Log.w(TAG, "Cannot check for an update", task.exception)
                 done.resume(null)
