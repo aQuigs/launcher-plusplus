@@ -50,6 +50,12 @@ private const val SHOWN_SHORTCUTS = ShortcutQuery.FLAG_MATCH_MANIFEST or Shortcu
 // What a square leaves free on each side when its corners touch a circle as wide: (1 - 1/√2) / 2.
 private val SQUARE_IN_CIRCLE = ((1 - 1 / sqrt(2.0)) / 2).toFloat()
 
+internal fun Context.openStorePage(packageName: String, tag: String) = startOrLog(tag, "the Play Store page of $packageName") {
+    val page = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).setPackage(PLAY_STORE)
+    // In a task of its own, as when an app is launched, so HOME leaves it rather than clearing it off the launcher's.
+    startActivity(page.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
 class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
     private val activityManager = context.getSystemService(ActivityManager::class.java)
@@ -160,11 +166,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         }
     }
 
-    override fun openStorePage(app: AppEntry) = startOrLog(TAG, "the Play Store page of ${app.packageName}") {
-        val page = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${app.packageName}")).setPackage(PLAY_STORE)
-        // In a task of its own, as when an app is launched, so HOME leaves it rather than clearing it off the launcher's.
-        context.startActivity(page.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
+    override fun openStorePage(app: AppEntry) = context.openStorePage(app.packageName, TAG)
 
     override fun uninstall(app: AppEntry) = startOrLog(TAG, "uninstall for ${app.key}") {
         // In a task of its own, left out of recents: in the launcher's task, HOME would clear the confirmation and count as

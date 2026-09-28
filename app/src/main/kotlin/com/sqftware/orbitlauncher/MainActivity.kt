@@ -19,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.NotificationBadges
+import com.sqftware.orbitlauncher.apps.PlayAppUpdates
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
@@ -27,6 +28,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesFolderLookStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
 import com.sqftware.orbitlauncher.apps.SystemAppUsage
@@ -74,6 +76,8 @@ class MainActivity : ComponentActivity() {
         val reorderModeStore = SharedPreferencesReorderModeStore(this)
         val drawerStyleStore = SharedPreferencesDrawerStyleStore(this)
         val ringer = SystemRinger(this)
+        val appUpdates = PlayAppUpdates(this)
+        val updateCheckStore = SharedPreferencesUpdateCheckStore(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
         val collectionsStore = SharedPreferencesCollectionsStore(this)
@@ -140,6 +144,11 @@ class MainActivity : ComponentActivity() {
                 // the launcher is visible, like the clock.
                 val ringerMode by produceState(remember { ringer.mode() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { ringer.modes().collect { value = it } }
+                }
+                var checkForUpdates by remember { mutableStateOf(updateCheckStore.load()) }
+                // Play tells no one of a new release, so it is asked, only while the launcher is visible, like the clock.
+                val updateAvailable by produceState(false, checkForUpdates) {
+                    if (checkForUpdates) repeatOnLifecycle(Lifecycle.State.STARTED) { appUpdates.available().collect { value = it } }
                 }
                 // Read again on each return to the front, since the user may have picked another home app in Settings.
                 val isHomeApp by produceState(remember { homeRole.isHeld() }) {
@@ -210,6 +219,13 @@ class MainActivity : ComponentActivity() {
                     onOpenCalendar = wallClock::openCalendar,
                     ringerMode = ringerMode,
                     onRingerTap = ringer::cycle,
+                    updateAvailable = updateAvailable,
+                    onOpenUpdate = appUpdates::openStorePage,
+                    checkForUpdates = checkForUpdates,
+                    onCheckForUpdatesChange = {
+                        checkForUpdates = it
+                        updateCheckStore.save(it)
+                    },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPage = widgetPage,

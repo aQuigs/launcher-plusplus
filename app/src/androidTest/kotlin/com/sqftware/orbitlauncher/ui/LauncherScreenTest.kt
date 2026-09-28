@@ -82,6 +82,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -112,6 +113,9 @@ class LauncherScreenTest {
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
     private var ringerTaps = 0
+    private var updateAvailable by mutableStateOf(false)
+    private var updatesOpened = 0
+    private var checkForUpdates by mutableStateOf(true)
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -194,6 +198,10 @@ class LauncherScreenTest {
             onOpenCalendar = { opened += "calendar" },
             ringerMode = ringerMode,
             onRingerTap = { ringerTaps++ },
+            updateAvailable = updateAvailable,
+            onOpenUpdate = { updatesOpened++ },
+            checkForUpdates = checkForUpdates,
+            onCheckForUpdatesChange = { checkForUpdates = it },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPage = widgetPage,
@@ -400,6 +408,19 @@ class LauncherScreenTest {
         compose.ringer().performClick()
 
         compose.runOnIdle { assertEquals(1, ringerTaps) }
+    }
+
+    @Test
+    fun theUpdateButtonShowsBesideTheRingerOnlyWhileAnUpdateIsOutAndHandsOnATap() {
+        show()
+        compose.onNodeWithTag(HomeClockTags.UPDATE).assertDoesNotExist()
+
+        updateAvailable = true
+
+        val button = compose.onNodeWithTag(HomeClockTags.UPDATE).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue("the button sits beside the ringer", compose.ringer().getUnclippedBoundsInRoot().right <= button.left)
+        compose.onNodeWithTag(HomeClockTags.UPDATE).performClick()
+        compose.runOnIdle { assertEquals(1, updatesOpened) }
     }
 
     @Test
@@ -1649,6 +1670,19 @@ class LauncherScreenTest {
         compose.onNodeWithText("24-hour clock").assertIsOff()
         compose.onNodeWithText("24-hour clock").performClick()
         compose.runOnIdle { assertEquals(listOf(false, true), hourStylesChosen) }
+    }
+
+    @Test
+    fun theLauncherMenusUpdateRowShowsWhetherItChecksAndATapFlipsIt() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Check for updates").assertIsOn()
+
+        compose.onNodeWithText("Check for updates").performClick()
+
+        compose.runOnIdle { assertFalse(checkForUpdates) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Check for updates").assertIsOff()
     }
 
     @Test
