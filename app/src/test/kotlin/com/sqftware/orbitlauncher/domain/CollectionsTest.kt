@@ -57,6 +57,29 @@ class CollectionsTest {
     }
 
     @Test
+    fun `rows are set on one card, from one to four, and a built-in card works out enough apps to fill them`() {
+        val page = CollectionsPage().setRows(MostUsed, 3)
+
+        assertEquals(1, page.card(NewApps)!!.rows)
+        assertEquals(3, page.card(MostUsed)!!.rows)
+        assertEquals(4, page.setRows(MostUsed, 9).card(MostUsed)!!.rows)
+        assertEquals(1, page.setRows(MostUsed, 0).card(MostUsed)!!.rows)
+        assertEquals(10, page.card(NewApps)!!.builtInLimit)
+        assertEquals(15, page.card(MostUsed)!!.builtInLimit)
+        assertEquals(3, page.remove(MostUsed).add(page.card(MostUsed)!!).card(MostUsed)!!.rows)
+    }
+
+    @Test
+    fun `rows missing or out of range are one, and whatever follows them is ignored`() {
+        val text = "NewApps\t0,\nMostUsed\t1,9\nTools\t0,3,x\ta/A"
+
+        assertEquals(
+            listOf(CollectionCard(NewApps), CollectionCard(MostUsed, expanded = true), CollectionCard(tools, Favourites(listOf("a/A")), rows = 3)),
+            decodeCollectionsPage(text).cards,
+        )
+    }
+
+    @Test
     fun `a card moves to another position and stays put for one off the page`() {
         val page = CollectionsPage().add(tools)
 
@@ -139,10 +162,11 @@ class CollectionsTest {
 
     @Test
     fun `a page comes back as it went`() {
-        val page = CollectionsPage().toggleExpanded(NewApps).add(tools, Favourites(listOf(clock.key, mail.key))).add(photos)
+        val page = CollectionsPage().toggleExpanded(NewApps).setRows(MostUsed, 2)
+            .add(tools, Favourites(listOf(clock.key, mail.key))).setRows(tools, 4).add(photos)
 
         assertEquals(
-            "NewApps\t1\nMostUsed\t0\nTools\t0\t${clock.key}\t${mail.key}\nPhotos\t0",
+            "NewApps\t1\nMostUsed\t0,2\nTools\t0,4\t${clock.key}\t${mail.key}\nPhotos\t0",
             page.encode(),
         )
         assertEquals(page, decodeCollectionsPage(page.encode()))
