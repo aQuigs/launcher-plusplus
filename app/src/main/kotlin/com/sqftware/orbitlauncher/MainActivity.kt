@@ -89,12 +89,14 @@ class MainActivity : ComponentActivity() {
             sizing = widgetHost::sizing,
         )
         val layout = PageLayout()
+        val clearBadge = { app: AppEntry -> badges.opened(app.packageName) }
         val actions = AppActions(
             icon = repository::icon,
             launch = {
-                badges.opened(it.packageName)
+                clearBadge(it)
                 repository.launch(it)
             },
+            clearBadge = clearBadge,
             shortcuts = repository::shortcuts,
             shortcutIcon = repository::shortcutIcon,
             startShortcut = {

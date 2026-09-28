@@ -21,7 +21,7 @@ interface Badges {
     /** The unread counts now and as they change, empty while not [isEnabled]. Collect while the launcher is visible. */
     fun counts(): Flow<UnreadCounts>
 
-    /** Clears the counts kept for [packageName]'s dismissed notifications, now that the user is opening it. */
+    /** Clears the counts kept for [packageName]'s dismissed notifications, now that the user has opened it or cleared them. */
     fun opened(packageName: String)
 
     /** Opens the system screen where the user grants or revokes the launcher's notification access. */

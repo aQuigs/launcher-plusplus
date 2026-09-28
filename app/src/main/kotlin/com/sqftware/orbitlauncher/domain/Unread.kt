@@ -11,17 +11,24 @@ data class PostedNotification(
 
 /**
  * How many unread notifications each package has. A package with none is absent. A pinned shortcut counts none: its own
- * notifications are not told apart from the rest of its app's, which would overstate them.
+ * notifications are not told apart from the rest of its app's, which would overstate them. [dismissed] holds the packages
+ * whose count includes notifications the user dismissed unread.
  */
-data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap()) {
+data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismissed: Set<String> = emptySet()) {
     operator fun get(app: AppEntry): Int = sum(listOf(app))
+
+    /** Whether [app]'s badge holds notifications the user dismissed unread, which clearing it forgets. */
+    fun hasDismissed(app: AppEntry): Boolean = this[app] > 0 && app.packageName in dismissed
 
     /** The count for a folder of [apps]: each package counted once, however many of its activities are in there. */
     fun sum(apps: List<AppEntry>): Int = apps.filter { it.shortcutId == null }.map { it.packageName }.distinct().sumOf { byPackage[it] ?: 0 }
 
     operator fun plus(other: UnreadCounts) = UnreadCounts(
         (byPackage.keys + other.byPackage.keys).associateWith { (byPackage[it] ?: 0) + (other.byPackage[it] ?: 0) },
+        dismissed + other.dismissed,
     )
+
+    operator fun minus(packages: Set<String>) = UnreadCounts(byPackage - packages, dismissed - packages)
 }
 
 /**
@@ -90,7 +97,7 @@ data class KeptNotification(val packageName: String, val count: Int)
  */
 data class Kept(val byKey: Map<String, KeptNotification> = emptyMap()) {
     val counts: UnreadCounts
-        get() = UnreadCounts(byKey.values.groupingBy { it.packageName }.fold(0) { total, kept -> total + kept.count })
+        get() = byKey.values.groupingBy { it.packageName }.fold(0) { total, kept -> total + kept.count }.let { UnreadCounts(it, it.keys) }
 
     fun afterRemoval(key: String, notification: PostedNotification, removal: Removal): Kept = when {
         removal == Removal.Opened -> opened(notification.packageName)

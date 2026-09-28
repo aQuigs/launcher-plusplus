@@ -25,8 +25,8 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 
 /**
  * One app as a round icon, named by its label for screen readers, with a badge for its [unread] notifications. A tap
- * launches it, a long press opens its [menu], and a long press that goes on becomes a [drag]; its parent decides the
- * size.
+ * launches it, a double tap [clears][onClearBadge] what its badge holds of the notifications dismissed unread, a long
+ * press opens its [menu], and a long press that goes on becomes a [drag]; its parent decides the size.
  */
 @Composable
 fun AppIcon(
@@ -37,12 +37,13 @@ fun AppIcon(
     menu: AppMenu? = null,
     unread: Int = 0,
     drag: AppDrag? = null,
+    onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
     val presses = remember { MutableInteractionSource() }
 
     Box(
         modifier
-            .launchable(app, onLaunch, menu, presses)
+            .launchable(app, onLaunch, menu, presses, onClearBadge)
             .itemDrag(app, drag)
             .semantics { contentDescription = app.label.withUnread(unread) },
     ) {

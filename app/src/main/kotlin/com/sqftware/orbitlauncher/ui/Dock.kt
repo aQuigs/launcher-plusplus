@@ -53,6 +53,7 @@ fun Dock(
     menu: AppMenu? = null,
     folderMenu: FolderMenu? = null,
     unread: UnreadCounts = UnreadCounts(),
+    onClearBadge: ((AppEntry) -> Unit)? = null,
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
 ) {
@@ -70,7 +71,7 @@ fun Dock(
                 }
                 key(tag) {
                     val slot = Modifier.testTag(tag).reorderSlot(rearrange, index, landsAt == index).foldTarget(index == foldTarget, marks.lit)
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, menu, folderMenu, unread, rearrange?.drag(index))
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, menu, folderMenu, unread, rearrange?.drag(index), onClearBadge)
                 }
             }
         },
