@@ -1,11 +1,13 @@
 #!/bin/zsh
 # Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
-# Boots this repo's emulator, creating its AVD on first use, and waits until Android is ready.
+# Boots this repo's AVD as the machine's only emulator, creating the AVD on first use, and waits until Android is ready.
+# Holds the machine-wide emulator lock while it works, and stops any other emulator first so plain adb -e stays unambiguous.
 # Uses the system image bootstrap.sh installed; this script never installs anything.
 # emulator-lock.sh runs it before and after device work; run it directly only to use the emulator yourself.
 # Usage: scripts/emulator.sh        (IMAGE_TAG=google_apis for the rootable image, WINDOW=1 to show the emulator window)
-#        scripts/emulator.sh stop   stops it once no session is using it, saving the snapshot that makes the next boot quick
+#        scripts/emulator.sh stop   stops the running emulator once no session is using it, saving the snapshot that makes the next boot quick
+#   LOCK_WAIT_MINUTES (default 20) is how long to wait for the lock; EMULATOR_LOCK overrides the lock path
 
 set -e
 
@@ -30,7 +32,7 @@ fi
 RELATIVE_DIR=${IMAGE_DIRS[1]#$IMAGE_ROOT/}
 API_DIR=${RELATIVE_DIR%%/*}
 
-# Worktrees share the repo's AVD and emulator-lock.sh's lock, so both are named after the main checkout, not the worktree
+# Worktrees share the repo's AVD, so it is named after the main checkout, not the worktree
 MAIN_CHECKOUT=$(git rev-parse --path-format=absolute --git-common-dir)
 MAIN_CHECKOUT=${MAIN_CHECKOUT:h}
 
@@ -40,48 +42,62 @@ AVD_NAME=${REPO_NAME}_${API_DIR#android-}_$IMAGE_TAG
 AVD_DIR=$HOME/.android/avd/$AVD_NAME.avd
 LOG_FILE=${TMPDIR:-/tmp}/emulator-$AVD_NAME.log
 
-LOCK=${EMULATOR_LOCK:-/tmp/${MAIN_CHECKOUT:t}-emulator.flock}
+# One lock and one emulator for the whole machine, so every repo's device work takes turns
+LOCK=${EMULATOR_LOCK:-/tmp/android-emulator.flock}
+HOLDER=$LOCK.holder
 WAIT_MINUTES=${LOCK_WAIT_MINUTES:-20}
+BOOT_WAIT_MINUTES=5
 
-if [[ $1 == stop ]]; then
-  # Under emulator-lock.sh the lock is already ours, and asking for it again would wait on ourselves
-  if [[ -z $EMULATOR_LOCK_HELD ]]; then
-    touch "$LOCK"
+# Under emulator-lock.sh the lock is already ours, and asking for it again would wait on ourselves
+if [[ -z $EMULATOR_LOCK_HELD ]]; then
+  touch "$LOCK"
+  if ! zsystem flock -t 0 "$LOCK" 2>/dev/null; then
+    echo "Waiting up to $WAIT_MINUTES min for the emulator lock, held by $(cat "$HOLDER" 2>/dev/null)"
     if ! zsystem flock -t $(( WAIT_MINUTES * 60 )) "$LOCK"; then
-      echo "Gave up after $WAIT_MINUTES min waiting for the emulator lock $LOCK, held by $(cat "$LOCK.holder" 2>/dev/null)"
+      echo "Gave up after $WAIT_MINUTES min waiting for the emulator lock $LOCK, held by $(cat "$HOLDER" 2>/dev/null)"
       exit 1
     fi
   fi
+  print -r -- "pid $$ since $(date '+%H:%M:%S') in ${(D)PWD}: scripts/emulator.sh $*" > "$HOLDER"
+fi
 
-  if [[ $(adb -e emu avd name 2>/dev/null | head -1 | tr -d '\r') != "$AVD_NAME" ]]; then
-    echo "$AVD_NAME is not running"
-    exit 0
-  fi
+emulator_serials() {
+  adb devices | awk '/^emulator-/ {print $1}'
+}
 
-  echo "Stopping $AVD_NAME"
-  adb -e emu kill > /dev/null
+# Holding the lock, any running emulator is idle: a KEEP_EMULATOR leftover or one started outside the lock
+stop_emulators() {
+  local serial
+  for serial in ${(f)"$(emulator_serials)"}; do
+    echo "Stopping $(adb -s "$serial" emu avd name 2>/dev/null | head -1 | tr -d '\r') on $serial"
+    adb -s "$serial" emu kill > /dev/null
+  done
 
   # The console closes before the snapshot is saved, so the process exiting is the real signal
   repeat 120 {
-    if ! pgrep -f -- "-avd $AVD_NAME( |\$)" > /dev/null; then
-      echo "Stopped $AVD_NAME"
-      exit 0
+    if ! pgrep -f -- '-avd ' > /dev/null; then
+      return 0
     fi
     sleep 1
   }
-  echo "$AVD_NAME is still running 2 min after it was told to stop, see $LOG_FILE"
+  echo "An emulator is still running 2 min after it was told to stop: $(pgrep -lf -- '-avd ')"
   exit 1
+}
+
+if [[ $1 == stop ]]; then
+  stop_emulators
+  echo "No emulator is running"
+  exit 0
 fi
 
-# adb -e ignores plugged-in phones; a different emulator must be stopped because the boot wait cannot tell them apart
-RUNNING_AVD=$(adb -e emu avd name 2>/dev/null | head -1 | tr -d '\r')
-if [[ $RUNNING_AVD == "$AVD_NAME" ]]; then
+# adb -e ignores plugged-in phones, and with a single emulator it cannot pick the wrong one
+SERIALS=(${(f)"$(emulator_serials)"})
+if (( ${#SERIALS} == 1 )) && [[ $(adb -e emu avd name 2>/dev/null | head -1 | tr -d '\r') == "$AVD_NAME" ]]; then
   echo "$AVD_NAME is already running"
   exit 0
-elif [[ -n $RUNNING_AVD ]]; then
-  echo "Emulator $RUNNING_AVD is running instead of $AVD_NAME, stop it first: adb -e emu kill"
-  exit 1
 fi
+
+stop_emulators
 
 if [[ ! -d $AVD_DIR ]]; then
   echo "Creating AVD $AVD_NAME"
@@ -103,11 +119,19 @@ echo "Booting $AVD_NAME, log at $LOG_FILE"
 emulator -avd "$AVD_NAME" -gpu swiftshader_indirect -no-boot-anim $WINDOW_ARGS > "$LOG_FILE" 2>&1 &
 EMULATOR_PID=$!
 
+DEADLINE=$(( SECONDS + BOOT_WAIT_MINUTES * 60 ))
 until [[ $(adb -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') == 1 ]]; do
   if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
     echo "Emulator exited before boot completed, see $LOG_FILE"
     exit 1
   fi
+
+  if (( SECONDS > DEADLINE )); then
+    echo "$AVD_NAME did not finish booting within $BOOT_WAIT_MINUTES min, stopping it; see $LOG_FILE"
+    kill "$EMULATOR_PID"
+    exit 1
+  fi
+
   sleep 2
 done
 

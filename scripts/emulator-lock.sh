@@ -1,8 +1,8 @@
 #!/bin/zsh
 # Shared script: sync-common keeps every repo's copy identical to the original in the tooling checkout; edit the original only.
 
-# Runs a command holding this repo's emulator lock, so sessions that share the emulator take turns.
-# Boots the emulator first and stops it after, since a quickboot costs seconds and an idle emulator costs RAM and battery.
+# Runs a command holding the machine-wide emulator lock, so every repo's device work takes turns on the one emulator.
+# Boots this repo's emulator first and stops it after, since a quickboot costs seconds and an idle emulator costs RAM and battery.
 # The command inherits the lock, so killing this script can't free it while the command still runs, and the OS drops it once both are gone.
 # Usage: scripts/emulator-lock.sh <command> [args...]
 #   e.g. scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest
@@ -19,13 +19,9 @@ if (( $# == 0 )); then
   exit 2
 fi
 
-# Worktrees of a repo share its emulator, so the lock is named after the main checkout, not the worktree
 SCRIPT_DIR=${0:A:h}
-COMMON_DIR=$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
-REPO_DIR=${COMMON_DIR:+${COMMON_DIR:h}}
-REPO_NAME=$(basename "${REPO_DIR:-$SCRIPT_DIR:h}")
 
-LOCK=${EMULATOR_LOCK:-/tmp/$REPO_NAME-emulator.flock}
+LOCK=${EMULATOR_LOCK:-/tmp/android-emulator.flock}
 # Separate from the lock file: closing any descriptor on that file, even one opened only to write it, drops the lock
 HOLDER=$LOCK.holder
 WAIT_MINUTES=${LOCK_WAIT_MINUTES:-20}
@@ -41,7 +37,8 @@ if ! zsystem flock -e -f LOCK_FD -t 0 "$LOCK" 2>/dev/null; then
   fi
 fi
 
-print -r -- "pid $$ since $(date '+%H:%M:%S'): $*" > "$HOLDER"
+# Names the checkout so waiters in other repos see whose work holds the emulator
+print -r -- "pid $$ since $(date '+%H:%M:%S') in ${(D)${SCRIPT_DIR:h}}: $*" > "$HOLDER"
 export EMULATOR_LOCK_HELD=1
 
 # The emulator outlives this script, so it must not inherit the lock

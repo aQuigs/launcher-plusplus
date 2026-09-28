@@ -12,7 +12,7 @@
 ## Emulator
 
 - The emulator is the test target. Gradle downloads the platform and build-tools for `compileSdk`; never install SDK packages or system images from the repo (`android sdk`, `sdkmanager`). When `scripts/emulator.sh` reports a missing image, pass its message on to the user.
-- Sessions share the emulator: build first, then run device work through `scripts/emulator-lock.sh <command>` (e.g. `scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest`) with `ANDROID_SERIAL` pinned. Never hold the lock while building, debugging or waiting. It boots the emulator before the command and stops it after; pass `KEEP_EMULATOR=1` only when more device work follows within about 30 s.
+- The machine runs one emulator at a time, and every repo's sessions take turns on it through one machine-wide lock: build first, then run device work through `scripts/emulator-lock.sh <command>` (e.g. `scripts/emulator-lock.sh ./gradlew connectedDebugAndroidTest`) with `ANDROID_SERIAL` pinned. Never hold the lock while building, debugging or waiting. It boots the emulator before the command and stops it after; pass `KEEP_EMULATOR=1` only when more device work follows within about 30 s.
 - Every wait has a deadline and watches the real completion signal (process exit, result file, lock release), never `adb shell ps`: Android keeps a finished test process cached.
 
 ## Architecture and tests
