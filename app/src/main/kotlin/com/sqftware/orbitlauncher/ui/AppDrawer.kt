@@ -142,6 +142,7 @@ fun AppDrawer(
     query: String,
     onQueryChange: (String) -> Unit,
     unread: UnreadCounts = UnreadCounts(),
+    onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val rowMenu = menu.takeIf { picking == null }
@@ -188,14 +189,14 @@ fun AppDrawer(
                     sections.forEach { section ->
                         item(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
                         items(section.apps, key = { it.key }, contentType = { "app" }) { app ->
-                            AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                            AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app], unread.clearing(app, onClearBadge))
                         }
                     }
                 } else if (matches.isEmpty()) {
                     item(contentType = "empty") { NoMatches() }
                 } else {
                     items(matches, key = { it.key }, contentType = { "app" }) { app ->
-                        AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app])
+                        AppRow(app, detail(app), icon, onLaunch, picking, rowMenu, rowDrag, unread[app], unread.clearing(app, onClearBadge))
                     }
                 }
             }
@@ -275,11 +276,12 @@ private fun AppRow(
     menu: AppMenu?,
     drag: AppDrag?,
     unread: Int,
+    onClearBadge: ((AppEntry) -> Unit)?,
 ) {
     val picked = picking?.isPicked(app) == true
     val action = when {
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
-        picking == null -> Modifier.launchable(app, onLaunch, menu).itemDrag(app, drag)
+        picking == null -> Modifier.launchable(app, onLaunch, menu, onClearBadge = onClearBadge).itemDrag(app, drag)
         picking.mark == PickMark.Check -> {
             Modifier.toggleable(value = picked, role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
         }

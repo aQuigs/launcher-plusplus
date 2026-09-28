@@ -146,6 +146,7 @@ class LauncherScreenTest {
     private val actions = AppActions(
         icon = { null },
         launch = launched::add,
+        clearBadge = {},
         shortcuts = {
             shortcutsLoaded.await()
             if (it.key == mail.key) listOf(composeMail) else emptyList()

@@ -854,6 +854,7 @@ fun LauncherScreen(
                         query = query,
                         onQueryChange = { query = it },
                         unread = unread,
+                        onClearBadge = actions.clearBadge,
                         picking = picking?.let { place ->
                             val picked = homeApps[place]
                             Picking(
@@ -929,6 +930,7 @@ fun LauncherScreen(
                                             folderMenu = folderMenu,
                                             folderAppMenu = folderAppMenu,
                                             unread = unread,
+                                            onClearBadge = actions.clearBadge,
                                             rearrange = if (open != null) folderRearrange else ringRearrange,
                                             foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                             held = (dragged as? Drag.OutOfFolder)?.app,
@@ -964,6 +966,7 @@ fun LauncherScreen(
                                         menu = dockMenu,
                                         folderMenu = folderMenu,
                                         unread = unread,
+                                        onClearBadge = actions.clearBadge,
                                         rearrange = dockRearrange,
                                         foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Dock }?.index,
                                     )
@@ -990,6 +993,7 @@ fun LauncherScreen(
                                 menu = { kind -> cardMenus.getOrPut(kind) { appMenu(AppSpot.Card(kind)) } },
                                 bin = if (binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
                                 unread = unread,
+                                onClearBadge = actions.clearBadge,
                             )
                         }
                     }

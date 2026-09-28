@@ -25,11 +25,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.title
 
 object AppOptionsTags {
@@ -42,24 +46,45 @@ class LongPressMenu<T>(val onOpen: (T) -> Unit, val content: @Composable (T) -> 
 typealias AppMenu = LongPressMenu<AppEntry>
 
 /**
- * A tap launches [app]; with a [menu], a long press opens it. Given [presses], the presses are only recorded there, for
- * a ripple drawn on another node, rather than shown on this one.
+ * [onClearBadge] while [app]'s badge holds notifications the user dismissed unread, or none: a double tap delays every tap
+ * by the wait for a second one, so it is armed only where it has something to clear.
  */
-fun Modifier.launchable(app: AppEntry, onLaunch: (AppEntry) -> Unit, menu: AppMenu?, presses: MutableInteractionSource? = null): Modifier {
+internal fun UnreadCounts.clearing(app: AppEntry, onClearBadge: ((AppEntry) -> Unit)?) = onClearBadge?.takeIf { hasDismissed(app) }
+
+/**
+ * A tap launches [app]; with a [menu], a long press opens it, and with [onClearBadge], a double tap clears its badge instead
+ * of launching. Given [presses], the presses are only recorded there, for a ripple drawn on another node, rather than shown
+ * on this one.
+ */
+fun Modifier.launchable(
+    app: AppEntry,
+    onLaunch: (AppEntry) -> Unit,
+    menu: AppMenu?,
+    presses: MutableInteractionSource? = null,
+    onClearBadge: ((AppEntry) -> Unit)? = null,
+): Modifier {
     val onLongClickLabel = menu?.let { "App options" }
     // A hold is never a tap: with no menu to open it does nothing, rather than launching the app on release.
     val onLongClick = menu?.let { m -> { m.onOpen(app) } } ?: {}
     val onClick = { onLaunch(app) }
-    return if (presses == null) {
-        combinedClickable(onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)
+    val onDoubleClick = onClearBadge?.let { clear -> { clear(app) } }
+    val clicks = if (presses == null) {
+        combinedClickable(onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onDoubleClick = onDoubleClick, onClick = onClick)
     } else {
         combinedClickable(
             interactionSource = presses,
             indication = null,
             onLongClickLabel = onLongClickLabel,
             onLongClick = onLongClick,
+            onDoubleClick = onDoubleClick,
             onClick = onClick,
         )
+    }
+    // A screen reader's double tap is a click, so clearing needs an action of its own.
+    return if (onDoubleClick == null) {
+        clicks
+    } else {
+        clicks.semantics { customActions = listOf(CustomAccessibilityAction("Clear badge") { onDoubleClick(); true }) }
     }
 }
 

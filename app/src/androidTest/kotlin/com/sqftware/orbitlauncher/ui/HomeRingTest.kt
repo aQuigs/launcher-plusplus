@@ -4,17 +4,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
@@ -56,6 +59,7 @@ class HomeRingTest {
         onEdit: () -> Unit = {},
         onOpenFolder: (RingItem.Folder) -> Unit = {},
         onCloseFolder: () -> Unit = {},
+        onClearBadge: (AppEntry) -> Unit = {},
     ) {
         ring = items
         compose.setContent {
@@ -69,6 +73,7 @@ class HomeRingTest {
                 onEdit = onEdit,
                 openFolder = openFolder,
                 unread = unread,
+                onClearBadge = onClearBadge,
             )
         }
     }
@@ -94,6 +99,22 @@ class HomeRingTest {
         compose.onNodeWithContentDescription("Mail").performClick()
 
         assertEquals(listOf(mail), launched)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun doubleTappingAnAppWithDismissedNotificationsClearsItsBadgeWithoutLaunchingIt() {
+        val launched = mutableListOf<AppEntry>()
+        val cleared = mutableListOf<AppEntry>()
+        unread = UnreadCounts(mapOf(mail.packageName to 2, clock.packageName to 1), dismissed = setOf(mail.packageName))
+        showItems(listOf(clock, mail).asRingItems(), onLaunch = launched::add, onClearBadge = cleared::add)
+
+        compose.ringSlot(mail).performTouchInput { doubleClick() }
+        compose.ringSlot(clock).performTouchInput { doubleClick() }
+        compose.ringSlot(mail).performCustomAccessibilityActionWithLabel("Clear badge")
+
+        assertEquals(listOf(mail, mail), cleared)
+        assertEquals(listOf(clock, clock), launched)
     }
 
     @Test

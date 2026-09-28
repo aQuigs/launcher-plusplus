@@ -14,7 +14,7 @@ data class AppSettings(val badgeOff: Set<String> = emptySet(), val offBuiltInCar
     fun toggleBuiltInCards(app: AppEntry): AppSettings = copy(offBuiltInCards = offBuiltInCards.toggle(app.packageName))
 
     /** [unread] without the counts of the apps whose badge is off. */
-    fun badges(unread: UnreadCounts): UnreadCounts = UnreadCounts(unread.byPackage - badgeOff)
+    fun badges(unread: UnreadCounts): UnreadCounts = unread - badgeOff
 }
 
 private fun Set<String>.toggle(item: String) = if (item in this) this - item else this + item

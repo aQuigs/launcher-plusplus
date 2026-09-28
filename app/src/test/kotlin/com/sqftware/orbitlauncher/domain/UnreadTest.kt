@@ -1,6 +1,8 @@
 package com.sqftware.orbitlauncher.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UnreadTest {
@@ -9,6 +11,9 @@ class UnreadTest {
 
     private fun posted(app: AppEntry, summary: Boolean = false, ongoing: Boolean = false, media: Boolean = false, number: Int = 0) =
         PostedNotification(app.packageName, isGroupSummary = summary, isOngoing = ongoing, isMedia = media, number = number)
+
+    private fun dismissed(vararg counts: Pair<AppEntry, Int>) =
+        UnreadCounts(counts.associate { (app, count) -> app.packageName to count }, counts.map { it.first.packageName }.toSet())
 
     @Test
     fun `each notification counts one for its package`() {
@@ -71,11 +76,11 @@ class UnreadTest {
     @Test
     fun `a dismissed notification is kept, a tapped one clears its app and a withdrawn one changes nothing`() {
         val kept = Kept().afterRemoval("m1", posted(mail), Removal.Dismissed).afterRemoval("c1", posted(chat), Removal.Dismissed)
-        assertEquals(UnreadCounts(mapOf(mail.packageName to 1, chat.packageName to 1)), kept.counts)
+        assertEquals(dismissed(mail to 1, chat to 1), kept.counts)
 
         val more = kept.afterRemoval("m2", posted(mail, number = 5), Removal.Dismissed)
-        assertEquals(UnreadCounts(mapOf(mail.packageName to 6, chat.packageName to 1)), more.counts)
-        assertEquals(UnreadCounts(mapOf(chat.packageName to 1)), more.afterRemoval("m3", posted(mail), Removal.Opened).counts)
+        assertEquals(dismissed(mail to 6, chat to 1), more.counts)
+        assertEquals(dismissed(chat to 1), more.afterRemoval("m3", posted(mail), Removal.Opened).counts)
         assertEquals(more, more.afterRemoval("m3", posted(mail), Removal.Withdrawn))
     }
 
@@ -90,9 +95,14 @@ class UnreadTest {
     fun `a notification posted again replaces its kept count, and an opened app drops out`() {
         val kept = Kept().afterRemoval("m", posted(mail, number = 3), Removal.Dismissed).afterRemoval("c", posted(chat), Removal.Dismissed)
 
-        assertEquals(UnreadCounts(mapOf(chat.packageName to 1)), kept.posted("m").counts)
-        assertEquals(UnreadCounts(mapOf(mail.packageName to 3)), kept.opened(chat.packageName).counts)
-        assertEquals(UnreadCounts(mapOf(mail.packageName to 4, chat.packageName to 1)), UnreadCounts(mapOf(mail.packageName to 1)) + kept.counts)
+        assertEquals(dismissed(chat to 1), kept.posted("m").counts)
+        assertEquals(dismissed(mail to 3), kept.opened(chat.packageName).counts)
+
+        val live = UnreadCounts(mapOf(mail.packageName to 1, chat.packageName to 2)) + kept.posted("c").counts
+        assertEquals(mapOf(mail.packageName to 4, chat.packageName to 2), live.byPackage)
+        assertTrue(live.hasDismissed(mail))
+        assertFalse(live.hasDismissed(chat))
+        assertFalse(live.hasDismissed(mail.copy(shortcutId = "inbox")))
     }
 
     @Test

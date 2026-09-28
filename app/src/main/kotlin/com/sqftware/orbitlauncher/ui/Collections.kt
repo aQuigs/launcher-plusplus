@@ -181,6 +181,7 @@ fun CollectionsColumn(
     menu: (CollectionKind) -> AppMenu? = { null },
     bin: BinTarget? = null,
     unread: UnreadCounts = UnreadCounts(),
+    onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
     val newApps = remember(builtInApps) { newApps(builtInApps) }
     val mostUsed = remember(builtInApps, foregroundTime) { foregroundTime?.let { mostUsed(builtInApps, it) } }
@@ -215,6 +216,7 @@ fun CollectionsColumn(
                         menu = menu(card.kind),
                         onOpenUsageSettings = onOpenUsageSettings,
                         unread = unread,
+                        onClearBadge = onClearBadge,
                     )
                 }
             }
@@ -242,6 +244,7 @@ private fun CollectionCardView(
     menu: AppMenu?,
     onOpenUsageSettings: () -> Unit,
     unread: UnreadCounts,
+    onClearBadge: ((AppEntry) -> Unit)?,
 ) {
     val dragged = reorder.dragging == index
     val colours = MaterialTheme.colorScheme
@@ -273,7 +276,7 @@ private fun CollectionCardView(
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings)
             } else {
-                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, rearrange, menu, unread)
+                AppGrid(card.kind, apps, card.expanded, icon, onLaunch, rearrange, menu, unread, onClearBadge)
             }
         }
     }
@@ -373,6 +376,7 @@ private fun AppGrid(
     rearrange: Rearrange?,
     menu: AppMenu?,
     unread: UnreadCounts,
+    onClearBadge: ((AppEntry) -> Unit)?,
 ) {
     val moving = rearrange?.moving
     val ordered = moving.shown(apps)
@@ -404,6 +408,7 @@ private fun AppGrid(
                             menu = menu,
                             drag = rearrange?.drag(index),
                             unread = unread[app],
+                            onClearBadge = unread.clearing(app, onClearBadge),
                         )
                         if (expanded) {
                             Text(

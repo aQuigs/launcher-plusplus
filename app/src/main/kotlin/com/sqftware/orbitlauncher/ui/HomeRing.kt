@@ -187,6 +187,7 @@ fun HomeRing(
     folderMenu: FolderMenu? = null,
     folderAppMenu: AppMenu? = null,
     unread: UnreadCounts = UnreadCounts(),
+    onClearBadge: ((AppEntry) -> Unit)? = null,
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
     held: AppEntry? = null,
@@ -261,7 +262,7 @@ fun HomeRing(
                     } else {
                         Modifier.layoutId(Part.Held).alpha(0f)
                     }
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index))
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge)
                 }
             }
             // Only pictures of what is going: the ring stepping aside for an opening folder, and a closed folder's apps

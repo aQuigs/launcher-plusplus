@@ -8,6 +8,7 @@ import com.sqftware.orbitlauncher.domain.AppShortcut
 class AppActions(
     val icon: suspend (AppEntry) -> ImageBitmap?,
     val launch: (AppEntry) -> Unit,
+    val clearBadge: (AppEntry) -> Unit,
     val shortcuts: suspend (AppEntry) -> List<AppShortcut>,
     val shortcutIcon: suspend (AppShortcut) -> ImageBitmap?,
     val startShortcut: (AppShortcut) -> Unit,
