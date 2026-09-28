@@ -162,7 +162,8 @@ class DrawerControls(
  * or else in one run, the most used ([foregroundTime]) or the newest first. The style can head the list with a row of the
  * most used apps; what needs usage access asks for it ([onOpenUsageSettings]) until it is granted. An app whose name an app from
  * another package shares also shows its package name, to tell them apart. A tap launches the app and a long press opens
- * its [menu], unless the drawer is [picking]; a long press that moves on becomes a [drag]. A search field heads the
+ * its [menu], or in the most used row the [mostUsedMenu], unless the drawer is [picking]; a long press that moves on
+ * becomes a [drag]. A change of style starts the list again at its top. A search field heads the
  * list: with a [query] the list holds only the matching apps, without sections or rail, and the keyboard's search key
  * acts on the first of them as a tap would. An app with [unread] notifications shows their number, in full at the end of
  * its row, since a row has the room a badge lacks, or as a badge on its icon in the grid.
@@ -176,6 +177,7 @@ fun AppDrawer(
     picking: Picking? = null,
     gridState: LazyGridState = rememberLazyGridState(),
     menu: AppMenu? = null,
+    mostUsedMenu: AppMenu? = null,
     drag: AppDrag? = null,
     query: String,
     onQueryChange: (String) -> Unit,
@@ -218,9 +220,12 @@ fun AppDrawer(
         derivedStateOf {
             val chosenHeader = lastSelected?.let(headerIndices::getOrNull)
             lastSelected.takeIf { chosenHeader != null && gridState.layoutInfo.visibleItemsInfo.any { it.index == chosenHeader } }
-                ?: headerIndices.indexOfLast { it <= gridState.firstVisibleItemIndex }
+                ?: headerIndices.indexOfLast { it <= gridState.firstVisibleItemIndex }.coerceAtLeast(0)
         }
     }
+    // The list keeps its place by the first item on screen, so a new order or a new row at the top would open it midway,
+    // or the row out of sight above.
+    LaunchedEffect(style.order, style.layout, leading) { gridState.scrollToItem(0) }
     val showsRail = !searching && alphabetical
     val entry = DrawerEntry(
         layout = style.layout,
@@ -257,7 +262,9 @@ fun AppDrawer(
                     else -> {
                         if (askForUsage) fullWidth(key = "usage", contentType = "usage") { UsageAccess(onOpenUsageSettings) }
                         if (mostUsedApps.isNotEmpty()) {
-                            fullWidth(key = "most_used", contentType = "most_used") { MostUsedRow(mostUsedApps, entry, detail) }
+                            fullWidth(key = "most_used", contentType = "most_used") {
+                                MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail)
+                            }
                         }
                         if (alphabetical) {
                             sections.forEach { section ->
@@ -391,7 +398,7 @@ private fun LazyGridScope.apps(apps: List<AppEntry>, entry: DrawerEntry, detail:
     items(apps, key = { it.key }, contentType = { "app" }) { app -> entry.Show(app, detail(app)) }
 
 /** What every app in the drawer is shown with, in its [layout]: a row, or a cell of the grid. */
-private class DrawerEntry(
+private data class DrawerEntry(
     val layout: DrawerLayout,
     val icon: suspend (AppEntry) -> ImageBitmap?,
     val onLaunch: (AppEntry) -> Unit,

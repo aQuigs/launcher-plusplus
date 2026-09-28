@@ -526,6 +526,7 @@ fun LauncherScreen(
     )
     // Built once, so the ring, the dock and the drawer can skip recomposing while only the page or the drawer moves.
     val drawerMenu = remember(actions) { appMenu(AppSpot.Drawer) }
+    val mostUsedMenu = remember(actions) { appMenu(AppSpot.MostUsedRow) }
     val ringMenu = remember(actions) { appMenu(AppSpot.Home(HomePlace.Ring)) }
     val dockMenu = remember(actions) { appMenu(AppSpot.Home(HomePlace.Dock)) }
     val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(AppSpot.Home(it.at)) } }
@@ -859,6 +860,7 @@ fun LauncherScreen(
                         icon = actions.icon,
                         onLaunch = actions.launch,
                         menu = drawerMenu,
+                        mostUsedMenu = mostUsedMenu,
                         drag = dragFromDrawer,
                         query = query,
                         onQueryChange = { query = it },

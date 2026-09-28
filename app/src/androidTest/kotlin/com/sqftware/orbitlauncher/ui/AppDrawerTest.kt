@@ -92,11 +92,12 @@ class AppDrawerTest {
         assertTrue(top("B2") > top("A1"))
         compose.sectionHeader('A').assertDoesNotExist()
 
-        compose.railLetter('T').performClick()
+        compose.railLetter('H').performClick()
 
-        compose.runOnIdle { assertEquals(('T' - 'A') * APPS_PER_LETTER, gridState.firstVisibleItemIndex) }
-        compose.onNodeWithText("T1").performClick()
-        assertEquals("T1", launched.single().label)
+        // A grid scrolls by rows, so H1's row, which starts with G3, comes to the top.
+        compose.runOnIdle { assertEquals(('G' - 'A') * APPS_PER_LETTER + 2, gridState.firstVisibleItemIndex) }
+        compose.onNodeWithText("H1").performClick()
+        assertEquals("H1", launched.single().label)
     }
 
     @Test
@@ -148,6 +149,31 @@ class AppDrawerTest {
         compose.railLetter('T').performClick()
 
         compose.runOnIdle { assertEquals(1 + ('T' - 'A') * itemsPerLetter, gridState.firstVisibleItemIndex) }
+    }
+
+    @Test
+    fun aNewStyleStartsTheListAtItsTopWithTheNewRowInSight() {
+        var style by mutableStateOf(DrawerStyle())
+        compose.setContent {
+            AppDrawer(
+                alphabet,
+                icon = { null },
+                onLaunch = {},
+                gridState = gridState,
+                query = "",
+                onQueryChange = {},
+                controls = DrawerControls(style, onStyleChange = { style = it }, sorting = false, onSortingChange = {}),
+                foregroundTime = ForegroundTime(mapOf("com.example.m1" to 5L)),
+            )
+        }
+        compose.onNodeWithText("A1").assertIsDisplayed()
+
+        compose.runOnIdle { style = style.copy(mostUsedRow = true) }
+
+        compose.onNodeWithTag(AppDrawerTags.MOST_USED).assertIsDisplayed()
+        compose.railLetter('T').performClick()
+        compose.runOnIdle { style = style.copy(order = DrawerOrder.Newest) }
+        compose.runOnIdle { assertEquals(0, gridState.firstVisibleItemIndex) }
     }
 
     @Test
