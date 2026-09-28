@@ -28,7 +28,7 @@ private val CHECK_EVERY = 1.hours.inWholeMilliseconds
  * did not install has none.
  */
 class PlayAppUpdates(private val context: Context) : AppUpdates {
-    private val manager = AppUpdateManagerFactory.create(context)
+    private val manager by lazy { AppUpdateManagerFactory.create(context) }
 
     // Kept across collections, so each return to the launcher does not ask Play again within the hour.
     private var available = false

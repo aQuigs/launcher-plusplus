@@ -40,7 +40,6 @@ import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
 
 private const val TAG = "LauncherAppsRepository"
-private const val PLAY_STORE = "com.android.vending"
 private const val MAX_SHORTCUTS = 4
 // Room for a few hundred icons at the largest launcher size: every drawer row asks for its app's, and a cache the drawer
 // churns through would evict the ring's and the dock's, which would then come back blank on the way home.
@@ -49,12 +48,6 @@ private const val SHOWN_SHORTCUTS = ShortcutQuery.FLAG_MATCH_MANIFEST or Shortcu
 
 // What a square leaves free on each side when its corners touch a circle as wide: (1 - 1/√2) / 2.
 private val SQUARE_IN_CIRCLE = ((1 - 1 / sqrt(2.0)) / 2).toFloat()
-
-internal fun Context.openStorePage(packageName: String, tag: String) = startOrLog(tag, "the Play Store page of $packageName") {
-    val page = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).setPackage(PLAY_STORE)
-    // In a task of its own, as when an app is launched, so HOME leaves it rather than clearing it off the launcher's.
-    startActivity(page.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-}
 
 class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
