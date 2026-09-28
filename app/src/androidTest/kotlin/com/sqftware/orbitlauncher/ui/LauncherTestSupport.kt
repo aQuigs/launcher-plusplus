@@ -83,6 +83,8 @@ fun SemanticsNodeInteractionsProvider.ringer() = onNodeWithTag(HomeClockTags.RIN
 
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
+fun SemanticsNodeInteractionsProvider.pickAppsLink() = onNodeWithTag(LauncherTags.PICK_APPS)
+
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
 
 fun SemanticsNodeInteractionsProvider.folderSlot(index: Int) = onNodeWithTag(HomeRingTags.folder(index))

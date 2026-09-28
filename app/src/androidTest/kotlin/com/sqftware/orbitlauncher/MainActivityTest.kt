@@ -35,10 +35,10 @@ import com.sqftware.orbitlauncher.ui.LauncherTags
 import com.sqftware.orbitlauncher.ui.PinDialogTags
 import com.sqftware.orbitlauncher.ui.appList
 import com.sqftware.orbitlauncher.ui.drawerHandle
-import com.sqftware.orbitlauncher.ui.emblem
 import com.sqftware.orbitlauncher.ui.homeAppCard
 import com.sqftware.orbitlauncher.ui.longPressEmptyHomeSpace
 import com.sqftware.orbitlauncher.ui.page
+import com.sqftware.orbitlauncher.ui.pickAppsLink
 import com.sqftware.orbitlauncher.ui.placeOption
 import com.sqftware.orbitlauncher.ui.swipePager
 import org.junit.After
@@ -146,7 +146,7 @@ class MainActivityTest {
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun homeScreenAppsSurviveRecreatingTheActivity() {
-        compose.emblem().performClick()
+        compose.pickAppsLink().performClick()
         scrollDrawerTo("Settings")
         compose.onNodeWithText("Settings").performClick()
         compose.placeOption(HomePlace.Dock).performClick()

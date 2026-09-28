@@ -32,6 +32,8 @@ sealed interface Landing {
 
 /** The apps the user keeps on the home screen: on the ring round the emblem, and in the dock at the foot of the page. */
 data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
+    val isEmpty: Boolean get() = ring.isEmpty && dock.isEmpty
+
     fun slots(place: HomePlace.Slots): Ring = when (place) {
         HomePlace.Ring -> ring
         HomePlace.Dock -> dock

@@ -156,7 +156,7 @@ private sealed interface Part {
 /**
  * The [ring] of favourite apps and folders, joined like the stars of the launcher icon, round an emblem. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
- * the emblem to choose the favourites on the ring and in the dock. With [showHint] the emblem invites you to add apps
+ * the emblem to choose the favourites on the ring and in the dock. With a [hint] the emblem says what a tap there does
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
  * land. A folder is a planet: an [openFolder] glides from its slot into the centre in the emblem's place, its apps
  * spiralling out round it into the slots, each with the [folderAppMenu], while the ring drifts outward and fades; a tap
@@ -174,7 +174,7 @@ private sealed interface Part {
 @Composable
 fun HomeRing(
     ring: List<RingItem>,
-    showHint: Boolean,
+    hint: String?,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
@@ -202,7 +202,7 @@ fun HomeRing(
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
     val marks = LocalRingColors.current
     // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
-    val turning = turns && !showHint && openFolder == null
+    val turning = turns && hint == null && openFolder == null
     val spark = turnAngle(turning, SPARK_TURN_MILLIS)
     val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
     fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx())
@@ -245,7 +245,7 @@ fun HomeRing(
     Layout(
         content = {
             if (openFolder == null || spreadingOut) {
-                Emblem(showHint, { skyTurn.value }, { spark.value }, onEdit, Modifier.layoutId(Part.Emblem))
+                Emblem(hint, { skyTurn.value }, { spark.value }, onEdit, Modifier.layoutId(Part.Emblem))
             }
             centred?.let { folder ->
                 key(Part.Planet) {
@@ -439,11 +439,11 @@ private fun Modifier.inert(): Modifier = clearAndSetSemantics {}.pointerInput(Un
 /**
  * The ring's centre, the heart of the launcher icon's constellation whose stars are the apps round it: the icon's night
  * sky, half see-through so it darkens a bright wallpaper without hiding it, in a disc edged by a hairline, with the
- * icon's spark in the middle, the sky turned to [skyAngle] and the spark to [sparkAngle], or the hint to add apps in its
+ * icon's spark in the middle, the sky turned to [skyAngle] and the spark to [sparkAngle], or the [hint] in its
  * place. Quiet, so the icons stay the eye's first stop.
  */
 @Composable
-private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun Emblem(hint: String?, skyAngle: () -> Float, sparkAngle: () -> Float, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
     val edgeMark = LocalRingColors.current.mark
 
@@ -451,10 +451,10 @@ private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> F
         contentAlignment = Alignment.Center,
         modifier = modifier
             .clip(CircleShape)
-            .clickable(onClickLabel = "Choose the apps on the home screen", onClick = onClick)
+            .clickable(onClickLabel = hint ?: "Choose the apps on the home screen", onClick = onClick)
             .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
-            .semantics { if (!showHint) contentDescription = "Favourites" },
+            .semantics { if (hint == null) contentDescription = "Favourites" },
     ) {
         // Sky and spark each on a layer of their own, so turning them changes a property of the layer and nothing is drawn
         // again.
@@ -471,7 +471,7 @@ private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> F
                     onDrawBehind { clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } } }
                 },
         )
-        if (!showHint) {
+        if (hint == null) {
             Spacer(
                 Modifier
                     .fillMaxSize()
@@ -483,7 +483,7 @@ private fun Emblem(showHint: Boolean, skyAngle: () -> Float, sparkAngle: () -> F
             )
         } else {
             Text(
-                text = "Add apps",
+                text = hint,
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
                 style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(RingShade, blurRadius = 6f)),
                 color = RingInk,
