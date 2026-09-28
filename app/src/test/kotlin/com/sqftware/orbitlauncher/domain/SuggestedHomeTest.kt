@@ -75,14 +75,15 @@ class SuggestedHomeTest {
     }
 
     @Test
-    fun `the fullest categories of three apps or more get cards, the fullest first`() {
+    fun `the fullest categories of two apps or more get cards, the fullest first`() {
         val games = (1..4).map { AppEntry("Game $it", "pkg.game$it", "Main", category = AppCategory.Games) }
         val music = (1..3).map { AppEntry("Music $it", "pkg.music$it", "Main", category = AppCategory.Music) }
         val social = (1..2).map { AppEntry("Social $it", "pkg.social$it", "Main", category = AppCategory.Social) }
         val shopping = (1..3).map { AppEntry("Shop $it", "pkg.shop$it", "Main", category = AppCategory.Shopping) }
+        val tool = AppEntry("Tool", "pkg.tool", "Main", category = AppCategory.Tools)
         val launcher = AppEntry("Launcher", "pkg.launcher", "Main", category = AppCategory.Music)
 
-        val page = setUp(games + music + social + shopping + launcher, DefaultApps(skips = setOf(launcher.packageName))).collections
+        val page = setUp(games + music + social + shopping + tool + launcher, DefaultApps(skips = setOf(launcher.packageName))).collections
 
         assertEquals(
             listOf(
@@ -91,6 +92,7 @@ class SuggestedHomeTest {
                 CollectionKind.Category(AppCategory.Games),
                 CollectionKind.Category(AppCategory.Music),
                 CollectionKind.Category(AppCategory.Shopping),
+                CollectionKind.Category(AppCategory.Social),
             ),
             page.cards.map { it.kind },
         )

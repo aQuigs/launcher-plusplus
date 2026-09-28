@@ -47,14 +47,14 @@ class HomeRingTest {
 
     private fun show(
         favourites: List<AppEntry>,
-        showHint: Boolean = false,
+        hint: String? = null,
         onLaunch: (AppEntry) -> Unit = {},
         onEdit: () -> Unit = {},
-    ) = showItems(favourites.asRingItems(), showHint, onLaunch, onEdit)
+    ) = showItems(favourites.asRingItems(), hint, onLaunch, onEdit)
 
     private fun showItems(
         items: List<RingItem>,
-        showHint: Boolean = false,
+        hint: String? = null,
         onLaunch: (AppEntry) -> Unit = {},
         onEdit: () -> Unit = {},
         onOpenFolder: (RingItem.Folder) -> Unit = {},
@@ -65,7 +65,7 @@ class HomeRingTest {
         compose.setContent {
             HomeRing(
                 ring = ring,
-                showHint = showHint,
+                hint = hint,
                 icon = { null },
                 onLaunch = onLaunch,
                 onOpenFolder = onOpenFolder,
@@ -83,8 +83,8 @@ class HomeRingTest {
     private fun iconWidth(app: AppEntry) = compose.ringSlot(app).getUnclippedBoundsInRoot().width
 
     @Test
-    fun theHintInvitesYouToAddApps() {
-        show(emptyList(), showHint = true)
+    fun theHintTakesTheMarksPlace() {
+        show(emptyList(), hint = "Add apps")
 
         compose.emblem().assertIsDisplayed()
         compose.onNodeWithText("Add apps").assertIsDisplayed()

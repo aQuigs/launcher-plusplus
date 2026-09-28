@@ -390,17 +390,21 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun anEmptyHomeOffersToSetItselfUpOnceTheAppsHaveLoaded() {
-        apps = null
+    fun anEmptyHomeOffersToSetItselfUpOrToPickAppsByHand() {
         show()
-        compose.onNodeWithTag(LauncherTags.SET_UP_HOME).assertDoesNotExist()
+        compose.onNodeWithText(AUTO_SET_UP).assertIsDisplayed()
 
-        apps = listOf(clock, mail)
-        compose.onNodeWithTag(LauncherTags.SET_UP_HOME).assertIsDisplayed().performClick()
+        compose.emblem().performClick()
         compose.runOnIdle { assertEquals(1, setUps) }
+        compose.pickAppsLink().performClick()
+        assertDrawerOpen(true)
+        compose.placePicker().assertIsDisplayed()
+        Espresso.pressBack()
 
         homeApps = HomeApps(dock = ringOf(mail))
-        compose.onNodeWithTag(LauncherTags.SET_UP_HOME).assertDoesNotExist()
+        compose.onNodeWithText(AUTO_SET_UP).assertDoesNotExist()
+        compose.pickAppsLink().assertDoesNotExist()
+        compose.onNodeWithText("Add apps").assertIsDisplayed()
     }
 
     @Test
@@ -460,6 +464,7 @@ class LauncherScreenTest {
 
     @Test
     fun theEmblemOpensTheDrawerToPickAppsForTheRing() {
+        homeApps = HomeApps(dock = ringOf(clock))
         show()
 
         compose.emblem().performClick()
@@ -479,11 +484,11 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun anEmptyRingInvitesYouToAddAppsBeforeTheAppListLoads() {
+    fun anEmptyHomeOffersToSetItselfUpBeforeTheAppListLoads() {
         apps = null
         show()
 
-        compose.onNodeWithText("Add apps").assertIsDisplayed()
+        compose.onNodeWithText(AUTO_SET_UP).assertIsDisplayed()
     }
 
     @Test
@@ -501,7 +506,7 @@ class LauncherScreenTest {
     @Test
     fun closingTheDrawerEndsPicking() {
         show()
-        compose.emblem().performClick()
+        compose.pickAppsLink().performClick()
         assertDrawerOpen(true)
 
         Espresso.pressBack()
@@ -517,7 +522,7 @@ class LauncherScreenTest {
     @Test
     fun aDragThatLeavesTheDrawerOpenKeepsPicking() {
         show()
-        compose.emblem().performClick()
+        compose.pickAppsLink().performClick()
         assertDrawerOpen(true)
         val handle = compose.drawerHandle().fetchSemanticsNode().boundsInRoot.center
 
@@ -538,7 +543,7 @@ class LauncherScreenTest {
     @Test
     fun pickingForTheDockFillsTheDockAndLeavesTheRing() {
         show()
-        compose.emblem().performClick()
+        compose.pickAppsLink().performClick()
         assertDrawerOpen(true)
 
         compose.placeOption(HomePlace.Dock).performClick()
@@ -834,7 +839,7 @@ class LauncherScreenTest {
         compose.onNodeWithText("Remove folder").performClick()
 
         compose.folderSlot(0).assertDoesNotExist()
-        compose.onNodeWithText("Add apps").assertIsDisplayed()
+        compose.onNodeWithText(AUTO_SET_UP).assertIsDisplayed()
         compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
     }
 
@@ -987,7 +992,7 @@ class LauncherScreenTest {
     @Test
     fun aLongPressWhilePickingPicksTheAppAndOpensNoMenu() {
         show()
-        compose.emblem().performClick()
+        compose.pickAppsLink().performClick()
         assertDrawerOpen(true)
 
         compose.onNodeWithText("Mail").performTouchInput { longClick() }

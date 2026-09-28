@@ -12,8 +12,8 @@ data class Setup(val home: HomeApps, val collections: CollectionsPage)
 private val DOCK_ROLES = listOf(AppRole.Phone, AppRole.Messages, AppRole.Browser, AppRole.Camera)
 private val RING_ROLES = listOf(AppRole.Email, AppRole.Maps, AppRole.Photos, AppRole.Calendar, AppRole.Store, AppRole.Clock)
 private const val SUGGESTED_RING_APPS = 6
-private const val SUGGESTED_CARDS = 3
-private const val SUGGESTED_CARD_MIN_APPS = 3
+private const val SUGGESTED_CARDS = 6
+private const val SUGGESTED_CARD_MIN_APPS = 2
 
 /**
  * A guess at the [home] screen and [collections] of someone who has set up neither, as Arc starts with one; null once

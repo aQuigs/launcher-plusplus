@@ -18,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
@@ -98,12 +99,27 @@ import kotlin.math.roundToInt
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
-    const val SET_UP_HOME = "set_up_home"
+    const val PICK_APPS = "pick_apps"
 
     fun page(page: LauncherPage) = "page_${page.name}"
 }
 
 private val DRAWER_PEEK = 48.dp
+
+const val AUTO_SET_UP = "Auto set up"
+
+/** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
+@Composable
+private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        Text(
+            text = "$AUTO_SET_UP fills your home with the apps you use most",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onPickApps, modifier = Modifier.testTag(LauncherTags.PICK_APPS)) { Text("Pick apps myself") }
+    }
+}
 
 /** How far above the drawer's strip the shade along the bottom edge starts. */
 private val BOTTOM_SHADE_FADE = 32.dp
@@ -116,8 +132,8 @@ data class HomePress(val launcherInFront: Boolean)
  * shows the [clock] over the ring from [homeApps], with the dock at its foot: the time and the date open the clock app
  * and the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
- * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, a button under the ring
- * offers to fill them with a guess ([onSetUpHome]). Until [isHomeApp],
+ * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, the emblem offers to
+ * fill them with a guess ([onSetUpHome]), and a link under the ring to pick them by hand. Until [isHomeApp],
  * a strip over the dock says so and offers [onBecomeHomeApp]. From anywhere on the home page, dock included, a swipe down
  * pulls down the notification shade ([onOpenNotifications]) and a swipe up opens the drawer. Long-pressing an app
  * anywhere opens its menu of shortcuts and
@@ -972,12 +988,17 @@ fun LauncherScreen(
                                             ring = ring,
                                             // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
                                             // theirs is there, so neither the hint nor the mark flashes while they load.
-                                            showHint = homeApps.ring.isEmpty || (onHome != null && ring.isEmpty()),
+                                            // A home with nothing stored is known before the first frame, so its offer never flashes.
+                                            hint = when {
+                                                homeApps.isEmpty -> AUTO_SET_UP
+                                                homeApps.ring.isEmpty || (onHome != null && ring.isEmpty()) -> "Add apps"
+                                                else -> null
+                                            },
                                             icon = actions.icon,
                                             onLaunch = actions.launch,
                                             onOpenFolder = { openFolder = it.at },
                                             onCloseFolder = { openFolder = null },
-                                            onEdit = { pickFor(HomePlace.Ring) },
+                                            onEdit = { if (homeApps.isEmpty) onSetUpHome() else pickFor(HomePlace.Ring) },
                                             modifier = Modifier.weight(1f).dropZone { copy(ring = it) },
                                             highlighted = dropPlace == HomePlace.Ring,
                                             openFolder = open,
@@ -994,12 +1015,9 @@ fun LauncherScreen(
                                             dock = dock,
                                             dockSlot = { dockRearrange.boundsOf(it, dock) },
                                         )
-                                        // Once the apps have loaded, so it does not flash before stored slots resolve. Under the ring,
-                                        // as the emblem already asks to pick apps by hand.
-                                        if (apps != null && homeApps.isEmpty) {
-                                            TonalButton(onClick = onSetUpHome, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.SET_UP_HOME)) {
-                                                Text("Set up home")
-                                            }
+                                        // The emblem offers the automatic setup, so picking by hand, which it offers otherwise, moves here.
+                                        if (homeApps.isEmpty) {
+                                            SetUpChoice(onPickApps = { pickFor(HomePlace.Ring) }, modifier = Modifier.padding(top = 8.dp))
                                         }
                                         // Nothing dismisses the card: a launcher that is not the home app is not doing its job. Under
                                         // the ring, which sizes itself to the room left, so the two can never overlap.
