@@ -7,6 +7,9 @@ data class AppShortcut(val packageName: String, val id: String, val label: Strin
 sealed interface AppSpot {
     data object Drawer : AppSpot
 
+    /** The drawer's row of the most used apps, whose apps are in the drawer's list too and offer the same. */
+    data object MostUsedRow : AppSpot
+
     data class Home(val place: HomePlace) : AppSpot
 
     data class Card(val kind: CollectionKind) : AppSpot

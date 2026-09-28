@@ -63,6 +63,7 @@ import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionsPage
+import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.Favourites
@@ -143,9 +144,10 @@ data class HomePress(val launcherInFront: Boolean)
  * ([onFolderLookChange]), restart the launcher ([onRestart]), and reset it ([onReset]) once a
  * dialog has asked. The ring, the dock and folders hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all
  * that is open, as HOME in front does, and asks on the home page whether to add its shortcut, which goes at the end of
- * the ring once the system has pinned it. [apps] and [pinnedShortcuts] are null until they have loaded. Every
- * [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the drawer, the editor, the picker
- * and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
+ * the ring once the system has pinned it. [apps] and [pinnedShortcuts] are null until they have loaded. The drawer lays
+ * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
+ * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
+ * drawer, the editor, the picker and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
  * it cancels a drag, else closes the menu or a dialog, then the drawer, then the editor or the picker, then ends widget
  * editing, then returns to the home page, then closes the folder.
  */
@@ -166,6 +168,8 @@ fun LauncherScreen(
     onTwentyFourHourChange: (Boolean) -> Unit,
     folderLook: FolderLook,
     onFolderLookChange: (FolderLook) -> Unit,
+    drawerStyle: DrawerStyle,
+    onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
     ringerMode: RingerMode,
@@ -522,6 +526,7 @@ fun LauncherScreen(
     )
     // Built once, so the ring, the dock and the drawer can skip recomposing while only the page or the drawer moves.
     val drawerMenu = remember(actions) { appMenu(AppSpot.Drawer) }
+    val mostUsedMenu = remember(actions) { appMenu(AppSpot.MostUsedRow) }
     val ringMenu = remember(actions) { appMenu(AppSpot.Home(HomePlace.Ring)) }
     val dockMenu = remember(actions) { appMenu(AppSpot.Home(HomePlace.Dock)) }
     val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(AppSpot.Home(it.at)) } }
@@ -855,11 +860,22 @@ fun LauncherScreen(
                         icon = actions.icon,
                         onLaunch = actions.launch,
                         menu = drawerMenu,
+                        mostUsedMenu = mostUsedMenu,
                         drag = dragFromDrawer,
                         query = query,
                         onQueryChange = { query = it },
                         unread = unread,
                         onClearBadge = actions.clearBadge,
+                        controls = DrawerControls(
+                            style = drawerStyle,
+                            onStyleChange = onDrawerStyleChange,
+                            sorting = (openMenu as? OpenMenu.DrawerSort)?.expanded == true,
+                            onSortingChange = { open ->
+                                if (open) openMenuUnlessDragging { openMenu = OpenMenu.DrawerSort() } else closeMenu()
+                            },
+                        ),
+                        foregroundTime = foregroundTime,
+                        onOpenUsageSettings = onOpenUsageSettings,
                         picking = picking?.let { place ->
                             val picked = homeApps[place]
                             Picking(
@@ -1222,6 +1238,11 @@ private sealed interface OpenMenu {
 
     /** The launcher's own menu, from the home page's empty space. */
     data class Launcher(override val expanded: Boolean = true) : OpenMenu {
+        override fun closed() = copy(expanded = false)
+    }
+
+    /** The drawer's menu of the orders it can list the apps in. */
+    data class DrawerSort(override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 }

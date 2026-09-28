@@ -24,6 +24,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesFolderLookStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
@@ -71,6 +72,7 @@ class MainActivity : ComponentActivity() {
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
         val folderLookStore = SharedPreferencesFolderLookStore(this)
         val reorderModeStore = SharedPreferencesReorderModeStore(this)
+        val drawerStyleStore = SharedPreferencesDrawerStyleStore(this)
         val ringer = SystemRinger(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
@@ -128,6 +130,7 @@ class MainActivity : ComponentActivity() {
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
                 var folderLook by remember { mutableStateOf(folderLookStore.load()) }
                 var reorderMode by remember { mutableStateOf(reorderModeStore.load()) }
+                var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
                 val clock by produceState(remember { wallClock.face(twentyFourHour) }, twentyFourHour) {
@@ -197,6 +200,11 @@ class MainActivity : ComponentActivity() {
                     onFolderLookChange = {
                         folderLook = it
                         folderLookStore.save(it)
+                    },
+                    drawerStyle = drawerStyle,
+                    onDrawerStyleChange = {
+                        drawerStyle = it
+                        drawerStyleStore.save(it)
                     },
                     onOpenClock = wallClock::openClock,
                     onOpenCalendar = wallClock::openCalendar,

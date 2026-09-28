@@ -282,7 +282,7 @@ private fun CollectionCardView(
         Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
             CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onChooseRows, onEdit)
             if (apps == null) {
-                PermissionRequired(onOpenUsageSettings)
+                PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
             } else {
                 AppGrid(card.kind, apps, card.expanded, card.compactApps, icon, onLaunch, rearrange, menu, unread, onClearBadge)
             }
@@ -435,16 +435,7 @@ private fun AppGrid(
                             unread = unread[app],
                             onClearBadge = unread.clearing(app, onClearBadge),
                         )
-                        if (expanded) {
-                            Text(
-                                text = app.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                        }
+                        if (expanded) AppLabel(app.label)
                     }
                 }
             }
@@ -469,12 +460,11 @@ private fun AppGrid(
 
 // The whole body opens the settings, as Arc's does; the button is there so it is plain what to do.
 @Composable
-private fun PermissionRequired(onClick: () -> Unit) {
+internal fun PermissionRequired(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(end = 8.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClickLabel = "Open the usage access settings", onClick = onClick)
             .padding(vertical = 12.dp),
@@ -736,7 +726,7 @@ private val SparkleGlyph = materialGlyph(
     "M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12" +
         "l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z",
 )
-private val GridGlyph = materialGlyph(
+internal val GridGlyph = materialGlyph(
     "Apps",
     "M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4z" +
         "m0 6h4v-4h-4v4z",
