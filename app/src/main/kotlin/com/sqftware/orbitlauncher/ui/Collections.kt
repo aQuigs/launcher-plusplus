@@ -282,7 +282,7 @@ private fun CollectionCardView(
         Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
             CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onChooseRows, onEdit)
             if (apps == null) {
-                PermissionRequired(onOpenUsageSettings)
+                PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
             } else {
                 AppGrid(card.kind, apps, card.expanded, card.compactApps, icon, onLaunch, rearrange, menu, unread, onClearBadge)
             }
@@ -431,16 +431,7 @@ private fun AppGrid(
                             unread = unread[app],
                             onClearBadge = unread.clearing(app, onClearBadge),
                         )
-                        if (expanded) {
-                            Text(
-                                text = app.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                        }
+                        if (expanded) AppLabel(app.label)
                     }
                 }
             }
@@ -465,12 +456,11 @@ private fun AppGrid(
 
 // The whole body opens the settings, as Arc's does; the button is there so it is plain what to do.
 @Composable
-private fun PermissionRequired(onClick: () -> Unit) {
+internal fun PermissionRequired(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(end = 8.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClickLabel = "Open the usage access settings", onClick = onClick)
             .padding(vertical = 12.dp),

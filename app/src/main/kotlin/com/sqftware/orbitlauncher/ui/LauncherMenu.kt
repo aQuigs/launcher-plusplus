@@ -96,31 +96,35 @@ fun EmptySpace(menu: LauncherMenu, onTap: () -> Unit, modifier: Modifier = Modif
 @Composable
 fun LauncherOptionsMenu(expanded: Boolean, rows: List<LauncherMenuRow>, onDismiss: () -> Unit) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.MENU)) {
-        rows.forEach { row ->
-            DropdownMenuItem(
-                text = { Text(row.label) },
-                // The switch only shows the state: the row is the control. A row whose tap goes elsewhere to change the
-                // state is a button with a state to screen readers, not a switch that would not flip.
-                trailingIcon = row.on?.let { on -> { Switch(checked = on, onCheckedChange = null) } }
-                    ?: row.value?.let { value -> { Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
-                onClick = { chooseFrom(expanded, onDismiss, row.onClick) },
-                modifier = Modifier.semantics {
-                    val on = row.on
-                    when {
-                        on == null -> role = Role.Button
-                        row.flips -> {
-                            role = Role.Switch
-                            toggleableState = ToggleableState(on)
-                        }
-                        else -> {
-                            role = Role.Button
-                            stateDescription = if (on) "On" else "Off"
-                        }
-                    }
-                },
-            )
-        }
+        rows.forEach { row -> LauncherMenuItem(row, expanded, onDismiss) }
     }
+}
+
+/** A [row] of a menu shown while [expanded]. Choosing it dismisses the menu ([onDismiss]), then hands on the choice. */
+@Composable
+fun LauncherMenuItem(row: LauncherMenuRow, expanded: Boolean, onDismiss: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(row.label) },
+        // The switch only shows the state: the row is the control. A row whose tap goes elsewhere to change the
+        // state is a button with a state to screen readers, not a switch that would not flip.
+        trailingIcon = row.on?.let { on -> { Switch(checked = on, onCheckedChange = null) } }
+            ?: row.value?.let { value -> { Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+        onClick = { chooseFrom(expanded, onDismiss, row.onClick) },
+        modifier = Modifier.semantics {
+            val on = row.on
+            when {
+                on == null -> role = Role.Button
+                row.flips -> {
+                    role = Role.Switch
+                    toggleableState = ToggleableState(on)
+                }
+                else -> {
+                    role = Role.Button
+                    stateDescription = if (on) "On" else "Off"
+                }
+            }
+        },
+    )
 }
 
 /** Asks before [onReset] erases all the launcher keeps. Cancel, Back and a tap outside call [onDismiss]. */

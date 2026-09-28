@@ -60,7 +60,6 @@ import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
-import com.sqftware.orbitlauncher.domain.DrawerLayout
 import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
@@ -1668,12 +1667,9 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theDrawersButtonsChangeItsStyleAndHomeClosesItsSortMenu() {
+    fun homeClosesTheDrawersSortMenu() {
         show()
         compose.drawerHandle().performClick()
-        compose.onNodeWithContentDescription("Grid view").performClick()
-        compose.runOnIdle { assertEquals(DrawerLayout.Grid, drawerStyle.layout) }
-
         compose.onNodeWithContentDescription("Sort apps").performClick()
         compose.onNodeWithTag(AppDrawerTags.SORT_MENU).assertIsDisplayed()
         pressHome(launcherInFront = true)

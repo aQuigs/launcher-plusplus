@@ -43,7 +43,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,16 +65,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -149,7 +144,7 @@ class Picking(
  * [style] has lit, and a button opening the sort menu, shown while [sorting], of the orders and the row of the most used
  * apps. A choice goes to [onStyleChange]; opening and closing the menu to [onSortingChange].
  */
-class DrawerControls(
+data class DrawerControls(
     val style: DrawerStyle,
     val onStyleChange: (DrawerStyle) -> Unit,
     val sorting: Boolean,
@@ -196,16 +191,19 @@ fun AppDrawer(
     val matchesState = rememberLazyGridState()
     LaunchedEffect(matches) { matchesState.scrollToItem(0) }
     val alphabetical = style.order == DrawerOrder.Alphabetical
-    val ordered = remember(apps, style.order, foregroundTime) { apps.inOrder(style.order, foregroundTime) }
+    val usageForOrder = foregroundTime.takeIf { style.order == DrawerOrder.MostUsed }
+    val ordered = remember(apps, style.order, usageForOrder) { apps.inOrder(style.order, usageForOrder) }
     val sections = remember(ordered, alphabetical) { if (alphabetical) ordered.sectionsByInitial() else emptyList() }
     val askForUsage = picking == null && style.readsUsage && foregroundTime == null
-    val mostUsedApps = remember(apps, style.mostUsedRow, foregroundTime) {
-        if (style.mostUsedRow && foregroundTime != null) mostUsed(apps, foregroundTime, GRID_COLUMNS) else emptyList()
-    }.takeIf { picking == null }.orEmpty()
+    val showsMostUsed = picking == null && style.mostUsedRow
+    val mostUsedApps = remember(apps, showsMostUsed, foregroundTime) {
+        if (showsMostUsed && foregroundTime != null) mostUsed(apps, foregroundTime, GRID_COLUMNS) else emptyList()
+    }
     val sharingALabel = remember(apps) { apps.keysWithSharedLabels() }
     val detail = { app: AppEntry -> app.packageName.takeIf { app.key in sharingALabel } }
     val initials = remember(sections) { sections.map { it.initial } }
-    val leading = listOf(askForUsage, mostUsedApps.isNotEmpty()).count { it }
+    // At most one row heads the list: the prompt needs usage access missing, the row needs it granted.
+    val leading = if (askForUsage || mostUsedApps.isNotEmpty()) 1 else 0
     // The grid has no headers, as Arc's has none, so there the rail jumps to a section's first app.
     val headed = style.layout == DrawerLayout.List
     // The rail's targets are the running item counts: each section is its header, if it has one, then its apps.
@@ -245,7 +243,7 @@ fun AppDrawer(
                 query = query,
                 onQueryChange = onQueryChange,
                 onSearch = { matches.firstOrNull()?.let(picking?.onToggle ?: onLaunch) },
-                modifier = Modifier.weight(1f).padding(end = if (controls == null) 24.dp else 4.dp),
+                modifier = Modifier.weight(1f).padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp),
             )
             controls?.let { StyleButtons(it) }
         }
@@ -260,7 +258,11 @@ fun AppDrawer(
                     searching && matches.isEmpty() -> fullWidth(contentType = "empty") { NoMatches() }
                     searching -> apps(matches, entry, detail)
                     else -> {
-                        if (askForUsage) fullWidth(key = "usage", contentType = "usage") { UsageAccess(onOpenUsageSettings) }
+                        if (askForUsage) {
+                            fullWidth(key = "usage", contentType = "usage") {
+                                PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = 24.dp).testTag(AppDrawerTags.USAGE_ACCESS))
+                            }
+                        }
                         if (mostUsedApps.isNotEmpty()) {
                             fullWidth(key = "most_used", contentType = "most_used") {
                                 MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail)
@@ -309,7 +311,6 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         modifier = modifier
-            .padding(start = 24.dp, top = 8.dp, bottom = 8.dp)
             // The placeholder goes once there is text, and a screen reader should still say what the field is for.
             .semantics { contentDescription = "Search apps" }
             .testTag(AppDrawerTags.SEARCH),
@@ -328,7 +329,7 @@ private fun StyleButtons(controls: DrawerControls) {
         ) {
             Icon(
                 imageVector = if (layout == DrawerLayout.List) Icons.AutoMirrored.Filled.List else GridGlyph,
-                contentDescription = "${layout.label} view",
+                contentDescription = "${layout.name} view",
                 tint = if (lit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -363,15 +364,12 @@ private fun SortMenu(controls: DrawerControls) {
             )
         }
         HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text("Most used row") },
-            // The switch only shows the state: the row is the control.
-            trailingIcon = { Switch(checked = style.mostUsedRow, onCheckedChange = null) },
-            onClick = { choose(style.copy(mostUsedRow = !style.mostUsedRow)) },
-            modifier = Modifier.semantics {
-                role = Role.Switch
-                toggleableState = ToggleableState(style.mostUsedRow)
+        LauncherMenuItem(
+            LauncherMenuRow("Most used row", on = style.mostUsedRow, flips = true) {
+                controls.onStyleChange(style.copy(mostUsedRow = !style.mostUsedRow))
             },
+            controls.sorting,
+            close,
         )
     }
 }
@@ -422,21 +420,6 @@ private data class DrawerEntry(
         }
         else -> Modifier.clickable { picking.onToggle(app) }
     }
-}
-
-/** Asks for usage access, which what the drawer's style shows first needs. The whole row opens the settings. */
-@Composable
-private fun UsageAccess(onClick: () -> Unit) {
-    Text(
-        text = "Allow usage access to see your most used apps",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp)
-            .testTag(AppDrawerTags.USAGE_ACCESS),
-    )
 }
 
 /** The [apps] used most, a grid row of them under their own heading, whatever the drawer's layout. */
@@ -504,7 +487,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
         }
         if (picked) {
             when (picking?.mark) {
-                PickMark.Dot -> Dot()
+                PickMark.Dot -> Dot(Modifier.padding(start = 12.dp))
                 else -> Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
         }
@@ -547,14 +530,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
             }
             entry.menu?.content?.invoke(app)
         }
-        Text(
-            text = app.label,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        AppLabel(app.label)
         if (detail != null) {
             Text(
                 text = detail,
@@ -569,7 +545,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
 
 /** Marks a row whose app was just added: read as part of the row, like the unread count. */
 @Composable
-private fun Dot(modifier: Modifier = Modifier.padding(start = 12.dp)) {
+private fun Dot(modifier: Modifier = Modifier) {
     Box(
         modifier
             .size(8.dp)

@@ -1,12 +1,12 @@
 package com.sqftware.orbitlauncher.domain
 
 /** How the drawer lays out its apps. */
-enum class DrawerLayout(val label: String) {
+enum class DrawerLayout {
     /** A row per app, its name beside its icon. */
-    List("List"),
+    List,
 
     /** Rows of icons, each named underneath. */
-    Grid("Grid"),
+    Grid,
 }
 
 /** The order the drawer lists its apps in. */
@@ -37,6 +37,6 @@ data class DrawerStyle(
  */
 fun List<AppEntry>.inOrder(order: DrawerOrder, time: ForegroundTime?): List<AppEntry> = when (order) {
     DrawerOrder.Alphabetical -> this
-    DrawerOrder.MostUsed -> sortedByDescending { time?.byPackage?.get(it.packageName) ?: 0L }
+    DrawerOrder.MostUsed -> sortedByDescending { time?.of(it) ?: 0L }
     DrawerOrder.Newest -> sortedByDescending { it.installedAt }
 }

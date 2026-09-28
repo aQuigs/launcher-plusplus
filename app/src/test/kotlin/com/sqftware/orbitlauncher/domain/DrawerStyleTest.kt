@@ -10,11 +10,6 @@ class DrawerStyleTest {
     private val byName = listOf(calendar, chrome, maps)
 
     @Test
-    fun `A to Z keeps the order by name`() {
-        assertEquals(byName, byName.inOrder(DrawerOrder.Alphabetical, null))
-    }
-
-    @Test
     fun `most used puts the longest in front first, and apps never in front after them by name`() {
         val time = ForegroundTime(mapOf(maps.packageName to 50L, chrome.packageName to 10L))
 

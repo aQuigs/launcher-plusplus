@@ -50,6 +50,7 @@ class AppDrawerTest {
     val compose = createComposeRule()
 
     private val gridState = LazyGridState()
+    private var style by mutableStateOf(DrawerStyle())
 
     // Each letter of the alphabet fixture is one header row followed by its apps.
     private val itemsPerLetter = APPS_PER_LETTER + 1
@@ -60,25 +61,28 @@ class AppDrawerTest {
         picking: Picking? = null,
         unread: UnreadCounts = UnreadCounts(),
         style: DrawerStyle = DrawerStyle(),
-        onStyleChange: (DrawerStyle) -> Unit = {},
+        onStyleChange: (DrawerStyle) -> Unit = { this.style = it },
         foregroundTime: ForegroundTime? = null,
         onOpenUsageSettings: () -> Unit = {},
-    ) = compose.setContent {
-        var query by remember { mutableStateOf("") }
-        var sorting by remember { mutableStateOf(false) }
-        AppDrawer(
-            apps,
-            icon = { null },
-            onLaunch,
-            picking = picking,
-            gridState = gridState,
-            query = query,
-            onQueryChange = { query = it },
-            unread = unread,
-            controls = DrawerControls(style, onStyleChange, sorting, onSortingChange = { sorting = it }),
-            foregroundTime = foregroundTime,
-            onOpenUsageSettings = onOpenUsageSettings,
-        )
+    ) {
+        this.style = style
+        compose.setContent {
+            var query by remember { mutableStateOf("") }
+            var sorting by remember { mutableStateOf(false) }
+            AppDrawer(
+                apps,
+                icon = { null },
+                onLaunch,
+                picking = picking,
+                gridState = gridState,
+                query = query,
+                onQueryChange = { query = it },
+                unread = unread,
+                controls = DrawerControls(this.style, onStyleChange, sorting, onSortingChange = { sorting = it }),
+                foregroundTime = foregroundTime,
+                onOpenUsageSettings = onOpenUsageSettings,
+            )
+        }
     }
 
     private fun top(label: String) = compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot.top
@@ -153,19 +157,7 @@ class AppDrawerTest {
 
     @Test
     fun aNewStyleStartsTheListAtItsTopWithTheNewRowInSight() {
-        var style by mutableStateOf(DrawerStyle())
-        compose.setContent {
-            AppDrawer(
-                alphabet,
-                icon = { null },
-                onLaunch = {},
-                gridState = gridState,
-                query = "",
-                onQueryChange = {},
-                controls = DrawerControls(style, onStyleChange = { style = it }, sorting = false, onSortingChange = {}),
-                foregroundTime = ForegroundTime(mapOf("com.example.m1" to 5L)),
-            )
-        }
+        show(alphabet, foregroundTime = ForegroundTime(mapOf("com.example.m1" to 5L)))
         compose.onNodeWithText("A1").assertIsDisplayed()
 
         compose.runOnIdle { style = style.copy(mostUsedRow = true) }
