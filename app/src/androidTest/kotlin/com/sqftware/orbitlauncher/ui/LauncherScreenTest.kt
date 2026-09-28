@@ -109,6 +109,7 @@ class LauncherScreenTest {
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
     private val hourStylesChosen = mutableListOf<Boolean>()
     private var folderLook by mutableStateOf(FolderLook.SolarSystem)
+    private var ambientMotion by mutableStateOf(true)
     private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
@@ -192,6 +193,8 @@ class LauncherScreenTest {
             },
             folderLook = folderLook,
             onFolderLookChange = { folderLook = it },
+            ambientMotion = ambientMotion,
+            onAmbientMotionChange = { ambientMotion = it },
             drawerStyle = drawerStyle,
             onDrawerStyleChange = { drawerStyle = it },
             onOpenClock = { opened += "clock" },
@@ -1670,6 +1673,15 @@ class LauncherScreenTest {
         compose.onNodeWithText("24-hour clock").assertIsOff()
         compose.onNodeWithText("24-hour clock").performClick()
         compose.runOnIdle { assertEquals(listOf(false, true), hourStylesChosen) }
+    }
+
+    @Test
+    fun theLauncherMenusAmbientMotionRowShowsTheSettingAndATapFlipsIt() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Ambient motion").assertIsOn().performClick()
+
+        compose.runOnIdle { assertFalse(ambientMotion) }
     }
 
     @Test

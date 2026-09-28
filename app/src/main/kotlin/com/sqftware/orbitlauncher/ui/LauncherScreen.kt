@@ -143,11 +143,12 @@ data class HomePress(val launcherInFront: Boolean)
  * page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog
- * ([onFolderLookChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
- * restart the launcher ([onRestart]), and reset it ([onReset]) once a
- * dialog has asked. The ring, the dock and folders hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all
- * that is open, as HOME in front does, and asks on the home page whether to add its shortcut, which goes at the end of
- * the ring once the system has pinned it. [apps] and [pinnedShortcuts] are null until they have loaded. The drawer lays
+ * ([onFolderLookChange]), show whether the planets and the emblem's sky turn on their own and flip it ([ambientMotion],
+ * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
+ * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
+ * the home page whether to add its shortcut, which goes at the end of the ring once the system has pinned it. [apps] and
+ * [pinnedShortcuts] are null until they have loaded. The drawer lays
  * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
  * drawer, the editor, the picker and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
@@ -171,6 +172,8 @@ fun LauncherScreen(
     onTwentyFourHourChange: (Boolean) -> Unit,
     folderLook: FolderLook,
     onFolderLookChange: (FolderLook) -> Unit,
+    ambientMotion: Boolean,
+    onAmbientMotionChange: (Boolean) -> Unit,
     drawerStyle: DrawerStyle,
     onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
@@ -226,6 +229,8 @@ fun LauncherScreen(
     val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestFolderLook by rememberUpdatedState(folderLook)
+    val latestAmbientMotion by rememberUpdatedState(ambientMotion)
+    val latestOnAmbientMotionChange by rememberUpdatedState(onAmbientMotionChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
     val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
     val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
@@ -329,7 +334,8 @@ fun LauncherScreen(
     // The planets turn like the emblem's sky, only while there are some to see move, an hour to a turn: every orbit goes
     // round a whole number of times in it, so none jumps as the turn starts over.
     val planets = remember(ring, dock) { planetsOf(ring, dock) }
-    val skyTurns = homeInSight && when (folderLook) {
+    val ambient = ambientMotion && homeInSight
+    val skyTurns = ambient && when (folderLook) {
         FolderLook.SolarSystem -> planets.values.any(Planet::moves)
         FolderLook.Orbit -> (ring + dock).any { it is RingItem.Folder }
         else -> false
@@ -726,6 +732,12 @@ fun LauncherScreen(
                             ),
                             LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
                             LauncherMenuRow(
+                                "Ambient motion",
+                                on = latestAmbientMotion,
+                                flips = true,
+                                onClick = { latestOnAmbientMotionChange(!latestAmbientMotion) },
+                            ),
+                            LauncherMenuRow(
                                 "Check for updates",
                                 on = latestCheckForUpdates,
                                 flips = true,
@@ -974,6 +986,7 @@ fun LauncherScreen(
                                             foldTarget = litSlot?.takeIf { it.foldInto?.holder == HomePlace.Ring }?.index,
                                             held = (dragged as? Drag.OutOfFolder)?.app,
                                             inSight = homeInSight,
+                                            turns = ambient,
                                             dock = dock,
                                             dockSlot = { dockRearrange.boundsOf(it, dock) },
                                         )

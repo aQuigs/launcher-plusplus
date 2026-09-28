@@ -166,7 +166,7 @@ private sealed interface Part {
  * dropped. The item at [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of
  * a folder that has closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag
  * ends or the ring makes way for it, showing where it would land as an app from another place does. The emblem's sky and
- * spark turn slowly while the ring is [inSight], and hold still otherwise. A folder opened or closed out of sight, or
+ * spark turn slowly while the ring [turns], and hold still otherwise. A folder opened or closed out of sight, or
  * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
  * still found, and [dockSlot] where the dock shows a folder, in root coordinates, so its planet leaves from there and
  * goes back there.
@@ -192,6 +192,7 @@ fun HomeRing(
     foldTarget: Int? = null,
     held: AppEntry? = null,
     inSight: Boolean = true,
+    turns: Boolean = true,
     dock: List<RingItem> = emptyList(),
     dockSlot: (RingItem.Folder) -> Bounds? = { null },
 ) {
@@ -201,7 +202,7 @@ fun HomeRing(
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
     val marks = LocalRingColors.current
     // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
-    val turning = inSight && !showHint && openFolder == null
+    val turning = turns && !showHint && openFolder == null
     val spark = turnAngle(turning, SPARK_TURN_MILLIS)
     val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
     fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx())
