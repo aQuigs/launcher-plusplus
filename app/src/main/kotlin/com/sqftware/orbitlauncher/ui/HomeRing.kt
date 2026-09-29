@@ -161,10 +161,10 @@ private sealed interface Part {
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
  * land. A folder is a planet: an [openFolder] glides from its slot into the centre in the emblem's place, its apps
  * spiralling out round it into the slots, each with the [folderAppMenu], while the ring drifts outward and fades; a tap
- * on the planet calls [onCloseFolder], and it goes back the way it came, and a long press there calls [onAddToFolder]. Each app wears its [unread] count, and a folder
- * the sum of its apps'. With [rearrange], a long press that moves on picks up what is in a slot to move it round the
- * ring, or round the open folder; while one is on the move, the slots show where everything would be if it were
- * dropped. The item at [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of
+ * on the planet calls [onCloseFolder], and it goes back the way it came, and a long press there calls [onAddToFolder].
+ * Each app wears its [unread] count, and a folder the sum of its apps'. With [rearrange], a long press that moves on
+ * picks up what is in a slot to move it round the ring, or round the open folder; while one is on the move, the slots
+ * show where everything would be if it were dropped. The item at [foldTarget] is lit as the one an app let go now would fold into. [held] is an app dragged out of
  * a folder that has closed under the finger: its icon carries the gesture, so it stays composed, unseen, until the drag
  * ends or the ring makes way for it, showing where it would land as an app from another place does. The emblem's sky and
  * spark turn slowly while the ring [turns], and hold still otherwise. A folder opened or closed out of sight, or
@@ -546,8 +546,8 @@ private val RingItem.tag: String
 
 /**
  * An open [folder]'s planet in the ring's centre, where the emblem was, drawn a little smaller than it; a tap there calls
- * [onClose] and a long press [onAddApps]. Without [onClose] it is only the planet going back to its slot. [inner] fades its previews, as its apps are
- * round it.
+ * [onClose] and a long press [onAddApps]. Without [onClose] it is only the planet going back to its slot. [inner] fades
+ * its previews, as its apps are round it.
  */
 @Composable
 private fun CentrePlanet(

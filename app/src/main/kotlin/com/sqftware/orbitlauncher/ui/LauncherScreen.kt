@@ -1003,7 +1003,7 @@ fun LauncherScreen(
                                             highlighted = dropPlace == HomePlace.Ring,
                                             openFolder = open,
                                             // Not mid-drag: a second finger would open the drawer over the app still held.
-                                            onAddToFolder = { if (dragged == null) openFolder?.let(::pickFor) },
+                                            onAddToFolder = if (dragged == null) ({ openFolder?.let(::pickFor) }) else null,
                                             menu = ringMenu,
                                             folderMenu = folderMenu,
                                             folderAppMenu = folderAppMenu,
