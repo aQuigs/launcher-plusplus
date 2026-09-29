@@ -140,8 +140,8 @@ class Picking(
 )
 
 /**
- * The drawer's own controls beside its search field, as Arc has them: a button for each [DrawerLayout], the one the
- * [style] has lit, and a button opening the sort menu, shown while [sorting], of the orders and the row of the most used
+ * The drawer's own controls beside its search field: one button that switches the [style] to the next [DrawerLayout],
+ * and a button opening the sort menu, shown while [sorting], of the orders and the row of the most used
  * apps. A choice goes to [onStyleChange]; opening and closing the menu to [onSortingChange].
  */
 data class DrawerControls(
@@ -322,18 +322,16 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
 private fun StyleButtons(controls: DrawerControls) {
     val style = controls.style
 
-    DrawerLayout.entries.forEach { layout ->
-        val lit = layout == style.layout
-        IconButton(
-            onClick = { controls.onStyleChange(style.copy(layout = layout)) },
-            modifier = Modifier.semantics { selected = lit },
-        ) {
-            Icon(
-                imageVector = if (layout == DrawerLayout.List) Icons.AutoMirrored.Filled.List else GridGlyph,
-                contentDescription = "${layout.name} view",
-                tint = if (lit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    // The button shows the layout a tap switches to, as the view toggle in Files does.
+    val next = DrawerLayout.entries.let { it[(style.layout.ordinal + 1) % it.size] }
+    IconButton(onClick = { controls.onStyleChange(style.copy(layout = next)) }) {
+        Icon(
+            imageVector = when (next) {
+                DrawerLayout.List -> Icons.AutoMirrored.Filled.List
+                DrawerLayout.Grid -> GridGlyph
+            },
+            contentDescription = "Switch to ${next.name.lowercase()} view",
+        )
     }
     Box(Modifier.padding(end = 8.dp)) {
         IconButton(onClick = { controls.onSortingChange(true) }) {

@@ -105,12 +105,23 @@ class AppDrawerTest {
     }
 
     @Test
-    fun theHeaderButtonsSetTheLayoutAndTheSortMenuTheOrderAndTheMostUsedRow() {
+    fun oneButtonTogglesBetweenTheListAndTheGrid() {
+        show(listOf(clock, mail))
+
+        compose.onNodeWithContentDescription("Switch to list view").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Switch to grid view").performClick()
+        compose.runOnIdle { assertEquals(DrawerLayout.Grid, style.layout) }
+
+        compose.onNodeWithContentDescription("Switch to grid view").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Switch to list view").performClick()
+        compose.runOnIdle { assertEquals(DrawerLayout.List, style.layout) }
+    }
+
+    @Test
+    fun theSortMenuSetsTheOrderAndTheMostUsedRow() {
         val changes = mutableListOf<DrawerStyle>()
         show(listOf(clock, mail), onStyleChange = changes::add)
 
-        compose.onNodeWithContentDescription("List view").assertIsSelected()
-        compose.onNodeWithContentDescription("Grid view").performClick()
         compose.onNodeWithContentDescription("Sort apps").performClick()
         compose.onNodeWithText("A to Z").assertIsSelected()
         compose.onNodeWithText("Date added").performClick()
@@ -120,7 +131,6 @@ class AppDrawerTest {
 
         assertEquals(
             listOf(
-                DrawerStyle(layout = DrawerLayout.Grid),
                 DrawerStyle(order = DrawerOrder.Newest),
                 DrawerStyle(mostUsedRow = true),
             ),
