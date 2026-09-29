@@ -48,6 +48,15 @@ class CollectionsTest {
     }
 
     @Test
+    fun `a toggle adds an app to a card or takes it off`() {
+        val page = CollectionsPage().add(tools).addApp(tools, mail)
+
+        assertEquals(Favourites(listOf(mail.key, clock.key)), page.toggleApp(tools, clock).card(tools)!!.apps)
+        assertEquals(Favourites(), page.toggleApp(tools, mail).card(tools)!!.apps)
+        assertEquals(page, page.toggleApp(photos, clock))
+    }
+
+    @Test
     fun `expanded flips one card`() {
         val page = CollectionsPage().toggleExpanded(MostUsed)
 

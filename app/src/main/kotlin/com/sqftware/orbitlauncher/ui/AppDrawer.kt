@@ -125,7 +125,7 @@ fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifi
     )
 }
 
-/** How a picked row is marked: a check on a row a tap takes off again, or a dot on one a tap only ever adds. */
+/** How a picked row is marked: a check on a row a tap takes off again, or a dot on one a tap cannot change. */
 enum class PickMark { Check, Dot }
 
 /**

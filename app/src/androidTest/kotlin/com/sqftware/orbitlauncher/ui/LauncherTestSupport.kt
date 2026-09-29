@@ -179,8 +179,6 @@ fun SemanticsNodeInteractionsProvider.collectionBin() = onNodeWithTag(Collection
 
 fun SemanticsNodeInteractionsProvider.collectionPicker() = onNodeWithTag(CollectionTags.PICKER)
 
-fun SemanticsNodeInteractionsProvider.collectionEditor() = onNodeWithTag(CollectionTags.EDITOR)
-
 // The picker's grid is lazy: a tile far down is not composed, so not found, until the grid has scrolled to it.
 fun SemanticsNodeInteractionsProvider.pickerTile(tag: String): SemanticsNodeInteraction {
     onNode(hasScrollToNodeAction() and hasAnyAncestor(hasTestTag(CollectionTags.PICKER))).performScrollToNode(hasTestTag(tag))
@@ -195,6 +193,6 @@ fun SemanticsNodeInteractionsProvider.createCollectionDialog() = onNodeWithTag(C
 
 fun SemanticsNodeInteractionsProvider.createCollectionName() = onNodeWithTag(CollectionTags.CREATE_NAME)
 
-// The drawer's list is composed under the editor too, so a row is told apart by the screen it is on.
-fun SemanticsNodeInteractionsProvider.editorRow(label: String) =
-    onNode(hasText(label) and hasAnyAncestor(hasTestTag(CollectionTags.EDITOR)))
+// A card on the page behind the drawer can show the same label, so a row is told apart by the list it is in.
+fun SemanticsNodeInteractionsProvider.drawerRow(label: String) =
+    onNode(hasText(label) and hasAnyAncestor(hasTestTag(AppDrawerTags.LIST)))
