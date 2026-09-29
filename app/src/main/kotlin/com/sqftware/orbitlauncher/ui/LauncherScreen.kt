@@ -148,8 +148,8 @@ data class HomePress(val launcherInFront: Boolean)
  * [widgets]; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
  * out of view. The collections page shows the cards of [collections], the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
- * pencil opens an editor over the screen that adds apps to it, and the button under the cards opens the picker that adds
- * and removes cards, whose last tile opens a dialog naming a new custom collection. An app on a card opens its menu at
+ * pencil opens the drawer to pick its apps, as the ring's emblem does, and the button under the cards opens the picker that
+ * adds and removes cards, whose last tile opens a dialog naming a new custom collection. An app on a card opens its menu at
  * a long press, as anywhere else; lifted off a hand-picked card, dropping it on the bin takes it off the card. A long
  * press that moves on picks up an app or a folder on the ring, an app in the open folder, the dock or a hand-picked
  * card, to move it among its neighbours: they make way where the finger rests, and letting go over another's place puts
@@ -175,8 +175,8 @@ data class HomePress(val launcherInFront: Boolean)
  * [pinnedShortcuts] are null until they have loaded. The drawer lays
  * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
- * drawer, the editor, the picker and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
- * it cancels a drag, else closes the menu or a dialog, then the drawer, then the editor or the picker, then ends widget
+ * drawer, the collection picker and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
+ * it cancels a drag, else closes the menu or a dialog, then the drawer, then the collection picker, then ends widget
  * editing, then returns to the home page, then closes the folder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -348,20 +348,13 @@ fun LauncherScreen(
             focusManager.clearFocus()
         }
     }
-    // The editor and the picker each cover the whole screen until Back or HOME. The editor marks the apps tapped while it
-    // was open, and starts clean each time; dropping focus takes its keyboard down with it. The card being edited is held
-    // by its stored name, which survives the activity being recreated.
-    var editing by rememberSaveable { mutableStateOf<String?>(null) }
+    // The collection picker covers the whole screen until Back or HOME. Its surface is translucent so the wallpaper shows
+    // through, as it does through the drawer; the pages and the drawer's chevron must not, so they go while it is up. Not
+    // animated: it comes and goes in a frame, and pages fading back in would be tappable before they could be seen.
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
-    var justPicked by rememberSaveable { mutableStateOf(emptySet<String>()) }
-    var editorQuery by rememberSaveable { mutableStateOf("") }
-    // Their surfaces are translucent so the wallpaper shows through, as it does through the drawer; the pages and the
-    // drawer's chevron must not, so they go while either is up. Not animated: the overlays come and go in a frame,
-    // and pages fading back in would be tappable before they could be seen.
-    val overlayOpen = editing != null || pickingCollection
     // Every page stays composed, so the home page must be told when nobody can see it.
     val homeSettled by remember(pagerState, layout) { derivedStateOf { pagerState.settledPage == layout.homeIndex } }
-    val homeInSight = homeSettled && !drawerOpen && !overlayOpen
+    val homeInSight = homeSettled && !drawerOpen && !pickingCollection
     // The planets turn like the emblem's sky, only while there are some to see move, an hour to a turn: every orbit goes
     // round a whole number of times in it, so none jumps as the turn starts over.
     val planets = remember(ring, dock) { planetsOf(ring, dock) }
@@ -373,13 +366,6 @@ fun LauncherScreen(
     }
     val sky = rememberUpdatedState(turnAngle(skyTurns, FOLDER_SKY_TURN_MILLIS))
     val folderStyle = remember(folderLook, planets) { FolderStyle(folderLook, planets) { sky.value.value / 360f * 60f } }
-    LaunchedEffect(editing) {
-        if (editing == null) {
-            justPicked = emptySet()
-            editorQuery = ""
-            focusManager.clearFocus()
-        }
-    }
     // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
     var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
     var openingMenu by remember { mutableStateOf<Job?>(null) }
@@ -489,7 +475,7 @@ fun LauncherScreen(
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
-    // By the card's stored name, as the editor holds its card.
+    // By the card's stored name, which survives the activity being recreated.
     var choosingRows by rememberSaveable { mutableStateOf<String?>(null) }
     // The widget in edit mode counts only while it is on the page and the page is in view: one gone with its provider, or
     // a long press that fired as the page left, must not leave an unseen mode taking taps and Back, nor come back with
@@ -504,17 +490,17 @@ fun LauncherScreen(
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
     fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
 
-    fun pickFor(place: HomePlace) {
-        picking = DrawerPick.Apps(place)
-        openDrawer()
-    }
-
-    // A search the menu was opened from would hide the other apps.
-    fun pickPartner(app: AppEntry, spot: AppSpot) {
-        picking = DrawerPick.Partner(app.key, spot)
+    // A search left over from the drawer, or the menu was opened from, would hide the other apps: the drawer may be
+    // reopened before it settles closed, which is what ends a search.
+    fun pick(pick: DrawerPick) {
+        picking = pick
         query = ""
         openDrawer()
     }
+
+    fun pickFor(place: HomePlace) = pick(DrawerPick.Apps(place))
+
+    fun pickPartner(app: AppEntry, spot: AppSpot) = pick(DrawerPick.Partner(app.key, spot))
 
     // Where the first app was pressed, if the user fills that place, else at the end of the ring: the apps in the drawer
     // and on the built-in cards are the system's. The pair is seen landing, as a pinned shortcut is; a card is on the page
@@ -813,7 +799,6 @@ fun LauncherScreen(
         openFolder = null
         editingWidget = null
         closeDrawer()
-        editing = null
         pickingCollection = false
         confirmingReset = false
         confirmingPin = null
@@ -838,17 +823,16 @@ fun LauncherScreen(
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
-    // not a rung of its own: the keyboard takes the first Back, and closing the drawer or the editor ends the search.
+    // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search.
     // The open folder comes last because the drawer and the other pages both hide it, and a press should undo something
     // in view.
     BackHandler(
-        enabled = dragged != null || drawerOpen || overlayOpen || editedWidget != null ||
+        enabled = dragged != null || drawerOpen || pickingCollection || editedWidget != null ||
             pagerState.currentPage != layout.homeIndex || open != null,
     ) {
         when {
             dragged != null -> dragged = null
             drawerOpen -> closeDrawer()
-            editing != null -> editing = null
             pickingCollection -> pickingCollection = false
             editedWidget != null -> editingWidget = null
             pagerState.currentPage != layout.homeIndex -> goHome()
@@ -964,13 +948,20 @@ fun LauncherScreen(
                                 Picking(
                                     header = {
                                         when (place) {
-                                            is HomePlace.Folder -> FolderPicker()
+                                            is HomePlace.Folder -> AddingPicker("folder")
                                             HomePlace.Ring, HomePlace.Dock ->
                                                 PlacePicker(place = place, onPlaceChange = { picking = DrawerPick.Apps(it) })
                                         }
                                     },
                                     isPicked = { it in picked },
                                     onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
+                                )
+                            }
+                            is DrawerPick.Card -> collections.card(pick.kind)?.let { card ->
+                                Picking(
+                                    header = { AddingPicker(pick.kind.title) },
+                                    isPicked = { it in card.apps },
+                                    onToggle = { changeCollections { toggleApp(pick.kind, it) } },
                                 )
                             }
                             // Neither the app split nor another of its package can be its partner.
@@ -990,7 +981,7 @@ fun LauncherScreen(
             },
             // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
             // navigation-bar inset.
-            modifier = Modifier.clipToBounds().alpha(if (overlayOpen) 0f else 1f),
+            modifier = Modifier.clipToBounds().alpha(if (pickingCollection) 0f else 1f),
         ) { padding ->
             HorizontalPager(
                 state = pagerState,
@@ -1119,7 +1110,7 @@ fun LauncherScreen(
                                 onToggleExpanded = { kind -> changeCollections { toggleExpanded(kind) } },
                                 onChooseRows = { choosingRows = it.name },
                                 onMove = { from, to -> changeCollections { move(from, to) } },
-                                onEdit = { editing = it.name },
+                                onEdit = { pick(DrawerPick.Card(it)) },
                                 onAdd = { pickingCollection = true },
                                 onOpenUsageSettings = onOpenUsageSettings,
                                 rearrange = cardRearrange,
@@ -1133,22 +1124,7 @@ fun LauncherScreen(
                 }
             }
         }
-        // Over the hidden scaffold, drawer strip included: each is a screen of its own until Back or HOME.
-        remember(editing) { editing?.let(CollectionKind::named) }?.let { kind ->
-            CollectionEditor(
-                title = "Add to ${kind.title}",
-                apps = apps.orEmpty(),
-                icon = actions.icon,
-                isPicked = { it.key in justPicked },
-                onPick = { app ->
-                    // Marked whether or not it was already in the card, so the tap is seen to have counted either way.
-                    justPicked = justPicked + app.key
-                    changeCollections { addApp(kind, app) }
-                },
-                query = editorQuery,
-                onQueryChange = { editorQuery = it },
-            )
-        }
+        // Over the hidden scaffold, drawer strip included: a screen of its own until Back or HOME.
         if (pickingCollection) {
             // Both last as long as this visit to the picker. The custom cards it has listed keep a tile tapped off where
             // it was, with its apps, so a second tap cannot land on its neighbour and puts it back whole.
@@ -1308,6 +1284,9 @@ private sealed interface Drag {
 private sealed interface DrawerPick : Serializable {
     /** The apps at [place], which a tap puts there or takes off. */
     data class Apps(val place: HomePlace) : DrawerPick
+
+    /** The apps on the collection card of [kind], which a tap puts there or takes off. */
+    data class Card(val kind: CollectionKind.HandPicked) : DrawerPick
 
     /** The app to pair the one keyed [app] with, which was long-pressed at [spot]. */
     data class Partner(val app: String, val spot: AppSpot) : DrawerPick

@@ -116,7 +116,6 @@ object CollectionTags {
     const val ADD = "collection_add"
     const val BIN = "collection_bin"
     const val PICKER = "collection_picker"
-    const val EDITOR = "collection_editor"
     const val NOTICE = "collection_notice"
     const val CREATE = "collection_create"
     const val CREATE_DIALOG = "collection_create_dialog"
@@ -178,7 +177,7 @@ fun CollectionsColumn(
     onToggleExpanded: (CollectionKind) -> Unit,
     onChooseRows: (CollectionKind) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
-    onEdit: (CollectionKind) -> Unit,
+    onEdit: (CollectionKind.HandPicked) -> Unit,
     onAdd: () -> Unit,
     onOpenUsageSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -218,7 +217,7 @@ fun CollectionsColumn(
                         onToggleExpanded = { onToggleExpanded(card.kind) },
                         onChooseRows = { onChooseRows(card.kind) },
                         onMove = onMove,
-                        onEdit = if (handPicked != null) ({ onEdit(card.kind) }) else null,
+                        onEdit = handPicked?.let { { onEdit(it) } },
                         rearrange = handPicked?.let(rearrange),
                         menu = menu(card.kind),
                         onOpenUsageSettings = onOpenUsageSettings,
@@ -644,46 +643,6 @@ private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
             .testTag(CollectionTags.NOTICE),
     ) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.inverseOnSurface)
-    }
-}
-
-/**
- * Adding apps to a hand-picked card, named by [title]: the drawer's list of every app, with its search and rail, where a
- * tap calls [onPick] and the rows [isPicked] says wear a dot, without check marks, since a tap only ever adds.
- */
-@Composable
-fun CollectionEditor(
-    title: String,
-    apps: List<AppEntry>,
-    icon: suspend (AppEntry) -> ImageBitmap?,
-    isPicked: (AppEntry) -> Boolean,
-    onPick: (AppEntry) -> Unit,
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Panel(modifier.testTag(CollectionTags.EDITOR)) {
-        AppDrawer(
-            apps = apps,
-            icon = icon,
-            onLaunch = {},
-            picking = Picking(
-                header = {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp),
-                    )
-                },
-                isPicked = isPicked,
-                onToggle = onPick,
-                mark = PickMark.Dot,
-            ),
-            query = query,
-            onQueryChange = onQueryChange,
-        )
     }
 }
 

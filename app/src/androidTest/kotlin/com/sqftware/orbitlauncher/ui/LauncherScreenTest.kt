@@ -2082,7 +2082,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun anEditorOpenOnACustomCardSurvivesTheScreenBeingRecreated() {
+    fun pickingForACustomCardSurvivesTheScreenBeingRecreated() {
         val bills = CollectionKind.Custom("Bills")
         collections = CollectionsPage(listOf(CollectionCard(bills)))
         val restoration = StateRestorationTester(compose)
@@ -2092,8 +2092,8 @@ class LauncherScreenTest {
 
         restoration.emulateSavedInstanceStateRestore()
 
-        compose.onNodeWithText("Add to Bills").assertIsDisplayed()
-        compose.editorRow("Mail").performClick()
+        compose.onNodeWithText("Adding to Bills").assertIsDisplayed()
+        compose.drawerRow("Mail").performClick()
         compose.runOnIdle { assertEquals(Favourites(listOf(mail.key)), collections.card(bills)!!.apps) }
     }
 
@@ -2113,34 +2113,31 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun thePencilOpensAnEditorThatAddsATappedAppOnceAndBackReturnsToThePage() {
-        collections = CollectionsPage().add(tools)
+    fun thePencilPicksForTheCardWithItsAppsCheckedAndATapTogglesOne() {
+        collections = CollectionsPage().add(tools).addApp(tools, mail)
         show()
         goToCollections()
 
         compose.collectionEditButton(tools).performClick()
 
-        compose.collectionEditor().assertIsDisplayed()
-        compose.editorRow("Mail").assert(hasText("added").not())
-        compose.editorRow("Mail").performClick()
-        compose.editorRow("Mail").assert(hasText("added"))
-        compose.editorRow("Mail").performClick()
-        compose.editorRow("Clock").performClick()
+        compose.onNodeWithText("Adding to Tools").assertIsDisplayed()
+        compose.drawerRow("Mail").assertIsOn()
+        compose.drawerRow("Clock").assertIsOff()
+        compose.drawerRow("Clock").performClick()
+        compose.drawerRow("Mail").performClick()
+        compose.drawerRow("Clock").assertIsOn()
+        compose.drawerRow("Mail").assertIsOff()
         compose.runOnIdle {
-            assertEquals(Favourites(listOf(mail.key, clock.key)), collections.card(tools)!!.apps)
+            assertEquals(Favourites(listOf(clock.key)), collections.card(tools)!!.apps)
             assertEquals(emptyList<AppEntry>(), launched)
         }
 
         Espresso.pressBack()
 
-        compose.collectionEditor().assertDoesNotExist()
+        compose.placePicker().assertDoesNotExist()
         assertSettledOn(LauncherPage.Collections)
-        compose.collectionApp(tools, mail).assertIsDisplayed()
         compose.collectionApp(tools, clock).assertIsDisplayed()
-
-        // The dots are for this visit's taps, as in Arc.
-        compose.collectionEditButton(tools).performClick()
-        compose.editorRow("Mail").assert(hasText("added").not())
+        compose.collectionApp(tools, mail).assertDoesNotExist()
     }
 
     @Test
@@ -2288,16 +2285,16 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun homeClosesTheEditorAndThePicker() {
+    fun homeEndsPickingForACardAndClosesThePicker() {
         collections = CollectionsPage().add(tools)
         show()
         goToCollections()
         compose.collectionEditButton(tools).performClick()
-        compose.collectionEditor().assertIsDisplayed()
+        compose.placePicker().assertIsDisplayed()
 
         pressHome(launcherInFront = true)
 
-        compose.collectionEditor().assertDoesNotExist()
+        compose.placePicker().assertDoesNotExist()
         assertSettledOn(LauncherPage.Home)
 
         goToCollections()

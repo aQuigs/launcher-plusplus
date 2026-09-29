@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.HomePlace
@@ -42,11 +43,16 @@ fun PlacePicker(place: HomePlace, onPlaceChange: (HomePlace) -> Unit, modifier: 
     }
 }
 
-/** Heads the drawer while picking for a folder: that a tap fills the folder, and what a tap does. */
+/** Heads the drawer while picking for a folder or a collection card, named by [target]: what a tap fills, and what a tap does. */
 @Composable
-fun FolderPicker(modifier: Modifier = Modifier) {
+fun AddingPicker(target: String, modifier: Modifier = Modifier) {
     PickingHeader(modifier) {
-        Text(text = "Adding to folder", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Adding to $target",
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
