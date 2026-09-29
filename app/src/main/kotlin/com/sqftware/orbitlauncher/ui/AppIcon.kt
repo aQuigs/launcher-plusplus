@@ -20,13 +20,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.EntryKind
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * One app as a round icon, named by its label for screen readers, with a badge for its [unread] notifications. A tap
@@ -94,9 +107,60 @@ fun AppLabel(label: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** An app's icon alone, with no name and nothing to tap; blank until it has loaded. */
+/** An app's icon alone, with no name and nothing to tap, or a pair's; blank until it has loaded. */
 @Composable
 fun AppImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier = Modifier) {
+    val kind = app.kind
+    if (kind is EntryKind.AppPair) PairImage(kind, icon, modifier) else OwnImage(app, icon, modifier)
+}
+
+/** How much of a pair's square each of its apps' icons takes. */
+private const val PAIR_ICON_FRACTION = 0.58f
+
+/** How far the second of a pair's icons sits from the first, of the room the square leaves them, as far as keeps both in the disc. */
+private const val PAIR_ICON_BIAS = 0.7f
+
+/** How far the first of a pair's icons is cut back round the second, which parts them where they overlap. */
+private val PAIR_GAP = 1.5.dp
+
+/** How far, across and down, the second of a pair's icons, [side] wide, sits from the first. */
+private fun secondIconOffset(side: Int): Int = ((side / PAIR_ICON_FRACTION - side) * PAIR_ICON_BIAS).roundToInt()
+
+/**
+ * A pair's two icons in one square, the first towards the top start and the second, over it, towards the bottom end. The
+ * gap between them is cut out of the first, so whatever is behind shows through it, a disc or the sky of a folder.
+ */
+@Composable
+private fun PairImage(pair: EntryKind.AppPair, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier) {
+    Layout(
+        content = {
+            OwnImage(pair.first, icon, Modifier.clip(CircleShape).cutAroundSecond())
+            OwnImage(pair.second, icon, Modifier.clip(CircleShape))
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val side = min(constraints.maxWidth, constraints.maxHeight)
+        val iconSide = (side * PAIR_ICON_FRACTION).roundToInt()
+        val (first, second) = measurables.map { it.measure(Constraints.fixed(iconSide, iconSide)) }
+        val apart = secondIconOffset(iconSide)
+        val inset = (side - iconSide - apart) / 2
+        layout(side, side) {
+            first.placeRelative(inset, inset)
+            second.placeRelative(inset + apart, inset + apart)
+        }
+    }
+}
+
+// The icons are placed relative to the layout direction, so right to left the second is to the left of the first.
+private fun Modifier.cutAroundSecond() = drawWithCache {
+    val apart = secondIconOffset(size.width.roundToInt()).toFloat()
+    val across = if (layoutDirection == LayoutDirection.Ltr) apart else -apart
+    val cut = Path().apply { addOval(Rect(size.center + Offset(across, apart), size.width / 2 + PAIR_GAP.toPx())) }
+    onDrawWithContent { clipPath(cut, ClipOp.Difference) { this@onDrawWithContent.drawContent() } }
+}
+
+@Composable
+private fun OwnImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier) {
     val bitmap by produceState<ImageBitmap?>(null, app.key) {
         // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one.
         value = null

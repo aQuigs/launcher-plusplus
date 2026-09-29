@@ -268,5 +268,5 @@ class HomeAppsTest {
         assertEquals(mapOf("web" to listOf("a", "b"), "chat" to emptyList<String>()), kept)
     }
 
-    private fun shortcut(packageName: String, id: String) = AppEntry(id, packageName, "Main", shortcutId = id)
+    private fun shortcut(packageName: String, id: String) = AppEntry(id, packageName, "Main", kind = EntryKind.Shortcut(id))
 }

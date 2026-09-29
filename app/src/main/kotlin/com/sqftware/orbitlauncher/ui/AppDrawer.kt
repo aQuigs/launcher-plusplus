@@ -130,13 +130,14 @@ enum class PickMark { Check, Dot }
 
 /**
  * Picking apps instead of launching them: the drawer shows [header] above the list, puts a [mark] on the rows [isPicked]
- * says, and a tap calls [onToggle].
+ * says, and a tap on a row [isPickable] says calls [onToggle].
  */
 class Picking(
     val header: @Composable () -> Unit,
     val isPicked: (AppEntry) -> Boolean,
     val onToggle: (AppEntry) -> Unit,
     val mark: PickMark = PickMark.Check,
+    val isPickable: (AppEntry) -> Boolean = { true },
 )
 
 /**
@@ -242,7 +243,9 @@ fun AppDrawer(
             SearchField(
                 query = query,
                 onQueryChange = onQueryChange,
-                onSearch = { matches.firstOrNull()?.let(picking?.onToggle ?: onLaunch) },
+                onSearch = {
+                    if (picking == null) matches.firstOrNull()?.let(onLaunch) else matches.firstOrNull(picking.isPickable)?.let(picking.onToggle)
+                },
                 modifier = Modifier.weight(1f).padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp),
             )
             controls?.let { StyleButtons(it) }
@@ -415,9 +418,14 @@ private data class DrawerEntry(
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
         picking == null -> Modifier.launchable(app, onLaunch, menu, onClearBadge = unread.clearing(app, onClearBadge)).itemDrag(app, drag)
         picking.mark == PickMark.Check -> {
-            Modifier.toggleable(value = picking.isPicked(app), role = Role.Checkbox, onValueChange = { picking.onToggle(app) })
+            Modifier.toggleable(
+                value = picking.isPicked(app),
+                enabled = picking.isPickable(app),
+                role = Role.Checkbox,
+                onValueChange = { picking.onToggle(app) },
+            )
         }
-        else -> Modifier.clickable { picking.onToggle(app) }
+        else -> Modifier.clickable(enabled = picking.isPickable(app)) { picking.onToggle(app) }
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.HomePlace
 
 object PlacePickerTags {
@@ -49,15 +50,27 @@ fun FolderPicker(modifier: Modifier = Modifier) {
     }
 }
 
+/** Heads the drawer while picking the app to pair [app] with: that a tap makes the pair. */
 @Composable
-private fun PickingHeader(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun PartnerPicker(app: AppEntry, modifier: Modifier = Modifier) {
+    PickingHeader(modifier, hint = "Tap an app to open both in split screen") {
+        Text(text = "Pick an app to split with ${app.label}", style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun PickingHeader(
+    modifier: Modifier = Modifier,
+    hint: String = "Tap apps to add them or take them off",
+    content: @Composable () -> Unit,
+) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(PlacePickerTags.PICKER),
     ) {
         content()
         Text(
-            text = "Tap apps to add them or take them off",
+            text = hint,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

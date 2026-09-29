@@ -61,6 +61,7 @@ import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.DrawerStyle
+import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -78,6 +79,7 @@ import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetSizing
+import com.sqftware.orbitlauncher.domain.pairOf
 import kotlin.math.abs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -101,7 +103,7 @@ class LauncherScreenTest {
     private val pinRequests = MutableSharedFlow<PinRequest>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var pinnedShortcuts by mutableStateOf<List<AppEntry>?>(emptyList())
-    private val squoosh = AppEntry("Squoosh", "com.example.browser", "com.example.browser.Main", canUninstall = false, shortcutId = "squoosh")
+    private val squoosh = AppEntry("Squoosh", "com.example.browser", "com.example.browser.Main", canUninstall = false, kind = EntryKind.Shortcut("squoosh"))
     private var accepts = 0
     private var homeApps by mutableStateOf(HomeApps())
     private var homeAppsChanges = 0
@@ -915,6 +917,75 @@ class LauncherScreenTest {
             assertEquals(listOf(mail), uninstalled)
             assertEquals(emptyList<AppEntry>(), launched)
         }
+    }
+
+    @Test
+    fun splittingARingAppWithAnotherPutsThePairOnTheRingWhereATapLaunchesIt() {
+        homeApps = HomeApps(ring = ringOf(clock))
+        show()
+
+        compose.ringSlot(clock).performTouchInput { longClick() }
+        compose.onNodeWithText("Split with…").performClick()
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Pick an app to split with Clock").assertIsDisplayed()
+        compose.onNodeWithText("Mail").performClick()
+
+        val pair = pairOf(clock, mail)!!
+        assertDrawerOpen(false)
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(RingSlot.App(clock.key), RingSlot.App(pair.key)))), homeApps) }
+        compose.ringSlot(pair).assertContentDescriptionEquals("Clock | Mail").performClick()
+        compose.runOnIdle { assertEquals(listOf(pair), launched) }
+
+        compose.ringSlot(pair).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove from the ring").assertIsDisplayed()
+    }
+
+    @Test
+    fun aPairSplitFromTheDrawerGoesOnTheRingAndBackEndsThePickWithout() {
+        show()
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Split with…").performClick()
+
+        compose.onNodeWithText("Mail").assertIsNotEnabled()
+        compose.onNodeWithText("Pick an app to split with Mail").assertIsDisplayed()
+        Espresso.pressBack()
+        assertDrawerOpen(false)
+        compose.runOnIdle { assertEquals(HomeApps(), homeApps) }
+
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        compose.placePicker().assertDoesNotExist()
+        compose.onNodeWithText("Mail").performTouchInput { longClick() }
+        compose.onNodeWithText("Split with…").performClick()
+        compose.onNodeWithText("Clock").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(pairOf(mail, clock)!!)), homeApps) }
+    }
+
+    @Test
+    fun aPairSplitOnAHandPickedCardGoesOnThatCardAndOnABuiltInOneOnTheRing() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(clock.key))), CollectionCard(NewApps)))
+        show()
+        goToCollections()
+
+        compose.collectionApp(tools, clock).performTouchInput { longClick() }
+        compose.onNodeWithText("Split with…").performClick()
+        compose.onNodeWithText("Mail").performClick()
+
+        val pair = pairOf(clock, mail)!!
+        assertDrawerOpen(false)
+        assertSettledOn(LauncherPage.Collections)
+        compose.collectionApp(tools, pair).assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(Favourites(listOf(clock.key, pair.key)), collections.card(tools)!!.apps)
+            assertEquals(HomeApps(), homeApps)
+        }
+
+        compose.collectionApp(NewApps, mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Split with…").performClick()
+        compose.onNodeWithText("Clock").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(pairOf(mail, clock)!!)), homeApps) }
     }
 
     @Test

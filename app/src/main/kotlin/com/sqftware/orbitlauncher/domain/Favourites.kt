@@ -18,11 +18,11 @@ data class Favourites(val keys: List<String> = emptyList()) {
         Favourites(keys.reordered(keys.indexOf(app.key), keys.indexOf(target.key), mode))
 
     /**
-     * The installed favourites in order. A favourite whose app is missing is skipped but kept, so an app that disappears
-     * while it updates comes back in its old place.
+     * The installed favourites in order, pairs of them included. A favourite whose app is missing is skipped but kept, so
+     * an app that disappears while it updates comes back in its old place.
      */
     fun resolve(apps: List<AppEntry>): List<AppEntry> {
-        val byKey = apps.associateBy { it.key }
+        val byKey = AppsByKey(apps)
         return keys.mapNotNull(byKey::get)
     }
 }

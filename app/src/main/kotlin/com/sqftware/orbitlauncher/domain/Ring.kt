@@ -74,12 +74,12 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     fun removeIfEmpty(index: Int, shown: Set<String>): Ring = if (folder(index)?.showsNone(shown) == true) remove(index) else this
 
     /**
-     * The slots of [place] with their installed apps, in order. An app that is missing is skipped but kept, in its slot
+     * The slots of [place] with their installed apps, and pairs of them, in order. An app that is missing is skipped but kept, in its slot
      * or in a folder, so what disappears while it updates comes back in its old place. A folder shows whatever is left in
      * it, so a folder emptied by the user is an empty badge, not a gap.
      */
     fun resolve(apps: List<AppEntry>, place: HomePlace.Slots): List<RingItem> {
-        val byKey = apps.associateBy { it.key }
+        val byKey = AppsByKey(apps)
         return slots.mapIndexedNotNull { index, slot ->
             when (slot) {
                 is RingSlot.App -> byKey[slot.key]?.let(RingItem::App)

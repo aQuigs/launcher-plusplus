@@ -69,6 +69,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Only the launcher starts it, to open a pair of apps in split screen. It stays until the second app is started,
+             so it is see-through rather than without display, and keeps its history, which would end it once the first
+             app covers it. The split and the apps' own orientations resize it, which it rides out rather than start the
+             pair again. -->
+        <activity
+            android:name=".apps.SplitScreenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- The system binds it only after the user grants notification access, and only the system may. -->
         <service
             android:name=".apps.UnreadListener"

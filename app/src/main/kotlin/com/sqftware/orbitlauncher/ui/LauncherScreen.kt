@@ -61,6 +61,7 @@ import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppShortcut
+import com.sqftware.orbitlauncher.domain.AppsByKey
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
@@ -86,10 +87,12 @@ import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.appOptions
+import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
 import com.sqftware.orbitlauncher.ui.theme.LocalDrawerStar
+import java.io.Serializable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -157,7 +160,9 @@ data class HomePress(val launcherInFront: Boolean)
  * in the dock lights it, and letting go there folds it in; a folder whose last app leaves goes. Apps everywhere wear
  * their [unread] counts. An app's menu turns its badge off or on, leaves it off the built-in collection cards or puts
  * it back, as the [appSettings] say ([onAppSettingsChange]), opens its Play Store page, and in the drawer or on a card
- * adds it to the ring or the dock; on a hand-picked card it also takes the app off the card. A long press on a card's
+ * adds it to the ring or the dock; on a hand-picked card it also takes the app off the card. It also splits the app with
+ * another, which the drawer then picks: the pair, one icon that opens both in split screen, goes at the end of the ring,
+ * dock, folder or hand-picked card the app was pressed on, or else of the ring. A long press on a card's
  * header asks in a dialog how many rows it shows while compact. A long press on the home
  * page's empty space opens the launcher's own menu. Its rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
@@ -226,12 +231,16 @@ fun LauncherScreen(
     val scope = rememberCoroutineScope()
     val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
     val drawerOpen = drawerState.targetValue == SheetValue.Expanded
-    // The drawer, search and the collections list the installed apps alone; home keeps shortcuts too. It waits for both,
-    // so the ring does not space itself out again when the shortcuts join.
+    // The drawer, search and the collections list the installed apps alone, where home and hand-picked cards also resolve
+    // pairs of them; home keeps shortcuts too. It waits for both, so the ring does not space itself out again when the
+    // shortcuts join.
     val onHome = remember(apps, pinnedShortcuts) { if (apps != null && pinnedShortcuts != null) apps + pinnedShortcuts else null }
     val ring = remember(homeApps.ring, onHome) { homeApps.ring.resolve(onHome.orEmpty(), HomePlace.Ring) }
     val dock = remember(homeApps.dock, onHome) { homeApps.dock.resolve(onHome.orEmpty(), HomePlace.Dock) }
-    val shown = remember(onHome) { onHome?.mapTo(HashSet()) { it.key } }
+    // The keys on home that show something, a pair's among them.
+    val shown = remember(onHome, homeApps) {
+        onHome?.let(::AppsByKey)?.let { lookup -> homeApps.keys.filterTo(HashSet()) { lookup[it] != null } }
+    }
     val latestHomeApps by rememberUpdatedState(homeApps)
     val latestApps by rememberUpdatedState(apps)
     val latestShown by rememberUpdatedState(shown)
@@ -321,15 +330,17 @@ fun LauncherScreen(
     // They wait for the drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up
     // open. Dropping focus takes the keyboard down with the drawer. An app dragged out of a search waits too: ending the
     // search would take away the row it left, and the gesture with it, while the finger is still down.
-    var picking by rememberSaveable { mutableStateOf<HomePlace?>(null) }
+    var picking by rememberSaveable { mutableStateOf<DrawerPick?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    val splittingKey = (picking as? DrawerPick.Partner)?.app
+    val splitting = remember(apps, splittingKey) { splittingKey?.let { key -> apps?.find { it.key == key } } }
     val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen && dragged == null
     LaunchedEffect(drawerSettledClosed) {
         if (drawerSettledClosed) {
             // A folder left empty goes once its pick is over, not while toggling apps off and on again. Not before the apps
             // load, as until then it shows none of them.
-            (picking as? HomePlace.Folder)?.let { folder ->
+            ((picking as? DrawerPick.Apps)?.place as? HomePlace.Folder)?.let { folder ->
                 latestShown?.let { shown -> changeHomeApps { change(folder.holder) { removeIfEmpty(folder.index, shown) } } }
             }
             picking = null
@@ -494,8 +505,30 @@ fun LauncherScreen(
     fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
 
     fun pickFor(place: HomePlace) {
-        picking = place
+        picking = DrawerPick.Apps(place)
         openDrawer()
+    }
+
+    // A search the menu was opened from would hide the other apps.
+    fun pickPartner(app: AppEntry, spot: AppSpot) {
+        picking = DrawerPick.Partner(app.key, spot)
+        query = ""
+        openDrawer()
+    }
+
+    // Where the first app was pressed, if the user fills that place, else at the end of the ring: the apps in the drawer
+    // and on the built-in cards are the system's. The pair is seen landing, as a pinned shortcut is; a card is on the page
+    // the pick was made from.
+    fun makePair(first: AppEntry, second: AppEntry, spot: AppSpot) {
+        val pair = pairOf(first, second) ?: return
+        val card = (spot as? AppSpot.Card)?.kind as? CollectionKind.HandPicked
+        if (card != null) {
+            changeCollections { addApp(card, pair) }
+        } else {
+            changeHomeApps { add((spot as? AppSpot.Home)?.place ?: HomePlace.Ring, pair) }
+            goHome()
+        }
+        closeDrawer()
     }
 
     // A menu still loading its shortcuts is cancelled too, or HOME pressed meanwhile would not stop it opening afterwards.
@@ -547,6 +580,7 @@ fun LauncherScreen(
                                 }
                             }
                             is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
+                            AppOption.SplitWith -> pickPartner(app, spot)
                             is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(app))
                             is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
                             AppOption.PlayStore -> actions.openStorePage(app)
@@ -923,18 +957,33 @@ fun LauncherScreen(
                         ),
                         foregroundTime = foregroundTime,
                         onOpenUsageSettings = onOpenUsageSettings,
-                        picking = picking?.let { place ->
-                            val picked = homeApps[place]
-                            Picking(
-                                header = {
-                                    when (place) {
-                                        is HomePlace.Folder -> FolderPicker()
-                                        HomePlace.Ring, HomePlace.Dock -> PlacePicker(place = place, onPlaceChange = { picking = it })
-                                    }
-                                },
-                                isPicked = { it in picked },
-                                onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
-                            )
+                        picking = when (val pick = picking) {
+                            is DrawerPick.Apps -> {
+                                val place = pick.place
+                                val picked = homeApps[place]
+                                Picking(
+                                    header = {
+                                        when (place) {
+                                            is HomePlace.Folder -> FolderPicker()
+                                            HomePlace.Ring, HomePlace.Dock ->
+                                                PlacePicker(place = place, onPlaceChange = { picking = DrawerPick.Apps(it) })
+                                        }
+                                    },
+                                    isPicked = { it in picked },
+                                    onToggle = { onHomeAppsChange(homeApps.toggle(place, it)) },
+                                )
+                            }
+                            // Neither the app split nor another of its package can be its partner.
+                            is DrawerPick.Partner -> splitting?.let { first ->
+                                Picking(
+                                    header = { PartnerPicker(first) },
+                                    isPicked = { it.key == first.key },
+                                    onToggle = { makePair(first, it, pick.spot) },
+                                    mark = PickMark.Dot,
+                                    isPickable = { it.packageName != first.packageName },
+                                )
+                            }
+                            null -> null
                         },
                     )
                 }
@@ -1253,6 +1302,15 @@ private sealed interface Drag {
     class OutOfFolder(override val app: AppEntry, override val home: HomePlace.Folder, override val current: () -> Boolean) : Drag {
         override val item = RingItem.App(app)
     }
+}
+
+/** What the drawer is picking apps for. Serializable, so the screen can save it. */
+private sealed interface DrawerPick : Serializable {
+    /** The apps at [place], which a tap puts there or takes off. */
+    data class Apps(val place: HomePlace) : DrawerPick
+
+    /** The app to pair the one keyed [app] with, which was long-pressed at [spot]. */
+    data class Partner(val app: String, val spot: AppSpot) : DrawerPick
 }
 
 /** What the finger holding a dragged item is over, as far as letting it go there goes. */
