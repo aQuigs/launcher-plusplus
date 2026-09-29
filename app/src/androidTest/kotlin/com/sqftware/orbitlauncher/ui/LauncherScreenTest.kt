@@ -844,6 +844,25 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aLongPressOnAnOpenFoldersMiddleAddsAppsToItAndLeavesItOpen() {
+        val other = alphabet[0]
+        apps = listOf(clock, mail, other)
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.folderSlot(0).performClick()
+
+        compose.closeFolder().performTouchInput { longClick() }
+        assertDrawerOpen(true)
+        compose.onNodeWithText("Adding to folder").assertIsDisplayed()
+        compose.onNodeWithText(other.label).performClick()
+        Espresso.pressBack()
+
+        assertDrawerOpen(false)
+        compose.ringSlot(other).assertIsDisplayed()
+        compose.closeFolder().assertIsDisplayed()
+    }
+
+    @Test
     fun theFolderMenuPicksTheFoldersPlanetInTheSolarSystemOnly() {
         homeApps = HomeApps(ring = Ring(listOf(work)))
         show()

@@ -139,7 +139,7 @@ data class HomePress(val launcherInFront: Boolean)
  * anywhere opens its menu of shortcuts and
  * options; the menu of an app on the ring or in the dock can start a folder in its slot. A folder, on the ring or in the
  * dock, opens in place on the ring, as in Arc: its apps take the ring's slots and the emblem makes way for a target that
- * closes it; its own menu fills it from the drawer or removes it. A long
+ * closes it, and a long press on that target fills it from the drawer; its own menu does too, or removes it. A long
  * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
  * home page, and letting go over the ring or the dock adds it there. The widget page shows [widgetPage] through
  * [widgets]; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
@@ -1002,6 +1002,8 @@ fun LauncherScreen(
                                             modifier = Modifier.weight(1f).dropZone { copy(ring = it) },
                                             highlighted = dropPlace == HomePlace.Ring,
                                             openFolder = open,
+                                            // Not mid-drag: a second finger would open the drawer over the app still held.
+                                            onAddToFolder = { if (dragged == null) openFolder?.let(::pickFor) },
                                             menu = ringMenu,
                                             folderMenu = folderMenu,
                                             folderAppMenu = folderAppMenu,
