@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.domain
 
+import java.io.Serializable
+
 /** The categories a collection card can be, in the order the picker offers them. */
 enum class AppCategory {
     Business, Communication, Entertainment, Games, Kids, LifeStyle, Media, Music, Personalisation, Photos, Productivity,
@@ -8,9 +10,10 @@ enum class AppCategory {
 
 /**
  * What a collection card shows. The built-in kinds work their apps out from the system; the apps of a category or a
- * custom collection are the user's. [name] is how a kind is stored, and how a card is told from the others.
+ * custom collection are the user's. [name] is how a kind is stored, and how a card is told from the others. Serializable
+ * so the screen can save a pick for a card.
  */
-sealed interface CollectionKind {
+sealed interface CollectionKind : Serializable {
     val name: String
 
     data object NewApps : CollectionKind {

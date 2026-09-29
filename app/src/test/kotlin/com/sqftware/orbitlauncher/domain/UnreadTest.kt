@@ -66,11 +66,21 @@ class UnreadTest {
     @Test
     fun `a pinned shortcut counts none, alone or in a folder`() {
         val counts = UnreadCounts(mapOf(chat.packageName to 4))
-        val pinnedChat = chat.copy(label = "Sam", shortcutId = "sam")
+        val pinnedChat = chat.copy(label = "Sam", kind = EntryKind.Shortcut("sam"))
 
         assertEquals(0, counts[pinnedChat])
         assertEquals(0, counts.sum(listOf(pinnedChat)))
         assertEquals(4, counts.sum(listOf(pinnedChat, chat)))
+    }
+
+    @Test
+    fun `a pair counts both its apps, each package once in a folder`() {
+        val counts = UnreadCounts(mapOf(chat.packageName to 4, mail.packageName to 1), dismissed = setOf(mail.packageName))
+        val pair = pairOf(chat, mail)!!
+
+        assertEquals(5, counts[pair])
+        assertEquals(5, counts.sum(listOf(pair, chat)))
+        assertTrue(counts.hasDismissed(pair))
     }
 
     @Test
@@ -102,7 +112,7 @@ class UnreadTest {
         assertEquals(mapOf(mail.packageName to 4, chat.packageName to 2), live.byPackage)
         assertTrue(live.hasDismissed(mail))
         assertFalse(live.hasDismissed(chat))
-        assertFalse(live.hasDismissed(mail.copy(shortcutId = "inbox")))
+        assertFalse(live.hasDismissed(mail.copy(kind = EntryKind.Shortcut("inbox"))))
     }
 
     @Test

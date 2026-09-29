@@ -17,13 +17,19 @@ interface AppRepository {
      */
     fun pinnedShortcuts(): Flow<List<AppEntry>>
 
-    /** Reads the icon from the app's package, or the pinned shortcut's. Null when it is gone or cannot be drawn. */
+    /** Reads the icon from the app's package, or the pinned shortcut's. Null when it is gone or cannot be drawn, and for a pair. */
     suspend fun icon(app: AppEntry): ImageBitmap?
 
-    /** Starts [app], or the pinned shortcut. Does nothing if it has gone since the list was loaded. */
+    /**
+     * Starts [app], the pinned shortcut, or the pair's two apps together in split screen. Does nothing if it has gone since
+     * the list was loaded.
+     */
     fun launch(app: AppEntry)
 
-    /** At most four of the app's shortcuts, manifest ones first. None for a pinned shortcut, or until the launcher is the home app. */
+    /**
+     * At most four of the app's shortcuts, manifest ones first. None for a pinned shortcut or a pair, or until the launcher is
+     * the home app.
+     */
     suspend fun shortcuts(app: AppEntry): List<AppShortcut>
 
     /** The shortcut's icon. Null when it has none, has gone, or cannot be drawn. */

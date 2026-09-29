@@ -34,6 +34,15 @@ sealed interface Landing {
 data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
     val isEmpty: Boolean get() = ring.isEmpty && dock.isEmpty
 
+    /** The key of every app kept here, in a slot of its own or in a folder, on the ring or in the dock. */
+    val keys: Set<String>
+        get() = (ring.slots + dock.slots).flatMapTo(LinkedHashSet()) { slot ->
+            when (slot) {
+                is RingSlot.App -> listOf(slot.key)
+                is RingSlot.Folder -> slot.keys
+            }
+        }
+
     fun slots(place: HomePlace.Slots): Ring = when (place) {
         HomePlace.Ring -> ring
         HomePlace.Dock -> dock
@@ -152,12 +161,7 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
      * now, by package; the result holds, for each package with a pin that has gone, the ids of its pins still here.
      */
     fun keptPins(pinned: Map<String, List<String>>): Map<String, List<String>> {
-        val here = (ring.slots + dock.slots).flatMap { slot ->
-            when (slot) {
-                is RingSlot.App -> listOf(slot.key)
-                is RingSlot.Folder -> slot.keys
-            }
-        }.toSet()
+        val here = keys
         return pinned.mapValues { (packageName, ids) -> ids.filter { shortcutKey(packageName, it) in here } }
             .filter { (packageName, kept) -> kept.size < pinned.getValue(packageName).size }
     }

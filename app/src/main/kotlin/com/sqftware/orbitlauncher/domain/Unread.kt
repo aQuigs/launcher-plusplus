@@ -10,18 +10,18 @@ data class PostedNotification(
 )
 
 /**
- * How many unread notifications each package has. A package with none is absent. A pinned shortcut counts none: its own
- * notifications are not told apart from the rest of its app's, which would overstate them. [dismissed] holds the packages
- * whose count includes notifications the user dismissed unread.
+ * How many unread notifications each package has, which an entry's badge counts for its [AppEntry.badgePackages]: a pair
+ * counts its two apps', as an app kept only in a pair has no other icon on home to show them. A package with none is
+ * absent. [dismissed] holds the packages whose count includes notifications the user dismissed unread.
  */
 data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismissed: Set<String> = emptySet()) {
-    operator fun get(app: AppEntry): Int = sum(listOf(app))
+    operator fun get(app: AppEntry): Int = app.badgePackages.sumOf { byPackage[it] ?: 0 }
 
     /** Whether [app]'s badge holds notifications the user dismissed unread, which clearing it forgets. */
-    fun hasDismissed(app: AppEntry): Boolean = this[app] > 0 && app.packageName in dismissed
+    fun hasDismissed(app: AppEntry): Boolean = this[app] > 0 && app.badgePackages.any { it in dismissed }
 
-    /** The count for a folder of [apps]: each package counted once, however many of its activities are in there. */
-    fun sum(apps: List<AppEntry>): Int = apps.filter { it.shortcutId == null }.map { it.packageName }.distinct().sumOf { byPackage[it] ?: 0 }
+    /** The count for a folder of [apps]: each package counted once, however many of its activities and pairs are in there. */
+    fun sum(apps: List<AppEntry>): Int = apps.flatMapTo(HashSet()) { it.badgePackages }.sumOf { byPackage[it] ?: 0 }
 
     operator fun plus(other: UnreadCounts) = UnreadCounts(
         (byPackage.keys + other.byPackage.keys).associateWith { (byPackage[it] ?: 0) + (other.byPackage[it] ?: 0) },

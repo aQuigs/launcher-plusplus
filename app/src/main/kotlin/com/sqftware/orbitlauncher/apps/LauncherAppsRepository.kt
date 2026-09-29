@@ -26,6 +26,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
+import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.isStorable
 import com.sqftware.orbitlauncher.domain.sortedByLabel
@@ -100,11 +101,13 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             }
             .sortedByLabel()
 
+    // A pair has no icon of its own: the screen draws its apps' together.
     override suspend fun icon(app: AppEntry): ImageBitmap? = icons.get(app.key)
         ?: draw(app.key) { density ->
-            when (val id = app.shortcutId) {
-                null -> activityIcon(app, density)
-                else -> pinnedIcon(shortcutInfo(app.packageName, id, ShortcutQuery.FLAG_MATCH_PINNED), app, density)
+            when (val kind = app.kind) {
+                EntryKind.App -> activityIcon(app, density)
+                is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED), app, density)
+                is EntryKind.AppPair -> null
             }
         }?.also { icons.put(app.key, it) }
 
@@ -120,14 +123,15 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             ?: activityIcon(shortcut, density)
 
     override fun launch(app: AppEntry) = startOrLog(TAG, app.key) {
-        when (val id = app.shortcutId) {
-            null -> launcherApps.startMainActivity(app.component, user, null, null)
-            else -> launcherApps.startShortcut(app.packageName, id, null, null, user)
+        when (val kind = app.kind) {
+            EntryKind.App -> launcherApps.startMainActivity(app.component, user, null, null)
+            is EntryKind.Shortcut -> launcherApps.startShortcut(app.packageName, kind.id, null, null, user)
+            is EntryKind.AppPair -> context.startActivity(SplitScreenActivity.intent(context, kind.first.component, kind.second.component))
         }
     }
 
     override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
-        if (app.shortcutId != null) return@withContext emptyList()
+        if (!app.isApp) return@withContext emptyList()
         query(shortcutQuery(app.packageName).setActivity(app.component), app.key)
             .filter { it.isEnabled }
             .sortedWith(compareBy({ !it.isDeclaredInManifest }, { it.rank }))
@@ -224,7 +228,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         packageName = `package`,
         activityName = activity?.className.orEmpty(),
         canUninstall = false,
-        shortcutId = id,
+        kind = EntryKind.Shortcut(id),
     ).takeIf { isStorable(it.key) }
 
     private fun labelOf(packageName: String): String = try {

@@ -10,6 +10,9 @@
 ## How we work
 
 - Every change after the initial scaffold ships as a PR against `main`, using the PR template. Code changes get an adversarial-review pass and `/simplify` on the branch. Then, for code and docs alike, ask: can this be made meaningfully simpler without losing functionality? Generated docs run verbose, so they need the question as much as code. If so, make those changes before opening the PR. Only a trivial change, like a few words, skips it.
+- A PR body holds the reviewer's takeaways, not a log of the work. Put each section's points in order of importance, and stop when what's left wouldn't change how the PR is reviewed or merged:
+  - Decisions made: choices a reviewer might have made differently, each with its reason and any cost or limit it leaves. Leave out how the design evolved, earlier drafts, and anything the diff or Details already shows.
+  - Testing done: what shows the change works beyond what CI reports, such as checks on the device or against a reference figure, and what wasn't tested and why. Describe what the tests cover, not each test. A review finding belongs only as the reason for a decision, never as a narrated review round.
 - A passing test is not a passing feature: for UI changes, run the app, screenshot, and look at the image before calling it done.
 - User-visible changes carry screenshots (or a recording) in the PR's "Screenshots / recording" section:
   - Shoot every state the change touches, not one before and one after. Empty and filled, and before and after an action, are separate states. Light and dark theme are separate states only when the change is about colour or theming; otherwise one theme is enough.

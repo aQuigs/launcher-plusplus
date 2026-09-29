@@ -139,6 +139,12 @@ private fun ShortcutIcon(shortcut: AppShortcut, icon: suspend (AppShortcut) -> I
     }
 }
 
+private val SplitGlyph = materialGlyph(
+    "Splitscreen",
+    "M18 4v5H6V4h12m0-2H6c-1.1 0-2 .9-2 2v5c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 13v5H6v-5h12m0-2H6" +
+        "c-1.1 0-2 .9-2 2v5c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2z",
+)
+
 private val AppOption.label
     get() = when (this) {
         is AppOption.Remove -> when (place) {
@@ -152,6 +158,7 @@ private val AppOption.label
             HomePlace.Ring -> "Add to the ring"
             HomePlace.Dock -> "Add to the dock"
         }
+        AppOption.SplitWith -> "Split with…"
         is AppOption.Badge -> if (isOff) "Show badge" else "Hide badge"
         is AppOption.BuiltInCards -> if (isOff) "Show in New & Most Used" else "Hide from New & Most Used"
         AppOption.PlayStore -> "Open in Play Store"
@@ -165,6 +172,7 @@ private val AppOption.icon
         AppOption.NewFolder -> FolderGlyph
         is AppOption.RemoveFromCard -> Icons.Default.Close
         is AppOption.AddTo -> Icons.Default.Add
+        AppOption.SplitWith -> SplitGlyph
         is AppOption.Badge -> Icons.Default.Notifications
         is AppOption.BuiltInCards -> Icons.Default.Star
         AppOption.PlayStore -> Icons.Default.ShoppingCart

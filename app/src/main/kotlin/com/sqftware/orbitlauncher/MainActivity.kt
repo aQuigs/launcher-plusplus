@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
             sizing = widgetHost::sizing,
         )
         val layout = PageLayout()
-        val clearBadge = { app: AppEntry -> badges.opened(app.packageName) }
+        val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageName) } }
         val actions = AppActions(
             icon = repository::icon,
             launch = {

@@ -161,7 +161,7 @@ private const val NOTICE_MILLIS = 2_000L
  * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
  * chevron that calls [onToggleExpanded]: a compact card shows its set number of rows of its first apps, an expanded one
  * every app with its label. A long press anywhere on the header but its buttons calls [onChooseRows]. The built-in cards work their apps out
- * from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
+ * from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], pairs included, and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
  * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
  * to drop it there. While one of its apps is on the move, a card shows where they would be if it
