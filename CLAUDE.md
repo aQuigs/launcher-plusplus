@@ -43,7 +43,6 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 ## How we work
 
 - Arc Launcher (`apptech.arc`, sideloaded on the project emulator) is the reference. Where it has a feature, mimic how it behaves and how it is laid out, in our own colours. Unsure how Arc does something? Open it on the emulator and look, do not guess. Where Arc has no such feature, use your judgement or ask.
-- A PR that only refreshes shared files through `sync-common` can be merged by Claude once its checks pass, without waiting for the user. Any other change in it leaves the merge to the user.
 - Pure logic goes in `domain` with a unit test. `MainActivityTest` is the one end-to-end smoke test against the real system.
 
 ## Conventions
