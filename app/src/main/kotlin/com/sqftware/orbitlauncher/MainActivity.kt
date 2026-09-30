@@ -7,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
@@ -41,6 +39,7 @@ import com.sqftware.orbitlauncher.apps.SystemRinger
 import com.sqftware.orbitlauncher.apps.SystemWallClock
 import com.sqftware.orbitlauncher.apps.SystemWallpaper
 import com.sqftware.orbitlauncher.apps.SystemWidgetHost
+import com.sqftware.orbitlauncher.apps.WindowSystemBars
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -99,6 +98,7 @@ class MainActivity : ComponentActivity() {
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
+        val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = WidgetActions(
@@ -301,9 +301,9 @@ class MainActivity : ComponentActivity() {
                         appSettingsStore.save(it)
                     },
                     onOpenNotifications = shade::open,
+                    onSystemBarsShownChange = systemBars::setShown,
                     onRestart = relauncher::restart,
                     onReset = relauncher::reset,
-                    modifier = Modifier.safeDrawingPadding(),
                 )
             }
         }
