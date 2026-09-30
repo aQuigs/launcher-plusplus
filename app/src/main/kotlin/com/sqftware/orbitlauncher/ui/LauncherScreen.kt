@@ -776,7 +776,7 @@ fun LauncherScreen(
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
                         rows = listOf(
-                            LauncherMenuRow("Show wallpaper") { showingWallpaper = true },
+                            LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
                             LauncherMenuRow(
                                 "24-hour clock",

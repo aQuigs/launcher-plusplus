@@ -1844,7 +1844,7 @@ class LauncherScreenTest {
         val mailAt = centreOf(compose.ringSlot(mail))
         compose.longPressEmptyHomeSpace()
 
-        compose.onNodeWithText("Show wallpaper").performClick()
+        compose.onNodeWithText("Showcase wallpaper").performClick()
 
         compose.pager().assertDoesNotExist()
         compose.runOnIdle { assertEquals(false, barsShown.last()) }
@@ -1868,7 +1868,7 @@ class LauncherScreenTest {
         show()
         for (bringBack in listOf({ Espresso.pressBack() }, { pressHome(launcherInFront = true) })) {
             compose.longPressEmptyHomeSpace()
-            compose.onNodeWithText("Show wallpaper").performClick()
+            compose.onNodeWithText("Showcase wallpaper").performClick()
             compose.pager().assertDoesNotExist()
 
             bringBack()
