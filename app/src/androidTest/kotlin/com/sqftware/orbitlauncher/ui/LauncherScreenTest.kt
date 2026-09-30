@@ -2,7 +2,6 @@ package com.sqftware.orbitlauncher.ui
 
 import android.view.View
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +27,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
@@ -151,6 +151,7 @@ class LauncherScreenTest {
     private var badgeSettingsOpened = 0
     private var appSettings by mutableStateOf(AppSettings())
     private var notificationsOpened = 0
+    private val barsShown = mutableListOf<Boolean>()
     private var restarts = 0
     private var resets = 0
     private val actions = AppActions(
@@ -223,6 +224,7 @@ class LauncherScreenTest {
             appSettings = appSettings,
             onAppSettingsChange = { appSettings = it },
             onOpenNotifications = { notificationsOpened++ },
+            onSystemBarsShownChange = { barsShown += it },
             onRestart = { restarts++ },
             onReset = { resets++ },
             modifier = modifier,
@@ -1834,6 +1836,49 @@ class LauncherScreenTest {
         compose.onNodeWithTag(AppDrawerTags.SORT_MENU).assertDoesNotExist()
     }
 
+    // A tap while the launcher fades back in is taken by the wallpaper, not by the app fading in under it.
+    @Test
+    fun theLauncherMenusWallpaperRowHidesTheLauncherAndTheBarsUntilTheNextTap() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        show()
+        val mailAt = centreOf(compose.ringSlot(mail))
+        compose.longPressEmptyHomeSpace()
+
+        compose.onNodeWithText("Show wallpaper").performClick()
+
+        compose.pager().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(false, barsShown.last()) }
+        compose.mainClock.autoAdvance = false
+        compose.wallpaper().performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onRoot().performTouchInput { click(mailAt) }
+        compose.mainClock.autoAdvance = true
+
+        compose.wallpaper().assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(emptyList<AppEntry>(), launched)
+            assertEquals(true, barsShown.last())
+        }
+        compose.onRoot().performTouchInput { click(mailAt) }
+        compose.runOnIdle { assertEquals(listOf(mail), launched) }
+    }
+
+    @Test
+    fun backAndHomeBringTheLauncherBackOverTheWallpaper() {
+        show()
+        for (bringBack in listOf({ Espresso.pressBack() }, { pressHome(launcherInFront = true) })) {
+            compose.longPressEmptyHomeSpace()
+            compose.onNodeWithText("Show wallpaper").performClick()
+            compose.pager().assertDoesNotExist()
+
+            bringBack()
+
+            compose.pager().assertIsDisplayed()
+            compose.wallpaper().assertDoesNotExist()
+            compose.runOnIdle { assertEquals(true, barsShown.last()) }
+        }
+    }
+
     @Test
     fun theLauncherMenusRestartRowIsAPlainButtonThatRestartsAtOnce() {
         show()
@@ -2099,8 +2144,7 @@ class LauncherScreenTest {
 
     @Test
     fun aPanelFillsTheNavigationBarBelowIt() {
-        // Clear of the system bars, as MainActivity lays it out.
-        show(Modifier.safeDrawingPadding())
+        show()
         goToCollections()
 
         compose.addCollectionButton().performClick()

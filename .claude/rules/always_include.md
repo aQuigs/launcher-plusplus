@@ -4,7 +4,7 @@
 
 ## Shared files
 
-- Files headed `Shared script:`, `Shared workflow:`, `Shared config:` or `Shared rules:` are copies of files in a separate tooling checkout. `sync-common` overwrites them, matched by name. Edit them at the source, never here, and do not name a repo-owned file after a shared one.
+- Files headed `Shared script:`, `Shared workflow:`, `Shared config:` or `Shared rules:` are copies of files in a separate tooling checkout. `sync-common` overwrites them, matched by name. Edit them at the source, never here, and do not name a repo-owned file after a shared one. Merge a PR that only runs `sync-common` yourself once its checks pass.
 - `sync-common` lists every shared file this repo has no copy of as `skipped`. When one fits the work at hand (a rule file for a platform the repo now targets, a script it now needs), adopt it as the line says: create it empty at the path shown and run `sync-common` again, or for a rule file, ask the user to.
 
 ## How we work

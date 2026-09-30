@@ -85,6 +85,8 @@ fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBL
 
 fun SemanticsNodeInteractionsProvider.pickAppsLink() = onNodeWithTag(LauncherTags.PICK_APPS)
 
+fun SemanticsNodeInteractionsProvider.wallpaper() = onNodeWithTag(LauncherTags.WALLPAPER)
+
 fun SemanticsNodeInteractionsProvider.ringSlot(app: AppEntry) = onNodeWithTag(HomeRingTags.slot(app))
 
 fun SemanticsNodeInteractionsProvider.folderSlot(index: Int) = onNodeWithTag(HomeRingTags.folder(index))
