@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -144,7 +145,12 @@ object ClockworkArt : ThemeArt {
                         .fillMaxSize()
                         .graphicsLayer { rotationZ = style.minutes() * 6f * GEAR_TURNS_PER_HOUR }
                         .drawWithCache {
-                            val cog = cogPath(size.center, size.minDimension / 2 * GEAR_TIP, size.minDimension / 2 * GEAR_ROOT)
+                            val half = size.minDimension / 2
+                            // Only the toothed rim, so the glass disc over the hub stays glass, as a sub-dial's is.
+                            val cog = cogPath(size.center, half * GEAR_TIP, half * GEAR_ROOT).apply {
+                                fillType = PathFillType.EvenOdd
+                                addOval(Rect(size.center, half * GEAR_DISC * 0.97f))
+                            }
                             val outline = Stroke(1.dp.toPx())
                             onDrawBehind {
                                 drawPath(cog, GearCog.inner)
