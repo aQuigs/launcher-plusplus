@@ -76,6 +76,15 @@ enum class FolderLook(val label: String) {
 
     /** A geode broken open, its previews in the hollow. */
     Geode("Geode"),
+
+    /** A wire sphere turning round its previews. */
+    WireSphere("Wire sphere"),
+
+    /** A glass orb that swells and eases under its previews. */
+    Orb("Orb"),
+
+    /** A hexagonal cell, its previews in its well. */
+    HexCell("Hex cell"),
 }
 
 /**
@@ -85,11 +94,12 @@ enum class FolderLook(val label: String) {
 fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
     FolderLook.SolarSystem -> planets.any(Planet::moves)
     FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop,
-    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell, FolderLook.Pinwheel, FolderLook.Octahedron -> folders
+    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell, FolderLook.Pinwheel, FolderLook.Octahedron,
+    FolderLook.WireSphere, FolderLook.Orb -> folders
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
     FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal,
     FolderLook.FoldedSquare, FolderLook.Envelope,
-    FolderLook.Cube, FolderLook.Geode -> false
+    FolderLook.Cube, FolderLook.Geode, FolderLook.HexCell -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */

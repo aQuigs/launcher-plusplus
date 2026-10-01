@@ -13,6 +13,7 @@ enum class Theme(val label: String, val folderLooks: List<FolderLook>) {
     Germ("Germ", listOf(FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell)),
     Paper("Paper", listOf(FolderLook.FoldedSquare, FolderLook.Envelope, FolderLook.Pinwheel)),
     CrystalCity("Crystal city", listOf(FolderLook.Cube, FolderLook.Octahedron, FolderLook.Geode)),
+    GreenCore("Green core", listOf(FolderLook.WireSphere, FolderLook.Orb, FolderLook.HexCell)),
 }
 
 /**
