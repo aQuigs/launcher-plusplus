@@ -40,6 +40,15 @@ enum class FolderLook(val label: String) {
 
     /** A patch of moss, its previews on it. */
     Moss("Moss"),
+
+    /** A grey wash brushed round in one ink stroke. */
+    Enso("Ensō"),
+
+    /** A red seal pressed a little askew, its previews in the carved square. */
+    Seal("Seal"),
+
+    /** A drop of ink bleeding out into the paper under its previews. */
+    InkDrop("Ink drop"),
 }
 
 /**
@@ -48,9 +57,9 @@ enum class FolderLook(val label: String) {
  */
 fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
     FolderLook.SolarSystem -> planets.any(Planet::moves)
-    FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond -> folders
+    FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop -> folders
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
-    FolderLook.Stone, FolderLook.Moss -> false
+    FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */

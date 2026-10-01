@@ -58,7 +58,7 @@ class LauncherColorsTest {
     // 3:1 is the WCAG floor for a control's edge; either scheme may be showing, so it cannot lean on the scheme's colours.
     @Test
     fun `a folder's edge stands out on a white and on a black wallpaper`() {
-        listOf(FolderEdge, DialEdge, GearCog, ChartEdge, GardenEdge).forEach { edge ->
+        listOf(FolderEdge, DialEdge, GearCog, ChartEdge, GardenEdge, InkEdge).forEach { edge ->
             listOf(Color.White, Color.Black).forEach { wallpaper ->
                 val best = listOf(edge.outer, edge.inner).maxOf { contrast(it.compositeOver(wallpaper), wallpaper) }
                 assertTrue("edge on $wallpaper: $best", best >= 3f)
