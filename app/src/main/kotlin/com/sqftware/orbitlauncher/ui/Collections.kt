@@ -638,7 +638,7 @@ fun CollectionSettingsDialog(
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
         title = { Text("${kind.title} settings") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { setting ->
                     SettingChoices(kind, setting, look, isOwn = setting in card.own, onChange)
                 }
@@ -658,7 +658,14 @@ private fun <T : Any> SettingChoices(
 ) {
     val value = setting.of(look)
 
-    Column {
+    // Each setting in a box of its own, so its title, choices and buttons read as one, apart from the next setting's.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = if (isOwn) 0.dp else 12.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
             Text(setting.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             Text(
@@ -680,7 +687,7 @@ private fun <T : Any> SettingChoices(
                     ),
                     // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
                     icon = {},
-                    label = { Text(choice.toString(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    label = { Text(choice.toString(), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     modifier = Modifier.testTag(CollectionTags.choice(setting, choice)),
                 )
             }
