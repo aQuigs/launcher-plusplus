@@ -142,6 +142,18 @@ fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+/** Asks whether to set [scene] as the home screen's wallpaper: Set calls [onSet]; Cancel, Back and a tap outside call [onDismiss]. */
+@Composable
+fun SceneDialog(scene: ThemeScene, onSet: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onSet) { Text("Set") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text("Set the ${scene.name} as wallpaper?") },
+        text = { Text("It replaces the home screen's wallpaper.") },
+    )
+}
+
 /**
  * Asks which of [choices] to have, each named by its [label], with [chosen] marked. A tap on one hands it to [onChoose];
  * Cancel, Back and a tap outside call [onDismiss].

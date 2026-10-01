@@ -8,6 +8,7 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- A swipe down on the home page pulls the notification shade down with it. -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Lists the launcher on the system's Do Not Disturb access screen, where the user grants the access the ringer switch
          needs. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />

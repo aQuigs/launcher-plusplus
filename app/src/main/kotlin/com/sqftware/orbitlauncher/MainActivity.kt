@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
@@ -315,6 +316,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenNotifications = shade::open,
                     onSystemBarsShownChange = systemBars::setShown,
+                    onSetWallpaper = { draw -> scope.launch(Dispatchers.IO) { wallpaper.set(draw().asAndroidBitmap()) } },
                     onRestart = relauncher::restart,
                     onReset = relauncher::reset,
                 )

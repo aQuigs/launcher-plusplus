@@ -3,9 +3,12 @@ package com.sqftware.orbitlauncher.apps
 import android.app.WallpaperColors
 import android.app.WallpaperManager
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import java.io.IOException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -18,6 +21,9 @@ interface Wallpaper {
 
     /** [isLight] now, then again whenever the wallpaper changes. Collect while the launcher is visible. */
     fun lightness(): Flow<Boolean>
+
+    /** Makes [image] the home screen's wallpaper. It blocks, so call it off the main thread. */
+    fun set(image: Bitmap)
 }
 
 /** The system's home screen wallpaper, through the colours the system extracts from it. */
@@ -38,6 +44,21 @@ class SystemWallpaper(context: Context) : Wallpaper {
         }
             .conflate()
             .distinctUntilChanged()
+
+    override fun set(image: Bitmap) {
+        // A wallpaper the system cannot take, or a system server that has gone, may not crash the launcher.
+        try {
+            manager.setBitmap(image, null, true, WallpaperManager.FLAG_SYSTEM)
+        } catch (e: IOException) {
+            Log.w(TAG, "Cannot set the wallpaper", e)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Cannot set the wallpaper", e)
+        }
+    }
+
+    private companion object {
+        const val TAG = "SystemWallpaper"
+    }
 }
 
 // The hint the system sets for launchers is public only from Android 12; before it, judge by the dominant colour.

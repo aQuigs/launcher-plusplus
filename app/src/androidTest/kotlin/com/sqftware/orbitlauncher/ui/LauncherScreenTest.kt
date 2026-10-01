@@ -4,9 +4,11 @@ import android.view.View
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toPixelMap
@@ -164,6 +166,8 @@ class LauncherScreenTest {
     private var appSettings by mutableStateOf(AppSettings())
     private var notificationsOpened = 0
     private val barsShown = mutableListOf<Boolean>()
+    private val wallpapersSet = mutableListOf<ImageBitmap>()
+    private var art by mutableStateOf<ThemeArt>(SpaceArt)
     private var restarts = 0
     private var resets = 0
     private val actions = AppActions(
@@ -187,7 +191,7 @@ class LauncherScreenTest {
     }
 
     @Composable
-    private fun Screen(modifier: Modifier) {
+    private fun Screen(modifier: Modifier) = CompositionLocalProvider(LocalThemeArt provides art) {
         LauncherScreen(
             layout = layout,
             homePresses = homePresses,
@@ -241,6 +245,7 @@ class LauncherScreenTest {
             onAppSettingsChange = { appSettings = it },
             onOpenNotifications = { notificationsOpened++ },
             onSystemBarsShownChange = { barsShown += it },
+            onSetWallpaper = { wallpapersSet += it() },
             onRestart = { restarts++ },
             onReset = { resets++ },
             modifier = modifier,
@@ -1885,6 +1890,26 @@ class LauncherScreenTest {
         }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Theme").assert(hasText("Clockwork"))
+    }
+
+    @Test
+    fun aThemeWithASceneOffersToSetItAsTheWallpaperOnceADialogHasAsked() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("as wallpaper", substring = true).assertDoesNotExist()
+
+        art = CrystalArt
+        compose.onNodeWithText("Use the crystal city as wallpaper").performClick()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.runOnIdle { assertTrue(wallpapersSet.isEmpty()) }
+
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Use the crystal city as wallpaper").performClick()
+        compose.onNodeWithText("Set").performClick()
+        compose.runOnIdle {
+            val scene = wallpapersSet.single().toPixelMap()
+            assertEquals(1f, scene[scene.width / 2, scene.height / 2].alpha)
+        }
     }
 
     @Test
