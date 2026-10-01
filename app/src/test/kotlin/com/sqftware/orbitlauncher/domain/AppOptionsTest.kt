@@ -80,16 +80,23 @@ class AppOptionsTest {
     }
 
     @Test
-    fun `a pair offers only what takes it off where it is, or puts it on the ring or the dock`() {
-        val pair = pairOf(maps, app("Music"))!!
+    fun `a pair offers only what takes it off where it is, or puts it on the ring or the dock, and each app's badge`() {
+        val music = app("Music")
+        val pair = pairOf(maps, music)!!
         assertEquals(
             listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder),
-            options(pair, AppSpot.Home(HomePlace.Ring), badgesEnabled = true, hasStorePage = true),
+            options(pair, AppSpot.Home(HomePlace.Ring), hasStorePage = true),
         )
         val tools = CollectionKind.Category(AppCategory.Tools)
         assertEquals(
-            listOf(AppOption.RemoveFromCard(tools), AppOption.AddTo(HomePlace.Ring), AppOption.AddTo(HomePlace.Dock)),
-            options(pair, AppSpot.Card(tools), badgesEnabled = true, hasStorePage = true),
+            listOf(
+                AppOption.RemoveFromCard(tools),
+                AppOption.AddTo(HomePlace.Ring),
+                AppOption.AddTo(HomePlace.Dock),
+                AppOption.Badge(isOff = true, maps),
+                AppOption.Badge(isOff = false, music),
+            ),
+            options(pair, AppSpot.Card(tools), settings = AppSettings().toggleBadge(maps), badgesEnabled = true, hasStorePage = true),
         )
     }
 }
