@@ -580,7 +580,7 @@ fun LauncherScreen(
                             }
                             is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
                             AppOption.SplitWith -> pickPartner(app, spot)
-                            is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(app))
+                            is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(option.member ?: app))
                             is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
                             AppOption.PlayStore -> actions.openStorePage(app)
                             AppOption.AppInfo -> actions.openAppInfo(app)

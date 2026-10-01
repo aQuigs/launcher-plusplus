@@ -159,7 +159,7 @@ private val AppOption.label
             HomePlace.Dock -> "Add to the dock"
         }
         AppOption.SplitWith -> "Split with…"
-        is AppOption.Badge -> if (isOff) "Show badge" else "Hide badge"
+        is AppOption.Badge -> listOfNotNull(if (isOff) "Show" else "Hide", member?.label, "badge").joinToString(" ")
         is AppOption.BuiltInCards -> if (isOff) "Show in New & Most Used" else "Hide from New & Most Used"
         AppOption.PlayStore -> "Open in Play Store"
         AppOption.AppInfo -> "App info"
