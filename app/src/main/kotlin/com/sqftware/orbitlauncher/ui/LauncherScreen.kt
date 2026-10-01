@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
@@ -59,7 +60,9 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -182,6 +185,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
  * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
  * the home page whether to add its shortcut, which goes at the end of the ring once the system has pinned it. [apps] and
@@ -241,6 +245,7 @@ fun LauncherScreen(
     onAppSettingsChange: (AppSettings) -> Unit,
     onOpenNotifications: () -> Unit,
     onSystemBarsShownChange: (Boolean) -> Unit,
+    onSetWallpaper: (draw: () -> ImageBitmap) -> Unit,
     onRestart: () -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
@@ -495,6 +500,7 @@ fun LauncherScreen(
 
     // The dialogs are windows of their own too, so like the menu they take Back before this screen's BackHandler.
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
+    var confirmingScene by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
@@ -785,8 +791,9 @@ fun LauncherScreen(
                 (openMenu as? OpenMenu.Launcher)?.let { shown ->
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
-                        rows = listOf(
+                        rows = listOfNotNull(
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
+                            LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
                             LauncherMenuRow(
                                 "24-hour clock",
@@ -827,6 +834,7 @@ fun LauncherScreen(
         closeDrawer()
         pickingCollection = false
         confirmingReset = false
+        confirmingScene = false
         confirmingPin = null
         latestOnPreviewThemeChange(null)
         choosingLook = false
@@ -1244,6 +1252,19 @@ fun LauncherScreen(
                     kind = kind,
                     onChange = ::changeCollections,
                     onDismiss = { settingCard = null },
+                )
+            }
+            val scene = LocalThemeArt.current.scene
+            if (confirmingScene && scene != null) {
+                val screen = LocalWindowInfo.current.containerSize
+                val density = LocalDensity.current
+                SceneDialog(
+                    scene = scene,
+                    onSet = {
+                        confirmingScene = false
+                        onSetWallpaper { scene.image(screen, density) }
+                    },
+                    onDismiss = { confirmingScene = false },
                 )
             }
             if (confirmingReset) {

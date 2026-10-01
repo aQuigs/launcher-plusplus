@@ -6,12 +6,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.toSize
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
@@ -74,7 +80,20 @@ interface ThemeArt {
 
     /** The faint pattern over the drawer's veil, in [colour] at its brightest, drifting by a share of how far the list has [scrolled]. */
     fun DrawScope.drawBackdrop(colour: Color, scrolled: Float)
+
+    /** The theme's world as a scene the launcher's menu offers to set as the wallpaper, if it has one. */
+    val scene: ThemeScene?
+        get() = null
 }
+
+/** A scene of a theme's world, [name]d in the launcher's menu, which the launcher can set as the wallpaper. */
+class ThemeScene(val name: String, val draw: DrawScope.() -> Unit)
+
+/** The scene drawn on a new image [size] pixels across, as the wallpaper it becomes. It draws in software, so it may run off the main thread. */
+fun ThemeScene.image(size: IntSize, density: Density): ImageBitmap =
+    ImageBitmap(size.width, size.height).also { image ->
+        CanvasDrawScope().draw(density, LayoutDirection.Ltr, Canvas(image), size.toSize(), draw)
+    }
 
 private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.Space -> SpaceArt
@@ -84,6 +103,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.Ink -> InkArt
     Theme.Germ -> GermArt
     Theme.Paper -> PaperArt
+    Theme.CrystalCity -> CrystalArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }

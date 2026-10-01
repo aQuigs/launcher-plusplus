@@ -67,6 +67,15 @@ enum class FolderLook(val label: String) {
 
     /** A paper pinwheel spinning in a breeze under its previews. */
     Pinwheel("Pinwheel"),
+
+    /** A glass cube seen corner on, its previews on it. */
+    Cube("Cube"),
+
+    /** A glass octahedron turning slowly under its previews. */
+    Octahedron("Octahedron"),
+
+    /** A geode broken open, its previews in the hollow. */
+    Geode("Geode"),
 }
 
 /**
@@ -76,10 +85,11 @@ enum class FolderLook(val label: String) {
 fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
     FolderLook.SolarSystem -> planets.any(Planet::moves)
     FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop,
-    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell, FolderLook.Pinwheel -> folders
+    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell, FolderLook.Pinwheel, FolderLook.Octahedron -> folders
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
     FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal,
-    FolderLook.FoldedSquare, FolderLook.Envelope -> false
+    FolderLook.FoldedSquare, FolderLook.Envelope,
+    FolderLook.Cube, FolderLook.Geode -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */
