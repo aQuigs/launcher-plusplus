@@ -117,11 +117,12 @@ class LauncherScreenTest {
     private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true, minuteOfDay = 619))
     private val hourStylesChosen = mutableListOf<Boolean>()
     private var theme by mutableStateOf(Theme.Space)
+    private var previewTheme by mutableStateOf<Theme?>(null)
     private var folderLooks by mutableStateOf(FolderLooks().with(Theme.Space, FolderLook.SolarSystem))
     private var folderLook: FolderLook
-        get() = folderLooks.of(theme)
+        get() = folderLooks.of(previewTheme ?: theme)
         set(look) {
-            folderLooks = folderLooks.with(theme, look)
+            folderLooks = folderLooks.with(previewTheme ?: theme, look)
         }
     private var ambientMotion by mutableStateOf(true)
     private var drawerStyle by mutableStateOf(DrawerStyle())
@@ -207,10 +208,12 @@ class LauncherScreenTest {
                 hourStylesChosen += it
                 face = face.copy(twentyFourHour = it)
             },
-            theme = theme,
+            theme = previewTheme ?: theme,
             onThemeChange = { theme = it },
-            folderLook = folderLook,
-            onFolderLookChange = { folderLook = it },
+            previewing = previewTheme != null,
+            onPreviewThemeChange = { previewTheme = it },
+            folderLooks = folderLooks,
+            onFolderLooksChange = { folderLooks = it },
             ambientMotion = ambientMotion,
             onAmbientMotionChange = { ambientMotion = it },
             drawerStyle = drawerStyle,
@@ -1856,21 +1859,84 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theLauncherMenusThemeRowShowsTheThemeAndItsDialogChangesItAndTheLooksOnOffer() {
+    fun theLauncherMenusThemeRowTriesThemesAndTheirFolderLooksOnHomeUntilOneIsUsed() {
         show()
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Theme").assert(hasText("Space")).performClick()
-        compose.onNodeWithTag(LauncherMenuTags.THEME_DIALOG).assertIsDisplayed()
 
+        compose.onNodeWithTag(ThemePreviewTags.BAR).assertIsDisplayed()
+        compose.onNodeWithText(face.time).assertDoesNotExist()
+        compose.onNodeWithText("Solar system folders").assertIsSelected()
         compose.onNodeWithText("Clockwork").performClick()
+        compose.runOnIdle { assertEquals(Theme.Clockwork, previewTheme) }
+        compose.onNodeWithText("Solar system folders").assertDoesNotExist()
+        compose.onNodeWithText("Gear folders").performClick()
+        compose.runOnIdle {
+            assertEquals(FolderLook.Gear, folderLooks.of(Theme.Clockwork))
+            assertEquals(Theme.Space, theme)
+        }
 
-        compose.onNodeWithTag(LauncherMenuTags.THEME_DIALOG).assertDoesNotExist()
-        compose.runOnIdle { assertEquals(Theme.Clockwork, theme) }
+        compose.onNodeWithTag(ThemePreviewTags.USE).assert(hasText("Use Clockwork")).performClick()
+
+        compose.onNodeWithTag(ThemePreviewTags.BAR).assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(Theme.Clockwork, theme)
+            assertEquals(null, previewTheme)
+        }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Theme").assert(hasText("Clockwork"))
-        compose.onNodeWithText("Folder look").performClick()
-        compose.onNodeWithText("Gear").assertIsDisplayed()
-        compose.onNodeWithText("Solar system").assertDoesNotExist()
+    }
+
+    @Test
+    fun backLeavesATryOfAThemeOnlyOnceTheFolderIsClosedAndCloseAndHomeLeaveItToo() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").performClick()
+        compose.onNodeWithText("Clockwork").performClick()
+        compose.folderSlot(0).performClick()
+        compose.emblem().assertDoesNotExist()
+
+        Espresso.pressBack()
+
+        compose.emblem().assertIsDisplayed()
+        compose.onNodeWithTag(ThemePreviewTags.BAR).assertIsDisplayed()
+        Espresso.pressBack()
+        compose.onNodeWithTag(ThemePreviewTags.BAR).assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(null, previewTheme)
+            assertEquals(Theme.Space, theme)
+        }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").performClick()
+        compose.onNodeWithTag(ThemePreviewTags.CLOSE).performClick()
+        compose.onNodeWithTag(ThemePreviewTags.BAR).assertDoesNotExist()
+
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").performClick()
+        pressHome(launcherInFront = true)
+        compose.onNodeWithTag(ThemePreviewTags.BAR).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(null, previewTheme) }
+    }
+
+    @Test
+    fun whileAThemeIsTriedTheMenuShowsItAndOffersItsFolderLooks() {
+        folderLooks = FolderLooks().with(Theme.Clockwork, FolderLook.Gear)
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").performClick()
+        compose.onNodeWithText("Clockwork").performClick()
+
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").assert(hasText("Clockwork"))
+        compose.onNodeWithText("Folder look").assert(hasText("Gear")).performClick()
+        compose.onNodeWithText("Sub-dial").performClick()
+
+        compose.runOnIdle {
+            assertEquals(FolderLook.SubDial, folderLooks.of(Theme.Clockwork))
+            assertEquals(FolderLook.Rim, folderLooks.of(Theme.Space))
+            assertEquals(Theme.Clockwork, previewTheme)
+        }
     }
 
     @Test

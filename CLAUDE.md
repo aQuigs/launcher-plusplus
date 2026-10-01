@@ -54,7 +54,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 
 The launcher's look is a theme, picked in the launcher's menu: Space (the ring's constellation, the drawer's stars, the planet folder looks) or Clockwork (a watch dial telling the time, a chapter ring, sub-dial and gear folders). A theme is an entry of the `Theme` enum in `domain`, listing its own folder looks; a `Palette` in `ui/theme/<Theme>Colors.kt`, from which both schemes and the ring's colours are drawn; and a `ThemeArt` in `ui/<Theme>Art.kt` for the shapes that are its own (the emblem, the ring's marks, folders, the drawer's backdrop). `MainActivity` hands the theme to `LauncherTheme` and `LauncherScreen`, which provides its art. A theme owns every surface below, in both the day and night schemes:
 
-- Home ring: its track and marks, the centre emblem, the home clock
+- Home ring: its track and marks, the centre emblem, the home clock and the theme preview bar in its place
 - Folders: each folder look closed on the ring and in the dock, and open in the ring's centre
 - Dock and the drawer handle
 - App drawer: the veil and what is drawn on it, search, the list and grid

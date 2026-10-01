@@ -78,6 +78,7 @@ import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
+import com.sqftware.orbitlauncher.domain.FolderLooks
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HomePlace
@@ -176,8 +177,9 @@ data class HomePress(val launcherInFront: Boolean)
  * page's empty space opens the launcher's own menu. Its first row shows the wallpaper alone: the launcher fades away and
  * the system bars hide ([onSystemBarsShownChange]) until the next touch, Back or HOME brings them back. Its other rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
- * hours and flip it ([onTwentyFourHourChange]), show the [theme] the launcher is drawn in and choose another in a dialog
- * ([onThemeChange]), show the theme's [folderLook] and choose another of the theme's in a dialog ([onFolderLookChange]),
+ * hours and flip it ([onTwentyFourHourChange]), show the [theme] shown, the one in use unless one is being tried on the
+ * home page ([previewing]), and try others there ([onPreviewThemeChange]) until one is used ([onThemeChange]) or the try is
+ * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
  * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
@@ -186,9 +188,9 @@ data class HomePress(val launcherInFront: Boolean)
  * [pinnedShortcuts] are null until they have loaded. The drawer lays
  * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
- * drawer, the collection picker and the folder; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
+ * drawer, the collection picker, the folder and a theme's try; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
  * it brings the launcher back over the wallpaper, else cancels a drag, else closes the menu or a dialog, then the drawer, then the collection picker,
- * then ends widget editing, then returns to the home page, then closes the folder. The launcher lays itself out clear of the system bars.
+ * then ends widget editing, then returns to the home page, then closes the folder, then leaves a theme's try. The launcher lays itself out clear of the system bars.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -208,8 +210,10 @@ fun LauncherScreen(
     onTwentyFourHourChange: (Boolean) -> Unit,
     theme: Theme,
     onThemeChange: (Theme) -> Unit,
-    folderLook: FolderLook,
-    onFolderLookChange: (FolderLook) -> Unit,
+    previewing: Boolean,
+    onPreviewThemeChange: (Theme?) -> Unit,
+    folderLooks: FolderLooks,
+    onFolderLooksChange: (FolderLooks) -> Unit,
     ambientMotion: Boolean,
     onAmbientMotionChange: (Boolean) -> Unit,
     drawerStyle: DrawerStyle,
@@ -273,7 +277,10 @@ fun LauncherScreen(
     val latestMinuteOfDay by rememberUpdatedState(clock.minuteOfDay)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
     val latestTheme by rememberUpdatedState(theme)
+    val latestOnPreviewThemeChange by rememberUpdatedState(onPreviewThemeChange)
+    val folderLook = folderLooks.of(theme)
     val latestFolderLook by rememberUpdatedState(folderLook)
+    fun changeFolderLook(look: FolderLook) = onFolderLooksChange(folderLooks.with(theme, look))
     val latestAmbientMotion by rememberUpdatedState(ambientMotion)
     val latestOnAmbientMotionChange by rememberUpdatedState(onAmbientMotionChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
@@ -489,7 +496,6 @@ fun LauncherScreen(
     // The dialogs are windows of their own too, so like the menu they take Back before this screen's BackHandler.
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
-    var choosingTheme by rememberSaveable { mutableStateOf(false) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     // By the card's stored name, which survives the activity being recreated.
@@ -788,7 +794,7 @@ fun LauncherScreen(
                                 flips = true,
                                 onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
                             ),
-                            LauncherMenuRow("Theme", value = latestTheme.label) { choosingTheme = true },
+                            LauncherMenuRow("Theme", value = latestTheme.label) { latestOnPreviewThemeChange(latestTheme) },
                             LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
                             LauncherMenuRow(
                                 "Ambient motion",
@@ -822,7 +828,7 @@ fun LauncherScreen(
         pickingCollection = false
         confirmingReset = false
         confirmingPin = null
-        choosingTheme = false
+        latestOnPreviewThemeChange(null)
         choosingLook = false
         choosingPlanet = null
         settingCard = null
@@ -849,7 +855,7 @@ fun LauncherScreen(
     // in view.
     BackHandler(
         enabled = showingWallpaper || dragged != null || drawerOpen || pickingCollection || editedWidget != null ||
-            pagerState.currentPage != layout.homeIndex || open != null,
+            pagerState.currentPage != layout.homeIndex || open != null || previewing,
     ) {
         when {
             showingWallpaper -> showingWallpaper = false
@@ -858,7 +864,8 @@ fun LauncherScreen(
             pickingCollection -> pickingCollection = false
             editedWidget != null -> editingWidget = null
             pagerState.currentPage != layout.homeIndex -> goHome()
-            else -> openFolder = null
+            open != null -> openFolder = null
+            else -> onPreviewThemeChange(null)
         }
     }
 
@@ -1041,15 +1048,33 @@ fun LauncherScreen(
                                         // A tap anywhere there closes an open folder, not only one on the ring's centre.
                                         EmptySpace(menu = launcherMenu, onTap = { openFolder = null })
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            HomeClock(
-                                                face = clock,
-                                                onTimeClick = onOpenClock,
-                                                onDateClick = onOpenCalendar,
-                                                modifier = Modifier.padding(top = 24.dp),
-                                            )
-                                            Row {
-                                                RingerSwitch(mode = ringerMode, onClick = onRingerTap)
-                                                if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
+                                            ClockOrThemePreview(
+                                                bar = if (previewing) ({
+                                                    ThemePreviewBar(
+                                                        shown = theme,
+                                                        onShow = onPreviewThemeChange,
+                                                        folderLook = folderLook,
+                                                        onFolderLookChange = ::changeFolderLook,
+                                                        onUse = {
+                                                            onPreviewThemeChange(null)
+                                                            onThemeChange(theme)
+                                                        },
+                                                        onClose = { onPreviewThemeChange(null) },
+                                                    )
+                                                }) else null,
+                                            ) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    HomeClock(
+                                                        face = clock,
+                                                        onTimeClick = onOpenClock,
+                                                        onDateClick = onOpenCalendar,
+                                                        modifier = Modifier.padding(top = 24.dp),
+                                                    )
+                                                    Row {
+                                                        RingerSwitch(mode = ringerMode, onClick = onRingerTap)
+                                                        if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
+                                                    }
+                                                }
                                             }
                                             HomeRing(
                                                 ring = ring,
@@ -1185,20 +1210,6 @@ fun LauncherScreen(
                     )
                 }
             }
-            if (choosingTheme) {
-                ChoiceDialog(
-                    title = "Theme",
-                    choices = Theme.entries,
-                    chosen = theme,
-                    label = Theme::label,
-                    onChoose = {
-                        choosingTheme = false
-                        onThemeChange(it)
-                    },
-                    onDismiss = { choosingTheme = false },
-                    modifier = Modifier.testTag(LauncherMenuTags.THEME_DIALOG),
-                )
-            }
             if (choosingLook) {
                 ChoiceDialog(
                     title = "Folder look",
@@ -1207,7 +1218,7 @@ fun LauncherScreen(
                     label = FolderLook::label,
                     onChoose = {
                         choosingLook = false
-                        onFolderLookChange(it)
+                        changeFolderLook(it)
                     },
                     onDismiss = { choosingLook = false },
                     modifier = Modifier.testTag(LauncherMenuTags.LOOK_DIALOG),

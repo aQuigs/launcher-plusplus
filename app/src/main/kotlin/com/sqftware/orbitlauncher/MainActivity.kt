@@ -46,6 +46,7 @@ import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.PageLayout
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.ui.AppActions
@@ -143,7 +144,9 @@ class MainActivity : ComponentActivity() {
             }
             LaunchedEffect(lightWallpaper) { showBarsFor(lightWallpaper) }
             var theme by remember { mutableStateOf(themeStore.load()) }
-            Themed(theme, lightWallpaper) {
+            var previewTheme by rememberSaveable { mutableStateOf<Theme?>(null) }
+            val shownTheme = previewTheme ?: theme
+            Themed(shownTheme, lightWallpaper) {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
@@ -261,14 +264,16 @@ class MainActivity : ComponentActivity() {
                         twentyFourHour = it
                         hourStyleStore.save(it)
                     },
-                    theme = theme,
+                    theme = shownTheme,
                     onThemeChange = {
                         theme = it
                         themeStore.save(it)
                     },
-                    folderLook = folderLooks.of(theme),
-                    onFolderLookChange = {
-                        folderLooks = folderLooks.with(theme, it)
+                    previewing = previewTheme != null,
+                    onPreviewThemeChange = { previewTheme = it },
+                    folderLooks = folderLooks,
+                    onFolderLooksChange = {
+                        folderLooks = it
                         folderLookStore.save(folderLooks)
                     },
                     ambientMotion = ambientMotion,
