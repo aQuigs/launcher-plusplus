@@ -49,6 +49,15 @@ enum class FolderLook(val label: String) {
 
     /** A drop of ink bleeding out into the paper under its previews. */
     InkDrop("Ink drop"),
+
+    /** A rod-shaped bacterium waving its flagella, its previews inside. */
+    Bacillus("Bacillus"),
+
+    /** A virus turning slowly, its previews on it. */
+    Virus("Virus"),
+
+    /** A cell whose membrane wobbles, its previews inside. */
+    Cell("Cell"),
 }
 
 /**
@@ -57,7 +66,8 @@ enum class FolderLook(val label: String) {
  */
 fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
     FolderLook.SolarSystem -> planets.any(Planet::moves)
-    FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop -> folders
+    FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop,
+    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell -> folders
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
     FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal -> false
 }
