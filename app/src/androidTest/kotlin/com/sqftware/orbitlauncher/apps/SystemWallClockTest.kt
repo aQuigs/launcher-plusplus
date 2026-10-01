@@ -15,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.Calendar
 import java.util.Date
 
 @RunWith(AndroidJUnit4::class)
@@ -30,10 +31,12 @@ class SystemWallClockTest {
     private fun platformFace(): ClockFace {
         val now = Date()
         val locale = context.resources.configuration.locales[0]
+        val calendar = Calendar.getInstance().apply { time = now }
         return ClockFace(
             time = DateFormat.getTimeFormat(context).format(now),
             date = DateFormat.format(DateFormat.getBestDateTimePattern(locale, "EEEEMMMMd"), now).toString(),
             twentyFourHour = DateFormat.is24HourFormat(context),
+            minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE),
         )
     }
 

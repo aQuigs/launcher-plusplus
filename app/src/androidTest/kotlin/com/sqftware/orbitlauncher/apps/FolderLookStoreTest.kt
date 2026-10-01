@@ -5,6 +5,8 @@ import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sqftware.orbitlauncher.domain.FolderLook
+import com.sqftware.orbitlauncher.domain.FolderLooks
+import com.sqftware.orbitlauncher.domain.Theme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -22,13 +24,29 @@ class FolderLookStoreTest {
     fun forgetTheChoice() = prefs.edit(commit = true) { clear() }
 
     @Test
-    fun moonsOnTheRimUntilAnotherIsChosenAndAnUnknownLookFallsBackToThem() {
-        assertEquals(FolderLook.Rim, store.load())
+    fun eachThemeKeepsItsOwnPickAndAnUnknownLookFallsBackToTheThemesFirst() {
+        assertEquals(FolderLooks(), store.load())
 
-        store.save(FolderLook.Ringed)
-        assertEquals(FolderLook.Ringed, SharedPreferencesFolderLookStore(context).load())
+        store.save(FolderLooks().with(Theme.Space, FolderLook.Ringed).with(Theme.Clockwork, FolderLook.Gear))
+        val loaded = SharedPreferencesFolderLookStore(context).load()
+        assertEquals(FolderLook.Ringed, loaded.of(Theme.Space))
+        assertEquals(FolderLook.Gear, loaded.of(Theme.Clockwork))
 
         prefs.edit(commit = true) { putString("look", "Nebula") }
-        assertEquals(FolderLook.Rim, store.load())
+        assertEquals(FolderLook.Rim, store.load().of(Theme.Space))
+    }
+
+    @Test
+    fun aThemeWithNoPickIsNotStoredAsIfOneWasMade() {
+        store.save(FolderLooks().with(Theme.Space, FolderLook.Ringed))
+
+        assertEquals(null, store.load().picked(Theme.Clockwork))
+    }
+
+    @Test
+    fun spacesPickFromBeforeThemesIsKept() {
+        prefs.edit(commit = true) { putString("look", "SolarSystem") }
+
+        assertEquals(FolderLook.SolarSystem, store.load().of(Theme.Space))
     }
 }

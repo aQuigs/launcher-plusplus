@@ -67,6 +67,8 @@ import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
+import com.sqftware.orbitlauncher.domain.FolderLooks
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HomePlace
@@ -112,9 +114,15 @@ class LauncherScreenTest {
     private var homeAppsChanges = 0
     private var setUps = 0
     private val work = folderOf(clock, mail)
-    private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true))
+    private var face by mutableStateOf(ClockFace("10:19", "Saturday 13 September", twentyFourHour = true, minuteOfDay = 619))
     private val hourStylesChosen = mutableListOf<Boolean>()
-    private var folderLook by mutableStateOf(FolderLook.SolarSystem)
+    private var theme by mutableStateOf(Theme.Space)
+    private var folderLooks by mutableStateOf(FolderLooks().with(Theme.Space, FolderLook.SolarSystem))
+    private var folderLook: FolderLook
+        get() = folderLooks.of(theme)
+        set(look) {
+            folderLooks = folderLooks.with(theme, look)
+        }
     private var ambientMotion by mutableStateOf(true)
     private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
@@ -199,6 +207,8 @@ class LauncherScreenTest {
                 hourStylesChosen += it
                 face = face.copy(twentyFourHour = it)
             },
+            theme = theme,
+            onThemeChange = { theme = it },
             folderLook = folderLook,
             onFolderLookChange = { folderLook = it },
             ambientMotion = ambientMotion,
@@ -1843,6 +1853,24 @@ class LauncherScreenTest {
         compose.runOnIdle { assertEquals(FolderLook.Orbit, folderLook) }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Folder look").assert(hasText("Moons in orbit"))
+    }
+
+    @Test
+    fun theLauncherMenusThemeRowShowsTheThemeAndItsDialogChangesItAndTheLooksOnOffer() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").assert(hasText("Space")).performClick()
+        compose.onNodeWithTag(LauncherMenuTags.THEME_DIALOG).assertIsDisplayed()
+
+        compose.onNodeWithText("Clockwork").performClick()
+
+        compose.onNodeWithTag(LauncherMenuTags.THEME_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(Theme.Clockwork, theme) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").assert(hasText("Clockwork"))
+        compose.onNodeWithText("Folder look").performClick()
+        compose.onNodeWithText("Gear").assertIsDisplayed()
+        compose.onNodeWithText("Solar system").assertDoesNotExist()
     }
 
     @Test

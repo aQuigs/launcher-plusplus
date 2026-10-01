@@ -52,7 +52,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 
 ## Themes
 
-The launcher's look is a theme. Today there is one, the space look (the `ui/theme` palette, the ring's constellation, the drawer's stars, the planet folder looks), and more are planned. A theme owns every surface below, in both the day and night schemes:
+The launcher's look is a theme, picked in the launcher's menu: Space (the ring's constellation, the drawer's stars, the planet folder looks) or Clockwork (a watch dial telling the time, a chapter ring, sub-dial and gear folders). A theme is an entry of the `Theme` enum in `domain`, listing its own folder looks; a `Palette` in `ui/theme/<Theme>Colors.kt`, from which both schemes and the ring's colours are drawn; and a `ThemeArt` in `ui/<Theme>Art.kt` for the shapes that are its own (the emblem, the ring's marks, folders, the drawer's backdrop). `MainActivity` hands the theme to `LauncherTheme` and `LauncherScreen`, which provides its art. A theme owns every surface below, in both the day and night schemes:
 
 - Home ring: its track and marks, the centre emblem, the home clock
 - Folders: each folder look closed on the ring and in the dock, and open in the ring's centre
@@ -62,7 +62,7 @@ The launcher's look is a theme. Today there is one, the space look (the `ui/them
 - Widget page and the controls on every page (`TonalButton`, badges)
 - Popups and panels: the launcher menu, an app's menu, the pin dialog, the place picker
 
-A feature that adds one of these surfaces, or changes how one looks, draws it from `ui/theme` so each theme can give it its own look, and checks it under every theme. A new surface goes on this list.
+A feature that adds one of these surfaces, or changes how one looks, draws it from `ui/theme`, or from `LocalThemeArt` where its shape differs by theme, so each theme can give it its own look, and checks it under every theme. A new surface goes on this list.
 
 ## Don't
 

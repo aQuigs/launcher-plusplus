@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -111,9 +112,25 @@ fun FolderIcon(
             .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        PlanetFace(folder, icon, Modifier.fillMaxSize(), presses)
+        LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize(), presses) { 1f }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+    }
+}
+
+/** [folder]'s disc of previews, filling the item: [presses] ripple it, and [inner] fades the previews. */
+@Composable
+fun FolderDisc(
+    folder: RingItem.Folder,
+    icon: suspend (AppEntry) -> ImageBitmap?,
+    presses: InteractionSource?,
+    inner: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    IconDisc(presses, modifier, contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, contentAlignment = Alignment.Center) {
+            FolderPreviews(folder, icon)
+        }
     }
 }
 

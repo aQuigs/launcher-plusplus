@@ -1,6 +1,6 @@
 package com.sqftware.orbitlauncher.domain
 
-/** How the folders on the home screen are drawn, all of them planets of a kind: a launcher-wide setting. */
+/** How the folders on the home screen are drawn. Each [Theme] has its own, and the user picks one of the theme's. */
 enum class FolderLook(val label: String) {
     /** The folder's disc of previews, with a moon on its edge for every app in it. */
     Rim("Moons on the rim"),
@@ -16,6 +16,22 @@ enum class FolderLook(val label: String) {
 
     /** Each folder a different planet of the Solar system, in order. */
     SolarSystem("Solar system"),
+
+    /** A small dial of its own set into the watch's face, its previews in the middle. */
+    SubDial("Sub-dial"),
+
+    /** A brass cog with the previews in its hub. */
+    Gear("Gear"),
+}
+
+/**
+ * Whether folders in this look move as the folders' sky turns: in the Solar system only if one of the [planets] shown
+ * moves, and in the looks that turn whenever there are [folders] at all.
+ */
+fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
+    FolderLook.SolarSystem -> planets.any(Planet::moves)
+    FolderLook.Orbit, FolderLook.Gear -> folders
+    FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */

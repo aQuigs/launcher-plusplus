@@ -88,15 +88,17 @@ import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
+import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.appOptions
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
-import com.sqftware.orbitlauncher.ui.theme.LocalDrawerStar
+import com.sqftware.orbitlauncher.ui.theme.LocalDrawerMark
 import java.io.Serializable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -174,8 +176,9 @@ data class HomePress(val launcherInFront: Boolean)
  * page's empty space opens the launcher's own menu. Its first row shows the wallpaper alone: the launcher fades away and
  * the system bars hide ([onSystemBarsShownChange]) until the next touch, Back or HOME brings them back. Its other rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
- * hours and flip it ([onTwentyFourHourChange]), show the [folderLook] and choose another in a dialog
- * ([onFolderLookChange]), show whether the planets and the emblem's sky turn on their own and flip it ([ambientMotion],
+ * hours and flip it ([onTwentyFourHourChange]), show the [theme] the launcher is drawn in and choose another in a dialog
+ * ([onThemeChange]), show the theme's [folderLook] and choose another of the theme's in a dialog ([onFolderLookChange]),
+ * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
  * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -203,6 +206,8 @@ fun LauncherScreen(
     onReorderModeChange: (ReorderMode) -> Unit,
     clock: ClockFace,
     onTwentyFourHourChange: (Boolean) -> Unit,
+    theme: Theme,
+    onThemeChange: (Theme) -> Unit,
     folderLook: FolderLook,
     onFolderLookChange: (FolderLook) -> Unit,
     ambientMotion: Boolean,
@@ -265,7 +270,9 @@ fun LauncherScreen(
     val latestOnAppSettingsChange by rememberUpdatedState(onAppSettingsChange)
     val builtInApps = remember(apps, appSettings.offBuiltInCards) { apps.orEmpty().filterNot(appSettings::isOffBuiltInCards) }
     val latestTwentyFourHour by rememberUpdatedState(clock.twentyFourHour)
+    val latestMinuteOfDay by rememberUpdatedState(clock.minuteOfDay)
     val latestOnTwentyFourHourChange by rememberUpdatedState(onTwentyFourHourChange)
+    val latestTheme by rememberUpdatedState(theme)
     val latestFolderLook by rememberUpdatedState(folderLook)
     val latestAmbientMotion by rememberUpdatedState(ambientMotion)
     val latestOnAmbientMotionChange by rememberUpdatedState(onAmbientMotionChange)
@@ -372,11 +379,7 @@ fun LauncherScreen(
     // round a whole number of times in it, so none jumps as the turn starts over.
     val planets = remember(ring, dock) { planetsOf(ring, dock) }
     val ambient = ambientMotion && homeInSight
-    val skyTurns = ambient && when (folderLook) {
-        FolderLook.SolarSystem -> planets.values.any(Planet::moves)
-        FolderLook.Orbit -> (ring + dock).any { it is RingItem.Folder }
-        else -> false
-    }
+    val skyTurns = ambient && folderLook.moves(folders = (ring + dock).any { it is RingItem.Folder }, planets = planets.values)
     val sky = rememberUpdatedState(turnAngle(skyTurns, FOLDER_SKY_TURN_MILLIS))
     val folderStyle = remember(folderLook, planets) { FolderStyle(folderLook, planets) { sky.value.value / 360f * 60f } }
     // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
@@ -486,6 +489,7 @@ fun LauncherScreen(
     // The dialogs are windows of their own too, so like the menu they take Back before this screen's BackHandler.
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
+    var choosingTheme by rememberSaveable { mutableStateOf(false) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     // By the card's stored name, which survives the activity being recreated.
@@ -784,6 +788,7 @@ fun LauncherScreen(
                                 flips = true,
                                 onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
                             ),
+                            LauncherMenuRow("Theme", value = latestTheme.label) { choosingTheme = true },
                             LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
                             LauncherMenuRow(
                                 "Ambient motion",
@@ -817,6 +822,7 @@ fun LauncherScreen(
         pickingCollection = false
         confirmingReset = false
         confirmingPin = null
+        choosingTheme = false
         choosingLook = false
         choosingPlanet = null
         settingCard = null
@@ -861,7 +867,7 @@ fun LauncherScreen(
     // the system bars, so it is the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
     val panel = MaterialTheme.colorScheme.surfaceDim
-    val star = LocalDrawerStar.current
+    val drawerMark = LocalDrawerMark.current
     // How far the drawer's list has been dragged and flung, for the stars to follow. A jump by the letter rail is a cut,
     // after which no one could tell where the stars ought to be, so it need not count.
     val drawerScrolled = remember { mutableFloatStateOf(0f) }
@@ -882,6 +888,7 @@ fun LauncherScreen(
     val navigationBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
     // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back.
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
+    val art = LocalThemeArt.current
     WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -932,7 +939,7 @@ fun LauncherScreen(
                             drawRect(panel.copy(alpha = panel.alpha * open), size = Size(size.width, strip))
                             drawRect(panel, Offset(0f, strip))
                             // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
-                            drawStarField(star.copy(alpha = star.alpha * open), drawerScrolled.floatValue)
+                            with(art) { drawBackdrop(drawerMark.copy(alpha = drawerMark.alpha * open), drawerScrolled.floatValue) }
                         }.nestedScroll(drawerScroll),
                     ) {
                         DrawerHandle(
@@ -1074,6 +1081,7 @@ fun LauncherScreen(
                                                 held = (dragged as? Drag.OutOfFolder)?.app,
                                                 inSight = homeInSight,
                                                 turns = ambient,
+                                                minuteOfDay = { latestMinuteOfDay },
                                                 dock = dock,
                                                 dockSlot = { dockRearrange.boundsOf(it, dock) },
                                             )
@@ -1177,10 +1185,24 @@ fun LauncherScreen(
                     )
                 }
             }
+            if (choosingTheme) {
+                ChoiceDialog(
+                    title = "Theme",
+                    choices = Theme.entries,
+                    chosen = theme,
+                    label = Theme::label,
+                    onChoose = {
+                        choosingTheme = false
+                        onThemeChange(it)
+                    },
+                    onDismiss = { choosingTheme = false },
+                    modifier = Modifier.testTag(LauncherMenuTags.THEME_DIALOG),
+                )
+            }
             if (choosingLook) {
                 ChoiceDialog(
                     title = "Folder look",
-                    choices = FolderLook.entries,
+                    choices = theme.folderLooks,
                     chosen = folderLook,
                     label = FolderLook::label,
                     onChoose = {

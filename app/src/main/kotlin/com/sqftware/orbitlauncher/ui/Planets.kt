@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -32,7 +31,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
-import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.ui.theme.DiscEdge
@@ -49,18 +47,6 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
-
-/**
- * How every folder on the screen draws itself: the [look] the user chose, the [planets] the folders are in the Solar
- * system, and the [minutes] the sky has turned, which move what moves.
- */
-class FolderStyle(
-    val look: FolderLook,
-    val planets: Map<HomePlace.Folder, Planet> = emptyMap(),
-    val minutes: () -> Float = { 0f },
-)
-
-val LocalFolderStyle = compositionLocalOf { FolderStyle(FolderLook.Rim) }
 
 /**
  * [folder] drawn as a planet in the look of [LocalFolderStyle], filling the item: a disc of its previews the size of an
@@ -112,11 +98,7 @@ fun PlanetFace(
 
     Box(layered.then(worn), contentAlignment = Alignment.Center) {
         // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into the wallpaper.
-        IconDisc(presses, Modifier.fillMaxSize(disc).then(glass).edge(FolderEdge).then(moons), contentAlignment = Alignment.Center) {
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, contentAlignment = Alignment.Center) {
-                FolderPreviews(folder, icon)
-            }
-        }
+        FolderDisc(folder, icon, presses, inner, Modifier.fillMaxSize(disc).then(glass).edge(FolderEdge).then(moons))
     }
 }
 
