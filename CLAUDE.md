@@ -50,6 +50,20 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 - The look follows the wallpaper: a light one gets the day scheme and day ring colours. Colours come from the scheme's roles or `LocalRingColors`, never from an assumption that the launcher is dark.
 - Colours live in `ui/theme`: components take a `colorScheme` role or a theme token, never a literal or a surface alpha copy, and a look changes by changing its role there (held by the `theme-colours-only` hook and `LauncherColorsTest`).
 
+## Themes
+
+The launcher's look is a theme. Today there is one, the space look (the `ui/theme` palette, the ring's constellation, the drawer's stars, the planet folder looks), and more are planned. A theme owns every surface below, in both the day and night schemes:
+
+- Home ring: its track and marks, the centre emblem, the home clock
+- Folders: each folder look closed on the ring and in the dock, and open in the ring's centre
+- Dock and the drawer handle
+- App drawer: the veil and what is drawn on it, search, the list and grid
+- Collections page: the cards, their header controls, the app picker
+- Widget page and the controls on every page (`TonalButton`, badges)
+- Popups and panels: the launcher menu, an app's menu, the pin dialog, the place picker
+
+A feature that adds one of these surfaces, or changes how one looks, draws it from `ui/theme` so each theme can give it its own look, and checks it under every theme. A new surface goes on this list.
+
 ## Don't
 
 - Put system calls in `ui`.
