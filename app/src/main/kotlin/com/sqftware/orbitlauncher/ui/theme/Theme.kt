@@ -6,52 +6,41 @@ import androidx.compose.material3.LocalTonalElevationEnabled
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import com.sqftware.orbitlauncher.domain.Planet
+import com.sqftware.orbitlauncher.domain.Theme
 
-// The launcher icon's palette (res/drawable/ic_launcher_*.xml). Only this file names a colour, and the rest of the app
-// reaches these through the scheme's roles or the ring's tokens below.
-private val Sky = Color(0xFF0F1630)
-private val Star = Color(0xFF9FB2E6)
-private val Starlight = Color(0xFFE8ECFF)
-private val Spark = Color(0xFFF4EFE6)
-private val Gold = Color(0xFFFFD27A)
-private val Ember = Color(0xFFFF8A80)
-private val Frost = Color.White
-
-private val Glass = Frost.copy(alpha = 0.1f)
-private val DayGlass = Frost.copy(alpha = 0.35f)
-private val DayGold = lerp(Gold, Sky, 0.5f)
-private val Mist = lerp(Starlight, Sky, 0.28f)
-private val DayStar = lerp(Sky, Star, 0.4f)
+// Only this package names a colour, and the rest of the app reaches them through the scheme's roles or the tokens here.
 
 /**
- * The home ring's marks that lie on the wallpaper (its track, the constellation's lines, the emblem's edge, the ring round
- * a fold target), in the icon's colours so the ring reads as the icon writ large, inked for the wallpaper like the scheme.
+ * The few colours a theme is made of, from which both its schemes are drawn: the [deep] ground of what floats, ink by
+ * day; its [accent] and [warm] second accent; the [pale] of text by night; the [spark] of what is lit on the ring and
+ * the [ringMark] of its track by night; the [alarm] of errors; and the [frost] that frosts the day's glass.
+ */
+internal class Palette(
+    val deep: Color,
+    val accent: Color,
+    val pale: Color,
+    val spark: Color,
+    val warm: Color,
+    val alarm: Color,
+    val frost: Color = Color.White,
+    val ringMark: Color = frost,
+) {
+    val glass = frost.copy(alpha = 0.1f)
+    val dayGlass = frost.copy(alpha = 0.35f)
+    val dayWarm = lerp(warm, deep, 0.5f)
+    val mist = lerp(pale, deep, 0.28f)
+    val dayAccent = lerp(deep, accent, 0.4f)
+}
+
+/**
+ * The home ring's marks that lie on the wallpaper (its track and the lines between its slots, the emblem's edge, the ring
+ * round a fold target), inked for the wallpaper like the scheme.
  */
 class RingColors(val mark: Color, val starLine: Color, val lit: Color)
-
-private val NightRing = RingColors(mark = Frost, starLine = Star.copy(alpha = 0.7f), lit = Spark)
-private val DayRing = RingColors(mark = Sky, starLine = DayStar.copy(alpha = 0.7f), lit = DayGold)
-
-val LocalRingColors = staticCompositionLocalOf { NightRing }
-
-private val NightDrawerStar = Starlight.copy(alpha = 0.5f)
-private val DayDrawerStar = DayStar.copy(alpha = 0.4f)
-
-/**
- * The faint stars scattered over the drawer's veil, at their brightest; each is dimmer by its own share. Starlight on the
- * night's sky veil, and on the day's frosted one the icon's star inked towards the sky, so they show without turning
- * the drawer busy.
- */
-val LocalDrawerStar = staticCompositionLocalOf { NightDrawerStar }
-
-// The emblem is a disc of the icon's own sky whatever the wallpaper, so what is drawn inside it keeps the night's colours.
-val RingSpark = Spark
-val RingInk = Frost.copy(alpha = 0.9f)
-val RingShade = Sky
 
 /**
  * The edge of a folder's glass disc: a dark line round a light one, the same in both schemes. The scheme follows the
@@ -60,193 +49,160 @@ val RingShade = Sky
  */
 class DiscEdge(val outer: Color, val inner: Color)
 
-val FolderEdge = DiscEdge(outer = Sky.copy(alpha = 0.5f), inner = Frost.copy(alpha = 0.5f))
+/** Everything a theme sets for one kind of wallpaper, a dark or a light one. */
+internal class LauncherLook(val colors: ColorScheme, val ring: RingColors, val drawerMark: Color, val tonalEdge: Color)
 
-/** What rims a planet's moons and rings, so they show on a light wallpaper as the folder's edge does. */
-val PlanetShadow = Sky.copy(alpha = 0.6f)
+internal fun lookOf(theme: Theme, lightWallpaper: Boolean): LauncherLook {
+    val palette = when (theme) {
+        Theme.Space -> SpacePalette
+        Theme.Clockwork -> ClockworkPalette
+    }
+    return if (lightWallpaper) palette.dayLook() else palette.nightLook()
+}
 
-/** A moon on a folder's edge: a spark ringed in shade, so it too shows on any patch of wallpaper. */
-val FolderMoon = DiscEdge(outer = PlanetShadow, inner = Spark)
-
-/** The tilted ring across a Ringed planet's disc: gold, shadowed on its outer edge so it shows on a light wallpaper. */
-val PlanetRing = DiscEdge(outer = PlanetShadow, inner = Gold.copy(alpha = 0.85f))
-
-/** The small planet at the heart of the Moons in orbit look, lit from the top left, and the track its moons follow. */
-val OrbitCoreLit = Color(0xFF4A5AA8)
-val OrbitCoreShade = Color(0xFF18214A)
-val OrbitTrack = Star.copy(alpha = 0.55f)
+val LocalRingColors = staticCompositionLocalOf { lookOf(Theme.Space, lightWallpaper = false).ring }
 
 /**
- * What one planet of the Solar system look adds to a folder: a [tint] through its glass, the colours of the touch it wears
- * ([accent], and [accent2] where it has two), its [moon]s, and its [features] in the order it draws them (the Earth's
- * land, ice and clouds, Jupiter's bands, Saturn's rings). Each planet uses only the ones it has.
+ * The faint marks the theme scatters over the drawer's veil, at their brightest; each is dimmer by its own share. Pale
+ * on the night's dark veil, and on the day's frosted one the accent inked towards the deep, so they show without
+ * turning the drawer busy.
  */
-class PlanetPaint(
-    val tint: Color,
-    val accent: Color = Color.Transparent,
-    val accent2: Color = Color.Transparent,
-    val moon: Color = Color.Transparent,
-    val features: List<Color> = emptyList(),
-)
+val LocalDrawerMark = staticCompositionLocalOf { lookOf(Theme.Space, lightWallpaper = false).drawerMark }
 
-private fun tint(colour: Long, alpha: Float = 0.3f) = Color(colour).copy(alpha = alpha)
-
-private val JupiterBrown = Color(0xFFA8704A)
-private val JupiterTan = Color(0xFFD6B284).copy(alpha = 0.6f)
-
-val PlanetPaints = mapOf(
-    Planet.Mercury to PlanetPaint(tint(0xFFC9C4BB), accent = Color(0xFFFFD678), accent2 = Color(0x00FF8A3D)),
-    Planet.Venus to PlanetPaint(tint(0xFFF3DCA0), accent = Color(0xFFFFF0C8).copy(alpha = 0.9f)),
-    Planet.Earth to PlanetPaint(
-        // Deeper than the other planets' glass, so the land reads against the sea.
-        tint(0xFF2F74D8, alpha = 0.6f),
-        moon = Color(0xFFD8D3CB),
-        features = listOf(Color(0xFF4CA64F), Color(0xFFF4F8FB), Color.White.copy(alpha = 0.55f)),
-    ),
-    Planet.Mars to PlanetPaint(tint(0xFFE0794A), accent = Color(0xFFD0643A).copy(alpha = 0.9f), moon = Color(0xFFC9B8A8)),
-    Planet.Jupiter to PlanetPaint(
-        tint(0xFFE9CFA0),
-        accent = Color(0xFFF6E2C4).copy(alpha = 0.8f),
-        accent2 = Color(0xFFC4553A).copy(alpha = 0.95f),
-        features = listOf(
-            JupiterBrown.copy(alpha = 0.6f), JupiterTan, JupiterBrown.copy(alpha = 0.65f), Color(0xFFECD6B0).copy(alpha = 0.5f),
-            Color(0xFFBE8458).copy(alpha = 0.65f), JupiterTan, Color(0xFF966240).copy(alpha = 0.6f),
-        ),
-    ),
-    Planet.Saturn to PlanetPaint(
-        tint(0xFFF2DFA6),
-        features = listOf(
-            Color(0xFFB89A66).copy(alpha = 0.55f), Color(0xFFF0DBA6).copy(alpha = 0.95f),
-            Color(0xFF281E14).copy(alpha = 0.55f), Color(0xFFD6BC84).copy(alpha = 0.9f),
-        ),
-    ),
-    Planet.Uranus to PlanetPaint(tint(0xFF9FE3E8), accent = Color(0xFFC8F5FA).copy(alpha = 0.85f)),
-    Planet.Neptune to PlanetPaint(tint(0xFF3A63D6), accent = Color(0xFF3A63D6).copy(alpha = 0.95f), moon = Color(0xFFE6E0D6)),
-    Planet.Pluto to PlanetPaint(tint(0xFFE3CDB0), accent = Color(0xFFFBF1DE), moon = Color(0xFFB3AEA9)),
-)
+/** The rim of a tonal button, whose tint is too faint to hold its edge on a light wallpaper. */
+val LocalTonalEdge = staticCompositionLocalOf { lookOf(Theme.Space, lightWallpaper = false).tonalEdge }
 
 /** What a glyph is drawn in before `Icon` tints it, as Material's own icons are. */
 val GlyphFill = Color.Black
 
 /**
  * Built with the full constructor, so no role is left on Material's stock greys. The surfaces come in two tiers of the
- * icon's sky. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
+ * deep. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
  * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) ask for the veil of
  * `surfaceDim` by name, so a container on one never stacks a second veil. What floats over other content (menus, dialogs,
- * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit sky, or the icons beneath would
- * show through. A tonal button's `secondaryContainer` is a faint tint, of sky by night and frost by day, rimmed by
- * [TonalEdge], so it shows on a light wallpaper without drawing the eye. Content colours are all opaque, so their
+ * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit deep, or the icons beneath would
+ * show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night and frost by day, rimmed by
+ * the tonal edge, so it shows on a light wallpaper without drawing the eye. Content colours are all opaque, so their
  * contrast does not hang on the wallpaper.
  */
-val LauncherColors = ColorScheme(
-    primary = Star,
-    onPrimary = Sky,
-    primaryContainer = lerp(Sky, Star, 0.5f),
-    onPrimaryContainer = Starlight,
-    inversePrimary = lerp(Star, Sky, 0.5f),
-    secondary = Mist,
-    onSecondary = Sky,
-    secondaryContainer = Sky.copy(alpha = 0.25f),
-    onSecondaryContainer = Starlight,
-    tertiary = Gold,
-    onTertiary = Sky,
-    tertiaryContainer = lerp(Sky, Gold, 0.5f),
-    onTertiaryContainer = Starlight,
-    background = Color.Transparent,
-    onBackground = Starlight,
-    surface = Glass,
-    onSurface = Starlight,
-    surfaceVariant = Glass,
-    onSurfaceVariant = Mist,
-    surfaceTint = Star,
-    inverseSurface = Starlight,
-    inverseOnSurface = Sky,
-    error = Ember,
-    onError = Sky,
-    errorContainer = lerp(Sky, Ember, 0.5f),
-    onErrorContainer = Starlight,
-    outline = lerp(Starlight, Sky, 0.4f),
-    outlineVariant = Frost.copy(alpha = 0.16f),
-    scrim = Sky,
-    surfaceBright = lerp(Sky, Frost, 0.22f),
-    // Dense enough that text on the drawer still reads over a white wallpaper.
-    surfaceDim = Sky.copy(alpha = 0.85f),
-    surfaceContainerLowest = Sky.copy(alpha = 0.6f),
-    surfaceContainerLow = lerp(Sky, Frost, 0.1f),
-    surfaceContainer = lerp(Sky, Frost, 0.14f),
-    surfaceContainerHigh = lerp(Sky, Frost, 0.18f),
-    surfaceContainerHighest = lerp(Sky, Frost, 0.22f),
-    primaryFixed = Star,
-    primaryFixedDim = lerp(Star, Sky, 0.2f),
-    onPrimaryFixed = Sky,
-    onPrimaryFixedVariant = lerp(Sky, Star, 0.3f),
-    secondaryFixed = Starlight,
-    secondaryFixedDim = lerp(Starlight, Sky, 0.2f),
-    onSecondaryFixed = Sky,
-    onSecondaryFixedVariant = lerp(Sky, Starlight, 0.3f),
-    tertiaryFixed = Gold,
-    tertiaryFixedDim = lerp(Gold, Sky, 0.2f),
-    onTertiaryFixed = Sky,
-    onTertiaryFixedVariant = lerp(Sky, Gold, 0.3f),
+private fun Palette.nightLook() = LauncherLook(
+    colors = ColorScheme(
+        primary = accent,
+        onPrimary = deep,
+        primaryContainer = lerp(deep, accent, 0.5f),
+        onPrimaryContainer = pale,
+        inversePrimary = lerp(accent, deep, 0.5f),
+        secondary = mist,
+        onSecondary = deep,
+        secondaryContainer = deep.copy(alpha = 0.25f),
+        onSecondaryContainer = pale,
+        tertiary = warm,
+        onTertiary = deep,
+        tertiaryContainer = lerp(deep, warm, 0.5f),
+        onTertiaryContainer = pale,
+        background = Color.Transparent,
+        onBackground = pale,
+        surface = glass,
+        onSurface = pale,
+        surfaceVariant = glass,
+        onSurfaceVariant = mist,
+        surfaceTint = accent,
+        inverseSurface = pale,
+        inverseOnSurface = deep,
+        error = alarm,
+        onError = deep,
+        errorContainer = lerp(deep, alarm, 0.5f),
+        onErrorContainer = pale,
+        outline = lerp(pale, deep, 0.4f),
+        outlineVariant = frost.copy(alpha = 0.16f),
+        scrim = deep,
+        surfaceBright = lerp(deep, frost, 0.22f),
+        // Dense enough that text on the drawer still reads over a white wallpaper.
+        surfaceDim = deep.copy(alpha = 0.85f),
+        surfaceContainerLowest = deep.copy(alpha = 0.6f),
+        surfaceContainerLow = lerp(deep, frost, 0.1f),
+        surfaceContainer = lerp(deep, frost, 0.14f),
+        surfaceContainerHigh = lerp(deep, frost, 0.18f),
+        surfaceContainerHighest = lerp(deep, frost, 0.22f),
+        primaryFixed = accent,
+        primaryFixedDim = lerp(accent, deep, 0.2f),
+        onPrimaryFixed = deep,
+        onPrimaryFixedVariant = lerp(deep, accent, 0.3f),
+        secondaryFixed = pale,
+        secondaryFixedDim = lerp(pale, deep, 0.2f),
+        onSecondaryFixed = deep,
+        onSecondaryFixedVariant = lerp(deep, pale, 0.3f),
+        tertiaryFixed = warm,
+        tertiaryFixedDim = lerp(warm, deep, 0.2f),
+        onTertiaryFixed = deep,
+        onTertiaryFixedVariant = lerp(deep, warm, 0.3f),
+    ),
+    ring = RingColors(mark = ringMark, starLine = accent.copy(alpha = 0.7f), lit = spark),
+    drawerMark = pale.copy(alpha = 0.5f),
+    tonalEdge = deep.copy(alpha = 0.5f),
 )
 
 /**
- * [LauncherColors] turned over for a light wallpaper, which the system says wants dark text: the same two tiers, with the
- * glass and the veil frosted instead of sky, what floats opaque lit frost, and sky ink for content. The scrim turns to
+ * The night's look turned over for a light wallpaper, which the system says wants dark text: the same two tiers, with the
+ * glass and the veil frosted instead of deep, what floats opaque lit frost, and deep ink for content. The scrim turns to
  * frost too, so the shades that lift the chevron and the navigation icons off the wallpaper stay light behind dark marks.
  * The fixed roles, the clear background and the tint stay the night's.
  */
-val LauncherDayColors = LauncherColors.copy(
-    primary = lerp(Sky, Star, 0.3f),
-    onPrimary = Starlight,
-    primaryContainer = lerp(Frost, Star, 0.5f),
-    onPrimaryContainer = Sky,
-    inversePrimary = Star,
-    secondary = lerp(Sky, Starlight, 0.3f),
-    onSecondary = Starlight,
-    secondaryContainer = DayGlass,
-    onSecondaryContainer = Sky,
-    tertiary = DayGold,
-    onTertiary = Starlight,
-    tertiaryContainer = lerp(Frost, Gold, 0.5f),
-    onTertiaryContainer = Sky,
-    onBackground = Sky,
-    surface = DayGlass,
-    onSurface = Sky,
-    surfaceVariant = DayGlass,
-    onSurfaceVariant = lerp(Sky, Starlight, 0.25f),
-    inverseSurface = Sky,
-    inverseOnSurface = Starlight,
-    error = lerp(Ember, Sky, 0.5f),
-    onError = Starlight,
-    errorContainer = lerp(Frost, Ember, 0.4f),
-    onErrorContainer = Sky,
-    outline = lerp(Sky, Starlight, 0.5f),
-    outlineVariant = Sky.copy(alpha = 0.16f),
-    scrim = Frost,
-    surfaceBright = Frost,
-    // Dense enough that text on the drawer still reads over a dark patch of the wallpaper.
-    surfaceDim = Starlight.copy(alpha = 0.92f),
-    surfaceContainerLowest = Starlight.copy(alpha = 0.6f),
-    surfaceContainerLow = lerp(Frost, Starlight, 0.4f),
-    surfaceContainer = lerp(Frost, Starlight, 0.6f),
-    surfaceContainerHigh = lerp(Frost, Starlight, 0.8f),
-    surfaceContainerHighest = Starlight,
-)
-
-/** The rim of a tonal button, whose tint is too faint to hold its edge on a light wallpaper. */
-val TonalEdge = Sky.copy(alpha = 0.5f)
+private fun Palette.dayLook() = nightLook().let { night ->
+    LauncherLook(
+        colors = night.colors.copy(
+            primary = lerp(deep, accent, 0.3f),
+            onPrimary = pale,
+            primaryContainer = lerp(frost, accent, 0.5f),
+            onPrimaryContainer = deep,
+            inversePrimary = accent,
+            secondary = lerp(deep, pale, 0.3f),
+            onSecondary = pale,
+            secondaryContainer = dayGlass,
+            onSecondaryContainer = deep,
+            tertiary = dayWarm,
+            onTertiary = pale,
+            tertiaryContainer = lerp(frost, warm, 0.5f),
+            onTertiaryContainer = deep,
+            onBackground = deep,
+            surface = dayGlass,
+            onSurface = deep,
+            surfaceVariant = dayGlass,
+            onSurfaceVariant = lerp(deep, pale, 0.25f),
+            inverseSurface = deep,
+            inverseOnSurface = pale,
+            error = lerp(alarm, deep, 0.5f),
+            onError = pale,
+            errorContainer = lerp(frost, alarm, 0.4f),
+            onErrorContainer = deep,
+            outline = lerp(deep, pale, 0.5f),
+            outlineVariant = deep.copy(alpha = 0.16f),
+            scrim = frost,
+            surfaceBright = frost,
+            // Dense enough that text on the drawer still reads over a dark patch of the wallpaper.
+            surfaceDim = pale.copy(alpha = 0.92f),
+            surfaceContainerLowest = pale.copy(alpha = 0.6f),
+            surfaceContainerLow = lerp(frost, pale, 0.4f),
+            surfaceContainer = lerp(frost, pale, 0.6f),
+            surfaceContainerHigh = lerp(frost, pale, 0.8f),
+            surfaceContainerHighest = pale,
+        ),
+        ring = RingColors(mark = deep, starLine = dayAccent.copy(alpha = 0.7f), lit = dayWarm),
+        drawerMark = dayAccent.copy(alpha = 0.4f),
+        tonalEdge = night.tonalEdge,
+    )
+}
 
 @Composable
-fun LauncherTheme(lightWallpaper: Boolean = false, content: @Composable () -> Unit) {
-    val (colors, ring, drawerStar) =
-        if (lightWallpaper) Triple(LauncherDayColors, DayRing, DayDrawerStar) else Triple(LauncherColors, NightRing, NightDrawerStar)
-    MaterialTheme(colorScheme = colors) {
+fun LauncherTheme(theme: Theme = Theme.Space, lightWallpaper: Boolean = false, content: @Composable () -> Unit) {
+    val look = remember(theme, lightWallpaper) { lookOf(theme, lightWallpaper) }
+    MaterialTheme(colorScheme = look.colors) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
-            LocalContentColor provides colors.onBackground,
-            LocalRingColors provides ring,
-            LocalDrawerStar provides drawerStar,
+            LocalContentColor provides look.colors.onBackground,
+            LocalRingColors provides look.ring,
+            LocalDrawerMark provides look.drawerMark,
+            LocalTonalEdge provides look.tonalEdge,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
             content = content,

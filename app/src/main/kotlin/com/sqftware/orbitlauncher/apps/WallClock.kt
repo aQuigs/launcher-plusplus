@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
+import java.util.Calendar
 import java.util.Date
 
 interface WallClock {
@@ -44,10 +45,12 @@ class SystemWallClock(private val context: Context) : WallClock {
         val locale = context.resources.configuration.locales[0]
         val now = Date()
         val inTwentyFour = twentyFourHour ?: is24HourFormat(context)
+        val calendar = Calendar.getInstance().apply { time = now }
         return ClockFace(
             time = DateFormat.getInstanceForSkeleton(if (inTwentyFour) "Hm" else "hm", locale).format(now),
             date = DateFormat.getInstanceForSkeleton("EEEEMMMMd", locale).format(now),
             twentyFourHour = inTwentyFour,
+            minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE),
         )
     }
 

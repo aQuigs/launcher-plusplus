@@ -6,14 +6,18 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import com.sqftware.orbitlauncher.domain.Theme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LauncherColorsTest {
+    private val nights = Theme.entries.map { lookOf(it, lightWallpaper = false).colors }
+    private val days = Theme.entries.map { lookOf(it, lightWallpaper = true).colors }
+
     @Test
     fun `no role is left on a stock Material colour`() {
-        listOf(LauncherColors to darkColorScheme(), LauncherDayColors to lightColorScheme()).forEach { (scheme, stock) ->
+        (nights.map { it to darkColorScheme() } + days.map { it to lightColorScheme() }).forEach { (scheme, stock) ->
             val ours = scheme.roles()
             val stockRoles = stock.roles()
 
@@ -26,7 +30,7 @@ class LauncherColorsTest {
     // opposite, as the worst patch a wallpaper may have.
     @Test
     fun `text reads over the wallpaper, the glass, the veil, a badge and every opaque container`() {
-        listOf(Triple(LauncherColors, Color.Black, Color.White), Triple(LauncherDayColors, Color.White, Color.Black)).forEach { (scheme, wallpaper, patch) ->
+        (nights.map { Triple(it, Color.Black, Color.White) } + days.map { Triple(it, Color.White, Color.Black) }).forEach { (scheme, wallpaper, patch) ->
             with(scheme) {
                 val opaque = listOf(surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest)
                 val veil = surfaceDim.compositeOver(patch)
@@ -43,7 +47,7 @@ class LauncherColorsTest {
 
     @Test
     fun `what floats over the wallpaper is opaque`() {
-        listOf(LauncherColors, LauncherDayColors).forEach { scheme ->
+        (nights + days).forEach { scheme ->
             with(scheme) {
                 listOf(surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest)
                     .forEach { assertEquals("$it", 1f, it.alpha) }
@@ -54,9 +58,11 @@ class LauncherColorsTest {
     // 3:1 is the WCAG floor for a control's edge; either scheme may be showing, so it cannot lean on the scheme's colours.
     @Test
     fun `a folder's edge stands out on a white and on a black wallpaper`() {
-        listOf(Color.White, Color.Black).forEach { wallpaper ->
-            val best = listOf(FolderEdge.outer, FolderEdge.inner).maxOf { contrast(it.compositeOver(wallpaper), wallpaper) }
-            assertTrue("edge on $wallpaper: $best", best >= 3f)
+        listOf(FolderEdge, DialEdge, GearCog).forEach { edge ->
+            listOf(Color.White, Color.Black).forEach { wallpaper ->
+                val best = listOf(edge.outer, edge.inner).maxOf { contrast(it.compositeOver(wallpaper), wallpaper) }
+                assertTrue("edge on $wallpaper: $best", best >= 3f)
+            }
         }
     }
 

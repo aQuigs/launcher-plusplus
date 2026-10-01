@@ -24,11 +24,12 @@ import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAmbientMotionStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
-import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
-import com.sqftware.orbitlauncher.apps.SharedPreferencesFolderLookStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesFolderLookStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
         val homeAppsStore = SharedPreferencesHomeAppsStore(this)
         val wallClock = SystemWallClock(this)
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
+        val themeStore = SharedPreferencesThemeStore(this)
         val folderLookStore = SharedPreferencesFolderLookStore(this)
         val reorderModeStore = SharedPreferencesReorderModeStore(this)
         val drawerStyleStore = SharedPreferencesDrawerStyleStore(this)
@@ -140,14 +142,15 @@ class MainActivity : ComponentActivity() {
                 repeatOnLifecycle(Lifecycle.State.STARTED) { wallpaper.lightness().collect { value = it } }
             }
             LaunchedEffect(lightWallpaper) { showBarsFor(lightWallpaper) }
-            LauncherTheme(lightWallpaper = lightWallpaper) {
+            var theme by remember { mutableStateOf(themeStore.load()) }
+            LauncherTheme(theme, lightWallpaper) {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
                 // as folders come and go.
                 var homeApps by remember { mutableStateOf(homeAppsStore.load().withPlanetsKept()) }
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
-                var folderLook by remember { mutableStateOf(folderLookStore.load()) }
+                var folderLooks by remember { mutableStateOf(folderLookStore.load()) }
                 var reorderMode by remember { mutableStateOf(reorderModeStore.load()) }
                 var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
@@ -258,10 +261,15 @@ class MainActivity : ComponentActivity() {
                         twentyFourHour = it
                         hourStyleStore.save(it)
                     },
-                    folderLook = folderLook,
+                    theme = theme,
+                    onThemeChange = {
+                        theme = it
+                        themeStore.save(it)
+                    },
+                    folderLook = folderLooks.of(theme),
                     onFolderLookChange = {
-                        folderLook = it
-                        folderLookStore.save(it)
+                        folderLooks = folderLooks.with(theme, it)
+                        folderLookStore.save(folderLooks)
                     },
                     ambientMotion = ambientMotion,
                     onAmbientMotionChange = {

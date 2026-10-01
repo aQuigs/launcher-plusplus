@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -44,6 +46,8 @@ class HomeRingTest {
     private var ring by mutableStateOf(emptyList<RingItem>())
     private var unread by mutableStateOf(UnreadCounts())
     private var openFolder by mutableStateOf<RingItem.Folder?>(null)
+    private var art by mutableStateOf<ThemeArt>(SpaceArt)
+    private var folderLook by mutableStateOf(FolderLook.Rim)
 
     private fun show(
         favourites: List<AppEntry>,
@@ -63,18 +67,20 @@ class HomeRingTest {
     ) {
         ring = items
         compose.setContent {
-            HomeRing(
-                ring = ring,
-                hint = hint,
-                icon = { null },
-                onLaunch = onLaunch,
-                onOpenFolder = onOpenFolder,
-                onCloseFolder = onCloseFolder,
-                onEdit = onEdit,
-                openFolder = openFolder,
-                unread = unread,
-                onClearBadge = onClearBadge,
-            )
+            CompositionLocalProvider(LocalThemeArt provides art, LocalFolderStyle provides FolderStyle(folderLook)) {
+                HomeRing(
+                    ring = ring,
+                    hint = hint,
+                    icon = { null },
+                    onLaunch = onLaunch,
+                    onOpenFolder = onOpenFolder,
+                    onCloseFolder = onCloseFolder,
+                    onEdit = onEdit,
+                    openFolder = openFolder,
+                    unread = unread,
+                    onClearBadge = onClearBadge,
+                )
+            }
         }
     }
 
@@ -192,6 +198,27 @@ class HomeRingTest {
         compose.ringSlot(clock).assertContentDescriptionEquals("Clock")
         compose.badgeOn(HomeRingTags.slot(clock)).assertDoesNotExist()
         compose.badgeOn(HomeRingTags.folder(1)).assertDoesNotExist()
+    }
+
+    @Test
+    fun clockworkDrawsTheRingItsHintAndItsFoldersInEitherLookOpenAndClosed() {
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, alphabet[0]))
+        art = ClockworkArt
+        folderLook = FolderLook.SubDial
+        showItems(listOf(RingItem.App(clock), work, RingItem.App(alphabet[1])), hint = "Add apps")
+
+        compose.onNodeWithText("Add apps").assertIsDisplayed()
+        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps")
+
+        folderLook = FolderLook.Gear
+        openFolder = work
+
+        compose.ringSlot(mail).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close folder").assertIsDisplayed()
+
+        openFolder = null
+
+        compose.folderSlot(1).assertIsDisplayed()
     }
 
     @Test
