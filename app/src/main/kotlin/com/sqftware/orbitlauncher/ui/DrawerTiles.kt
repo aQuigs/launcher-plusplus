@@ -3,6 +3,7 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 
@@ -27,4 +28,14 @@ internal fun DrawScope.forEachDrawerTile(scrolled: Float, tile: DrawScope.(origi
             tile(Offset(column * tileSize.width, top + row * tileSize.height), tileSize)
         }
     }
+}
+
+/**
+ * What a theme draws on every drawer tile, [build] once for the tile's size and again only when that changes: the
+ * drawer redraws its backdrop on every frame it moves, so a drawing with many parts is not remade each time.
+ */
+internal class DrawerTileArt<T>(private val build: Density.(Size) -> T) {
+    private var built: Pair<Size, T>? = null
+
+    fun DrawScope.of(tile: Size): T = built?.takeIf { it.first == tile }?.second ?: build(tile).also { built = tile to it }
 }

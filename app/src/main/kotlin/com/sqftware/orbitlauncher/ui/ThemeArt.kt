@@ -80,6 +80,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.Space -> SpaceArt
     Theme.Clockwork -> ClockworkArt
     Theme.Atlas -> AtlasArt
+    Theme.ZenGarden -> ZenArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }

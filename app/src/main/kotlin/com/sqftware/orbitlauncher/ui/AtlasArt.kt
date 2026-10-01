@@ -68,8 +68,8 @@ private val HillSteps = listOf(1f, 0.8f, 0.6f, 0.42f, 0.26f)
 private class Hill(val x: Float, val y: Float, val reach: Dp, val contours: Path)
 
 private val DrawerHills = listOf(
-    Hill(0.24f, 0.28f, 170.dp, coastline(0.6f, 1.9f, steps = HillSteps)),
-    Hill(0.8f, 0.72f, 210.dp, coastline(2.4f, 0.3f, steps = HillSteps)),
+    Hill(0.24f, 0.28f, 170.dp, wavering(0.6f, 1.9f, steps = HillSteps)),
+    Hill(0.8f, 0.72f, 210.dp, wavering(2.4f, 0.3f, steps = HillSteps)),
 )
 
 /**
@@ -149,29 +149,11 @@ object AtlasArt : ThemeArt {
     }
 }
 
-/**
- * A closed wavering line round [centre], shaped by two ripples set at [first] and [second], at [reach] times each of
- * [steps], so one path holds a coast or all of a hill's contours.
- */
-private fun coastline(first: Float, second: Float, centre: Offset = Offset.Zero, reach: Float = 1f, steps: List<Float> = listOf(1f)) =
-    Path().apply {
-        val points = 64
-        steps.forEach { step ->
-            repeat(points) { index ->
-                val angle = index * 2 * PI.toFloat() / points
-                val wave = 0.9f + 0.07f * sin(3 * angle + first) + 0.04f * sin(5 * angle + second)
-                val at = centre + Offset(sin(angle), -cos(angle)) * (reach * step * wave)
-                if (index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
-            }
-            close()
-        }
-    }
-
 /** An island reaching a little past the item: land inside a two-lined coast, and contour lines inland, round the disc. */
 private fun Modifier.island(): Modifier = drawWithCache {
     val reach = size.minDimension / 2 * 1.06f
-    val land = coastline(0.6f, 1.9f, size.center, reach)
-    val contours = coastline(0.6f, 1.9f, size.center, reach, steps = listOf(0.9f, 0.8f))
+    val land = wavering(0.6f, 1.9f, size.center, reach)
+    val contours = wavering(0.6f, 1.9f, size.center, reach, steps = listOf(0.9f, 0.8f))
     val line = 1.dp.toPx()
     onDrawBehind {
         drawPath(land, Land)
