@@ -76,6 +76,7 @@ import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionsPage
+import com.sqftware.orbitlauncher.domain.Colourways
 import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
@@ -182,7 +183,8 @@ data class HomePress(val launcherInFront: Boolean)
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [theme] shown, the one in use unless one is being tried on the
  * home page ([previewing]), and try others there ([onPreviewThemeChange]) until one is used ([onThemeChange]) or the try is
- * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]),
+ * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
+ * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
  * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
@@ -218,6 +220,8 @@ fun LauncherScreen(
     onPreviewThemeChange: (Theme?) -> Unit,
     folderLooks: FolderLooks,
     onFolderLooksChange: (FolderLooks) -> Unit,
+    colourways: Colourways,
+    onColourwaysChange: (Colourways) -> Unit,
     ambientMotion: Boolean,
     onAmbientMotionChange: (Boolean) -> Unit,
     drawerStyle: DrawerStyle,
@@ -1063,6 +1067,8 @@ fun LauncherScreen(
                                                         onShow = onPreviewThemeChange,
                                                         folderLook = folderLook,
                                                         onFolderLookChange = ::changeFolderLook,
+                                                        colourway = colourways.of(theme),
+                                                        onColourwayChange = { onColourwaysChange(colourways.with(theme, it)) },
                                                         onUse = {
                                                             onPreviewThemeChange(null)
                                                             onThemeChange(theme)

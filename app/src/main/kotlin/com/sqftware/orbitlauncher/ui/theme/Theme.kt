@@ -10,7 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import com.sqftware.orbitlauncher.domain.Theme
+import com.sqftware.orbitlauncher.domain.Colourway
 
 // Only this package names a colour, and the rest of the app reaches them through the scheme's roles or the tokens here.
 
@@ -52,32 +52,49 @@ class DiscEdge(val outer: Color, val inner: Color)
 /** Everything a theme sets for one kind of wallpaper, a dark or a light one. */
 internal class LauncherLook(val colors: ColorScheme, val ring: RingColors, val drawerMark: Color, val tonalEdge: Color)
 
-internal fun lookOf(theme: Theme, lightWallpaper: Boolean): LauncherLook {
-    val palette = when (theme) {
-        Theme.Space -> SpacePalette
-        Theme.Clockwork -> ClockworkPalette
-        Theme.Atlas -> AtlasPalette
-        Theme.ZenGarden -> ZenPalette
-        Theme.Ink -> InkPalette
-        Theme.Germ -> GermPalette
-        Theme.Paper -> PaperPalette
-        Theme.CrystalCity -> CrystalPalette
-        Theme.GreenCore -> GreenCorePalette
-    }
+internal fun lookOf(colourway: Colourway, lightWallpaper: Boolean): LauncherLook {
+    val palette = paletteOf(colourway)
     return if (lightWallpaper) palette.dayLook() else palette.nightLook()
 }
 
-val LocalRingColors = staticCompositionLocalOf { lookOf(Theme.Space, lightWallpaper = false).ring }
+// Every colourway named here, so a new one does not compile until it has its colours.
+private fun paletteOf(colourway: Colourway): Palette = when (colourway) {
+    Colourway.Midnight -> SpacePalette
+    Colourway.Nebula -> SpaceNebula
+    Colourway.Aurora -> SpaceAurora
+    Colourway.Mars -> SpaceMars
+    Colourway.Brass -> ClockworkPalette
+    Colourway.Steel -> ClockworkSteel
+    Colourway.RoseGold -> ClockworkRoseGold
+    Colourway.Emerald -> ClockworkEmerald
+    Colourway.Parchment -> AtlasPalette
+    Colourway.Nautical -> AtlasNautical
+    Colourway.Desert -> AtlasDesert
+    Colourway.Forest -> AtlasForest
+    Colourway.Sand -> ZenPalette
+    Colourway.Fern -> ZenFern
+    Colourway.Slate -> ZenSlate
+    Colourway.Sakura -> ZenSakura
+    Colourway.Sumi -> InkPalette
+    Colourway.Indigo -> InkIndigo
+    Colourway.Sepia -> InkSepia
+    Colourway.Lime -> GermPalette
+    Colourway.Coral -> PaperPalette
+    Colourway.Ice -> CrystalPalette
+    Colourway.Green -> GreenCorePalette
+}
+
+val LocalRingColors = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).ring }
 
 /**
  * The faint marks the theme scatters over the drawer's veil, at their brightest; each is dimmer by its own share. Pale
  * on the night's dark veil, and on the day's frosted one the accent inked towards the deep, so they show without
  * turning the drawer busy.
  */
-val LocalDrawerMark = staticCompositionLocalOf { lookOf(Theme.Space, lightWallpaper = false).drawerMark }
+val LocalDrawerMark = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).drawerMark }
 
 /** The rim of a tonal button, whose tint is too faint to hold its edge on a light wallpaper. */
-val LocalTonalEdge = staticCompositionLocalOf { lookOf(Theme.Space, lightWallpaper = false).tonalEdge }
+val LocalTonalEdge = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).tonalEdge }
 
 /** What a glyph is drawn in before `Icon` tints it, as Material's own icons are. */
 val GlyphFill = Color.Black
@@ -201,8 +218,8 @@ private fun Palette.dayLook() = nightLook().let { night ->
 }
 
 @Composable
-fun LauncherTheme(theme: Theme = Theme.Space, lightWallpaper: Boolean = false, content: @Composable () -> Unit) {
-    val look = remember(theme, lightWallpaper) { lookOf(theme, lightWallpaper) }
+fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
+    val look = remember(colourway, lightWallpaper) { lookOf(colourway, lightWallpaper) }
     MaterialTheme(colorScheme = look.colors) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.

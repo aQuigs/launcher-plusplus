@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
@@ -14,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.ui.theme.LocalTonalEdge
@@ -52,7 +56,8 @@ private fun Modifier.measuredOnly() = clearAndSetSemantics {}.layout { measurabl
 
 /**
  * The bar trying a theme on the user's own home: chips switch the [shown] theme ([onShow]) and pick its [folderLook]
- * ([onFolderLookChange]), saved as a pick from the menu is. [onUse] keeps the theme; [onClose] returns to the one in use.
+ * ([onFolderLookChange]), saved as a pick from the menu is, and its [colourway] ([onColourwayChange]). [onUse] keeps the
+ * theme; [onClose] returns to the one in use.
  */
 @Composable
 fun ThemePreviewBar(
@@ -60,6 +65,8 @@ fun ThemePreviewBar(
     onShow: (Theme) -> Unit,
     folderLook: FolderLook,
     onFolderLookChange: (FolderLook) -> Unit,
+    colourway: Colourway,
+    onColourwayChange: (Colourway) -> Unit,
     onUse: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -82,20 +89,31 @@ fun ThemePreviewBar(
                 TextButton(onClose, Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
                 TonalButton(onUse, Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
             }
-            Chips(Theme.entries, shown, Theme::label, onShow)
-            Chips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)
+            ChipRow { Chips(Theme.entries, shown, Theme::label, onShow) }
+            // One row for both, so the bar is no taller than the clock whose room it takes.
+            ChipRow {
+                Chips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)
+                if (shown.colourways.size > 1) {
+                    VerticalDivider(Modifier.height(24.dp).align(Alignment.CenterVertically))
+                    Chips(shown.colourways, colourway, Colourway::label, onColourwayChange)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun <T> Chips(choices: List<T>, chosen: T, label: (T) -> String, onChoose: (T) -> Unit) {
+private fun ChipRow(content: @Composable RowScope.() -> Unit) {
     Row(
         Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        choices.forEach { choice ->
-            FilterChip(selected = choice == chosen, onClick = { onChoose(choice) }, label = { Text(label(choice)) })
-        }
+        content = content,
+    )
+}
+
+@Composable
+private fun <T> Chips(choices: List<T>, chosen: T, label: (T) -> String, onChoose: (T) -> Unit) {
+    choices.forEach { choice ->
+        FilterChip(selected = choice == chosen, onClick = { onChoose(choice) }, label = { Text(label(choice)) })
     }
 }

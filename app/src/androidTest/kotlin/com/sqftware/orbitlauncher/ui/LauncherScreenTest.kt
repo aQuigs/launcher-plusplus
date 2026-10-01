@@ -65,6 +65,8 @@ import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
+import com.sqftware.orbitlauncher.domain.Colourway
+import com.sqftware.orbitlauncher.domain.Colourways
 import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Favourites
@@ -121,6 +123,7 @@ class LauncherScreenTest {
     private var theme by mutableStateOf(Theme.Space)
     private var previewTheme by mutableStateOf<Theme?>(null)
     private var folderLooks by mutableStateOf(FolderLooks().with(Theme.Space, FolderLook.SolarSystem))
+    private var colourways by mutableStateOf(Colourways())
     private var folderLook: FolderLook
         get() = folderLooks.of(previewTheme ?: theme)
         set(look) {
@@ -218,6 +221,8 @@ class LauncherScreenTest {
             onPreviewThemeChange = { previewTheme = it },
             folderLooks = folderLooks,
             onFolderLooksChange = { folderLooks = it },
+            colourways = colourways,
+            onColourwaysChange = { colourways = it },
             ambientMotion = ambientMotion,
             onAmbientMotionChange = { ambientMotion = it },
             drawerStyle = drawerStyle,
@@ -1876,8 +1881,12 @@ class LauncherScreenTest {
         compose.runOnIdle { assertEquals(Theme.Clockwork, previewTheme) }
         compose.onNodeWithText("Solar system folders").assertDoesNotExist()
         compose.onNodeWithText("Gear folders").performClick()
+        compose.onNodeWithText("Brass").assertIsSelected()
+        compose.onNodeWithText("Steel").performClick()
+        compose.onNodeWithText("Steel").assertIsSelected()
         compose.runOnIdle {
             assertEquals(FolderLook.Gear, folderLooks.of(Theme.Clockwork))
+            assertEquals(Colourway.Steel, colourways.of(Theme.Clockwork))
             assertEquals(Theme.Space, theme)
         }
 

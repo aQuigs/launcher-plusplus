@@ -20,6 +20,39 @@ internal val SpacePalette = Palette(
     frost = Frost,
 )
 
+/** Space in a nebula's violet and pink. */
+internal val SpaceNebula = Palette(
+    deep = Color(0xFF1A1030),
+    accent = Color(0xFFC3A6F2),
+    pale = Color(0xFFF0E8FF),
+    spark = Color(0xFFFFF0FA),
+    warm = Color(0xFFFF9ED2),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFE6DAFF),
+)
+
+/** Space under an aurora's teal and green. */
+internal val SpaceAurora = Palette(
+    deep = Color(0xFF08201E),
+    accent = Color(0xFF8FE3C8),
+    pale = Color(0xFFE4FFF6),
+    spark = Color(0xFFF0FFF8),
+    warm = Color(0xFFB5F27A),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFCFF5E8),
+)
+
+/** Space over Mars, in rust and dust. */
+internal val SpaceMars = Palette(
+    deep = Color(0xFF24120E),
+    accent = Color(0xFFF0A07A),
+    pale = Color(0xFFFFEDE4),
+    spark = Color(0xFFFFF4EC),
+    warm = Color(0xFFFFC46B),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFF5D6C8),
+)
+
 // The emblem is a disc of the icon's own sky whatever the wallpaper, so what is drawn inside it keeps the night's colours.
 val RingSpark = Spark
 val RingInk = Frost.copy(alpha = 0.9f)

@@ -6,14 +6,14 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
-import com.sqftware.orbitlauncher.domain.Theme
+import com.sqftware.orbitlauncher.domain.Colourway
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LauncherColorsTest {
-    private val nights = Theme.entries.map { lookOf(it, lightWallpaper = false).colors }
-    private val days = Theme.entries.map { lookOf(it, lightWallpaper = true).colors }
+    private val nights = Colourway.entries.map { lookOf(it, lightWallpaper = false).colors }
+    private val days = Colourway.entries.map { lookOf(it, lightWallpaper = true).colors }
 
     @Test
     fun `no role is left on a stock Material colour`() {
