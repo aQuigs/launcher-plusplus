@@ -112,7 +112,7 @@ fun FolderIcon(
             .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread) },
     ) {
-        LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize(), presses) { 1f }
+        LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses) { 1f }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
     }

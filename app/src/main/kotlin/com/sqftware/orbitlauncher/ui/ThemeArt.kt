@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -25,12 +26,15 @@ import com.sqftware.orbitlauncher.ui.theme.RingColors
  * ring, a folder, and what lies on the drawer's veil. Their colours still come from `ui/theme`.
  */
 interface ThemeArt {
-    /** What the emblem's hint is written in, and the shadow that keeps it legible, over the emblem's own face. */
-    @get:Composable
+    /**
+     * What the emblem's hint is written in, and the shadow that keeps it legible, over the emblem's own face: by default
+     * the content colour on its inverse, for a face drawn in the scheme's roles.
+     */
     val hintInk: Color
+        @Composable get() = MaterialTheme.colorScheme.onSurface
 
-    @get:Composable
     val hintShade: Color
+        @Composable get() = MaterialTheme.colorScheme.inverseOnSurface
 
     /**
      * The emblem's face, filling the item: its ground, and its mark unless [marked] is false because a hint is shown
@@ -56,7 +60,8 @@ interface ThemeArt {
     /**
      * [folder] in the look of [LocalFolderStyle], filling the item: a disc of its previews the size of an app's, with
      * whatever the look wears reaching past it. [inner] fades the previews, as when the folder takes the ring's centre and
-     * its apps are round it instead; [presses] ripple its disc.
+     * its apps are round it instead; [presses] ripple its disc. It is given a layer of its own, so what turns with the
+     * sky redraws only the folder, not the page round it.
      */
     @Composable
     fun FolderFace(
@@ -74,6 +79,7 @@ interface ThemeArt {
 private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.Space -> SpaceArt
     Theme.Clockwork -> ClockworkArt
+    Theme.Atlas -> AtlasArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }

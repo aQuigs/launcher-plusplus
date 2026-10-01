@@ -7,6 +7,7 @@ package com.sqftware.orbitlauncher.domain
 enum class Theme(val label: String, val folderLooks: List<FolderLook>) {
     Space("Space", listOf(FolderLook.Rim, FolderLook.Ringed, FolderLook.Orbit, FolderLook.Plain, FolderLook.SolarSystem)),
     Clockwork("Clockwork", listOf(FolderLook.SubDial, FolderLook.Gear)),
+    Atlas("Atlas", listOf(FolderLook.Island, FolderLook.Globe, FolderLook.FoldedMap)),
 }
 
 /**

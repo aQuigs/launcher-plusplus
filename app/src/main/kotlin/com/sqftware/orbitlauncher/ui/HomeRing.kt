@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
@@ -493,6 +494,6 @@ private fun CentrePlanet(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize(CENTRE_PLANET), null, inner)
+        LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize(CENTRE_PLANET).graphicsLayer(), null, inner)
     }
 }
