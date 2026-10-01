@@ -77,7 +77,6 @@ import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.Favourites
-import com.sqftware.orbitlauncher.domain.COLLAPSED_ROWS
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.HomeApps
@@ -169,8 +168,9 @@ data class HomePress(val launcherInFront: Boolean)
  * it back, as the [appSettings] say ([onAppSettingsChange]), opens its Play Store page, and in the drawer or on a card
  * adds it to the ring or the dock; on a hand-picked card it also takes the app off the card. It also splits the app with
  * another, which the drawer then picks: the pair, one icon that opens both in split screen, goes at the end of the ring,
- * dock, folder or hand-picked card the app was pressed on, or else of the ring. A long press on a card's
- * header asks in a dialog how many rows it shows while compact. A long press on the home
+ * dock, folder or hand-picked card the app was pressed on, or else of the ring. A card's gear opens its settings in a
+ * dialog: how many rows it shows while compact, how many apps a built-in card works out, and when it names its apps,
+ * each the card's own or the page's default. A long press on the home
  * page's empty space opens the launcher's own menu. Its first row shows the wallpaper alone: the launcher fades away and
  * the system bars hide ([onSystemBarsShownChange]) until the next touch, Back or HOME brings them back. Its other rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
@@ -489,7 +489,7 @@ fun LauncherScreen(
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     // By the card's stored name, which survives the activity being recreated.
-    var choosingRows by rememberSaveable { mutableStateOf<String?>(null) }
+    var settingCard by rememberSaveable { mutableStateOf<String?>(null) }
     // The widget in edit mode counts only while it is on the page and the page is in view: one gone with its provider, or
     // a long press that fired as the page left, must not leave an unseen mode taking taps and Back, nor come back with
     // the page. So whatever does not count is let go, as the mode ends when the page goes out of view.
@@ -819,7 +819,7 @@ fun LauncherScreen(
         confirmingPin = null
         choosingLook = false
         choosingPlanet = null
-        choosingRows = null
+        settingCard = null
     }
 
     LaunchedEffect(homePresses, pagerState, drawerState, layout) {
@@ -1128,7 +1128,7 @@ fun LauncherScreen(
                                     icon = actions.icon,
                                     onLaunch = actions.launch,
                                     onToggleExpanded = { kind -> changeCollections { toggleExpanded(kind) } },
-                                    onChooseRows = { choosingRows = it.name },
+                                    onSettings = { settingCard = it.name },
                                     onMove = { from, to -> changeCollections { move(from, to) } },
                                     onEdit = { pick(DrawerPick.Card(it)) },
                                     onAdd = { pickingCollection = true },
@@ -1205,18 +1205,12 @@ fun LauncherScreen(
                     modifier = Modifier.testTag(FolderTags.PLANET_DIALOG),
                 )
             }
-            choosingRows?.let(CollectionKind::named)?.let(collections::card)?.let { card ->
-                ChoiceDialog(
-                    title = "Rows when collapsed",
-                    choices = COLLAPSED_ROWS.toList(),
-                    chosen = card.rows,
-                    label = { if (it == 1) "1 row" else "$it rows" },
-                    onChoose = { rows ->
-                        choosingRows = null
-                        changeCollections { setRows(card.kind, rows) }
-                    },
-                    onDismiss = { choosingRows = null },
-                    modifier = Modifier.testTag(CollectionTags.ROWS_DIALOG),
+            settingCard?.let(CollectionKind::named)?.let { kind ->
+                CollectionSettingsDialog(
+                    page = collections,
+                    kind = kind,
+                    onChange = ::changeCollections,
+                    onDismiss = { settingCard = null },
                 )
             }
             if (confirmingReset) {

@@ -5,7 +5,6 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
@@ -21,15 +20,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
@@ -41,17 +45,25 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -86,6 +98,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -103,6 +116,9 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.CARD_ROW_APPS
 import com.sqftware.orbitlauncher.domain.CREATE_YOUR_OWN
+import com.sqftware.orbitlauncher.domain.CardLook
+import com.sqftware.orbitlauncher.domain.CARD_SETTINGS
+import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionsPage
@@ -124,17 +140,21 @@ object CollectionTags {
     const val CREATE = "collection_create"
     const val CREATE_DIALOG = "collection_create_dialog"
     const val CREATE_NAME = "collection_create_name"
-    const val ROWS_DIALOG = "collection_rows_dialog"
+    const val SETTINGS_DIALOG = "collection_settings_dialog"
 
     fun card(kind: CollectionKind) = "collection_${kind.name}"
-
-    fun header(kind: CollectionKind) = "collection_header_${kind.name}"
 
     fun handle(kind: CollectionKind) = "collection_handle_${kind.name}"
 
     fun chevron(kind: CollectionKind) = "collection_chevron_${kind.name}"
 
     fun edit(kind: CollectionKind) = "collection_edit_${kind.name}"
+
+    fun settings(kind: CollectionKind) = "collection_settings_${kind.name}"
+
+    fun choice(setting: CardSetting<*>, choice: Any) = "collection_setting_${setting}_$choice"
+
+    fun useDefault(setting: CardSetting<*>) = "collection_setting_${setting}_default"
 
     fun tile(kind: CollectionKind) = "collection_tile_${kind.name}"
 
@@ -155,6 +175,7 @@ private val CollectionKind.emptyText: String
 private val PAGE_PADDING = 16.dp
 private val CARD_GAP = 12.dp
 private val CARD_ICON_SIZE = 48.dp
+private val HEADER_BUTTON = 48.dp
 private val ROW_GAP = 12.dp
 private val BIN_SIZE = 72.dp
 // Arc's three columns, down to two once three would shrink the names below this share of the size the user chose.
@@ -166,10 +187,11 @@ private const val NOTICE_MILLIS = 2_000L
 
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
- * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], and a
- * chevron that calls [onToggleExpanded]: a compact card shows its set number of rows of its first apps, an expanded one
- * every app with its label. A long press anywhere on the header but its buttons calls [onChooseRows]. The built-in cards work their apps out
- * from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], pairs included, and Most Used asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
+ * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], a gear that
+ * calls [onSettings], and a chevron that calls [onToggleExpanded]: a compact card shows the rows its look sets of its
+ * first apps, an expanded one every app, each named as its look says. The built-in cards work out as many apps as their
+ * look allows from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], pairs included, and Most Used
+ * asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
  * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
  * to drop it there. While one of its apps is on the move, a card shows where they would be if it
@@ -184,7 +206,7 @@ fun CollectionsColumn(
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: (CollectionKind) -> Unit,
-    onChooseRows: (CollectionKind) -> Unit,
+    onSettings: (CollectionKind) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (CollectionKind.HandPicked) -> Unit,
     onAdd: () -> Unit,
@@ -208,7 +230,8 @@ fun CollectionsColumn(
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
                     val handPicked = card.kind as? CollectionKind.HandPicked
-                    val limit = card.builtInLimit
+                    val look = page.look(card)
+                    val limit = look.limit
                     val cardApps = when (card.kind) {
                         CollectionKind.NewApps -> remember(builtInApps, limit) { newApps(builtInApps, limit) }
                         CollectionKind.MostUsed -> remember(builtInApps, foregroundTime, limit) {
@@ -218,13 +241,14 @@ fun CollectionsColumn(
                     }
                     CollectionCardView(
                         card = card,
+                        look = look,
                         apps = cardApps,
                         index = index,
                         reorder = reorder,
                         icon = icon,
                         onLaunch = onLaunch,
                         onToggleExpanded = { onToggleExpanded(card.kind) },
-                        onChooseRows = { onChooseRows(card.kind) },
+                        onSettings = { onSettings(card.kind) },
                         onMove = onMove,
                         onEdit = handPicked?.let { { onEdit(it) } },
                         rearrange = handPicked?.let(rearrange),
@@ -247,13 +271,14 @@ fun CollectionsColumn(
 @Composable
 private fun CollectionCardView(
     card: CollectionCard,
+    look: CardLook,
     apps: List<AppEntry>?,
     index: Int,
     reorder: ListReorder,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: () -> Unit,
-    onChooseRows: () -> Unit,
+    onSettings: () -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (() -> Unit)?,
     rearrange: Rearrange?,
@@ -288,11 +313,11 @@ private fun CollectionCardView(
             .testTag(CollectionTags.card(card.kind)),
     ) {
         Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
-            CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onChooseRows, onEdit)
+            CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onSettings, onEdit)
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
             } else {
-                AppGrid(card.kind, apps, card.expanded, card.compactApps, icon, onLaunch, rearrange, menu, unread, onClearBadge)
+                AppGrid(card.kind, apps, card.expanded, look, icon, onLaunch, rearrange, menu, unread, onClearBadge)
             }
         }
     }
@@ -306,30 +331,20 @@ private fun CardHeader(
     reorder: ListReorder,
     onMove: (from: Int, to: Int) -> Unit,
     onToggleExpanded: () -> Unit,
-    onChooseRows: () -> Unit,
+    onSettings: () -> Unit,
     onEdit: (() -> Unit)?,
 ) {
     val latestOnMove by rememberUpdatedState(onMove)
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
-    // The handle, the pencil and the chevron take their own presses, so the header has the rest.
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .combinedClickable(
-                interactionSource = null,
-                indication = null,
-                onLongClickLabel = "Rows when collapsed",
-                onLongClick = onChooseRows,
-                onClick = {},
-            )
-            .testTag(CollectionTags.header(kind)),
-    ) {
-        // Kept clear of the handle in the middle, which a long title on a narrow screen would otherwise run under.
+    BoxWithConstraints(Modifier.fillMaxWidth().height(HEADER_BUTTON)) {
+        // In the middle, unless a narrow card would put it under the buttons. Room is left for all three on every card, so
+        // the handles line up down the page.
+        val handleStart = minOf((maxWidth - HEADER_BUTTON) / 2, maxWidth - HEADER_BUTTON * 4)
+        // Kept clear of the handle, which a long title on a narrow screen would otherwise run under.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.5f).padding(end = 28.dp),
+            modifier = Modifier.align(Alignment.CenterStart).width(handleStart - 4.dp),
         ) {
             Icon(kind.glyph, contentDescription = null, modifier = Modifier.size(22.dp))
             Text(
@@ -344,12 +359,12 @@ private fun CardHeader(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .align(Alignment.Center)
-                .size(48.dp)
+                .align(Alignment.CenterStart)
+                .offset(x = handleStart)
+                .size(HEADER_BUTTON)
                 .pointerInput(index) {
                     awaitEachGesture {
-                        // Taken, so a hold before the drag, as elsewhere in the launcher, is not the header's long press.
-                        val down = awaitFirstDown(requireUnconsumed = false).apply { consume() }
+                        val down = awaitFirstDown(requireUnconsumed = false)
                         var overSlop = 0f
                         val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over ->
                             change.consume()
@@ -371,8 +386,7 @@ private fun CardHeader(
                         }
                     }
                 }
-                // A control of its own, not merged into the header that holds it.
-                .semantics(mergeDescendants = true) { contentDescription = "Reorder ${kind.title}" }
+                .semantics { contentDescription = "Reorder ${kind.title}" }
                 .testTag(CollectionTags.handle(kind)),
         ) {
             Icon(DragHandleGlyph, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -382,6 +396,9 @@ private fun CardHeader(
                 IconButton(onClick = onEdit, modifier = Modifier.testTag(CollectionTags.edit(kind))) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit ${kind.title}")
                 }
+            }
+            IconButton(onClick = onSettings, modifier = Modifier.testTag(CollectionTags.settings(kind))) {
+                Icon(Icons.Default.Settings, contentDescription = "${kind.title} settings")
             }
             IconButton(onClick = onToggleExpanded, modifier = Modifier.testTag(CollectionTags.chevron(kind))) {
                 Icon(
@@ -395,15 +412,16 @@ private fun CardHeader(
 }
 
 /**
- * The card's apps in rows of five: the first [compactApps] alone when not [expanded], every row with labels when it is. One layout
- * holds every row, so an app on the move keeps its node, and the gesture, as it goes from row to row.
+ * The card's apps in rows of five: the [look]'s compact rows alone when not [expanded], every row when it is, named as
+ * the look says. One layout holds every row, so an app on the move keeps its node, and the gesture, as it goes from row
+ * to row.
  */
 @Composable
 private fun AppGrid(
     kind: CollectionKind,
     apps: List<AppEntry>,
     expanded: Boolean,
-    compactApps: Int,
+    look: CardLook,
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     rearrange: Rearrange?,
@@ -413,7 +431,8 @@ private fun AppGrid(
 ) {
     val moving = rearrange?.moving
     val ordered = moving.shown(apps)
-    val shown = if (expanded) ordered else ordered.take(compactApps)
+    val shown = if (expanded) ordered else ordered.take(look.compactApps)
+    val named = look.namesShown(expanded)
     val modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE)
 
     if (shown.isEmpty()) {
@@ -443,7 +462,7 @@ private fun AppGrid(
                             unread = unread[app],
                             onClearBadge = unread.clearing(app, onClearBadge),
                         )
-                        if (expanded) AppLabel(app.label)
+                        if (named) AppLabel(app.label)
                     }
                 }
             }
@@ -648,6 +667,127 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
         modifier = Modifier.testTag(CollectionTags.CREATE_DIALOG),
     )
 }
+
+/**
+ * The settings of [page]'s card of [kind] on one tab, and the defaults every card without its own follows on another.
+ * On the card's tab, a setting it has no use for is left out, and each other one is ticked to use the default until a
+ * choice gives the card its own value; ticking it again goes back. Each change goes to [onChange]. Done, Back and a tap
+ * outside call [onDismiss].
+ */
+@Composable
+fun CollectionSettingsDialog(
+    page: CollectionsPage,
+    kind: CollectionKind,
+    onChange: (CollectionsPage.() -> CollectionsPage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val card = page.card(kind) ?: return
+    var onDefaults by rememberSaveable { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        title = { Text("${kind.title} settings") },
+        text = {
+            Column {
+                SecondaryTabRow(selectedTabIndex = if (onDefaults) 1 else 0, containerColor = AlertDialogDefaults.containerColor) {
+                    Tab(selected = !onDefaults, onClick = { onDefaults = false }, text = { Text("This collection") })
+                    Tab(selected = onDefaults, onClick = { onDefaults = true }, text = { Text("Defaults") })
+                }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(top = 16.dp).verticalScroll(rememberScrollState()),
+                ) {
+                    if (onDefaults) {
+                        Text(
+                            text = "Every collection that uses the default follows these.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
+                    } else {
+                        val look = page.look(card)
+                        CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { OwnChoices(kind, it, look, isOwn = it in card.own, onChange) }
+                    }
+                }
+            }
+        },
+        modifier = Modifier.testTag(CollectionTags.SETTINGS_DIALOG),
+    )
+}
+
+@Composable
+private fun <T : Any> OwnChoices(
+    kind: CollectionKind,
+    setting: CardSetting<T>,
+    look: CardLook,
+    isOwn: Boolean,
+    onChange: (CollectionsPage.() -> CollectionsPage) -> Unit,
+) {
+    val value = setting.of(look)
+
+    SettingBox(setting, value, onChoose = { onChange { set(kind, setting, it) } }) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(value = !isOwn, role = Role.Checkbox) { useDefault ->
+                    // Unticked, the card keeps the value it shows, now as its own.
+                    onChange { if (useDefault) useDefault(kind, setting) else set(kind, setting, value) }
+                }
+                .testTag(CollectionTags.useDefault(setting)),
+        ) {
+            Checkbox(checked = !isOwn, onCheckedChange = null)
+            Text("Use default", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
+
+@Composable
+private fun <T : Any> DefaultChoices(setting: CardSetting<T>, defaults: CardLook, onChange: (CollectionsPage.() -> CollectionsPage) -> Unit) {
+    SettingBox(setting, setting.of(defaults), onChoose = { onChange { setDefault(setting, it) } })
+}
+
+/** A box of its own for [setting], so its title, choices and [footer] read as one, apart from the next setting's. */
+@Composable
+private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit, footer: @Composable () -> Unit = {}) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(12.dp),
+    ) {
+        Text(setting.title, style = MaterialTheme.typography.titleSmall)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            setting.choices.forEachIndexed { index, choice ->
+                SegmentedButton(
+                    selected = choice == value,
+                    onClick = { onChoose(choice) },
+                    shape = SegmentedButtonDefaults.itemShape(index, setting.choices.size),
+                    // Lit as the picker's tiles are: the default fill barely shows against the dialog.
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                    // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
+                    icon = {},
+                    label = { Text(choice.toString(), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier.testTag(CollectionTags.choice(setting, choice)),
+                )
+            }
+        }
+        footer()
+    }
+}
+
+private val CardSetting<*>.title: String
+    get() = when (this) {
+        CardSetting.Rows -> "Rows when collapsed"
+        CardSetting.Limit -> "App limit"
+        CardSetting.Names -> "App names"
+    }
 
 @Composable
 private fun Tile(
