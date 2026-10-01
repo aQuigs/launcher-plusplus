@@ -60,3 +60,28 @@ internal fun CacheDrawScope.tickedTrack(
         }
     }
 }
+
+/**
+ * A closed wavering line round [centre], like a coast or a stone: a circle rippled [lobes] and two more times round, the
+ * ripples set at [first] and [second]. It is drawn at [reach] times each of [steps], so one path holds a coast or all of
+ * a hill's contours.
+ */
+internal fun wavering(
+    first: Float,
+    second: Float,
+    centre: Offset = Offset.Zero,
+    reach: Float = 1f,
+    steps: List<Float> = listOf(1f),
+    lobes: Int = 3,
+) = Path().apply {
+    val points = 64
+    steps.forEach { step ->
+        repeat(points) { index ->
+            val angle = index * 2 * PI.toFloat() / points
+            val wave = 0.9f + 0.07f * sin(lobes * angle + first) + 0.04f * sin((lobes + 2) * angle + second)
+            val at = centre + Offset(sin(angle), -cos(angle)) * (reach * step * wave)
+            if (index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
+        }
+        close()
+    }
+}
