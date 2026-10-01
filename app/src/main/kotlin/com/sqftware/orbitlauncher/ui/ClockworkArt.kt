@@ -16,7 +16,6 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.center
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -25,7 +24,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -37,9 +35,6 @@ import com.sqftware.orbitlauncher.domain.minuteHandDegrees
 import com.sqftware.orbitlauncher.ui.theme.DialEdge
 import com.sqftware.orbitlauncher.ui.theme.GearCog
 import com.sqftware.orbitlauncher.ui.theme.RingColors
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 /** Where the opening onto the watch's wheel sits below the emblem's centre, and how large it is, as shares of its radius. */
 private const val WHEEL_AT = 0.42f
@@ -66,9 +61,6 @@ private val DrawerRosettes = listOf(Triple(0.18f, 0.2f, 150.dp), Triple(0.86f, 0
  * engine-turned rosettes are cut into the drawer.
  */
 object ClockworkArt : ThemeArt {
-    override val hintInk @Composable get() = MaterialTheme.colorScheme.onSurface
-    override val hintShade @Composable get() = MaterialTheme.colorScheme.inverseOnSurface
-
     /** The dial follows the scheme: walnut and brass by night, porcelain inked in walnut by day. */
     @Composable
     override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) {
@@ -109,23 +101,18 @@ object ClockworkArt : ThemeArt {
         iconSize: Float,
         colours: RingColors,
     ): DrawScope.(glow: Float, alpha: Float) -> Unit {
-        val minor = Stroke(1.dp.toPx())
-        val major = Stroke(2.dp.toPx())
         val short = 2.5.dp.toPx()
         val long = 6.dp.toPx()
-        val minutes = ticks(centre, 60, radius - short, radius + short) { it % 5 != 0 }
-        val fives = ticks(centre, 60, radius - long, radius + long) { it % 5 == 0 }
-        val discs = Path().apply { slots.forEach { addOval(Rect(it, iconSize / 2 + 3.dp.toPx())) } }
-        return { glow, alpha ->
-            if (alpha > 0f) {
-                clipPath(discs, ClipOp.Difference) {
-                    drawCircle(colours.mark.copy(alpha = (0.3f + 0.45f * glow) * alpha), radius, centre, style = minor)
-                    val tick = colours.starLine.copy(alpha = (colours.starLine.alpha + 0.3f * glow) * alpha)
-                    drawPath(minutes, tick.copy(alpha = tick.alpha * 0.6f), style = minor)
-                    drawPath(fives, tick, style = major)
-                }
-            }
-        }
+        return tickedTrack(
+            centre,
+            slots,
+            radius,
+            iconSize,
+            colours,
+            minor = ticks(centre, 60, radius - short, radius + short) { it % 5 != 0 },
+            major = ticks(centre, 60, radius - long, radius + long) { it % 5 == 0 },
+            majorWidth = 2.dp,
+        )
     }
 
     @Composable
@@ -173,22 +160,6 @@ object ClockworkArt : ThemeArt {
                 rosette(origin + Offset(x * tile.width, y * tile.height), reach.toPx(), faint, line)
             }
         }
-    }
-}
-
-/** The unit offset [degrees] round from the top, clockwise, in screen axes. */
-private fun direction(degrees: Float): Offset {
-    val angle = degrees / 180f * PI.toFloat()
-    return Offset(sin(angle), -cos(angle))
-}
-
-/** Radial marks round [centre] from [from] to [to] out, at those of [count] even steps [kept] by their index. */
-private fun ticks(centre: Offset, count: Int, from: Float, to: Float, kept: (Int) -> Boolean): Path = Path().apply {
-    for (index in 0 until count) {
-        if (!kept(index)) continue
-        val along = direction(index * 360f / count)
-        (centre + along * from).let { moveTo(it.x, it.y) }
-        (centre + along * to).let { lineTo(it.x, it.y) }
     }
 }
 

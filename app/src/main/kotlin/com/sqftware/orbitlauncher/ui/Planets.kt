@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -62,10 +61,8 @@ fun PlanetFace(
     inner: () -> Float = { 1f },
 ) {
     val style = LocalFolderStyle.current
-    // A layer of its own, so what turns with the sky redraws only the planet, not the page round it.
-    val layered = modifier.graphicsLayer()
     if (style.look == FolderLook.Orbit) {
-        OrbitFace(folder, icon, style.minutes, inner, layered)
+        OrbitFace(folder, icon, style.minutes, inner, modifier)
         return
     }
 
@@ -96,7 +93,7 @@ fun PlanetFace(
     }
     val moons = if (style.look == FolderLook.Rim) Modifier.moons(folder.apps.size) else Modifier
 
-    Box(layered.then(worn), contentAlignment = Alignment.Center) {
+    Box(modifier.then(worn), contentAlignment = Alignment.Center) {
         // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into the wallpaper.
         FolderDisc(folder, icon, presses, inner, Modifier.fillMaxSize(disc).then(glass).edge(FolderEdge).then(moons))
     }

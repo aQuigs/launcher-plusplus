@@ -49,6 +49,7 @@ class HomeRingTest {
     private var openFolder by mutableStateOf<RingItem.Folder?>(null)
     private var theme by mutableStateOf(Theme.Space)
     private var folderLook by mutableStateOf(FolderLook.Rim)
+    private var shownHint by mutableStateOf<String?>(null)
 
     private fun show(
         favourites: List<AppEntry>,
@@ -67,12 +68,13 @@ class HomeRingTest {
         onClearBadge: (AppEntry) -> Unit = {},
     ) {
         ring = items
+        shownHint = hint
         compose.setContent {
             Themed(theme, lightWallpaper = false) {
                 CompositionLocalProvider(LocalFolderStyle provides FolderStyle(folderLook)) {
                     HomeRing(
                         ring = ring,
-                        hint = hint,
+                        hint = shownHint,
                         icon = { null },
                         onLaunch = onLaunch,
                         onOpenFolder = onOpenFolder,
@@ -204,24 +206,27 @@ class HomeRingTest {
     }
 
     @Test
-    fun clockworkDrawsTheRingItsHintAndItsFoldersInEitherLookOpenAndClosed() {
+    fun everyThemeDrawsTheRingItsEmblemWithAndWithoutAHintAndEachOfItsFolderLooksOpenAndClosed() {
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, alphabet[0]))
-        theme = Theme.Clockwork
-        folderLook = FolderLook.SubDial
         showItems(listOf(RingItem.App(clock), work, RingItem.App(alphabet[1])), hint = "Add apps")
 
-        compose.onNodeWithText("Add apps").assertIsDisplayed()
-        compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps")
+        Theme.entries.forEach { shown ->
+            shown.folderLooks.forEach { look ->
+                theme = shown
+                folderLook = look
+                shownHint = "Add apps"
 
-        folderLook = FolderLook.Gear
-        openFolder = work
-
-        compose.ringSlot(mail).assertIsDisplayed()
-        compose.onNodeWithContentDescription("Close folder").assertIsDisplayed()
-
-        openFolder = null
-
-        compose.folderSlot(1).assertIsDisplayed()
+                compose.onNodeWithText("Add apps").assertIsDisplayed()
+                shownHint = null
+                compose.emblem().assertIsDisplayed()
+                compose.folderSlot(1).assertContentDescriptionEquals("Folder, 2 apps")
+                openFolder = work
+                compose.ringSlot(mail).assertIsDisplayed()
+                compose.onNodeWithContentDescription("Close folder").assertIsDisplayed()
+                openFolder = null
+                compose.folderSlot(1).assertIsDisplayed()
+            }
+        }
     }
 
     @Test

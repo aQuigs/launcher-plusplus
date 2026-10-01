@@ -56,6 +56,7 @@ internal fun lookOf(theme: Theme, lightWallpaper: Boolean): LauncherLook {
     val palette = when (theme) {
         Theme.Space -> SpacePalette
         Theme.Clockwork -> ClockworkPalette
+        Theme.Atlas -> AtlasPalette
     }
     return if (lightWallpaper) palette.dayLook() else palette.nightLook()
 }
