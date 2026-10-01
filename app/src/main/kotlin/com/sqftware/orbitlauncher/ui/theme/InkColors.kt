@@ -17,6 +17,28 @@ internal val InkPalette = Palette(
     ringMark = Color(0xFFDDD5C8),
 )
 
+/** Indigo ink on blue-grey paper. */
+internal val InkIndigo = Palette(
+    deep = Color(0xFF141A2A),
+    accent = Color(0xFFB8C4DE),
+    pale = Color(0xFFEEF0F6),
+    spark = Color(0xFFF8FAFF),
+    warm = Color(0xFFE0705F),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFD3D9E8),
+)
+
+/** Sepia ink on aged paper. */
+internal val InkSepia = Palette(
+    deep = Color(0xFF221A12),
+    accent = Color(0xFFD9C3A2),
+    pale = Color(0xFFF6EEE2),
+    spark = Color(0xFFFFF8EE),
+    warm = Color(0xFFE0705F),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFE6D6BE),
+)
+
 /** The edge of a blot, a seal or an ensō's wash, which like a planet's edge has to show on any patch of the wallpaper. */
 val InkEdge = DiscEdge(outer = Sumi.copy(alpha = 0.6f), inner = Paper.copy(alpha = 0.85f))
 

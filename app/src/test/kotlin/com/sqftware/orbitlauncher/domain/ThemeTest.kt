@@ -11,6 +11,11 @@ class ThemeTest {
     }
 
     @Test
+    fun `every colourway belongs to exactly one theme`() {
+        assertEquals(Colourway.entries.sorted(), Theme.entries.flatMap(Theme::colourways).sorted())
+    }
+
+    @Test
     fun `each theme keeps its own pick and shows its first until one is picked`() {
         val looks = FolderLooks().with(Theme.Space, FolderLook.SolarSystem)
 

@@ -70,7 +70,7 @@ class HomeRingTest {
         ring = items
         shownHint = hint
         compose.setContent {
-            Themed(theme, lightWallpaper = false) {
+            Themed(theme, theme.colourways.first(), lightWallpaper = false) {
                 CompositionLocalProvider(LocalFolderStyle provides FolderStyle(folderLook)) {
                     HomeRing(
                         ring = ring,

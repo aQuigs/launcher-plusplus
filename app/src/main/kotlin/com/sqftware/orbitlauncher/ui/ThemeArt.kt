@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.toSize
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Planet
@@ -109,10 +110,10 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
 
-/** [content] in [theme]: its colours for a light or a dark wallpaper, and its art, chosen together. */
+/** [content] in [theme]: its [colourway] for a light or a dark wallpaper, and its art, chosen together. */
 @Composable
-fun Themed(theme: Theme, lightWallpaper: Boolean, content: @Composable () -> Unit) {
-    LauncherTheme(theme, lightWallpaper) {
+fun Themed(theme: Theme, colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
+    LauncherTheme(colourway, lightWallpaper) {
         CompositionLocalProvider(LocalThemeArt provides artOf(theme), content = content)
     }
 }

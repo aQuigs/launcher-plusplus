@@ -18,6 +18,39 @@ internal val ZenPalette = Palette(
     ringMark = Color(0xFFE3D8C0),
 )
 
+/** A fern garden: soft green on dark earth. */
+internal val ZenFern = Palette(
+    deep = Color(0xFF161C14),
+    accent = Color(0xFFBCD9A0),
+    pale = Color(0xFFEAF3E2),
+    spark = Color(0xFFF6FFEE),
+    warm = Color(0xFFE8875A),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFD3E6C2),
+)
+
+/** A slate garden: blue grey on wet stone. */
+internal val ZenSlate = Palette(
+    deep = Color(0xFF14181E),
+    accent = Color(0xFFC6D3DF),
+    pale = Color(0xFFE8EEF4),
+    spark = Color(0xFFF4F8FC),
+    warm = Color(0xFFE8875A),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFD6DEE6),
+)
+
+/** A garden in blossom: cherry pink on dark bark. */
+internal val ZenSakura = Palette(
+    deep = Color(0xFF20161A),
+    accent = Color(0xFFF2C4CF),
+    pale = Color(0xFFFBECEF),
+    spark = Color(0xFFFFF5F7),
+    warm = Color(0xFFE8875A),
+    alarm = Color(0xFFFF8A80),
+    ringMark = Color(0xFFF2D6DD),
+)
+
 /** The edge of a stone, a pond or a patch of moss, which like a planet's edge has to show on any patch of the wallpaper. */
 val GardenEdge = DiscEdge(outer = Charcoal.copy(alpha = 0.6f), inner = Sand.copy(alpha = 0.85f))
 
