@@ -1025,6 +1025,23 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aPairsMenuTurnsEachOfItsAppsBadgesOffAndOn() {
+        val pair = pairOf(clock, mail)!!
+        homeApps = HomeApps(ring = ringOf(pair))
+        badgesEnabled = true
+        show()
+
+        compose.ringSlot(pair).performTouchInput { longClick() }
+        compose.onNodeWithText("Hide Mail badge").performClick()
+        compose.runOnIdle { assertEquals(AppSettings(badgeOff = setOf(mail.packageName)), appSettings) }
+
+        compose.ringSlot(pair).performTouchInput { longClick() }
+        compose.onNodeWithText("Hide Clock badge").assertIsDisplayed()
+        compose.onNodeWithText("Show Mail badge").performClick()
+        compose.runOnIdle { assertEquals(AppSettings(), appSettings) }
+    }
+
+    @Test
     fun anAppsMenuLeavesItOffTheBuiltInCardsAndPutsItBack() {
         collections = CollectionsPage(listOf(CollectionCard(NewApps)))
         show()
