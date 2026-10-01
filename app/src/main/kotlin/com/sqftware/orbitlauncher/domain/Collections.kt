@@ -207,14 +207,9 @@ data class CollectionsPage(
     /** Has the card of [kind] take [setting] from the defaults again. */
     fun useDefault(kind: CollectionKind, setting: CardSetting<*>): CollectionsPage = update(kind) { copy(own = own - setting) }
 
-    /**
-     * Makes the card of [kind]'s own [setting] the default, which it then follows like every card without one of its own;
-     * the cards with their own keep it.
-     */
-    fun makeDefault(kind: CollectionKind, setting: CardSetting<*>): CollectionsPage {
-        val value = card(kind)?.own?.get(setting) ?: return this
-        return copy(defaults = setting.with(defaults, value)).useDefault(kind, setting)
-    }
+    /** Makes [value] the default of [setting], which every card without its own then follows, unless it is not a choice. */
+    fun <T : Any> setDefault(setting: CardSetting<T>, value: T): CollectionsPage =
+        if (value !in setting.choices) this else copy(defaults = setting.with(defaults, value))
 
     /** Moves the card at [from] to [to]; a position off the page changes nothing. */
     fun move(from: Int, to: Int): CollectionsPage = copy(cards = cards.reordered(from, to, ReorderMode.Insert))

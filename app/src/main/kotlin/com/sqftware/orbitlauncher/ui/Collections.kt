@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -50,16 +51,20 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -93,6 +98,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -144,6 +150,8 @@ object CollectionTags {
     fun settings(kind: CollectionKind) = "collection_settings_${kind.name}"
 
     fun choice(setting: CardSetting<*>, choice: Any) = "collection_setting_${setting}_$choice"
+
+    fun useDefault(setting: CardSetting<*>) = "collection_setting_${setting}_default"
 
     fun tile(kind: CollectionKind) = "collection_tile_${kind.name}"
 
@@ -619,9 +627,10 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
 }
 
 /**
- * The settings of [page]'s card of [kind], those its card has use for, each showing its value, the card's own or the
- * default. A choice hands [onChange] the change that gives the card its own value; one of the card's own can go back to
- * the default or become it. Done, Back and a tap outside call [onDismiss].
+ * The settings of [page]'s card of [kind] on one tab, and the defaults every card without its own follows on another.
+ * On the card's tab, a setting it has no use for is left out, and each other one is ticked to use the default until a
+ * choice gives the card its own value; ticking it again goes back. Each change goes to [onChange]. Done, Back and a tap
+ * outside call [onDismiss].
  */
 @Composable
 fun CollectionSettingsDialog(
@@ -631,16 +640,33 @@ fun CollectionSettingsDialog(
     onDismiss: () -> Unit,
 ) {
     val card = page.card(kind) ?: return
-    val look = page.look(card)
+    var onDefaults by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
         title = { Text("${kind.title} settings") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { setting ->
-                    SettingChoices(kind, setting, look, isOwn = setting in card.own, onChange)
+            Column {
+                SecondaryTabRow(selectedTabIndex = if (onDefaults) 1 else 0, containerColor = AlertDialogDefaults.containerColor) {
+                    Tab(selected = !onDefaults, onClick = { onDefaults = false }, text = { Text("This collection") })
+                    Tab(selected = onDefaults, onClick = { onDefaults = true }, text = { Text("Defaults") })
+                }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(top = 16.dp).verticalScroll(rememberScrollState()),
+                ) {
+                    if (onDefaults) {
+                        Text(
+                            text = "Every collection that uses the default follows these.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
+                    } else {
+                        val look = page.look(card)
+                        CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { OwnChoices(kind, it, look, isOwn = it in card.own, onChange) }
+                    }
                 }
             }
         },
@@ -649,7 +675,7 @@ fun CollectionSettingsDialog(
 }
 
 @Composable
-private fun <T : Any> SettingChoices(
+private fun <T : Any> OwnChoices(
     kind: CollectionKind,
     setting: CardSetting<T>,
     look: CardLook,
@@ -658,27 +684,45 @@ private fun <T : Any> SettingChoices(
 ) {
     val value = setting.of(look)
 
-    // Each setting in a box of its own, so its title, choices and buttons read as one, apart from the next setting's.
+    SettingBox(setting, value, onChoose = { onChange { set(kind, setting, it) } }) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(value = !isOwn, role = Role.Checkbox) { useDefault ->
+                    // Unticked, the card keeps the value it shows, now as its own.
+                    onChange { if (useDefault) useDefault(kind, setting) else set(kind, setting, value) }
+                }
+                .testTag(CollectionTags.useDefault(setting)),
+        ) {
+            Checkbox(checked = !isOwn, onCheckedChange = null)
+            Text("Use default", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
+
+@Composable
+private fun <T : Any> DefaultChoices(setting: CardSetting<T>, defaults: CardLook, onChange: (CollectionsPage.() -> CollectionsPage) -> Unit) {
+    SettingBox(setting, setting.of(defaults), onChoose = { onChange { setDefault(setting, it) } })
+}
+
+/** A box of its own for [setting], so its title, choices and [footer] read as one, apart from the next setting's. */
+@Composable
+private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit, footer: @Composable () -> Unit = {}) {
     Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = if (isOwn) 0.dp else 12.dp),
+            .padding(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-            Text(setting.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            Text(
-                text = if (isOwn) "This collection" else "Default",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isOwn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(setting.title, style = MaterialTheme.typography.titleSmall)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             setting.choices.forEachIndexed { index, choice ->
                 SegmentedButton(
                     selected = choice == value,
-                    onClick = { onChange { set(kind, setting, choice) } },
+                    onClick = { onChoose(choice) },
                     shape = SegmentedButtonDefaults.itemShape(index, setting.choices.size),
                     // Lit as the picker's tiles are: the default fill barely shows against the dialog.
                     colors = SegmentedButtonDefaults.colors(
@@ -692,12 +736,7 @@ private fun <T : Any> SettingChoices(
                 )
             }
         }
-        if (isOwn) {
-            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = { onChange { useDefault(kind, setting) } }) { Text("Use default") }
-                TextButton(onClick = { onChange { makeDefault(kind, setting) } }) { Text("Make default") }
-            }
-        }
+        footer()
     }
 }
 

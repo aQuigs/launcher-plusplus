@@ -33,8 +33,7 @@ class CollectionsStoreTest {
     fun thePageComesBackAsItWent() {
         val page = CollectionsPage()
             .toggleExpanded(CollectionKind.NewApps)
-            .set(CollectionKind.MostUsed, CardSetting.Rows, 3)
-            .makeDefault(CollectionKind.MostUsed, CardSetting.Rows)
+            .setDefault(CardSetting.Rows, 3)
             .set(CollectionKind.NewApps, CardSetting.Limit, 20)
             .add(CollectionKind.Category(AppCategory.Tools), Favourites(listOf("a/A", "b/B")))
 

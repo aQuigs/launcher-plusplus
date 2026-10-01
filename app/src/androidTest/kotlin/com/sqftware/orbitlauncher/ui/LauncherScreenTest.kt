@@ -2060,7 +2060,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aCardsGearSetsItsOwnLookWhichGoesBackToTheDefaultOrBecomesIt() {
+    fun aCardsGearSetsItsOwnLookOrTheDefaultsOnTheirOwnTab() {
         val tools = CollectionKind.Category(AppCategory.Tools)
         collections = CollectionsPage().add(tools)
         show()
@@ -2071,22 +2071,19 @@ class LauncherScreenTest {
         compose.onNodeWithText("App limit").assertIsDisplayed()
         compose.onNodeWithTag(CollectionTags.choice(CardSetting.Rows, 3)).performClick()
         compose.runOnIdle { assertEquals(CardLook(rows = 3), collections.look(collections.card(MostUsed)!!)) }
-        compose.onNodeWithText("This collection").assertIsDisplayed()
+        compose.onNodeWithTag(CollectionTags.useDefault(CardSetting.Rows)).assertIsOff().performClick()
+        compose.runOnIdle { assertEquals(CollectionsPage().add(tools), collections) }
 
-        compose.onNodeWithText("Make default").performClick()
-        compose.runOnIdle {
-            assertEquals(CardLook(rows = 3), collections.defaults)
-            assertEquals(CollectionsPage().add(tools).copy(defaults = CardLook(rows = 3)), collections)
-        }
+        compose.onNodeWithText("Defaults").performClick()
+        compose.onNodeWithTag(CollectionTags.choice(CardSetting.Rows, 2)).performClick()
+        compose.runOnIdle { assertEquals(CollectionsPage().add(tools).setDefault(CardSetting.Rows, 2), collections) }
         compose.onNodeWithText("Done").performClick()
         compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertDoesNotExist()
 
-        // A card the user fills has no limit, and its own setting can go back to the default.
+        // A card the user fills has no limit of its own to set.
         compose.collectionSettingsButton(tools).performClick()
         compose.onNodeWithText("App limit").assertDoesNotExist()
-        compose.onNodeWithTag(CollectionTags.choice(CardSetting.Names, AppNames.Always)).performClick()
-        compose.onNodeWithText("Use default").performClick()
-        compose.runOnIdle { assertEquals(CollectionsPage().add(tools).copy(defaults = CardLook(rows = 3)), collections) }
+        compose.onNodeWithTag(CollectionTags.useDefault(CardSetting.Names)).assertIsOn()
     }
 
     @Test

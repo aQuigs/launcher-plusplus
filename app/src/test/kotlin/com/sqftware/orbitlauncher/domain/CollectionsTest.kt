@@ -79,24 +79,22 @@ class CollectionsTest {
 
     @Test
     fun `a card set to the default's value keeps it when the default changes`() {
-        val page = CollectionsPage().set(MostUsed, CardSetting.Rows, 1).set(NewApps, CardSetting.Rows, 3).makeDefault(NewApps, CardSetting.Rows)
+        val page = CollectionsPage().set(MostUsed, CardSetting.Rows, 1).setDefault(CardSetting.Rows, 3)
 
         assertEquals(listOf(3, 1), page.cards.map { page.look(it).rows })
     }
 
     @Test
-    fun `a card's own setting goes back to the default, or becomes it for every card without its own`() {
+    fun `a card's own setting goes back to the default, which every card without its own follows`() {
         val page = CollectionsPage().add(tools)
             .set(NewApps, CardSetting.Names, AppNames.Always)
             .set(tools, CardSetting.Names, AppNames.Never)
 
         assertEquals(CollectionsPage().add(tools).set(tools, CardSetting.Names, AppNames.Never), page.useDefault(NewApps, CardSetting.Names))
 
-        val lifted = page.makeDefault(NewApps, CardSetting.Names)
-        assertEquals(AppNames.Always, lifted.defaults.names)
-        assertEquals(listOf(AppNames.Always, AppNames.Always, AppNames.Never), lifted.cards.map { lifted.look(it).names })
-        assertEquals(emptyMap<CardSetting<*>, Any>(), lifted.card(NewApps)!!.own)
-        assertEquals(lifted, lifted.makeDefault(MostUsed, CardSetting.Names))
+        val changed = page.useDefault(NewApps, CardSetting.Names).setDefault(CardSetting.Names, AppNames.Always)
+        assertEquals(listOf(AppNames.Always, AppNames.Always, AppNames.Never), changed.cards.map { changed.look(it).names })
+        assertEquals(changed, changed.setDefault(CardSetting.Rows, 9))
     }
 
     @Test
