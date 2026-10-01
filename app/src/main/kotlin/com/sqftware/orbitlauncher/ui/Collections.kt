@@ -12,10 +12,10 @@ import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -87,11 +88,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.AppCategory
@@ -153,6 +157,11 @@ private val CARD_GAP = 12.dp
 private val CARD_ICON_SIZE = 48.dp
 private val ROW_GAP = 12.dp
 private val BIN_SIZE = 72.dp
+// Arc's three columns, down to two once three would shrink the names below this share of the size the user chose.
+private const val PICKER_COLUMNS = 3
+private const val MIN_KEPT_LABEL_SCALE = 0.75f
+private const val MIN_LABEL_SCALE = 0.25f
+private val TILE_PADDING = 4.dp
 private const val NOTICE_MILLIS = 2_000L
 
 /**
@@ -525,9 +534,10 @@ fun CollectionPicker(
     }
 
     Panel(modifier.testTag(CollectionTags.PICKER)) {
-        Box {
+        BoxWithConstraints {
+            val grid = tileGrid(constraints.maxWidth)
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Fixed(grid.columns),
                 contentPadding = PaddingValues(PAGE_PADDING),
                 horizontalArrangement = Arrangement.spacedBy(CARD_GAP),
                 verticalArrangement = Arrangement.spacedBy(CARD_GAP),
@@ -541,6 +551,7 @@ fun CollectionPicker(
                         // As in Arc Pro: a person on a custom collection's tile, the grid on its card.
                         glyph = if (kind is CollectionKind.Custom) Icons.Default.Person else kind.glyph,
                         title = kind.title,
+                        labelStyle = grid.labelStyle,
                         selected = onPage,
                         onClick = {
                             // Numbered so a second tap restarts the fade instead of sharing the first one's.
@@ -554,6 +565,7 @@ fun CollectionPicker(
                     Tile(
                         glyph = GridGlyph,
                         title = CREATE_YOUR_OWN,
+                        labelStyle = grid.labelStyle,
                         selected = false,
                         onClick = onCreate,
                         modifier = Modifier.testTag(CollectionTags.CREATE),
@@ -566,6 +578,37 @@ fun CollectionPicker(
 }
 
 private data class Notice(val text: String, val serial: Int)
+
+private data class TileGrid(val columns: Int, val labelStyle: TextStyle)
+
+// The names the grid is sized by. A custom name takes the size they set, so typing one cannot shrink every tile.
+private val FIXED_TITLES = CollectionKind.all.map { it.title } + CREATE_YOUR_OWN
+
+/**
+ * The most columns a grid [gridWidth] px wide can take at any font or display size, and one size for every tile's name
+ * in it: the largest at which each fixed name fits two lines of whole words.
+ */
+@Composable
+private fun tileGrid(gridWidth: Int): TileGrid {
+    val base = MaterialTheme.typography.labelLarge
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    return remember(gridWidth, base, measurer) {
+        fun fit(columns: Int, minScale: Float) =
+            measurer.fitWholeWords(FIXED_TITLES, base, density.labelWidth(gridWidth, columns), maxLines = 2, minScale)
+                ?.let { TileGrid(columns, it) }
+
+        val fewer = PICKER_COLUMNS - 1
+        fit(PICKER_COLUMNS, MIN_KEPT_LABEL_SCALE) ?: fit(fewer, MIN_LABEL_SCALE) ?: TileGrid(fewer, base)
+    }
+}
+
+// In whole px, rounded where the grid and the paddings round, so a name measured to fit is never a pixel too wide.
+private fun Density.labelWidth(gridWidth: Int, columns: Int): Int {
+    val content = gridWidth - PAGE_PADDING.roundToPx() * 2
+    val cell = (content - CARD_GAP.roundToPx() * (columns - 1)) / columns
+    return cell - TILE_PADDING.roundToPx() * 2
+}
 
 /**
  * Create Your Own: names a custom collection. Ok waits for a name [page] would take (see [CollectionsPage.custom]) and
@@ -607,7 +650,14 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
 }
 
 @Composable
-private fun Tile(glyph: ImageVector, title: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun Tile(
+    glyph: ImageVector,
+    title: String,
+    labelStyle: TextStyle,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colours = MaterialTheme.colorScheme
 
     Surface(
@@ -615,21 +665,34 @@ private fun Tile(glyph: ImageVector, title: String, selected: Boolean, onClick: 
         shape = RoundedCornerShape(16.dp),
         color = if (selected) colours.primaryContainer else colours.surfaceVariant,
         modifier = modifier
-            .aspectRatio(1f)
+            .atLeastSquare()
             .semantics { this.selected = selected },
     ) {
-        Column(verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = TILE_PADDING, vertical = 12.dp),
+        ) {
             Icon(glyph, contentDescription = null, modifier = Modifier.size(36.dp))
+            // Two lines held open on every tile, so icons line up across a row and a row of grown tiles stays even.
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge,
+                style = labelStyle,
                 textAlign = TextAlign.Center,
+                minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
+}
+
+// Square at the usual sizes; taller only when a large font or display size needs the room.
+private fun Modifier.atLeastSquare() = layout { measurable, constraints ->
+    val minHeight = constraints.maxWidth.coerceIn(constraints.minHeight, constraints.maxHeight)
+    val placeable = measurable.measure(constraints.copy(minHeight = minHeight))
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
 // A plain box rather than a surface: it must not take the taps meant for the tiles under it.
