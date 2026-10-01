@@ -11,6 +11,7 @@ enum class Theme(val label: String, val folderLooks: List<FolderLook>) {
     ZenGarden("Zen garden", listOf(FolderLook.Stone, FolderLook.KoiPond, FolderLook.Moss)),
     Ink("Ink", listOf(FolderLook.Enso, FolderLook.Seal, FolderLook.InkDrop)),
     Germ("Germ", listOf(FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell)),
+    Paper("Paper", listOf(FolderLook.FoldedSquare, FolderLook.Envelope, FolderLook.Pinwheel)),
 }
 
 /**

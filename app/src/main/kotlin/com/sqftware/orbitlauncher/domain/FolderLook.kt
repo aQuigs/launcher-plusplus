@@ -58,6 +58,15 @@ enum class FolderLook(val label: String) {
 
     /** A cell whose membrane wobbles, its previews inside. */
     Cell("Cell"),
+
+    /** A square of paper folded on its point, its previews on it. */
+    FoldedSquare("Folded square"),
+
+    /** A paper envelope, its previews on it. */
+    Envelope("Envelope"),
+
+    /** A paper pinwheel spinning in a breeze under its previews. */
+    Pinwheel("Pinwheel"),
 }
 
 /**
@@ -67,9 +76,10 @@ enum class FolderLook(val label: String) {
 fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
     FolderLook.SolarSystem -> planets.any(Planet::moves)
     FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop,
-    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell -> folders
+    FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell, FolderLook.Pinwheel -> folders
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
-    FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal -> false
+    FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal,
+    FolderLook.FoldedSquare, FolderLook.Envelope -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */
