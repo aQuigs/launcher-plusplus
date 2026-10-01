@@ -66,26 +66,69 @@ class CollectionsTest {
     }
 
     @Test
-    fun `rows are set on one card, from one to four, and a built-in card works out enough apps to fill them`() {
-        val page = CollectionsPage().setRows(MostUsed, 3)
+    fun `a card takes the defaults until it is given its own setting, and only one of the setting's choices`() {
+        val page = CollectionsPage().set(MostUsed, CardSetting.Rows, 3)
 
-        assertEquals(1, page.card(NewApps)!!.rows)
-        assertEquals(3, page.card(MostUsed)!!.rows)
-        assertEquals(4, page.setRows(MostUsed, 9).card(MostUsed)!!.rows)
-        assertEquals(1, page.setRows(MostUsed, 0).card(MostUsed)!!.rows)
-        assertEquals(10, page.card(NewApps)!!.builtInLimit)
-        assertEquals(15, page.card(MostUsed)!!.builtInLimit)
-        assertEquals(3, page.remove(MostUsed).add(page.card(MostUsed)!!).card(MostUsed)!!.rows)
+        assertEquals(CardLook(), page.look(page.card(NewApps)!!))
+        assertEquals(CardLook(rows = 3), page.look(page.card(MostUsed)!!))
+        assertEquals(page, page.set(MostUsed, CardSetting.Rows, 9))
+        assertEquals(page, page.set(MostUsed, CardSetting.Limit, 7))
+        assertEquals(page.add(tools), page.add(tools).set(tools, CardSetting.Limit, 20))
+        assertEquals(mapOf(CardSetting.Rows to 3), page.remove(MostUsed).add(page.card(MostUsed)!!).card(MostUsed)!!.own)
     }
 
     @Test
-    fun `rows missing or out of range are one, and whatever follows them is ignored`() {
-        val text = "NewApps\t0,\nMostUsed\t1,9\nTools\t0,3,x\ta/A"
+    fun `a card set to the default's value keeps it when the default changes`() {
+        val page = CollectionsPage().set(MostUsed, CardSetting.Rows, 1).set(NewApps, CardSetting.Rows, 3).makeDefault(NewApps, CardSetting.Rows)
+
+        assertEquals(listOf(3, 1), page.cards.map { page.look(it).rows })
+    }
+
+    @Test
+    fun `a card's own setting goes back to the default, or becomes it for every card without its own`() {
+        val page = CollectionsPage().add(tools)
+            .set(NewApps, CardSetting.Names, AppNames.Always)
+            .set(tools, CardSetting.Names, AppNames.Never)
+
+        assertEquals(CollectionsPage().add(tools).set(tools, CardSetting.Names, AppNames.Never), page.useDefault(NewApps, CardSetting.Names))
+
+        val lifted = page.makeDefault(NewApps, CardSetting.Names)
+        assertEquals(AppNames.Always, lifted.defaults.names)
+        assertEquals(listOf(AppNames.Always, AppNames.Always, AppNames.Never), lifted.cards.map { lifted.look(it).names })
+        assertEquals(emptyMap<CardSetting<*>, Any>(), lifted.card(NewApps)!!.own)
+        assertEquals(lifted, lifted.makeDefault(MostUsed, CardSetting.Names))
+    }
+
+    @Test
+    fun `a card shows its compact rows of apps, and names them as its look says`() {
+        assertEquals(15, CardLook(rows = 3).compactApps)
+        assertEquals(listOf(false, true), listOf(false, true).map(CardLook()::namesShown))
+        assertEquals(listOf(false, false), listOf(false, true).map(CardLook(names = AppNames.Never)::namesShown))
+        assertEquals(listOf(true, true), listOf(false, true).map(CardLook(names = AppNames.Always)::namesShown))
+    }
+
+    @Test
+    fun `a setting missing or not one of its choices is the default, and whatever follows them is ignored`() {
+        val text = "NewApps\t0,\nMostUsed\t1,9,15\nTools\t0,3,,Always,x\ta/A"
 
         assertEquals(
-            listOf(CollectionCard(NewApps), CollectionCard(MostUsed, expanded = true), CollectionCard(tools, Favourites(listOf("a/A")), rows = 3)),
+            listOf(
+                CollectionCard(NewApps),
+                CollectionCard(MostUsed, expanded = true, own = mapOf(CardSetting.Limit to 15)),
+                CollectionCard(tools, Favourites(listOf("a/A")), own = mapOf(CardSetting.Rows to 3, CardSetting.Names to AppNames.Always)),
+            ),
             decodeCollectionsPage(text).cards,
         )
+    }
+
+    @Test
+    fun `the defaults come back as they went, and one unreadable is the first default`() {
+        val defaults = CardLook(rows = 2, limit = 20, names = AppNames.Never)
+
+        assertEquals("2,20,Never", defaults.encode())
+        assertEquals(defaults, decodeCardLook(defaults.encode()))
+        assertEquals(CardLook(rows = 2), decodeCardLook("2,7"))
+        assertEquals(CardLook(), decodeCardLook(""))
     }
 
     @Test
@@ -171,11 +214,12 @@ class CollectionsTest {
 
     @Test
     fun `a page comes back as it went`() {
-        val page = CollectionsPage().toggleExpanded(NewApps).setRows(MostUsed, 2)
-            .add(tools, Favourites(listOf(clock.key, mail.key))).setRows(tools, 4).add(photos)
+        val page = CollectionsPage().toggleExpanded(NewApps).set(MostUsed, CardSetting.Rows, 2)
+            .add(tools, Favourites(listOf(clock.key, mail.key))).set(tools, CardSetting.Rows, 4).set(tools, CardSetting.Names, AppNames.Never)
+            .add(photos).set(MostUsed, CardSetting.Limit, 20)
 
         assertEquals(
-            "NewApps\t1\nMostUsed\t0,2\nTools\t0,4\t${clock.key}\t${mail.key}\nPhotos\t0",
+            "NewApps\t1\nMostUsed\t0,2,20\nTools\t0,4,,Never\t${clock.key}\t${mail.key}\nPhotos\t0",
             page.encode(),
         )
         assertEquals(page, decodeCollectionsPage(page.encode()))

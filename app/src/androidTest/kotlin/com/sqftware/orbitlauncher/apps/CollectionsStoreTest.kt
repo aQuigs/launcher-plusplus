@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sqftware.orbitlauncher.domain.AppCategory
+import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.Favourites
@@ -32,7 +33,9 @@ class CollectionsStoreTest {
     fun thePageComesBackAsItWent() {
         val page = CollectionsPage()
             .toggleExpanded(CollectionKind.NewApps)
-            .setRows(CollectionKind.MostUsed, 3)
+            .set(CollectionKind.MostUsed, CardSetting.Rows, 3)
+            .makeDefault(CollectionKind.MostUsed, CardSetting.Rows)
+            .set(CollectionKind.NewApps, CardSetting.Limit, 20)
             .add(CollectionKind.Category(AppCategory.Tools), Favourites(listOf("a/A", "b/B")))
 
         store.save(page)

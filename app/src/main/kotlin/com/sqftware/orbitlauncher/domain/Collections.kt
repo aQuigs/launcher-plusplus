@@ -96,33 +96,68 @@ val CollectionKind.title: String
 /** How many apps a card shows in a row. */
 const val CARD_ROW_APPS = 5
 
-/** The rows of apps a compact card can be set to show. */
-val COLLAPSED_ROWS = 1..4
+/** When a card names its apps underneath. */
+enum class AppNames { Never, Expanded, Always }
+
+/** How a card lays out its apps: [rows] of them while compact, at most [limit] if it works them out, named as [names] says. */
+data class CardLook(val rows: Int = 1, val limit: Int = BUILT_IN_CARD_APPS, val names: AppNames = AppNames.Expanded) {
+    /** How many apps it shows while compact. */
+    val compactApps: Int get() = rows * CARD_ROW_APPS
+
+    fun namesShown(expanded: Boolean): Boolean = names == AppNames.Always || names == AppNames.Expanded && expanded
+}
+
+/** One part of a [CardLook] a card can hold its own value of: the values it takes, and how it is read and written. */
+sealed class CardSetting<T : Any>(val choices: List<T>, private val get: (CardLook) -> T, private val put: (CardLook, T) -> CardLook) {
+    fun of(look: CardLook): T = get(look)
+
+    /** Whether a card of [kind] has any use for it. */
+    open fun appliesTo(kind: CollectionKind) = true
+
+    /** The choice [text] names, as [toString] writes it, if it names one. */
+    internal fun parse(text: String): T? = choices.find { it.toString() == text }
+
+    // Only ever handed a value this setting gave, as a card's own settings hold each under its setting.
+    @Suppress("UNCHECKED_CAST")
+    internal fun with(look: CardLook, value: Any): CardLook = put(look, value as T)
+
+    data object Rows : CardSetting<Int>((1..4).toList(), CardLook::rows, { look, it -> look.copy(rows = it) })
+
+    /** Only for a card that works its apps out: one the user fills holds what they put there. */
+    data object Limit : CardSetting<Int>((5..30 step 5).toList(), CardLook::limit, { look, it -> look.copy(limit = it) }) {
+        override fun appliesTo(kind: CollectionKind) = kind !is CollectionKind.HandPicked
+    }
+
+    data object Names : CardSetting<AppNames>(AppNames.entries, CardLook::names, { look, it -> look.copy(names = it) })
+}
+
+/** Every [CardSetting], in the order they are stored and offered. */
+val CARD_SETTINGS: List<CardSetting<*>> = listOf(CardSetting.Rows, CardSetting.Limit, CardSetting.Names)
 
 /**
- * One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], whether it shows them all with labels, and how
- * many [rows] of apps it shows while it does not.
+ * One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], whether it shows them all, and the settings it
+ * holds its [own] value of rather than taking the page's default, each value under its setting.
  */
 data class CollectionCard(
     val kind: CollectionKind,
     val apps: Favourites = Favourites(),
     val expanded: Boolean = false,
-    val rows: Int = COLLAPSED_ROWS.first,
-) {
-    /** How many apps it shows while compact. */
-    val compactApps: Int get() = rows * CARD_ROW_APPS
+    val own: Map<CardSetting<*>, Any> = emptyMap(),
+)
 
-    /** How many apps it works out if built in: enough to fill its compact rows, and never fewer than [BUILT_IN_CARD_APPS]. */
-    val builtInLimit: Int get() = maxOf(BUILT_IN_CARD_APPS, compactApps)
-}
-
-/** The cards on the collections page, top to bottom. A page never touched holds the two built-in cards, as Arc's does. */
+/**
+ * The cards on the collections page, top to bottom, and the [defaults] every card's look starts from. A page never
+ * touched holds the two built-in cards, as Arc's does.
+ */
 data class CollectionsPage(
     val cards: List<CollectionCard> = listOf(CollectionCard(CollectionKind.NewApps), CollectionCard(CollectionKind.MostUsed)),
+    val defaults: CardLook = CardLook(),
 ) {
     operator fun contains(kind: CollectionKind): Boolean = cards.any { it.kind == kind }
 
     fun card(kind: CollectionKind): CollectionCard? = cards.find { it.kind == kind }
+
+    fun look(card: CollectionCard): CardLook = card.own.entries.fold(defaults) { look, (setting, value) -> setting.with(look, value) }
 
     /**
      * The custom collection [label] names once cleaned up, or null when it names none: blank, or taken, whatever the case
@@ -143,10 +178,10 @@ data class CollectionsPage(
     fun add(kind: CollectionKind, apps: Favourites = Favourites()): CollectionsPage = add(CollectionCard(kind, apps))
 
     /** Adds [card] at the bottom as it is, unless the page has one of its kind. */
-    fun add(card: CollectionCard): CollectionsPage = if (card.kind in this) this else CollectionsPage(cards + card)
+    fun add(card: CollectionCard): CollectionsPage = if (card.kind in this) this else copy(cards = cards + card)
 
     /** Drops the card of [kind], and the apps it kept with it. */
-    fun remove(kind: CollectionKind): CollectionsPage = CollectionsPage(cards.filterNot { it.kind == kind })
+    fun remove(kind: CollectionKind): CollectionsPage = copy(cards = cards.filterNot { it.kind == kind })
 
     /** Adds [app] at the end of the card of [kind], unless it is already there or there is no such card. */
     fun addApp(kind: CollectionKind, app: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.add(app)) }
@@ -162,14 +197,30 @@ data class CollectionsPage(
 
     fun toggleExpanded(kind: CollectionKind): CollectionsPage = update(kind) { copy(expanded = !expanded) }
 
-    /** Sets how many rows the card of [kind] shows while compact, kept within [COLLAPSED_ROWS]. */
-    fun setRows(kind: CollectionKind, rows: Int): CollectionsPage = update(kind) { copy(rows = rows.coerceIn(COLLAPSED_ROWS)) }
+    /**
+     * Gives the card of [kind] its own [value] of [setting], unless the value is not one of its choices or the setting
+     * does not apply to the card. One the same as the default's is kept too, so the card holds it when the default changes.
+     */
+    fun <T : Any> set(kind: CollectionKind, setting: CardSetting<T>, value: T): CollectionsPage =
+        if (value !in setting.choices || !setting.appliesTo(kind)) this else update(kind) { copy(own = own + (setting to value)) }
+
+    /** Has the card of [kind] take [setting] from the defaults again. */
+    fun useDefault(kind: CollectionKind, setting: CardSetting<*>): CollectionsPage = update(kind) { copy(own = own - setting) }
+
+    /**
+     * Makes the card of [kind]'s own [setting] the default, which it then follows like every card without one of its own;
+     * the cards with their own keep it.
+     */
+    fun makeDefault(kind: CollectionKind, setting: CardSetting<*>): CollectionsPage {
+        val value = card(kind)?.own?.get(setting) ?: return this
+        return copy(defaults = setting.with(defaults, value)).useDefault(kind, setting)
+    }
 
     /** Moves the card at [from] to [to]; a position off the page changes nothing. */
-    fun move(from: Int, to: Int): CollectionsPage = CollectionsPage(cards.reordered(from, to, ReorderMode.Insert))
+    fun move(from: Int, to: Int): CollectionsPage = copy(cards = cards.reordered(from, to, ReorderMode.Insert))
 
     private fun update(kind: CollectionKind, change: CollectionCard.() -> CollectionCard) =
-        CollectionsPage(cards.map { if (it.kind == kind) it.change() else it })
+        copy(cards = cards.map { if (it.kind == kind) it.change() else it })
 }
 
 /** How many apps a built-in card lists at least. */
@@ -264,37 +315,45 @@ fun seedCategory(category: AppCategory, apps: List<AppEntry>): Favourites =
     Favourites(apps.filter { it.suggestedCategory == category }.map { it.key })
 
 /**
- * The page as text, one line per card: its kind, 1 or 0 for expanded with its compact rows after a comma unless it has
- * one, then the keys it keeps, all tab-separated. A card of one row is written as before rows could be set.
+ * The page's cards as text, one line per card: its kind, then 1 or 0 for expanded followed by its own settings, comma
+ * separated in [CARD_SETTINGS]'s order with nothing for a default, then the keys it keeps, all tab-separated. Defaults
+ * at the end are left off, so a card with its own rows alone is written as before the other settings came.
  */
 fun CollectionsPage.encode(): String = cards.joinToString(LINE) { card ->
-    val expanded = if (card.expanded) "1" else "0"
-    val look = if (card.rows == COLLAPSED_ROWS.first) expanded else "$expanded$ROWS${card.rows}"
+    val own = CARD_SETTINGS.map { card.own[it]?.toString().orEmpty() }
+    val look = (listOf(if (card.expanded) "1" else "0") + own).joinToString("$LOOK").trimEnd(LOOK)
     (listOf(card.kind.name, look) + card.apps.keys).joinToString(FIELD)
 }
 
-private const val ROWS = ","
+private const val LOOK = ','
 
 /**
  * A line whose kind is unknown (a custom name included that cleans to nothing or to a built-in's) or whose expanded flag
  * is not 0 or 1 is skipped, and so is a second line for a kind, so a damaged file loses that card and keeps the rest.
- * Rows missing or out of [COLLAPSED_ROWS] are one, and anything after them is ignored, so a card written by a later
- * version keeps its apps. Empty text is an empty page: the defaults are for a page never stored.
+ * A setting missing or not one of its choices is the default, and any after the known ones are ignored, so a card
+ * written by a later version keeps its apps. Empty text is an empty page: the default cards are for a page never stored.
  */
 fun decodeCollectionsPage(text: String): CollectionsPage = CollectionsPage(
     text.nonEmptyLines()
         .mapNotNull { line ->
             val fields = line.split(FIELD)
             val kind = CollectionKind.named(fields[0]) ?: return@mapNotNull null
-            val look = fields.getOrNull(1)?.split(ROWS) ?: return@mapNotNull null
+            val look = fields.getOrNull(1)?.split(LOOK) ?: return@mapNotNull null
             val expanded = when (look[0]) {
                 "1" -> true
                 "0" -> false
                 else -> return@mapNotNull null
             }
-            val rows = look.getOrNull(1)?.toIntOrNull()?.takeIf { it in COLLAPSED_ROWS } ?: COLLAPSED_ROWS.first
+            val own = CARD_SETTINGS.zip(look.drop(1)).mapNotNull { (setting, text) -> setting.parse(text)?.let { setting to it } }.toMap()
             val keys = if (kind is CollectionKind.HandPicked) fields.drop(2).filter(String::isNotEmpty) else emptyList()
-            CollectionCard(kind, Favourites(keys), expanded, rows)
+            CollectionCard(kind, Favourites(keys), expanded, own)
         }
         .distinctBy { it.kind },
 )
+
+/** The defaults as text: each setting in [CARD_SETTINGS]'s order, comma separated. */
+fun CardLook.encode(): String = CARD_SETTINGS.joinToString("$LOOK") { it.of(this).toString() }
+
+/** A setting missing or not one of its choices keeps its first default. */
+fun decodeCardLook(text: String): CardLook =
+    CARD_SETTINGS.zip(text.split(LOOK)).fold(CardLook()) { look, (setting, text) -> setting.parse(text)?.let { setting.with(look, it) } ?: look }

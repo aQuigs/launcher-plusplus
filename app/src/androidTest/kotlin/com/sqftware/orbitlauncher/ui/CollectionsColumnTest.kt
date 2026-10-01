@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.AppNames
+import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
@@ -43,7 +45,7 @@ class CollectionsColumnTest {
     private var adds = 0
     private var usageSettingsOpened = 0
     private val menusOpened = mutableListOf<Pair<CollectionKind, AppEntry>>()
-    private val rowsChosen = mutableListOf<CollectionKind>()
+    private val settingsOpened = mutableListOf<CollectionKind>()
 
     private fun show() = compose.setContent {
         CollectionsColumn(
@@ -54,7 +56,7 @@ class CollectionsColumnTest {
             icon = { null },
             onLaunch = launched::add,
             onToggleExpanded = { page = page.toggleExpanded(it) },
-            onChooseRows = rowsChosen::add,
+            onSettings = settingsOpened::add,
             onMove = { from, to -> page = page.move(from, to) },
             onEdit = edited::add,
             onAdd = { adds++ },
@@ -93,17 +95,34 @@ class CollectionsColumnTest {
     }
 
     @Test
-    fun aLongPressAnywhereOnAHeaderButItsButtonsAsksForRows() {
+    fun everyCardsGearOpensItsSettings() {
+        page = CollectionsPage().add(tools)
         show()
 
-        compose.collectionHeader(MostUsed).performTouchInput {
-            longClick(centerLeft + Offset(24.dp.toPx(), 0f))
-            longClick(Offset(width * 0.7f, centerY))
-        }
-        compose.collectionChevron(MostUsed).performTouchInput { longClick() }
-        compose.waitForIdle()
+        listOf(NewApps, MostUsed, tools).forEach { compose.collectionSettingsButton(it).performClick() }
 
-        assertEquals(List(2) { MostUsed }, rowsChosen)
+        compose.runOnIdle { assertEquals(listOf(NewApps, MostUsed, tools), settingsOpened) }
+    }
+
+    @Test
+    fun aBuiltInCardWorksOutNoMoreThanItsLimit() {
+        page = CollectionsPage().set(NewApps, CardSetting.Limit, 5).toggleExpanded(NewApps)
+        show()
+
+        (8..12).forEach { compose.collectionApp(NewApps, recent[it - 1]).assertIsDisplayed() }
+        compose.collectionApp(NewApps, recent[6]).assertDoesNotExist()
+    }
+
+    @Test
+    fun aCardNamesItsAppsAsItsLookSays() {
+        page = CollectionsPage().set(NewApps, CardSetting.Names, AppNames.Always).set(MostUsed, CardSetting.Names, AppNames.Never)
+            .toggleExpanded(MostUsed)
+        foregroundTime = ForegroundTime(mapOf(clock.packageName to 1L))
+        show()
+
+        compose.onNodeWithText("R12").assertIsDisplayed()
+        compose.collectionApp(MostUsed, clock).assertIsDisplayed()
+        compose.onNodeWithText(clock.label).assertDoesNotExist()
     }
 
     @Test
@@ -150,7 +169,7 @@ class CollectionsColumnTest {
 
     @Test
     fun aCompactCardOfThreeRowsShowsThatManyRowsOfItsApps() {
-        page = CollectionsPage().setRows(NewApps, 3)
+        page = CollectionsPage().set(NewApps, CardSetting.Rows, 3).set(NewApps, CardSetting.Limit, 15)
         show()
 
         // Twelve apps fill two rows and part of a third, still without labels.
@@ -202,26 +221,5 @@ class CollectionsColumnTest {
 
         compose.runOnIdle { assertEquals(listOf(tools, NewApps, MostUsed), page.cards.map { it.kind }) }
         assertTrue("Tools now on top", topOf(compose.collectionCard(tools)) < topOf(compose.collectionCard(NewApps)))
-    }
-
-    @Test
-    fun holdingAHandleBeforeDraggingStillReordersRatherThanAskingForRows() {
-        page = CollectionsPage().add(tools)
-        show()
-        val distance = topOf(compose.collectionCard(tools)) - topOf(compose.collectionCard(NewApps))
-        val handle = compose.collectionHandle(tools).fetchSemanticsNode().boundsInRoot.center
-
-        compose.onRoot().performTouchInput {
-            down(handle)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis * 2)
-            moveBy(Offset(0f, -viewConfiguration.touchSlop * 2))
-            repeat(10) { moveBy(Offset(0f, -(distance + 20.dp).toPx() / 10)) }
-            up()
-        }
-
-        compose.runOnIdle {
-            assertEquals(listOf(tools, NewApps, MostUsed), page.cards.map { it.kind })
-            assertTrue(rowsChosen.toString(), rowsChosen.isEmpty())
-        }
     }
 }

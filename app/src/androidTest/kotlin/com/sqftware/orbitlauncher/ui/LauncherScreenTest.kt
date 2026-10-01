@@ -52,9 +52,12 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.AppNames
 import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.ClockFace
+import com.sqftware.orbitlauncher.domain.CardLook
+import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
@@ -2057,18 +2060,33 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aLongPressOnACardsHeaderChoosesHowManyRowsItShowsCompact() {
-        collections = CollectionsPage()
+    fun aCardsGearSetsItsOwnLookWhichGoesBackToTheDefaultOrBecomesIt() {
+        val tools = CollectionKind.Category(AppCategory.Tools)
+        collections = CollectionsPage().add(tools)
         show()
         goToCollections()
 
-        // Clear of the handle in the middle.
-        compose.collectionHeader(MostUsed).performTouchInput { longClick(Offset(width * 0.7f, centerY)) }
-        compose.onNodeWithTag(CollectionTags.ROWS_DIALOG).assertIsDisplayed()
-        compose.onNodeWithText("3 rows").performClick()
+        compose.collectionSettingsButton(MostUsed).performClick()
+        compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertIsDisplayed()
+        compose.onNodeWithText("App limit").assertIsDisplayed()
+        compose.onNodeWithTag(CollectionTags.choice(CardSetting.Rows, 3)).performClick()
+        compose.runOnIdle { assertEquals(CardLook(rows = 3), collections.look(collections.card(MostUsed)!!)) }
+        compose.onNodeWithText("This collection").assertIsDisplayed()
 
-        compose.onNodeWithTag(CollectionTags.ROWS_DIALOG).assertDoesNotExist()
-        compose.runOnIdle { assertEquals(CollectionsPage().setRows(MostUsed, 3), collections) }
+        compose.onNodeWithText("Make default").performClick()
+        compose.runOnIdle {
+            assertEquals(CardLook(rows = 3), collections.defaults)
+            assertEquals(CollectionsPage().add(tools).copy(defaults = CardLook(rows = 3)), collections)
+        }
+        compose.onNodeWithText("Done").performClick()
+        compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertDoesNotExist()
+
+        // A card the user fills has no limit, and its own setting can go back to the default.
+        compose.collectionSettingsButton(tools).performClick()
+        compose.onNodeWithText("App limit").assertDoesNotExist()
+        compose.onNodeWithTag(CollectionTags.choice(CardSetting.Names, AppNames.Always)).performClick()
+        compose.onNodeWithText("Use default").performClick()
+        compose.runOnIdle { assertEquals(CollectionsPage().add(tools).copy(defaults = CardLook(rows = 3)), collections) }
     }
 
     @Test
