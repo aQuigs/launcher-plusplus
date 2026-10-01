@@ -66,14 +66,26 @@ internal fun CacheDrawScope.tickedTrack(
  * ripples set at [first] and [second]. It is drawn at [reach] times each of [steps], so one path holds a coast or all of
  * a hill's contours.
  */
+private val Once = listOf(1f)
+
 internal fun wavering(
     first: Float,
     second: Float,
     centre: Offset = Offset.Zero,
     reach: Float = 1f,
-    steps: List<Float> = listOf(1f),
+    steps: List<Float> = Once,
     lobes: Int = 3,
-) = Path().apply {
+) = Path().apply { addWavering(first, second, centre, reach, steps, lobes) }
+
+/** Adds a [wavering] line to this path, for one redrawn each frame into the same path. */
+internal fun Path.addWavering(
+    first: Float,
+    second: Float,
+    centre: Offset = Offset.Zero,
+    reach: Float = 1f,
+    steps: List<Float> = Once,
+    lobes: Int = 3,
+) {
     val points = 64
     steps.forEach { step ->
         repeat(points) { index ->

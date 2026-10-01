@@ -59,6 +59,7 @@ internal fun lookOf(theme: Theme, lightWallpaper: Boolean): LauncherLook {
         Theme.Atlas -> AtlasPalette
         Theme.ZenGarden -> ZenPalette
         Theme.Ink -> InkPalette
+        Theme.Germ -> GermPalette
     }
     return if (lightWallpaper) palette.dayLook() else palette.nightLook()
 }
