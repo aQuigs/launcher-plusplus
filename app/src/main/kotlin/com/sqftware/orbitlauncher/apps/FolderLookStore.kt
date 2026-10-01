@@ -21,7 +21,13 @@ class SharedPreferencesFolderLookStore(context: Context) : FolderLookStore {
         if (look == null) looks else looks.with(theme, look)
     }
 
-    override fun save(looks: FolderLooks) = prefs.edit { Theme.entries.forEach { putString(keyOf(it), looks.of(it).name) } }
+    // Only what was picked, so a theme still on its first look follows that if a later release puts another first.
+    override fun save(looks: FolderLooks) = prefs.edit {
+        Theme.entries.forEach { theme ->
+            val look = looks.picked(theme)
+            if (look == null) remove(keyOf(theme)) else putString(keyOf(theme), look.name)
+        }
+    }
 
     private companion object {
         // Space's pick keeps the key it had before there were themes, so it survives the update.

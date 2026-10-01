@@ -89,11 +89,11 @@ internal val RING_ICON_SIZE = 56.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
-/** How long the spark takes to turn once: slow enough to read as drift, not a spinner. */
-private const val SPARK_TURN_MILLIS = 60_000
+/** How long what the emblem turns fast (Space's spark) takes to turn once: slow enough to read as drift, not a spinner. */
+private const val FAST_TURN_MILLIS = 60_000
 
-/** How long the sky takes to turn once: slower than the spark, so the dust seems farther off. */
-private const val SKY_TURN_MILLIS = 600_000
+/** How long what it turns slowly (Space's sky) takes to turn once: slower, so it seems farther off. */
+private const val SLOW_TURN_MILLIS = 600_000
 
 /** How long an open folder's planet takes to reach the centre, and to go back to its slot. */
 private const val SPREAD_MILLIS = 380
@@ -174,7 +174,7 @@ fun HomeRing(
     held: AppEntry? = null,
     inSight: Boolean = true,
     turns: Boolean = true,
-    minuteOfDay: Int = 0,
+    minuteOfDay: () -> Int = { 0 },
     dock: List<RingItem> = emptyList(),
     dockSlot: (RingItem.Folder) -> Bounds? = { null },
 ) {
@@ -184,10 +184,10 @@ fun HomeRing(
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
     val marks = LocalRingColors.current
     val art = LocalThemeArt.current
-    // Here rather than in the emblem, which an open folder removes, so sky and spark keep their angles across one.
+    // Here rather than in the emblem, which an open folder removes, so what it turns keeps its angle across one.
     val turning = turns && hint == null && openFolder == null
-    val spark = turnAngle(turning, SPARK_TURN_MILLIS)
-    val skyTurn = turnAngle(turning, SKY_TURN_MILLIS)
+    val fastTurn = turnAngle(turning, FAST_TURN_MILLIS)
+    val slowTurn = turnAngle(turning, SLOW_TURN_MILLIS)
     fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx())
 
     // How far the open folder's planet has come from its slot: 0 there, 1 in the centre with its apps round it. The
@@ -228,7 +228,7 @@ fun HomeRing(
     Layout(
         content = {
             if (openFolder == null || spreadingOut) {
-                Emblem(hint, { skyTurn.value }, { spark.value }, minuteOfDay, onEdit, Modifier.layoutId(Part.Emblem))
+                Emblem(hint, { slowTurn.value }, { fastTurn.value }, minuteOfDay, onEdit, Modifier.layoutId(Part.Emblem))
             }
             centred?.let { folder ->
                 key(Part.Planet) {
@@ -404,7 +404,14 @@ private fun Modifier.inert(): Modifier = clearAndSetSemantics {}.pointerInput(Un
  * the eye's first stop.
  */
 @Composable
-private fun Emblem(hint: String?, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun Emblem(
+    hint: String?,
+    slowTurn: () -> Float,
+    fastTurn: () -> Float,
+    minuteOfDay: () -> Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val art = LocalThemeArt.current
     val edgeMark = LocalRingColors.current.mark
 

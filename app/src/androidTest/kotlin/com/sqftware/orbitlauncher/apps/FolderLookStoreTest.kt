@@ -37,6 +37,13 @@ class FolderLookStoreTest {
     }
 
     @Test
+    fun aThemeWithNoPickIsNotStoredAsIfOneWasMade() {
+        store.save(FolderLooks().with(Theme.Space, FolderLook.Ringed))
+
+        assertEquals(null, store.load().picked(Theme.Clockwork))
+    }
+
+    @Test
     fun spacesPickFromBeforeThemesIsKept() {
         prefs.edit(commit = true) { putString("look", "SolarSystem") }
 

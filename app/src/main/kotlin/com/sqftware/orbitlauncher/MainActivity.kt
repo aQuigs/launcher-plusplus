@@ -52,8 +52,8 @@ import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
 import com.sqftware.orbitlauncher.ui.LauncherScreen
 import com.sqftware.orbitlauncher.ui.PinRequest
+import com.sqftware.orbitlauncher.ui.Themed
 import com.sqftware.orbitlauncher.ui.WidgetActions
-import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity() {
             }
             LaunchedEffect(lightWallpaper) { showBarsFor(lightWallpaper) }
             var theme by remember { mutableStateOf(themeStore.load()) }
-            LauncherTheme(theme, lightWallpaper) {
+            Themed(theme, lightWallpaper) {
                 val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's

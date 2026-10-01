@@ -51,7 +51,7 @@ object SpaceArt : ThemeArt {
 
     /** The icon's night sky, half see-through so it darkens a bright wallpaper without hiding it, with its spark on top. */
     @Composable
-    override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: Int, modifier: Modifier) {
+    override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) {
         val sky = rememberVectorPainter(ImageVector.vectorResource(R.drawable.ic_launcher_background))
 
         // Sky and spark each on a layer of their own, so turning them changes a property of the layer and nothing is drawn

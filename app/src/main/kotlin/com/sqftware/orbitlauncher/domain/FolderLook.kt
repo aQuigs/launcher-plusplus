@@ -24,6 +24,16 @@ enum class FolderLook(val label: String) {
     Gear("Gear"),
 }
 
+/**
+ * Whether folders in this look move as the folders' sky turns: in the Solar system only if one of the [planets] shown
+ * moves, and in the looks that turn whenever there are [folders] at all.
+ */
+fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this) {
+    FolderLook.SolarSystem -> planets.any(Planet::moves)
+    FolderLook.Orbit, FolderLook.Gear -> folders
+    FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial -> false
+}
+
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */
 enum class Planet(val moves: Boolean = true) {
     Mercury(moves = false),

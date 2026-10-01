@@ -4,16 +4,15 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.DrawResult
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.center
@@ -27,46 +26,43 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.hourHandDegrees
+import com.sqftware.orbitlauncher.domain.minuteHandDegrees
 import com.sqftware.orbitlauncher.ui.theme.DialEdge
 import com.sqftware.orbitlauncher.ui.theme.GearCog
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import kotlin.math.PI
-import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Where the small seconds dial sits below the emblem's centre, and how large it is, as shares of the emblem's radius. */
-private const val SMALL_SECONDS_AT = 0.42f
-private const val SMALL_SECONDS = 0.17f
+/** Where the opening onto the watch's wheel sits below the emblem's centre, and how large it is, as shares of its radius. */
+private const val WHEEL_AT = 0.42f
+private const val WHEEL = 0.17f
 
 /** How many circles, turned round the centre, make an engine-turned rosette. */
 private const val ROSETTE_CIRCLES = 24
 
-/** How much of a gear folder's square its disc of previews takes, the teeth the rest. */
-private const val GEAR_DISC = 0.8f
+/** How much of a gear folder's square its disc of previews takes, and how far its teeth reach, past the square as moons do. */
+private const val GEAR_DISC = 0.88f
+private const val GEAR_ROOT = 0.92f
+private const val GEAR_TIP = 1.06f
 private const val GEAR_TEETH = 12
 
 /** How many times a gear turns in the hour the folders' sky takes to turn once: a whole number, so it never jumps. */
 private const val GEAR_TURNS_PER_HOUR = 2
 
-// The drawer's rosettes repeat in a tile a phone's screen fits in, as the space theme's stars do, at a fraction of the pace.
-private val TILE_WIDTH = 480.dp
-private val TILE_HEIGHT = 960.dp
-private const val PARALLAX = 0.25f
-
 /** Where each of the drawer's rosettes sits in its tile, as shares of it, and how far it reaches. */
 private val DrawerRosettes = listOf(Triple(0.18f, 0.2f, 150.dp), Triple(0.86f, 0.68f, 190.dp))
 
 /**
- * An old pocket watch: the emblem is its dial telling the time, with a small seconds hand that sweeps while the ring
- * turns; the ring is a chapter ring of minute marks; folders are sub-dials or gears; and engine-turned rosettes are cut
- * into the drawer.
+ * An old pocket watch: the emblem is its dial telling the time, with a wheel of the movement turning in an opening
+ * below the hands while the ring turns; the ring is a chapter ring of minute marks; folders are sub-dials or gears; and
+ * engine-turned rosettes are cut into the drawer.
  */
 object ClockworkArt : ThemeArt {
     override val hintInk @Composable get() = MaterialTheme.colorScheme.onSurface
@@ -74,29 +70,32 @@ object ClockworkArt : ThemeArt {
 
     /** The dial follows the scheme: walnut and brass by night, porcelain inked in walnut by day. */
     @Composable
-    override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: Int, modifier: Modifier) {
-        val dial = DialColors(MaterialTheme.colorScheme)
+    override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) {
+        val scheme = MaterialTheme.colorScheme
+        // Each part on a layer of its own, so the ring's glow, the wheel turning and the hands moving each redraw only it.
         Box(modifier) {
-            Spacer(Modifier.fillMaxSize().drawWithCache { dial(dial, marked) })
+            Spacer(Modifier.fillMaxSize().graphicsLayer().drawWithCache { dial(scheme, marked) })
             if (marked) {
-                Spacer(Modifier.fillMaxSize().drawBehind { drawHands(dial, minuteOfDay) })
                 Spacer(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            transformOrigin = TransformOrigin(0.5f, 0.5f + SMALL_SECONDS_AT * size.emblemRadius / size.height)
+                            transformOrigin = TransformOrigin(0.5f, 0.5f + WHEEL_AT * size.emblemRadius / size.height)
                             rotationZ = fastTurn()
                         }
                         .drawWithCache {
                             val radius = size.emblemRadius
-                            val hub = size.center + Offset(0f, radius * SMALL_SECONDS_AT)
-                            val hand = 1.5.dp.toPx()
+                            val hub = size.center + Offset(0f, radius * WHEEL_AT)
+                            val rim = radius * WHEEL * 0.8f
+                            val line = Stroke(1.5.dp.toPx())
+                            val spokes = ticks(hub, 6, -rim, rim) { it < 3 }
                             onDrawBehind {
-                                drawLine(dial.seconds, hub, hub - Offset(0f, radius * SMALL_SECONDS * 0.9f), hand, StrokeCap.Round)
-                                drawCircle(dial.seconds, hand, hub)
+                                drawCircle(scheme.tertiary, rim, hub, style = line)
+                                drawPath(spokes, scheme.tertiary, style = line)
                             }
                         },
                 )
+                Spacer(Modifier.fillMaxSize().graphicsLayer().drawBehind { drawHands(scheme, minuteOfDay()) })
             }
         }
     }
@@ -109,24 +108,17 @@ object ClockworkArt : ThemeArt {
         iconSize: Float,
         colours: RingColors,
     ): DrawScope.(glow: Float, alpha: Float) -> Unit {
-        val track = Stroke(1.dp.toPx())
         val minor = Stroke(1.dp.toPx())
         val major = Stroke(2.dp.toPx())
-        val minutes = Path()
-        val fives = Path()
-        repeat(60) { minute ->
-            val reach = (if (minute % 5 == 0) 6.dp else 2.5.dp).toPx()
-            val along = direction(minute * 6f)
-            (if (minute % 5 == 0) fives else minutes).apply {
-                moveTo(centre + along * (radius - reach))
-                lineTo(centre + along * (radius + reach))
-            }
-        }
+        val short = 2.5.dp.toPx()
+        val long = 6.dp.toPx()
+        val minutes = ticks(centre, 60, radius - short, radius + short) { it % 5 != 0 }
+        val fives = ticks(centre, 60, radius - long, radius + long) { it % 5 == 0 }
         val discs = Path().apply { slots.forEach { addOval(Rect(it, iconSize / 2 + 3.dp.toPx())) } }
         return { glow, alpha ->
             if (alpha > 0f) {
                 clipPath(discs, ClipOp.Difference) {
-                    drawCircle(colours.mark.copy(alpha = (0.3f + 0.45f * glow) * alpha), radius, centre, style = track)
+                    drawCircle(colours.mark.copy(alpha = (0.3f + 0.45f * glow) * alpha), radius, centre, style = minor)
                     val tick = colours.starLine.copy(alpha = (colours.starLine.alpha + 0.3f * glow) * alpha)
                     drawPath(minutes, tick.copy(alpha = tick.alpha * 0.6f), style = minor)
                     drawPath(fives, tick, style = major)
@@ -145,15 +137,14 @@ object ClockworkArt : ThemeArt {
     ) {
         val style = LocalFolderStyle.current
         val gear = style.look == FolderLook.Gear
-        // A layer of its own, so a turning gear redraws only itself, not the page round it.
-        Box(modifier.graphicsLayer(), contentAlignment = Alignment.Center) {
+        Box(modifier, contentAlignment = Alignment.Center) {
             if (gear) {
                 Spacer(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer { rotationZ = style.minutes() * 6f * GEAR_TURNS_PER_HOUR }
                         .drawWithCache {
-                            val cog = cogPath(size.center, size.minDimension / 2 - 1.dp.toPx(), size.minDimension / 2 * GEAR_DISC)
+                            val cog = cogPath(size.center, size.minDimension / 2 * GEAR_TIP, size.minDimension / 2 * GEAR_ROOT)
                             val outline = Stroke(1.dp.toPx())
                             onDrawBehind {
                                 drawPath(cog, GearCog.inner)
@@ -162,41 +153,38 @@ object ClockworkArt : ThemeArt {
                         },
                 )
             }
-            val face = if (gear) Modifier.fillMaxSize(GEAR_DISC * 0.94f) else Modifier.fillMaxSize().subDialMarks()
-            IconDisc(presses, face.edge(DialEdge), contentAlignment = Alignment.Center) {
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, contentAlignment = Alignment.Center) {
-                    FolderPreviews(folder, icon)
-                }
-            }
+            val face = if (gear) Modifier.fillMaxSize(GEAR_DISC) else Modifier.fillMaxSize().subDialMarks()
+            FolderDisc(folder, icon, presses, inner, face.edge(DialEdge))
         }
     }
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) {
         if (colour.alpha <= 0f) return
-        val tileWidth = TILE_WIDTH.toPx()
-        val tileHeight = TILE_HEIGHT.toPx()
-        val top = -(scrolled * PARALLAX).mod(tileHeight)
+        val faint = colour.copy(alpha = colour.alpha * 0.3f)
         val line = Stroke(0.5.dp.toPx())
-        repeat(ceil(size.width / tileWidth).toInt()) { column ->
-            repeat(ceil((size.height - top) / tileHeight).toInt()) { row ->
-                translate(column * tileWidth, top + row * tileHeight) {
-                    DrawerRosettes.forEach { (x, y, reach) ->
-                        rosette(Offset(x * tileWidth, y * tileHeight), reach.toPx(), colour.copy(alpha = colour.alpha * 0.3f), line)
-                    }
-                }
+        forEachDrawerTile(scrolled) { origin, tile ->
+            DrawerRosettes.forEach { (x, y, reach) ->
+                rosette(origin + Offset(x * tile.width, y * tile.height), reach.toPx(), faint, line)
             }
         }
     }
 }
 
+/** The unit offset [degrees] round from the top, clockwise, in screen axes. */
 private fun direction(degrees: Float): Offset {
     val angle = degrees / 180f * PI.toFloat()
     return Offset(sin(angle), -cos(angle))
 }
 
-private fun Path.moveTo(at: Offset) = moveTo(at.x, at.y)
-
-private fun Path.lineTo(at: Offset) = lineTo(at.x, at.y)
+/** Radial marks round [centre] from [from] to [to] out, at those of [count] even steps [kept] by their index. */
+private fun ticks(centre: Offset, count: Int, from: Float, to: Float, kept: (Int) -> Boolean): Path = Path().apply {
+    for (index in 0 until count) {
+        if (!kept(index)) continue
+        val along = direction(index * 360f / count)
+        (centre + along * from).let { moveTo(it.x, it.y) }
+        (centre + along * to).let { lineTo(it.x, it.y) }
+    }
+}
 
 /** Circles of [reach] turned round [centre], overlapping into the rosette a watchmaker's engine cuts into a dial. */
 private fun DrawScope.rosette(centre: Offset, reach: Float, colour: Color, line: Stroke) {
@@ -207,75 +195,58 @@ private fun DrawScope.rosette(centre: Offset, reach: Float, colour: Color, line:
 }
 
 /**
- * What the dial is drawn in, from the scheme so it turns over with the wallpaper: its [face] the see-through ground that
- * floats below the opaque containers, [rule]s cut faintly in the accent, [brass] hour marks, [hand]s in the content
- * colour on a [shade] of the face's own, and the [seconds] hand in the second accent.
+ * The watch's dial, in the scheme's roles so it turns over with the wallpaper: a face of the see-through ground that
+ * floats below the opaque containers, a rosette and minute marks cut faintly in the accent, accent hour marks, and the
+ * opening onto the wheel.
  */
-private class DialColors(scheme: ColorScheme) {
-    val face = scheme.surfaceContainerLowest
-    val rule = scheme.primary.copy(alpha = 0.35f)
-    val brass = scheme.primary
-    val hand = scheme.onSurface
-    val shade = scheme.inverseOnSurface
-    val seconds = scheme.tertiary
-}
-
-/** The watch's dial: its face, a rosette cut in it, its minute marks and brass hour marks, and the small seconds dial. */
-private fun CacheDrawScope.dial(colours: DialColors, marked: Boolean): DrawResult {
+private fun CacheDrawScope.dial(scheme: ColorScheme, marked: Boolean): DrawResult {
     val radius = size.emblemRadius
     val centre = size.center
+    val face = scheme.surfaceContainerLowest
+    val cut = scheme.primary.copy(alpha = 0.35f)
     val rule = Stroke(0.75.dp.toPx())
-    val minutes = Path()
-    val hours = Path()
-    repeat(60) { minute ->
-        val along = direction(minute * 6f)
-        (if (minute % 5 == 0) hours else minutes).apply {
-            moveTo(centre + along * radius * (if (minute % 5 == 0) 0.74f else 0.8f))
-            lineTo(centre + along * radius * 0.86f)
-        }
-    }
+    val minutes = ticks(centre, 60, radius * 0.8f, radius * 0.86f) { it % 5 != 0 }
+    val hours = ticks(centre, 12, radius * 0.74f, radius * 0.86f) { true }
     val hourMark = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
-    val smallSeconds = centre + Offset(0f, radius * SMALL_SECONDS_AT)
+    val opening = centre + Offset(0f, radius * WHEEL_AT)
     return onDrawBehind {
-        drawCircle(colours.face, radius, centre)
-        rosette(centre, radius * 0.62f, colours.rule, rule)
-        drawCircle(colours.rule, radius * 0.86f, centre, style = rule)
-        drawPath(minutes, colours.rule, style = rule)
+        drawCircle(face, radius, centre)
+        rosette(centre, radius * 0.62f, cut, rule)
+        drawCircle(cut, radius * 0.86f, centre, style = rule)
+        drawPath(minutes, cut, style = rule)
         if (marked) {
-            drawCircle(colours.face, radius * SMALL_SECONDS, smallSeconds)
-            drawCircle(colours.rule, radius * SMALL_SECONDS, smallSeconds, style = rule)
+            drawCircle(face, radius * WHEEL, opening)
+            drawCircle(cut, radius * WHEEL, opening, style = rule)
         }
-        drawPath(hours, colours.brass, style = hourMark)
+        drawPath(hours, scheme.primary, style = hourMark)
     }
 }
 
-/** The hour and minute hands at [minuteOfDay], on a shadow of the face's colour so they read over the rosette. */
-private fun DrawScope.drawHands(colours: DialColors, minuteOfDay: Int) {
+/** The hour and minute hands at [minuteOfDay], in the content colour on a shadow of the face's, so they read over the rosette. */
+private fun DrawScope.drawHands(scheme: ColorScheme, minuteOfDay: Int) {
     val radius = size.emblemRadius
     val centre = size.center
     fun hand(degrees: Float, length: Float, width: Float) = rotate(degrees, centre) {
         val tail = centre + Offset(0f, radius * 0.12f)
         val tip = centre - Offset(0f, radius * length)
-        drawLine(colours.shade, tail, tip, width + 2.dp.toPx(), StrokeCap.Round)
-        drawLine(colours.hand, tail, tip, width, StrokeCap.Round)
+        drawLine(scheme.inverseOnSurface, tail, tip, width + 2.dp.toPx(), StrokeCap.Round)
+        drawLine(scheme.onSurface, tail, tip, width, StrokeCap.Round)
     }
-    hand(minuteOfDay % 720 / 2f, 0.46f, 3.5.dp.toPx())
-    hand(minuteOfDay % 60 * 6f, 0.7f, 2.dp.toPx())
-    drawCircle(colours.brass, 3.5.dp.toPx(), centre)
+    hand(hourHandDegrees(minuteOfDay), 0.46f, 3.5.dp.toPx())
+    hand(minuteHandDegrees(minuteOfDay), 0.7f, 2.dp.toPx())
+    drawCircle(scheme.primary, 3.5.dp.toPx(), centre)
 }
 
-/** Twelve marks round the inside of a sub-dial's rim, as a watch's smaller dials have. */
-private fun Modifier.subDialMarks(): Modifier = drawWithContent {
-    drawContent()
-    val radius = size.minDimension / 2
+/** Twelve marks round the inside of a sub-dial's rim, longer at the quarters, as a watch's smaller dials have. */
+private fun Modifier.subDialMarks(): Modifier = drawWithCache {
+    val rim = size.minDimension / 2 - 3.5.dp.toPx()
     val mark = Stroke(1.dp.toPx(), cap = StrokeCap.Round)
-    val marks = Path()
-    repeat(12) { hour ->
-        val along = direction(hour * 30f)
-        marks.moveTo(center + along * (radius - 3.5.dp.toPx()))
-        marks.lineTo(center + along * (radius - (if (hour % 3 == 0) 8.dp else 5.5.dp).toPx()))
+    val marks = ticks(size.center, 12, rim - 2.dp.toPx(), rim) { it % 3 != 0 }
+        .apply { addPath(ticks(size.center, 12, rim - 4.5.dp.toPx(), rim) { it % 3 == 0 }) }
+    onDrawWithContent {
+        drawContent()
+        drawPath(marks, DialEdge.inner, style = mark)
     }
-    drawPath(marks, DialEdge.inner, style = mark)
 }
 
 /** A cog's outline round [centre]: [GEAR_TEETH] flat-topped teeth out to [outer], from a rim at [root]. */
@@ -290,7 +261,7 @@ private fun cogPath(centre: Offset, outer: Float, root: Float): Path = Path().ap
             start + step * 0.54f to root,
         ).forEachIndexed { index, (degrees, reach) ->
             val at = centre + direction(degrees) * reach
-            if (tooth == 0 && index == 0) moveTo(at) else lineTo(at)
+            if (tooth == 0 && index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
         }
     }
     close()

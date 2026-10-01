@@ -20,9 +20,19 @@ class ThemeTest {
     }
 
     @Test
+    fun `folders move only in a look that turns, and in the Solar system only if a planet shown moves`() {
+        assertTrue(FolderLook.Gear.moves(folders = true, planets = emptyList()))
+        assertTrue(!FolderLook.Gear.moves(folders = false, planets = emptyList()))
+        assertTrue(!FolderLook.SubDial.moves(folders = true, planets = listOf(Planet.Earth)))
+        assertTrue(!FolderLook.SolarSystem.moves(folders = true, planets = listOf(Planet.Mercury)))
+        assertTrue(FolderLook.SolarSystem.moves(folders = true, planets = listOf(Planet.Mercury, Planet.Earth)))
+    }
+
+    @Test
     fun `a pick the theme does not offer shows its first instead`() {
         assertTrue(FolderLook.Gear !in Theme.Space.folderLooks)
 
         assertEquals(FolderLook.Rim, FolderLooks().with(Theme.Space, FolderLook.Gear).of(Theme.Space))
+        assertEquals(null, FolderLooks().with(Theme.Space, FolderLook.Gear).picked(Theme.Space))
     }
 }

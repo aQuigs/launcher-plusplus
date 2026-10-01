@@ -29,14 +29,15 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
+import kotlin.math.min
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import kotlin.math.min
 
 @RunWith(AndroidJUnit4::class)
 class HomeRingTest {
@@ -46,7 +47,7 @@ class HomeRingTest {
     private var ring by mutableStateOf(emptyList<RingItem>())
     private var unread by mutableStateOf(UnreadCounts())
     private var openFolder by mutableStateOf<RingItem.Folder?>(null)
-    private var art by mutableStateOf<ThemeArt>(SpaceArt)
+    private var theme by mutableStateOf(Theme.Space)
     private var folderLook by mutableStateOf(FolderLook.Rim)
 
     private fun show(
@@ -67,19 +68,21 @@ class HomeRingTest {
     ) {
         ring = items
         compose.setContent {
-            CompositionLocalProvider(LocalThemeArt provides art, LocalFolderStyle provides FolderStyle(folderLook)) {
-                HomeRing(
-                    ring = ring,
-                    hint = hint,
-                    icon = { null },
-                    onLaunch = onLaunch,
-                    onOpenFolder = onOpenFolder,
-                    onCloseFolder = onCloseFolder,
-                    onEdit = onEdit,
-                    openFolder = openFolder,
-                    unread = unread,
-                    onClearBadge = onClearBadge,
-                )
+            Themed(theme, lightWallpaper = false) {
+                CompositionLocalProvider(LocalFolderStyle provides FolderStyle(folderLook)) {
+                    HomeRing(
+                        ring = ring,
+                        hint = hint,
+                        icon = { null },
+                        onLaunch = onLaunch,
+                        onOpenFolder = onOpenFolder,
+                        onCloseFolder = onCloseFolder,
+                        onEdit = onEdit,
+                        openFolder = openFolder,
+                        unread = unread,
+                        onClearBadge = onClearBadge,
+                    )
+                }
             }
         }
     }
@@ -203,7 +206,7 @@ class HomeRingTest {
     @Test
     fun clockworkDrawsTheRingItsHintAndItsFoldersInEitherLookOpenAndClosed() {
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, alphabet[0]))
-        art = ClockworkArt
+        theme = Theme.Clockwork
         folderLook = FolderLook.SubDial
         showItems(listOf(RingItem.App(clock), work, RingItem.App(alphabet[1])), hint = "Add apps")
 

@@ -14,7 +14,10 @@ enum class Theme(val label: String, val folderLooks: List<FolderLook>) {
  * picked, or with a pick it does not offer, shows its first.
  */
 data class FolderLooks(private val picks: Map<Theme, FolderLook> = emptyMap()) {
-    fun of(theme: Theme): FolderLook = picks[theme]?.takeIf { it in theme.folderLooks } ?: theme.folderLooks.first()
+    fun of(theme: Theme): FolderLook = picked(theme) ?: theme.folderLooks.first()
+
+    /** The look picked in [theme], if one of its own was. */
+    fun picked(theme: Theme): FolderLook? = picks[theme]?.takeIf { it in theme.folderLooks }
 
     fun with(theme: Theme, look: FolderLook): FolderLooks = copy(picks = picks + (theme to look))
 }
