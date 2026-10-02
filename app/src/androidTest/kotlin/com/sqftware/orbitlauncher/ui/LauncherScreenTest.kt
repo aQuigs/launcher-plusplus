@@ -724,6 +724,17 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun backWithNothingOpenKeepsTheLauncherOnTheHomePage() {
+        homeApps = HomeApps(ring = ringOf(clock, mail))
+        show()
+
+        Espresso.pressBack()
+
+        compose.ringSlot(clock).assertIsDisplayed()
+        assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
     fun backClosesTheDrawerOverAnOpenFolderFirst() {
         homeApps = HomeApps(ring = Ring(listOf(work)))
         show()

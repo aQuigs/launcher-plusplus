@@ -864,10 +864,11 @@ fun LauncherScreen(
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
     // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search.
     // The open folder comes last because the drawer and the other pages both hide it, and a press should undo something
-    // in view.
+    // in view. With nothing left, the home app still takes Back: left to the system, it would finish the home activity,
+    // which the system then starts afresh, reloading everything on screen. Opened as an app instead, Back leaves it.
     BackHandler(
-        enabled = showingWallpaper || dragged != null || drawerOpen || pickingCollection || editedWidget != null ||
-            pagerState.currentPage != layout.homeIndex || open != null || previewing,
+        enabled = isHomeApp || showingWallpaper || dragged != null || drawerOpen || pickingCollection ||
+            editedWidget != null || pagerState.currentPage != layout.homeIndex || open != null || previewing,
     ) {
         when {
             showingWallpaper -> showingWallpaper = false
@@ -877,7 +878,7 @@ fun LauncherScreen(
             editedWidget != null -> editingWidget = null
             pagerState.currentPage != layout.homeIndex -> goHome()
             open != null -> openFolder = null
-            else -> onPreviewThemeChange(null)
+            previewing -> onPreviewThemeChange(null)
         }
     }
 
