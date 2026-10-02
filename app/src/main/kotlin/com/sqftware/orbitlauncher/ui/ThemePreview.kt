@@ -20,10 +20,15 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
@@ -105,10 +110,18 @@ fun ThemePreviewBar(
 @Composable
 private fun ChipRow(content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        Modifier.nestedScroll(KeepsSideways).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
     )
+}
+
+// A row run to its end hands what is left of a sideways drag or fling to its parent, the pager, which would turn the page
+// under a finger only browsing the chips.
+private object KeepsSideways : NestedScrollConnection {
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource) = available
+
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity) = available
 }
 
 @Composable
