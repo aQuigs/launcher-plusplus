@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -43,19 +44,26 @@ import com.sqftware.orbitlauncher.ui.theme.SumiInk
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** How many times an ink drop bleeds out in the hour the folders' sky takes to turn once. */
+/**
+ * How many times an ink drop bleeds out in the hour the folders' sky takes to turn once, and how many times a minute ink
+ * bleeds out from under the emblem's seal.
+ */
 private const val BLEEDS_PER_HOUR = 30
+private const val EMBLEM_BLEEDS_PER_TURN = 4
 
 /** How much of a folder's square the disc of previews takes on an ensō and on a seal, which show round it. */
 private const val ENSO_DISC = 0.8f
 private const val SEAL_DISC = 0.74f
 
+/** How wide the emblem's seal is, as a share of the emblem's radius. */
+private const val SEAL_SIDE = 0.8f
+
 /** How far a seal is turned, as a hand presses it a little askew. */
 private const val SEAL_TILT = -6f
 
 /**
- * Sumi-e brushwork: the emblem is a red seal, the ring an ensō brushed in one stroke, folders are ensō, seals or ink
- * drops bleeding out, and the drawer is an ink-wash landscape.
+ * Sumi-e brushwork: the emblem is a red seal with ink bleeding out from under it, the ring an ensō brushed in one
+ * stroke, folders are ensō, seals or ink drops bleeding out, and the drawer is an ink-wash landscape.
  */
 object InkArt : ThemeArt {
     @Composable
@@ -63,24 +71,38 @@ object InkArt : ThemeArt {
         val ground = MaterialTheme.colorScheme.surfaceContainerLowest
         val glyphs = rememberTextMeasurer()
         val lettering = MaterialTheme.typography.titleLarge
-        Spacer(
-            modifier.drawWithCache {
-                val side = size.emblemRadius * 0.8f
-                val inset = side * 0.08f
-                val style = lettering.copy(fontSize = (side * 0.42f).toSp(), fontWeight = FontWeight.Black)
-                val glyph = glyphs.measure("++", style)
-                val at = size.center - Offset(glyph.size.width / 2f, glyph.size.height / 2f)
-                onDrawBehind {
-                    drawCircle(ground, size.emblemRadius)
-                    if (marked) {
-                        rotate(SEAL_TILT) {
-                            seal(size.center, side, inset)
-                            drawText(glyph, SealPaper, at)
+        val wash = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+        // The ink on a layer of its own, so its bleeding redraws only it, not the seal over it.
+        Box(modifier) {
+            Spacer(
+                Modifier.fillMaxSize().graphicsLayer().drawWithCache {
+                    onDrawBehind {
+                        drawCircle(ground, size.emblemRadius)
+                        if (marked) {
+                            val bled = cycles(fastTurn(), EMBLEM_BLEEDS_PER_TURN)
+                            drawBleeding(EmblemBleeds, size.center, size.emblemRadius * SEAL_SIDE / 2, size.emblemRadius * 0.95f, wash, bled)
                         }
                     }
-                }
-            },
-        )
+                },
+            )
+            if (marked) {
+                Spacer(
+                    Modifier.fillMaxSize().graphicsLayer().drawWithCache {
+                        val side = size.emblemRadius * SEAL_SIDE
+                        val inset = side * 0.08f
+                        val style = lettering.copy(fontSize = (side * 0.42f).toSp(), fontWeight = FontWeight.Black)
+                        val glyph = glyphs.measure("++", style)
+                        val at = size.center - Offset(glyph.size.width / 2f, glyph.size.height / 2f)
+                        onDrawBehind {
+                            rotate(SEAL_TILT) {
+                                seal(size.center, side, inset)
+                                drawText(glyph, SealPaper, at)
+                            }
+                        }
+                    },
+                )
+            }
+        }
     }
 
     /** An ensō through the slots: one brush stroke pressed in at the top right, thinning as it goes round to a dry tail. */
@@ -232,19 +254,29 @@ private fun Modifier.inkDrop(minutes: () -> Float): Modifier = drawWithCache {
     val half = size.minDimension / 2
     val centre = size.center
     val heart = wavering(1.1f, 2.7f, centre, half * 0.7f)
-    // Unit blots, scaled each frame to how far each ring has spread.
-    val rings = listOf(wavering(0.3f, 1.4f), wavering(2.2f, 0.6f), wavering(4.0f, 3.1f))
     val spatters = listOf(Offset(-0.84f, -0.7f) to 0.07f, Offset(-0.8f, 0.78f) to 0.05f)
     onDrawBehind {
-        val bled = minutes() * BLEEDS_PER_HOUR / 60f
-        rings.forEachIndexed { index, ring ->
-            val spread = (bled + index / rings.size.toFloat()) % 1f
-            withTransform({
-                translate(centre.x, centre.y)
-                scale(half * (0.7f + 0.38f * spread), half * (0.7f + 0.38f * spread), Offset.Zero)
-            }) { drawPath(ring, InkWash.copy(alpha = InkWash.alpha * 0.6f * sin(spread * PI.toFloat()))) }
-        }
+        drawBleeding(Bleeds, centre, half * 0.7f, half * 1.08f, InkWash.copy(alpha = InkWash.alpha * 0.6f), minutes() * BLEEDS_PER_HOUR / 60f)
         drawPath(heart, InkHeart)
         spatters.forEach { (at, reach) -> drawCircle(SumiInk, half * reach, centre + at * half) }
+    }
+}
+
+/** Unit blots of ink, scaled as they spread. */
+private val Bleeds = listOf(wavering(0.3f, 1.4f), wavering(2.2f, 0.6f), wavering(4.0f, 3.1f))
+private val EmblemBleeds = listOf(wavering(1.7f, 0.2f), wavering(3.3f, 2.5f), wavering(5.1f, 1.2f))
+
+/**
+ * [rings] of ink bleeding out round [centre] from [from] to [to] in [colour] as [bled] goes on, each once a whole step of
+ * it and the rest of the way behind the last, fading in and out so none pops.
+ */
+private fun DrawScope.drawBleeding(rings: List<Path>, centre: Offset, from: Float, to: Float, colour: Color, bled: Float) {
+    rings.forEachIndexed { index, ring ->
+        val spread = (bled + index / rings.size.toFloat()) % 1f
+        val reach = from + (to - from) * spread
+        withTransform({
+            translate(centre.x, centre.y)
+            scale(reach, reach, Offset.Zero)
+        }) { drawPath(ring, colour.copy(alpha = colour.alpha * sin(spread * PI.toFloat()))) }
     }
 }

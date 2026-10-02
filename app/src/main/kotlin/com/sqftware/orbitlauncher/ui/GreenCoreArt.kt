@@ -68,9 +68,10 @@ private const val RUNGS = 72
 private const val RUNG_POINTS = 12
 
 /**
- * A reactor's green core: the emblem is a wire sphere with a glowing heart, turning with the ring; the ring a wireframe
- * tube; folders are wire spheres, pulsing orbs or hex cells; the drawer ripples with waves; and the reactor itself, a
- * tunnel of rings into a blazing core, is a scene the launcher's menu offers as the wallpaper.
+ * A reactor's green core: the emblem is a wire sphere turning with the ring round a glowing blob that heaves and
+ * drifts; the ring a wireframe tube; folders are wire spheres, pulsing orbs or hex cells; the drawer ripples with
+ * waves; and the reactor itself, a tunnel of rings into a blazing core, is a scene the launcher's menu offers as the
+ * wallpaper.
  */
 object GreenCoreArt : ThemeArt {
     override val scene = ThemeScene("reactor") { reactor() }
@@ -84,11 +85,21 @@ object GreenCoreArt : ThemeArt {
                 val radius = size.emblemRadius * 0.62f
                 val sphere = WireSphere(size.center, radius)
                 val line = Stroke(1.dp.toPx())
-                val heart = Brush.radialGradient(listOf(wire.copy(alpha = 0.6f), Color.Transparent), size.center, radius * 0.5f)
+                // Built about the origin and moved to where the blob has drifted, so its glow is made once.
+                val blob = Path()
+                val plasma = Brush.radialGradient(listOf(wire.copy(alpha = 0.75f), wire.copy(alpha = 0.2f)), Offset.Zero, radius * 0.5f)
+                val rim = wire.copy(alpha = 0.8f)
                 onDrawBehind {
                     drawCircle(ground, size.emblemRadius)
                     if (marked) {
-                        drawCircle(heart, radius * 0.5f, size.center)
+                        val beat = cycles(fastTurn(), 1) * 2 * PI.toFloat()
+                        val heart = size.center + Offset(sin(beat * 3), sin(beat * 2 + 1f)) * (radius * 0.12f)
+                        blob.rewind()
+                        blob.addBlob(radius * 0.42f, beat)
+                        translate(heart.x, heart.y) {
+                            drawPath(blob, plasma)
+                            drawPath(blob, rim, style = line)
+                        }
                         sphere.draw(this, slowTurn(), wire, line)
                     }
                 }
@@ -197,6 +208,21 @@ private class WireSphere(val centre: Offset, val radius: Float) {
             }
         }
     }
+}
+
+/**
+ * A blob of plasma [reach] round the origin, its outline heaving as [beat] goes round: each swell a whole number of
+ * times a round, so it never jumps as it starts over. Rounder than [addWavering] would make it, so it heaves.
+ */
+private fun Path.addBlob(reach: Float, beat: Float) {
+    val points = 48
+    repeat(points) { index ->
+        val angle = index * 2 * PI.toFloat() / points
+        val swell = 1f + 0.12f * sin(3 * angle + beat * 5) + 0.08f * sin(5 * angle - beat * 7) + 0.05f * sin(2 * angle + beat * 4)
+        val at = Offset(cos(angle), sin(angle)) * (reach * swell)
+        if (index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
+    }
+    close()
 }
 
 /** A wire sphere round the item, turning as the [minutes] go by, its rim edged in two lines. */

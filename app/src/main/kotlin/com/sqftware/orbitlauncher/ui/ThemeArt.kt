@@ -45,8 +45,9 @@ interface ThemeArt {
 
     /**
      * The emblem's face, filling the item: its ground, and its mark unless [marked] is false because a hint is shown
-     * over it. [slowTurn] and [fastTurn] are angles in degrees that move while the ring turns; [minuteOfDay] is the time,
-     * read where it is drawn so the minute ticking over redraws only what shows it.
+     * over it. [slowTurn] and [fastTurn] are angles in degrees that move while the ring turns, once in ten minutes and
+     * once a minute, and start over at each turn; [fastTurn] is also the clock what moves on the face keeps time by, in
+     * [cycles]. [minuteOfDay] is the time, read where it is drawn so the minute ticking over redraws only what shows it.
      */
     @Composable
     fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier)
@@ -86,6 +87,12 @@ interface ThemeArt {
     val scene: ThemeScene?
         get() = null
 }
+
+/**
+ * How many times something done [perTurn] times a turn has been done when an angle that turns has come [turn] degrees
+ * round: a whole number a turn, so it never jumps as the angle starts over.
+ */
+internal fun cycles(turn: Float, perTurn: Int) = turn / 360f * perTurn
 
 /** A scene of a theme's world, [name]d in the launcher's menu, which the launcher can set as the wallpaper. */
 class ThemeScene(val name: String, val draw: DrawScope.() -> Unit)
