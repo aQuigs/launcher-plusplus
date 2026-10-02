@@ -1902,6 +1902,27 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aSidewaysDragOnTheThemeChipsScrollsThemPastTheirEndsWithoutMovingThePage() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Theme").performClick()
+        val chip = centreOf(compose.onNodeWithText("Space"))
+
+        // Right first, from the start of the row, where it has nothing to scroll; then left past its end.
+        listOf(1f, -1f, -1f, -1f, -1f).forEach { direction ->
+            compose.onRoot().performTouchInput {
+                down(chip)
+                repeat(10) { moveBy(Offset(direction * width / 20f, 0f)) }
+            }
+            compose.runOnIdle { assertEquals(0f, pager.currentPageOffsetFraction) }
+            compose.onRoot().performTouchInput { up() }
+        }
+
+        assertSettledOn(LauncherPage.Home)
+        compose.onNodeWithText("Green core").assertIsDisplayed()
+    }
+
+    @Test
     fun aThemeWithASceneOffersToSetItAsTheWallpaperOnceADialogHasAsked() {
         show()
         compose.longPressEmptyHomeSpace()
