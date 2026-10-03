@@ -54,7 +54,7 @@ fun AppIcon(
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     menu: AppMenu? = null,
-    unread: Unread = Unread(0),
+    unread: Unread = Unread.None,
     drag: AppDrag? = null,
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
@@ -62,7 +62,7 @@ fun AppIcon(
 
     Box(
         modifier
-            .launchable(app, onLaunch, menu, presses, onClearBadge)
+            .launchable(app, onLaunch, menu, presses, onClearBadge.clearing(unread))
             .itemDrag(app, drag)
             .semantics { contentDescription = app.label.withUnread(unread.count) },
     ) {

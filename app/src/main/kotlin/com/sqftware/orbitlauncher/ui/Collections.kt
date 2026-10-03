@@ -465,7 +465,7 @@ private fun AppGrid(
                             menu = menu,
                             drag = rearrange?.drag(index),
                             unread = unread.badge(app),
-                            onClearBadge = unread.clearing(app, onClearBadge),
+                            onClearBadge = onClearBadge,
                         )
                         if (named) AppLabel(app.label)
                     }

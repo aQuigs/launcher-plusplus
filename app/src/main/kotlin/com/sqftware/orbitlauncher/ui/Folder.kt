@@ -93,7 +93,7 @@ fun FolderIcon(
     onOpen: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,
     menu: FolderMenu? = null,
-    unread: Unread = Unread(0),
+    unread: Unread = Unread.None,
     drag: ItemDrag<RingItem.Folder>? = null,
 ) {
     val count = folder.apps.size
@@ -171,7 +171,7 @@ internal fun SlotIcon(
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
     when (item) {
-        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, unread.clearing(item.app, onClearBadge))
+        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, onClearBadge)
         is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.badge(item.apps), drag)
     }
 }

@@ -46,13 +46,8 @@ fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
         modifier = modifier
             // Over the corner rather than inside it: a round icon has no room there.
             .offset(x = BADGE_OVERHANG, y = -BADGE_OVERHANG)
-            .then(
-                if (unread.dismissed) {
-                    Modifier.background(colors.error, CircleShape)
-                } else {
-                    Modifier.background(colors.surfaceContainerHigh, CircleShape).border(BADGE_RING, colors.error, CircleShape)
-                },
-            )
+            .background(if (unread.dismissed) colors.error else colors.surfaceContainerHigh, CircleShape)
+            .border(BADGE_RING, colors.error, CircleShape)
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
             .padding(horizontal = 5.dp)
             .wrapContentHeight()

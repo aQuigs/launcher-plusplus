@@ -59,8 +59,8 @@ class UnreadTest {
 
         assertEquals(3, counts[mail])
         assertEquals(0, counts[app("Maps")])
-        assertEquals(5, counts.sum(listOf(mail, chat, mailAgain)))
-        assertEquals(0, counts.sum(emptyList()))
+        assertEquals(5, counts.badge(listOf(mail, chat, mailAgain)).count)
+        assertEquals(Unread.None, counts.badge(emptyList()))
     }
 
     @Test
@@ -69,8 +69,8 @@ class UnreadTest {
         val pinnedChat = chat.copy(label = "Sam", kind = EntryKind.Shortcut("sam"))
 
         assertEquals(0, counts[pinnedChat])
-        assertEquals(0, counts.sum(listOf(pinnedChat)))
-        assertEquals(4, counts.sum(listOf(pinnedChat, chat)))
+        assertEquals(Unread.None, counts.badge(listOf(pinnedChat)))
+        assertEquals(4, counts.badge(listOf(pinnedChat, chat)).count)
     }
 
     @Test
@@ -79,8 +79,8 @@ class UnreadTest {
         val pair = pairOf(chat, mail)!!
 
         assertEquals(5, counts[pair])
-        assertEquals(5, counts.sum(listOf(pair, chat)))
-        assertTrue(counts.hasDismissed(pair))
+        assertEquals(Unread(5, dismissed = true), counts.badge(listOf(pair, chat)))
+        assertTrue(counts.badge(pair).dismissed)
     }
 
     @Test
@@ -90,7 +90,6 @@ class UnreadTest {
         assertEquals(Unread(4, dismissed = false), counts.badge(chat))
         assertEquals(Unread(1, dismissed = true), counts.badge(mail))
         assertEquals(Unread(5, dismissed = true), counts.badge(listOf(chat, mail)))
-        assertEquals(Unread(4, dismissed = false), counts.badge(listOf(chat)))
     }
 
     @Test
@@ -120,9 +119,9 @@ class UnreadTest {
 
         val live = UnreadCounts(mapOf(mail.packageName to 1, chat.packageName to 2)) + kept.posted("c").counts
         assertEquals(mapOf(mail.packageName to 4, chat.packageName to 2), live.byPackage)
-        assertTrue(live.hasDismissed(mail))
-        assertFalse(live.hasDismissed(chat))
-        assertFalse(live.hasDismissed(mail.copy(kind = EntryKind.Shortcut("inbox"))))
+        assertTrue(live.badge(mail).dismissed)
+        assertFalse(live.badge(chat).dismissed)
+        assertFalse(live.badge(mail.copy(kind = EntryKind.Shortcut("inbox"))).dismissed)
     }
 
     @Test

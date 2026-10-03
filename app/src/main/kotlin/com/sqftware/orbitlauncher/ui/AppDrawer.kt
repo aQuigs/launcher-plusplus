@@ -415,7 +415,7 @@ private data class DrawerEntry(
 
     fun action(app: AppEntry): Modifier = when {
         // The drag comes after the click handling, so it reads each touch first and can keep the moves to itself.
-        picking == null -> Modifier.launchable(app, onLaunch, menu, onClearBadge = unread.clearing(app, onClearBadge)).itemDrag(app, drag)
+        picking == null -> Modifier.launchable(app, onLaunch, menu, onClearBadge = onClearBadge.clearing(unread.badge(app))).itemDrag(app, drag)
         picking.mark == PickMark.Check -> {
             Modifier.toggleable(
                 value = picking.isPicked(app),

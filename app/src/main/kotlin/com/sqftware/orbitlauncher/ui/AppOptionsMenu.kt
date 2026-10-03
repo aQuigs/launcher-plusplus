@@ -32,7 +32,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.HomePlace
-import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.title
 
 object AppOptionsTags {
@@ -45,10 +45,10 @@ class LongPressMenu<T>(val onOpen: (T) -> Unit, val content: @Composable (T) -> 
 typealias AppMenu = LongPressMenu<AppEntry>
 
 /**
- * [onClearBadge] while [app]'s badge holds notifications the user dismissed unread, or none: a double tap delays every tap
- * by the wait for a second one, so it is armed only where it has something to clear.
+ * [this] while [unread] holds notifications the user dismissed unread, or none: a double tap delays every tap by the wait
+ * for a second one, so it is armed only where it has something to clear, which is where the badge is filled.
  */
-internal fun UnreadCounts.clearing(app: AppEntry, onClearBadge: ((AppEntry) -> Unit)?) = onClearBadge?.takeIf { hasDismissed(app) }
+internal fun ((AppEntry) -> Unit)?.clearing(unread: Unread) = this?.takeIf { unread.dismissed }
 
 /**
  * A tap launches [app]; with a [menu], a long press opens it, and with [onClearBadge], a double tap clears its badge instead
