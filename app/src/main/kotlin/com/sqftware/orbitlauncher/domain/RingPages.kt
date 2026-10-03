@@ -11,6 +11,9 @@ data class RingPages(val rings: Map<String, Ring> = emptyMap(), val dock: Ring =
     /** These pages with [page]'s ring and the dock as [home] has them. */
     fun with(page: String, home: HomeApps): RingPages = RingPages(rings + (page to home.ring), home.dock)
 
+    /** These pages with only the rings of the pages in [ids]. */
+    fun keepingPages(ids: Set<String>): RingPages = copy(rings = rings.filterKeys { it in ids })
+
     /** The key of every app kept on any ring page or in the dock. */
     val keys: Set<String> get() = HomeApps(Ring(rings.values.flatMap { it.slots }), dock).keys
 

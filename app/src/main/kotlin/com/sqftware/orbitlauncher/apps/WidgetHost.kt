@@ -43,6 +43,9 @@ interface WidgetHost {
     /** Takes the widget [id] off its page and gives its id back to the system. */
     fun remove(id: Int)
 
+    /** Keeps only the widget pages in [ids]: the others' widgets, and a pick on its way to one, give their ids back to the system. */
+    fun keepPages(ids: Set<String>)
+
     /** Makes the widget [id] [rows] tall and [columns] wide. */
     fun resize(id: Int, rows: Int, columns: Int)
 
@@ -127,6 +130,14 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         host.deleteAppWidgetId(id)
         if (pending?.id == id) pending = null
         set(pages.value.changeHolding(id) { remove(id) })
+    }
+
+    override fun keepPages(ids: Set<String>) {
+        pending?.takeIf { it.page !in ids }?.let(::discard)
+        val kept = pages.value.keepingPages(ids)
+        if (kept == pages.value) return
+        (pages.value.ids - kept.ids).forEach(host::deleteAppWidgetId)
+        set(kept)
     }
 
     override fun resize(id: Int, rows: Int, columns: Int) = set(pages.value.changeHolding(id) { resize(id, rows, columns) })

@@ -27,6 +27,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
@@ -89,6 +90,7 @@ class MainActivity : ComponentActivity() {
         showBarsFor(lightAtStart)
         repository = LauncherAppsRepository(this)
         val ringPagesStore = SharedPreferencesRingPagesStore(this)
+        val pageLayoutStore = SharedPreferencesPageLayoutStore(this)
         val wallClock = SystemWallClock(this)
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
         val themeStore = SharedPreferencesThemeStore(this)
@@ -120,7 +122,6 @@ class MainActivity : ComponentActivity() {
                 sizing = widgetHost::sizing,
             )
         }
-        val layout = PageLayout()
         val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageName) } }
         val actions = AppActions(
             icon = repository::icon,
@@ -160,6 +161,7 @@ class MainActivity : ComponentActivity() {
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
                 // as folders come and go.
+                var layout by remember { mutableStateOf(pageLayoutStore.load()) }
                 var ringPages by remember { mutableStateOf(ringPagesStore.load().withPlanetsKept()) }
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
                 var folderLooks by remember { mutableStateOf(folderLookStore.load()) }
@@ -222,6 +224,18 @@ class MainActivity : ComponentActivity() {
                     collectionPages = changed
                     collectionsStore.save(changed)
                 }
+                // What a page no longer in the layout held goes, so no widget stays bound and no shortcut pinned for it.
+                fun keepPagesOf(layout: PageLayout) {
+                    ringPages.keepingPages(layout.ids).let { if (it != ringPages) changeRingPages(it) }
+                    collectionPages.keepingPages(layout.ids).let { if (it != collectionPages) changeCollectionPages(it) }
+                    widgetHost.keepPages(layout.ids)
+                }
+                fun changeLayout(changed: PageLayout) {
+                    layout = changed
+                    pageLayoutStore.save(changed)
+                    keepPagesOf(changed)
+                }
+                LaunchedEffect(Unit) { keepPagesOf(layout) }
 
                 val scope = rememberCoroutineScope()
                 // Usage is read afresh rather than from foregroundTime, which may not have caught up yet with access just
@@ -251,6 +265,7 @@ class MainActivity : ComponentActivity() {
 
                 LauncherScreen(
                     layout = layout,
+                    onLayoutChange = ::changeLayout,
                     homePresses = homePresses,
                     pinRequests = pinRequests,
                     apps = apps,

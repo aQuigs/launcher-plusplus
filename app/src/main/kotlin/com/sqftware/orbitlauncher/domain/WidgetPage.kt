@@ -98,6 +98,9 @@ data class WidgetPages(val pages: Map<String, WidgetPage> = emptyMap()) {
     fun changeHolding(id: Int, change: WidgetPage.() -> WidgetPage): WidgetPages =
         pages.entries.find { id in it.value.ids }?.let { change(it.key, change) } ?: this
 
+    /** These pages with only the widgets of the pages in [ids]. */
+    fun keepingPages(ids: Set<String>): WidgetPages = WidgetPages(pages.filterKeys { it in ids })
+
     /** These pages with only the widgets whose ids are in [held]. */
     fun keeping(held: Set<Int>): WidgetPages = WidgetPages(pages.mapValues { (_, page) -> WidgetPage(page.widgets.filter { it.id in held }) })
 }
@@ -113,12 +116,12 @@ fun widgetCells(minDp: Int, cellDp: Float, most: Int): Int =
 fun cellsWithin(dp: Float, cellDp: Float): Int = ((dp + WIDGET_GAP_DP) / (cellDp + WIDGET_GAP_DP)).toInt()
 
 /**
- * How hard a finger at [y] on a page [height] long pulls it towards an edge, from -1 at the top to 1 at the bottom: not
- * at all until it is within [zone] of one, then more the nearer it gets.
+ * How hard a finger [at] a point of a view [length] long pulls it towards an edge, from -1 at the start to 1 at the end:
+ * not at all until it is within [zone] of one, then more the nearer it gets.
  */
-fun edgePull(y: Float, height: Float, zone: Float): Float = when {
-    y > height - zone -> (y - height + zone) / zone
-    y < zone -> (y - zone) / zone
+fun edgePull(at: Float, length: Float, zone: Float): Float = when {
+    at > length - zone -> (at - length + zone) / zone
+    at < zone -> (at - zone) / zone
     else -> 0f
 }.coerceIn(-1f, 1f)
 
