@@ -14,7 +14,7 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
-import com.sqftware.orbitlauncher.domain.WidgetPage
+import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.WidgetResize
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.widgetCells
@@ -25,22 +25,22 @@ import kotlinx.coroutines.flow.onStart
 import kotlin.math.ceil
 
 interface WidgetHost {
-    /** The widget page as stored, less the widgets whose providers have gone. */
-    fun page(): WidgetPage
+    /** The widget pages as stored, less the widgets whose providers have gone. */
+    fun pages(): WidgetPages
 
     /**
-     * [page] now, then again each time a widget is added, removed, resized, moved or lost with its provider. The widgets draw their
-     * updates only while this is collected, so collect it while the launcher is visible.
+     * [pages] now, then again each time a widget is added, removed, resized, moved or lost with its provider. The widgets
+     * draw their updates only while this is collected, so collect it while the launcher is visible.
      */
-    fun updates(): Flow<WidgetPage>
+    fun updates(): Flow<WidgetPages>
 
     /**
-     * Lets the user pick a widget for the page, where it takes the cells its provider asks for, up to [pageRows] rows
-     * and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall.
+     * Lets the user pick a widget for the widget page [page], where it takes the cells its provider asks for, up to
+     * [pageRows] rows and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall.
      */
-    fun add(pageRows: Int, columnWidthDp: Float, rowHeightDp: Float)
+    fun add(page: String, pageRows: Int, columnWidthDp: Float, rowHeightDp: Float)
 
-    /** Takes the widget [id] off the page and gives its id back to the system. */
+    /** Takes the widget [id] off its page and gives its id back to the system. */
     fun remove(id: Int)
 
     /** Makes the widget [id] [rows] tall and [columns] wide. */
@@ -79,7 +79,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         // The system reports a widget whose provider was uninstalled, at once or when listening starts again.
         override fun onAppWidgetRemoved(appWidgetId: Int) = remove(appWidgetId)
     }
-    private val page = MutableStateFlow(store.load())
+    private val pages = MutableStateFlow(store.load())
     private val restored = store.loadPick()
     private var pending: WidgetPick? = restored
         set(value) {
@@ -100,24 +100,24 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         // The system drops a widget with its provider, so a stored one it no longer holds has gone; an id it holds that is
         // neither stored nor being picked was a pick lost with its process.
         val held = host.appWidgetIds.toSet()
-        val kept = page.value.widgets.filter { it.id in held }
-        val keptIds = kept.mapTo(mutableSetOf()) { it.id } + listOfNotNull(pending?.id)
+        val kept = pages.value.keeping(held)
+        val keptIds = kept.ids + listOfNotNull(pending?.id)
         held.filter { it !in keptIds }.forEach(host::deleteAppWidgetId)
-        if (kept.size != page.value.widgets.size) set(WidgetPage(kept))
+        if (kept != pages.value) set(kept)
     }
 
-    override fun page(): WidgetPage = page.value
+    override fun pages(): WidgetPages = pages.value
 
-    override fun updates(): Flow<WidgetPage> = page.onStart { host.startListening() }.onCompletion { host.stopListening() }
+    override fun updates(): Flow<WidgetPages> = pages.onStart { host.startListening() }.onCompletion { host.stopListening() }
 
-    override fun add(pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) {
+    override fun add(page: String, pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) {
         val inProgress = pending
         if (inProgress != null) {
             // Only a pick from before the process started can still be waiting once the user is back to ask again.
             if (inProgress != restored) return
             discard(inProgress)
         }
-        val pick = WidgetPick(host.allocateAppWidgetId(), pageRows, columnWidthDp, rowHeightDp)
+        val pick = WidgetPick(host.allocateAppWidgetId(), page, pageRows, columnWidthDp, rowHeightDp)
         pending = pick
         val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pick.id)
         if (!start("the widget picker") { picker.launch(intent) }) discard(pick)
@@ -126,12 +126,12 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
     override fun remove(id: Int) {
         host.deleteAppWidgetId(id)
         if (pending?.id == id) pending = null
-        set(page.value.remove(id))
+        set(pages.value.changeHolding(id) { remove(id) })
     }
 
-    override fun resize(id: Int, rows: Int, columns: Int) = set(page.value.resize(id, rows, columns))
+    override fun resize(id: Int, rows: Int, columns: Int) = set(pages.value.changeHolding(id) { resize(id, rows, columns) })
 
-    override fun move(id: Int, row: Int, column: Int) = set(page.value.move(id, row, column))
+    override fun move(id: Int, row: Int, column: Int) = set(pages.value.changeHolding(id) { move(id, row, column) })
 
     override fun sizing(id: Int): WidgetSizing {
         val info = manager.getAppWidgetInfo(id) ?: return WidgetSizing(WidgetResize(resizable = false), WidgetResize(resizable = false))
@@ -171,11 +171,13 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
     private fun place(pick: WidgetPick, info: AppWidgetProviderInfo) {
         pending = null
         set(
-            page.value.add(
-                pick.id,
-                rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp, pick.pageRows),
-                columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp, WIDGET_COLUMNS),
-            ),
+            pages.value.change(pick.page) {
+                add(
+                    pick.id,
+                    rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp, pick.pageRows),
+                    columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp, WIDGET_COLUMNS),
+                )
+            },
         )
     }
 
@@ -187,8 +189,8 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         host.deleteAppWidgetId(pick.id)
     }
 
-    private fun set(value: WidgetPage) {
-        page.value = value
+    private fun set(value: WidgetPages) {
+        pages.value = value
         store.save(value)
     }
 

@@ -27,7 +27,7 @@ import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.EntryKind
-import com.sqftware.orbitlauncher.domain.HomeApps
+import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.isStorable
 import com.sqftware.orbitlauncher.domain.sortedByLabel
 import kotlinx.coroutines.Dispatchers
@@ -196,9 +196,9 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         }
     }
 
-    override suspend fun unpinAllBut(homeApps: HomeApps) = withContext(pinWork) {
+    override suspend fun unpinAllBut(pages: RingPages) = withContext(pinWork) {
         val pinned = pinned(ShortcutQuery.FLAG_GET_KEY_FIELDS_ONLY).groupBy({ it.`package` }, { it.id })
-        homeApps.keptPins(pinned).forEach { (packageName, ids) ->
+        pages.keptPins(pinned).forEach { (packageName, ids) ->
             try {
                 launcherApps.pinShortcuts(packageName, ids, user)
             } catch (e: RuntimeException) {

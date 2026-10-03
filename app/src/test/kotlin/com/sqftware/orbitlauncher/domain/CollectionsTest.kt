@@ -290,4 +290,15 @@ class CollectionsTest {
             decodeCollectionsPage(text).cards,
         )
     }
+
+    @Test
+    fun `each collections page keeps its own cards, and a default set on one is every page's`() {
+        val pages = CollectionPages().with("collections", CollectionsPage().add(tools))
+
+        val changed = pages.with("collections-2", pages.on("collections-2").remove(MostUsed).setDefault(CardSetting.Rows, 3))
+
+        assertEquals(listOf(NewApps, MostUsed, tools), changed.on("collections").cards.map { it.kind })
+        assertEquals(listOf(NewApps), changed.on("collections-2").cards.map { it.kind })
+        assertEquals(3, changed.on("collections").defaults.rows)
+    }
 }

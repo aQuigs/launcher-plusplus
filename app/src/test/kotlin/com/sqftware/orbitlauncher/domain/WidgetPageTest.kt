@@ -175,4 +175,16 @@ class WidgetPageTest {
         assertEquals(0f, roomFor(by = 50f, at = 120f, low = -100f, high = 100f))
         assertEquals(-20f, roomFor(by = -20f, at = 120f, low = -100f, high = 100f))
     }
+
+    @Test
+    fun `a widget changes on the page that holds it, and the others are left as they are`() {
+        val pages = WidgetPages(mapOf("widgets" to page, "widgets-2" to WidgetPage(listOf(HostedWidget(30, 0, 0, 1, 1)))))
+
+        val moved = pages.changeHolding(clock.id) { move(clock.id, row = 4, column = 0) }
+
+        assertEquals(page.move(clock.id, row = 4, column = 0), moved["widgets"])
+        assertEquals(pages["widgets-2"], moved["widgets-2"])
+        assertEquals(pages, pages.changeHolding(99) { remove(99) })
+        assertEquals(setOf(notes.id), pages.keeping(setOf(notes.id)).ids)
+    }
 }

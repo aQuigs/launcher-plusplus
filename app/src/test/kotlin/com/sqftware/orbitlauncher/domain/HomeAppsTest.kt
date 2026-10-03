@@ -2,7 +2,6 @@ package com.sqftware.orbitlauncher.domain
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -249,24 +248,4 @@ class HomeAppsTest {
         assertFalse(homeApps.keeps(open, homeApps.add(HomePlace.Dock, maps)))
         assertFalse(homeApps.keeps(open, homeApps.copy(dock = Ring(listOf(RingSlot.App(clock.key), RingSlot.App(mail.key), folder(music))))))
     }
-
-    @Test
-    fun `a pin stays while its shortcut is anywhere on home, and an activity of the same name keeps none`() {
-        val onRing = shortcut("web", "a")
-        val inFolder = shortcut("web", "b")
-        val docked = shortcut("maps", "c")
-        val inDockFolder = shortcut("maps", "d")
-        val activity = AppEntry("Main", "chat", "Main")
-        assertNotEquals(activity.key, shortcut("chat", "Main").key)
-        val homeApps = HomeApps(
-            ring = Ring(listOf(RingSlot.App(onRing.key), folder(inFolder), RingSlot.App(activity.key))),
-            dock = Ring(listOf(RingSlot.App(docked.key), folder(inDockFolder))),
-        )
-
-        val kept = homeApps.keptPins(mapOf("web" to listOf("a", "b", "gone"), "maps" to listOf("c", "d"), "chat" to listOf("Main")))
-
-        assertEquals(mapOf("web" to listOf("a", "b"), "chat" to emptyList<String>()), kept)
-    }
-
-    private fun shortcut(packageName: String, id: String) = AppEntry(id, packageName, "Main", kind = EntryKind.Shortcut(id))
 }

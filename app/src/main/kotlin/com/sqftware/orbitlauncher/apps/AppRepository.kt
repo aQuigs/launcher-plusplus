@@ -4,7 +4,7 @@ import android.content.Intent
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
-import com.sqftware.orbitlauncher.domain.HomeApps
+import com.sqftware.orbitlauncher.domain.RingPages
 import kotlinx.coroutines.flow.Flow
 
 interface AppRepository {
@@ -56,8 +56,8 @@ interface AppRepository {
      */
     fun pinRequest(intent: Intent): PinItem?
 
-    /** Unpins every shortcut the launcher has pinned that [homeApps] no longer holds, so its app stops counting it as on home. */
-    suspend fun unpinAllBut(homeApps: HomeApps)
+    /** Unpins every shortcut the launcher has pinned that no page of [pages] holds any longer, so its app stops counting it as on home. */
+    suspend fun unpinAllBut(pages: RingPages)
 }
 
 /** An app's pending request to pin [shortcut], which [appLabel] names the app of. */
