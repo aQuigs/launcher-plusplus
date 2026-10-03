@@ -2687,6 +2687,18 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun theFirstFrameHoldsOnlyTheHomePageAndTheOthersFollow() {
+        compose.mainClock.autoAdvance = false
+        show()
+
+        compose.page(LauncherPage.Home).assertExists()
+        compose.page(LauncherPage.Widgets).assertDoesNotExist()
+
+        compose.mainClock.autoAdvance = true
+        compose.page(LauncherPage.Widgets).assertExists()
+    }
+
+    @Test
     fun aResizeThatDriftsAcrossKeepsThePage() {
         widgetPage = WidgetPage(listOf(search))
         show()

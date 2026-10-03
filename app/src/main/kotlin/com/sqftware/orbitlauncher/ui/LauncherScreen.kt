@@ -35,12 +35,14 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
@@ -393,6 +395,11 @@ fun LauncherScreen(
     // Every page stays composed, so the home page must be told when nobody can see it.
     val homeSettled by remember(pagerState, layout) { derivedStateOf { pagerState.settledPage == layout.homeIndex } }
     val homeInSight = homeSettled && !drawerOpen && !pickingCollection && !showingWallpaper
+    // The first frame holds only the page in view, so the others' widgets and cards do not delay it.
+    val firstFrameDrawn by produceState(false) {
+        withFrameNanos {}
+        value = true
+    }
     // The planets turn like the emblem's sky, only while there are some to see move, an hour to a turn: every orbit goes
     // round a whole number of times in it, so none jumps as the turn starts over.
     val planets = remember(ring, dock) { planetsOf(ring, dock) }
@@ -1043,7 +1050,7 @@ fun LauncherScreen(
                     state = pagerState,
                     key = { layout.pages[it].name },
                     // Every page stays composed, so swiping back does not rebuild the ring and reload its icons.
-                    beyondViewportPageCount = layout.pages.size - 1,
+                    beyondViewportPageCount = if (firstFrameDrawn) layout.pages.size - 1 else 0,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
