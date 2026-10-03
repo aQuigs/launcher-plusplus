@@ -21,12 +21,14 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -43,6 +45,8 @@ import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.Virus
 import com.sqftware.orbitlauncher.ui.theme.VirusLight
 import kotlin.math.PI
+import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.random.Random
 import kotlin.math.sin
 
@@ -51,6 +55,27 @@ import kotlin.math.sin
 private const val WAVES_PER_HOUR = 60
 private const val VIRUS_TURNS_PER_HOUR = 4
 private const val WOBBLES_PER_HOUR = 20
+
+/**
+ * How many times each of the emblem's bacilli divides in a turn, how far round each daughter leaves from the last, and
+ * for how many divisions a daughter is seen swimming off. The daughters go round a whole number of times a turn, so
+ * none jumps as it starts over.
+ */
+private const val GENERATIONS_PER_TURN = 8
+private const val SPLIT_TURN = 135f
+private const val DAUGHTERS = 2
+
+/**
+ * One of the emblem's bacilli: where it stays, as a share of the emblem's radius from its middle, how far through a
+ * division it is when the others start one, and which way it first faces.
+ */
+private class Bacillus(val at: Offset, val step: Float, val facing: Float)
+
+private val Bacilli = listOf(
+    Bacillus(Offset(-0.26f, -0.24f), 0f, 0f),
+    Bacillus(Offset(0.3f, -0.04f), 0.35f, 150f),
+    Bacillus(Offset(-0.06f, 0.34f), 0.7f, 260f),
+)
 
 /** How much of a folder's square the disc of previews takes on each germ, which shows round it. */
 private const val GERM_DISC = 0.78f
@@ -67,8 +92,8 @@ private val DishRods = listOf(20f to 0.76f, 160f to 0.72f, 250f to 0.78f)
 private val DishCocci = listOf(75f to 0.74f, 205f to 0.7f, 300f to 0.76f)
 
 /**
- * Under the microscope: the emblem is a virus turning slowly, the ring a petri dish with specks of culture in it,
- * folders are bacilli waving their flagella, viruses or wobbling cells, and the drawer is a slide.
+ * Under the microscope: the emblem is a bacillus dividing without end, the ring a petri dish with specks of culture in
+ * it, folders are bacilli waving their flagella, viruses or wobbling cells, and the drawer is a slide.
  */
 object GermArt : ThemeArt {
     @Composable
@@ -76,10 +101,8 @@ object GermArt : ThemeArt {
         val ground = MaterialTheme.colorScheme.surfaceContainerLowest
         Box(modifier) {
             Spacer(Modifier.fillMaxSize().drawWithCache { onDrawBehind { drawCircle(ground, size.emblemRadius) } })
-            // A layer of its own, so the virus turning redraws only it.
-            if (marked) {
-                Spacer(Modifier.fillMaxSize().graphicsLayer().drawWithCache { virus(size.emblemRadius * 0.46f, slowTurn) })
-            }
+            // A layer of its own, so the colony dividing redraws only it.
+            if (marked) Spacer(Modifier.fillMaxSize().graphicsLayer().drawWithCache { colony(fastTurn) })
         }
     }
 
@@ -209,10 +232,73 @@ private class SlideTile(density: Density, size: Size) {
 }
 
 /**
+ * A few bacilli in the dish, each dividing without end, [GENERATIONS_PER_TURN] times a turn of [turn] and out of step
+ * with the others: each grows out along its length, pinches in two, and the daughter swims off, tumbling and fading,
+ * while the half left behind turns on and grows again. Each daughter leaves [SPLIT_TURN] degrees round from the last.
+ */
+private fun CacheDrawScope.colony(turn: () -> Float): DrawResult {
+    val radius = size.emblemRadius
+    val length = radius * 0.28f
+    val thick = radius * 0.12f
+    val dish = Path().apply { addOval(Rect(size.center, radius)) }
+    val outer = Stroke(2.dp.toPx())
+    val inner = Stroke(1.dp.toPx())
+    fun Path.addCapsule(along: Float) =
+        addRoundRect(RoundRect(along - length / 2, -thick / 2, along + length / 2, thick / 2, CornerRadius(thick / 2)))
+    val cell = Path().apply { addCapsule(0f) }
+    val growth = Path()
+    val dividing = Path()
+    fun DrawScope.germAt(shape: Path, at: Offset, degrees: Float, alpha: Float = 1f) = withTransform({
+        translate(at.x, at.y)
+        rotate(degrees - 90f, Offset.Zero)
+    }) { germ(shape, outer, inner, alpha) }
+    return onDrawBehind {
+        clipPath(dish) {
+            Bacilli.forEach { bacillus ->
+                val home = size.center + bacillus.at * radius
+                val generations = cycles(turn(), GENERATIONS_PER_TURN) + bacillus.step
+                val born = floor(generations)
+                // Those already off, from the eldest, which is the furthest out and fades as it goes.
+                for (ago in DAUGHTERS downTo 1) {
+                    val left = born - ago + 1
+                    val swum = generations - left
+                    // Turning on as the cell it left does, and slowing, so it curves away rather than swinging off straight.
+                    val heading = bacillus.facing + (left + 1f - exp(-swum)) * SPLIT_TURN
+                    val at = home + direction(heading) * (length * (1f + swum + 0.2f * swum * swum))
+                    germAt(cell, at, heading, (DAUGHTERS - swum).coerceAtMost(1f))
+                }
+                val grown = length * (generations - born)
+                dividing.rewind()
+                if (grown <= length - thick) {
+                    // Its halves still share their sides, so it is one longer rod.
+                    dividing.addRoundRect(RoundRect(-length / 2, -thick / 2, grown + length / 2, thick / 2, CornerRadius(thick / 2)))
+                } else {
+                    // Pinching in two: the union shows the waist, or failing that both halves, which look the same but for it.
+                    growth.rewind()
+                    growth.addCapsule(grown)
+                    if (!dividing.op(cell, growth, PathOperation.Union)) {
+                        dividing.addPath(cell)
+                        dividing.addPath(growth)
+                    }
+                }
+                germAt(dividing, home, bacillus.facing + generations * SPLIT_TURN)
+            }
+        }
+    }
+}
+
+/** A germ's body in [shape], edged in its membrane's two lines so it shows on any wallpaper. */
+private fun DrawScope.germ(shape: Path, outer: Stroke, inner: Stroke, alpha: Float = 1f) {
+    drawPath(shape, GermBody, alpha)
+    drawPath(shape, Membrane.outer, alpha, outer)
+    drawPath(shape, Membrane.inner, alpha, inner)
+}
+
+/**
  * A virus [radius] round the middle: a pink sphere lit at its top left, with twelve spikes, each ending in a knob,
  * edged in two lines so it shows on any wallpaper, and turned by [turned] degrees while its light stays put.
  */
-private fun CacheDrawScope.virus(radius: Float, turned: () -> Float = { 0f }): DrawResult {
+private fun CacheDrawScope.virus(radius: Float, turned: () -> Float): DrawResult {
     val centre = size.center
     val spikes = Path()
     val knobs = Path()
@@ -270,9 +356,7 @@ private fun Modifier.bacillus(minutes: () -> Float): Modifier = drawWithCache {
         rotate(BACILLUS_TILT) {
             drawPath(tails, Membrane.outer, style = tailOuter)
             drawPath(tails, Membrane.inner, style = tailInner)
-            drawPath(capsule, GermBody)
-            drawPath(capsule, Membrane.outer, style = outer)
-            drawPath(capsule, Membrane.inner, style = inner)
+            germ(capsule, outer, inner)
         }
     }
 }

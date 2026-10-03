@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -66,6 +67,9 @@ private const val CUBE_DISC = 0.74f
 private const val OCTAHEDRON_DISC = 0.6f
 private const val GEODE_DISC = 0.66f
 
+/** How many times a minute the emblem's cubes float up and down. */
+private const val BOBS_PER_TURN = 6
+
 /** The emblem's cubes: where each sits about the middle, and how far it reaches, both as shares of the emblem's radius. */
 private val EmblemCubes = listOf(
     Offset(-0.3f, -0.3f) to 0.1f,
@@ -75,9 +79,9 @@ private val EmblemCubes = listOf(
 )
 
 /**
- * A city of glass seen from above: the emblem is a cluster of glass cubes, the ring a thread of light with a small cube
- * between each pair of slots, folders are cubes, turning octahedra or geodes, the drawer is scattered with wireframe
- * cubes, and the city itself is a scene the launcher's menu offers as the wallpaper.
+ * A city of glass seen from above: the emblem is a cluster of glass cubes floating, the ring a thread of light with a
+ * small cube between each pair of slots, folders are cubes, turning octahedra or geodes, the drawer is scattered with
+ * wireframe cubes, and the city itself is a scene the launcher's menu offers as the wallpaper.
  */
 object CrystalArt : ThemeArt {
     override val scene = ThemeScene("crystal city") { city() }
@@ -88,13 +92,19 @@ object CrystalArt : ThemeArt {
         // The glass's own light edges would vanish on the day's pale ground, so the emblem's are drawn in the scheme's.
         val edge = MaterialTheme.colorScheme.primary
         Spacer(
-            modifier.drawWithCache {
+            modifier.graphicsLayer().drawWithCache {
                 val radius = size.emblemRadius
                 val cubes = EmblemCubes.map { (at, reach) -> cube(size.center + at * radius, radius * reach) }
                 val line = Stroke(1.dp.toPx())
                 onDrawBehind {
                     drawCircle(ground, radius)
-                    if (marked) cubes.forEach { it.draw(this, line, edge) }
+                    if (marked) {
+                        val beat = cycles(fastTurn(), BOBS_PER_TURN) * 2 * PI.toFloat()
+                        cubes.forEachIndexed { index, cube ->
+                            // Each out of step with the next, so the cluster never rises and falls as one.
+                            translate(top = radius * 0.035f * sin(beat + index * 1.9f)) { cube.draw(this, line, edge) }
+                        }
+                    }
                 }
             },
         )

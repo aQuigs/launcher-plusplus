@@ -90,7 +90,10 @@ internal val RING_ICON_SIZE = 56.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
-/** How long what the emblem turns fast (Space's spark) takes to turn once: slow enough to read as drift, not a spinner. */
+/**
+ * How long what the emblem turns fast (Space's spark) takes to turn once: slow enough to read as drift, not a spinner.
+ * It is the clock every emblem's motion keeps, so changing it changes them all.
+ */
 private const val FAST_TURN_MILLIS = 60_000
 
 /** How long what it turns slowly (Space's sky) takes to turn once: slower, so it seems farther off. */

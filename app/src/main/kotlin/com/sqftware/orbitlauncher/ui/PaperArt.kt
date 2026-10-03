@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -37,6 +38,9 @@ import com.sqftware.orbitlauncher.ui.theme.PaperEdge
 import com.sqftware.orbitlauncher.ui.theme.PaperLight
 import com.sqftware.orbitlauncher.ui.theme.PaperMid
 import com.sqftware.orbitlauncher.ui.theme.RingColors
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /** How many times a pinwheel spins round in the hour the folders' sky takes to turn once. */
 private const val SPINS_PER_HOUR = 60
@@ -49,6 +53,9 @@ private const val PINWHEEL_DISC = 0.7f
 /** How many lengths of tape go round the ring, laid lighter and heavier by turns. */
 private const val WASHI_PIECES = 24
 
+/** How many times a minute the crane on the emblem beats its wings. */
+private const val FLAPS_PER_TURN = 15
+
 /** A paper crane facing left, in unit lengths about its middle: each fold's corners, and how much light it catches. */
 private val Crane = listOf(
     listOf(Offset(-0.28f, 0.02f), Offset(-0.32f, -0.75f), Offset(0.14f, -0.02f)) to PaperLight,
@@ -60,27 +67,38 @@ private val Crane = listOf(
     listOf(Offset(-0.02f, 0f), Offset(0.4f, -0.78f), Offset(0.3f, 0.04f)) to PaperMid,
 )
 
+/** Which of the crane's folds are its wings, the far one and the near one, each with its tip second. */
+private val CraneWings = setOf(0, 6)
+
 /**
- * Origami: the emblem is a paper crane, the ring a length of washi tape, folders are folded squares, envelopes or
- * pinwheels spinning in a breeze, and the drawer is paper creased on the diagonal.
+ * Origami: the emblem is a paper crane beating its wings, the ring a length of washi tape, folders are folded squares,
+ * envelopes or pinwheels spinning in a breeze, and the drawer is paper creased on the diagonal.
  */
 object PaperArt : ThemeArt {
     @Composable
     override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) {
         val ground = MaterialTheme.colorScheme.surfaceContainerLowest
         Spacer(
-            modifier.drawWithCache {
+            modifier.graphicsLayer().drawWithCache {
                 val reach = size.emblemRadius * 0.7f
                 // The crane runs higher than it runs low, so it is lowered to sit in the middle.
                 val middle = size.center + Offset(0f, reach * 0.23f)
-                val folds = Crane.map { (corners, light) -> polygon(middle, reach, corners) to light }
                 val crease = Stroke(1.dp.toPx(), join = StrokeJoin.Round)
+                val folds = Crane.map { (corners, light) -> polygon(middle, reach, corners) to light }
                 onDrawBehind {
                     drawCircle(ground, size.emblemRadius)
                     if (marked) {
-                        folds.forEach { (fold, light) ->
-                            drawPath(fold, light)
-                            drawPath(fold, PaperDark, style = crease)
+                        val beat = cycles(fastTurn(), FLAPS_PER_TURN) * 2 * PI.toFloat()
+                        // Its wings from raised to nearly level, the body lifting on each downstroke.
+                        val raised = 0.6f + 0.4f * cos(beat)
+                        CraneWings.forEach { wing ->
+                            folds[wing].first.apply { rewind(); addPolygon(middle, reach, Crane[wing].first, raised) }
+                        }
+                        translate(top = -reach * 0.06f * sin(beat)) {
+                            folds.forEach { (fold, light) ->
+                                drawPath(fold, light)
+                                drawPath(fold, PaperDark, style = crease)
+                            }
                         }
                     }
                 }
@@ -166,9 +184,12 @@ private class Creases(density: Density, size: Size) {
 }
 
 /** A closed path through [corners], given in unit lengths about [centre] and scaled by [reach]. */
-private fun polygon(centre: Offset, reach: Float, corners: List<Offset>) = Path().apply {
+private fun polygon(centre: Offset, reach: Float, corners: List<Offset>) = Path().apply { addPolygon(centre, reach, corners) }
+
+/** [corners] round [centre] at [reach], the second of them, a wing's tip, [raised] that share of its height. */
+private fun Path.addPolygon(centre: Offset, reach: Float, corners: List<Offset>, raised: Float = 1f) {
     corners.forEachIndexed { index, corner ->
-        val at = centre + corner * reach
+        val at = centre + Offset(corner.x, if (index == 1) corner.y * raised else corner.y) * reach
         if (index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
     }
     close()

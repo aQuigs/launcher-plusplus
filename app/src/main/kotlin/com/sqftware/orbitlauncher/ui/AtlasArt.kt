@@ -50,9 +50,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** How far the compass rose sways either way while the ring turns, and how many times in a turn: whole, so it never jumps. */
+/** How far the compass rose sways either way, and how many times a minute, with a quicker quiver as a needle hunting north has. */
 private const val SWAY_DEGREES = 4f
 private const val SWAYS_PER_TURN = 4
+private const val QUIVERS_PER_TURN = 11
 
 /** How many times a globe turns in the hour the folders' sky takes to turn once. */
 private const val GLOBE_TURNS_PER_HOUR = 2
@@ -73,9 +74,9 @@ private val DrawerHills = listOf(
 )
 
 /**
- * An explorer's chart: the emblem is a compass whose rose sways gently while the ring turns, inside a bezel marked
- * with the four points; the ring is a scale of degrees; folders are islands, globes or folded maps; and the drawer is a
- * topographic map.
+ * An explorer's chart: the emblem is a compass whose rose sways and quivers as a needle hunting north does, inside a
+ * bezel marked with the four points; the ring is a scale of degrees; folders are islands, globes or folded maps; and
+ * the drawer is a topographic map.
  */
 object AtlasArt : ThemeArt {
     @Composable
@@ -90,7 +91,11 @@ object AtlasArt : ThemeArt {
                 Spacer(
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { rotationZ = sin(slowTurn() * SWAYS_PER_TURN / 180f * PI.toFloat()) * SWAY_DEGREES }
+                        .graphicsLayer {
+                            val sway = sin(cycles(fastTurn(), SWAYS_PER_TURN) * 2 * PI.toFloat())
+                            val quiver = sin(cycles(fastTurn(), QUIVERS_PER_TURN) * 2 * PI.toFloat())
+                            rotationZ = (0.75f * sway + 0.25f * quiver) * SWAY_DEGREES
+                        }
                         .drawWithCache { rose(scheme) },
                 )
             }
