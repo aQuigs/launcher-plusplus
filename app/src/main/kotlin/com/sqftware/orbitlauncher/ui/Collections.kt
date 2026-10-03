@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -688,8 +689,26 @@ fun CollectionSettingsDialog(
     onDismiss: () -> Unit,
 ) {
     val card = page.card(kind) ?: return
-    val pager = rememberPagerState { 2 }
+    val pager = rememberPagerState { SETTINGS_TABS.size }
     val scope = rememberCoroutineScope()
+    val settings: @Composable (Int) -> Unit = { index ->
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+        ) {
+            if (index == 1) {
+                Text(
+                    text = "Every collection that uses the default follows these.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
+            } else {
+                val look = page.look(card)
+                CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { OwnChoices(kind, it, look, isOwn = it in card.own, onChange) }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -698,7 +717,7 @@ fun CollectionSettingsDialog(
         text = {
             Column {
                 SecondaryTabRow(selectedTabIndex = pager.targetPage, containerColor = AlertDialogDefaults.containerColor) {
-                    listOf("This collection", "Defaults").forEachIndexed { index, title ->
+                    SETTINGS_TABS.forEachIndexed { index, title ->
                         Tab(
                             selected = pager.targetPage == index,
                             onClick = { scope.launch { pager.animateScrollToPage(index) } },
@@ -706,27 +725,14 @@ fun CollectionSettingsDialog(
                         )
                     }
                 }
-                HorizontalPager(
-                    state = pager,
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier.padding(top = 16.dp).testTag(CollectionTags.SETTINGS_PAGES),
-                ) { index ->
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
-                    ) {
-                        if (index == 1) {
-                            Text(
-                                text = "Every collection that uses the default follows these.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
-                        } else {
-                            val look = page.look(card)
-                            CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { OwnChoices(kind, it, look, isOwn = it in card.own, onChange) }
-                        }
-                    }
+                // As tall as the taller tab throughout, or the centred dialog would grow and shrink under a swipe.
+                Box(Modifier.padding(top = 16.dp)) {
+                    SizeOfLargest { SETTINGS_TABS.indices.forEach { settings(it) } }
+                    HorizontalPager(
+                        state = pager,
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier.matchParentSize().testTag(CollectionTags.SETTINGS_PAGES),
+                    ) { settings(it) }
                 }
             }
         },
@@ -797,6 +803,17 @@ private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T
             }
         }
         footer()
+    }
+}
+
+private val SETTINGS_TABS = listOf("This collection", "Defaults")
+
+/** Takes the size of the largest of [content]'s children without placing, drawing or exposing any of them. */
+@Composable
+private fun SizeOfLargest(content: @Composable () -> Unit) {
+    Layout(content, Modifier.clearAndSetSemantics {}) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints) }
+        layout(placeables.maxOfOrNull { it.width } ?: 0, placeables.maxOfOrNull { it.height } ?: 0) {}
     }
 }
 
