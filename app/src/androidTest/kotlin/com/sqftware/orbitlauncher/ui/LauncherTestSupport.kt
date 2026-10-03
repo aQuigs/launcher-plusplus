@@ -167,6 +167,8 @@ fun SemanticsNodeInteractionsProvider.collectionApp(kind: CollectionKind, app: A
 
 fun SemanticsNodeInteractionsProvider.collectionChevron(kind: CollectionKind) = onNodeWithTag(CollectionTags.chevron(kind))
 
+fun SemanticsNodeInteractionsProvider.collectionMore(kind: CollectionKind) = onNodeWithTag(CollectionTags.more(kind))
+
 fun SemanticsNodeInteractionsProvider.collectionEditButton(kind: CollectionKind) = onNodeWithTag(CollectionTags.edit(kind))
 
 fun SemanticsNodeInteractionsProvider.collectionSettingsButton(kind: CollectionKind) = onNodeWithTag(CollectionTags.settings(kind))

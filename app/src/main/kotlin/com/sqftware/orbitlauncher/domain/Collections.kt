@@ -99,12 +99,27 @@ const val CARD_ROW_APPS = 5
 /** When a card names its apps underneath. */
 enum class AppNames { Never, Expanded, Always }
 
-/** How a card lays out its apps: [rows] of them while compact, at most [limit] if it works them out, named as [names] says. */
-data class CardLook(val rows: Int = 1, val limit: Int = BUILT_IN_CARD_APPS, val names: AppNames = AppNames.Expanded) {
+/** How a compact card marks that it holds more apps than it shows. */
+enum class MoreMark { Dots, Count, None }
+
+/**
+ * How a card lays out its apps: [rows] of them while compact, marked as [more] says when it holds more, at most [limit]
+ * if it works them out, named as [names] says.
+ */
+data class CardLook(
+    val rows: Int = 1,
+    val limit: Int = BUILT_IN_CARD_APPS,
+    val names: AppNames = AppNames.Expanded,
+    val more: MoreMark = MoreMark.Count,
+) {
     /** How many apps it shows while compact. */
     val compactApps: Int get() = rows * CARD_ROW_APPS
 
     fun namesShown(expanded: Boolean): Boolean = names == AppNames.Always || names == AppNames.Expanded && expanded
+
+    /** How many of a card's [count] apps it marks as more than it shows: none while [expanded] or with no mark. */
+    fun hiddenApps(count: Int, expanded: Boolean): Int =
+        if (expanded || more == MoreMark.None) 0 else (count - compactApps).coerceAtLeast(0)
 }
 
 /** One part of a [CardLook] a card can hold its own value of: the values it takes, and how it is read and written. */
@@ -129,10 +144,12 @@ sealed class CardSetting<T : Any>(val choices: List<T>, private val get: (CardLo
     }
 
     data object Names : CardSetting<AppNames>(AppNames.entries, CardLook::names, { look, it -> look.copy(names = it) })
+
+    data object More : CardSetting<MoreMark>(MoreMark.entries, CardLook::more, { look, it -> look.copy(more = it) })
 }
 
-/** Every [CardSetting], in the order they are stored and offered. */
-val CARD_SETTINGS: List<CardSetting<*>> = listOf(CardSetting.Rows, CardSetting.Limit, CardSetting.Names)
+/** Every [CardSetting], in the order they are stored and offered; a new one goes last, so stored looks still read. */
+val CARD_SETTINGS: List<CardSetting<*>> = listOf(CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More)
 
 /**
  * One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], whether it shows them all, and the settings it
