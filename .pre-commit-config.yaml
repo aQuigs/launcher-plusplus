@@ -32,11 +32,11 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/
       - id: panel-ground-only
-        name: Full-screen views take their ground from PanelGround
+        name: Full-screen views and pop-ups take their ground from PanelGround
         language: pygrep
-        entry: '\bsurfaceDim\b|\bLocalPanelMark\b|\bdrawBackdrop\('
+        entry: '\bsurfaceDim\b|\bLocalPanelMark\b|\bdrawBackdrop\(|(?<![\w.])(AlertDialog|DropdownMenu)\('
         files: ^app/src/main/kotlin/.*\.kt$
-        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Panel\.kt$|\w+Art\.kt$)
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Panel\.kt$|Popups\.kt$|\w+Art\.kt$)
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

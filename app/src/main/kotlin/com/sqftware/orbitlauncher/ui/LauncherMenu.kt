@@ -13,8 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -107,7 +105,7 @@ fun LauncherOptionsMenu(expanded: Boolean, at: () -> Offset, rows: List<Launcher
     // A point-sized anchor at the spot, so the popup opens under the finger rather than under the host. Absolute, since
     // the spot is in root coordinates, which right-to-left layouts do not mirror.
     Box(Modifier.absoluteOffset { at().round() }) {
-        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.MENU)) {
+        GroundMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.MENU)) {
             rows.forEach { row -> LauncherMenuItem(row, expanded, onDismiss) }
         }
     }
@@ -143,7 +141,7 @@ fun LauncherMenuItem(row: LauncherMenuRow, expanded: Boolean, onDismiss: () -> U
 /** Asks before [onReset] erases all the launcher keeps. Cancel, Back and a tap outside call [onDismiss]. */
 @Composable
 fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onReset) { Text("Reset") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -158,7 +156,7 @@ fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
 /** Asks whether to set [scene] as the home screen's wallpaper: Set calls [onSet]; Cancel, Back and a tap outside call [onDismiss]. */
 @Composable
 fun SceneDialog(scene: ThemeScene, onSet: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onSet) { Text("Set") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -181,7 +179,7 @@ fun <T> ChoiceDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AlertDialog(
+    GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

@@ -103,9 +103,10 @@ val GlyphFill = Color.Black
  * Built with the full constructor, so no role is left on Material's stock greys. The surfaces come in two tiers of the
  * deep. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
  * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) take the veil of
- * `surfaceDim` from their one `PanelGround`, so a container on one never stacks a second veil. What floats over other
- * content (menus, dialogs, sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit deep,
- * or the icons beneath would show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night
+ * `surfaceDim` from their one `PanelGround`, so a container on one never stacks a second veil. Menus and dialogs float
+ * on the same ground made opaque, so they read as the drawer does. Anything else that floats over other content (sheets,
+ * a bin, edit handles, a box within a dialog) takes `surfaceContainerLow` and up, which are opaque lit deep, or the icons
+ * beneath would show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night
  * and frost by day, rimmed by the tonal edge, so it shows on a light wallpaper without drawing the eye. Content colours
  * are all opaque, so their contrast does not hang on the wallpaper.
  */

@@ -9,19 +9,23 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.sqftware.orbitlauncher.ui.theme.LocalPanelMark
 
 /**
- * The ground of every full-screen view over the launcher, the drawer's and each [Panel]'s alike: the veil of
- * `surfaceDim`, and the theme's faint marks over it. Views draw it from here rather than picking colours of their own,
- * so a theme reaches all of them at once.
+ * The ground of every full-screen view over the launcher, the drawer's and each [Panel]'s alike, and of every pop-up:
+ * the veil of `surfaceDim`, and the theme's faint marks over it. Views draw it from here rather than picking colours of
+ * their own, so a theme reaches all of them at once.
  */
 class PanelGround(private val veil: Color, private val mark: Color, private val art: ThemeArt) {
+    private val solid = veil.copy(alpha = 1f)
+
     /** The veil at [alpha] of its own, over [size] from [topLeft]. */
     fun DrawScope.drawVeil(alpha: Float = 1f, topLeft: Offset = Offset.Zero, size: Size = this.size) =
         drawRect(veil.copy(alpha = veil.alpha * alpha), topLeft, size)
@@ -29,7 +33,16 @@ class PanelGround(private val veil: Color, private val mark: Color, private val 
     /** The theme's marks at [alpha] of their brightest, drifted by how far a list has [scrolled]. */
     fun DrawScope.drawMarks(alpha: Float = 1f, scrolled: Float = 0f) =
         with(art) { drawBackdrop(mark.copy(alpha = mark.alpha * alpha), scrolled) }
+
+    /** The veil made opaque, with the marks over it, for what floats over other content and must hide it. */
+    fun DrawScope.drawSolid() {
+        drawRect(solid)
+        drawMarks()
+    }
 }
+
+/** The solid [ground] under a pop-up's content, clipped to its [shape]. */
+fun Modifier.solidGround(ground: PanelGround, shape: Shape) = clip(shape).drawBehind { with(ground) { drawSolid() } }
 
 @Composable
 fun panelGround(): PanelGround {

@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -351,7 +350,7 @@ private fun SortMenu(controls: DrawerControls) {
     val close = { controls.onSortingChange(false) }
     fun choose(changed: DrawerStyle) = chooseFrom(controls.sorting, close) { controls.onStyleChange(changed) }
 
-    DropdownMenu(expanded = controls.sorting, onDismissRequest = close, modifier = Modifier.testTag(AppDrawerTags.SORT_MENU)) {
+    GroundMenu(expanded = controls.sorting, onDismissRequest = close, modifier = Modifier.testTag(AppDrawerTags.SORT_MENU)) {
         DrawerOrder.entries.forEach { order ->
             val chosen = order == style.order
             DropdownMenuItem(
