@@ -57,12 +57,25 @@ private const val VIRUS_TURNS_PER_HOUR = 4
 private const val WOBBLES_PER_HOUR = 20
 
 /**
- * How many times the emblem's bacillus divides in a turn, how far round each daughter leaves from the last, and how many
- * are seen swimming off. The daughters go round a whole number of times a turn, so none jumps as it starts over.
+ * How many times each of the emblem's bacilli divides in a turn, how far round each daughter leaves from the last, and
+ * for how many divisions a daughter is seen swimming off. The daughters go round a whole number of times a turn, so
+ * none jumps as it starts over.
  */
-private const val GENERATIONS_PER_TURN = 10
-private const val SPLIT_TURN = 108f
+private const val GENERATIONS_PER_TURN = 8
+private const val SPLIT_TURN = 135f
 private const val DAUGHTERS = 2
+
+/**
+ * One of the emblem's bacilli: where it stays, as a share of the emblem's radius from its middle, how far through a
+ * division it is when the others start one, and which way it first faces.
+ */
+private class Bacillus(val at: Offset, val step: Float, val facing: Float)
+
+private val Bacilli = listOf(
+    Bacillus(Offset(-0.26f, -0.24f), 0f, 0f),
+    Bacillus(Offset(0.3f, -0.04f), 0.35f, 150f),
+    Bacillus(Offset(-0.06f, 0.34f), 0.7f, 260f),
+)
 
 /** How much of a folder's square the disc of previews takes on each germ, which shows round it. */
 private const val GERM_DISC = 0.78f
@@ -219,62 +232,66 @@ private class SlideTile(density: Density, size: Size) {
 }
 
 /**
- * A bacillus in the middle of the dish dividing without end, [GENERATIONS_PER_TURN] times a turn of [turn]: it grows out
- * along its length, pinches in two, and the daughter swims off out of the dish, tumbling, while the half left behind
- * turns on and grows again. Each daughter leaves [SPLIT_TURN] degrees round from the last.
+ * A few bacilli in the dish, each dividing without end, [GENERATIONS_PER_TURN] times a turn of [turn] and out of step
+ * with the others: each grows out along its length, pinches in two, and the daughter swims off, tumbling and fading,
+ * while the half left behind turns on and grows again. Each daughter leaves [SPLIT_TURN] degrees round from the last.
  */
 private fun CacheDrawScope.colony(turn: () -> Float): DrawResult {
     val radius = size.emblemRadius
-    val length = radius * 0.36f
-    val thick = radius * 0.15f
+    val length = radius * 0.28f
+    val thick = radius * 0.12f
     val dish = Path().apply { addOval(Rect(size.center, radius)) }
-    val outer = Stroke(2.5.dp.toPx())
-    val inner = Stroke(1.2.dp.toPx())
+    val outer = Stroke(2.dp.toPx())
+    val inner = Stroke(1.dp.toPx())
     fun Path.addCapsule(along: Float) =
         addRoundRect(RoundRect(along - length / 2, -thick / 2, along + length / 2, thick / 2, CornerRadius(thick / 2)))
     val cell = Path().apply { addCapsule(0f) }
     val growth = Path()
     val dividing = Path()
-    fun DrawScope.germAt(shape: Path, at: Offset, degrees: Float) = withTransform({
+    fun DrawScope.germAt(shape: Path, at: Offset, degrees: Float, alpha: Float = 1f) = withTransform({
         translate(at.x, at.y)
         rotate(degrees - 90f, Offset.Zero)
-    }) { germ(shape, outer, inner) }
+    }) { germ(shape, outer, inner, alpha) }
     return onDrawBehind {
-        val generations = cycles(turn(), GENERATIONS_PER_TURN)
-        val born = floor(generations)
         clipPath(dish) {
-            // Those already off, from the eldest, which is the furthest out.
-            for (ago in DAUGHTERS downTo 1) {
-                val left = born - ago + 1
-                val swum = generations - left
-                // Turning on as the cell it left does, and slowing, so it curves away rather than swinging off straight.
-                val heading = (left + 1f - exp(-swum)) * SPLIT_TURN
-                germAt(cell, size.center + direction(heading) * (length * (1f + swum + 0.2f * swum * swum)), heading)
-            }
-            val grown = length * (generations - born)
-            dividing.rewind()
-            if (grown <= length - thick) {
-                // Its halves still share their sides, so it is one longer rod.
-                dividing.addRoundRect(RoundRect(-length / 2, -thick / 2, grown + length / 2, thick / 2, CornerRadius(thick / 2)))
-            } else {
-                // Pinching in two: the union shows the waist, or failing that both halves, which look the same but for it.
-                growth.rewind()
-                growth.addCapsule(grown)
-                if (!dividing.op(cell, growth, PathOperation.Union)) {
-                    dividing.addPath(cell)
-                    dividing.addPath(growth)
+            Bacilli.forEach { bacillus ->
+                val home = size.center + bacillus.at * radius
+                val generations = cycles(turn(), GENERATIONS_PER_TURN) + bacillus.step
+                val born = floor(generations)
+                // Those already off, from the eldest, which is the furthest out and fades as it goes.
+                for (ago in DAUGHTERS downTo 1) {
+                    val left = born - ago + 1
+                    val swum = generations - left
+                    // Turning on as the cell it left does, and slowing, so it curves away rather than swinging off straight.
+                    val heading = bacillus.facing + (left + 1f - exp(-swum)) * SPLIT_TURN
+                    val at = home + direction(heading) * (length * (1f + swum + 0.2f * swum * swum))
+                    germAt(cell, at, heading, (DAUGHTERS - swum).coerceAtMost(1f))
                 }
+                val grown = length * (generations - born)
+                dividing.rewind()
+                if (grown <= length - thick) {
+                    // Its halves still share their sides, so it is one longer rod.
+                    dividing.addRoundRect(RoundRect(-length / 2, -thick / 2, grown + length / 2, thick / 2, CornerRadius(thick / 2)))
+                } else {
+                    // Pinching in two: the union shows the waist, or failing that both halves, which look the same but for it.
+                    growth.rewind()
+                    growth.addCapsule(grown)
+                    if (!dividing.op(cell, growth, PathOperation.Union)) {
+                        dividing.addPath(cell)
+                        dividing.addPath(growth)
+                    }
+                }
+                germAt(dividing, home, bacillus.facing + generations * SPLIT_TURN)
             }
-            germAt(dividing, size.center, generations * SPLIT_TURN)
         }
     }
 }
 
 /** A germ's body in [shape], edged in its membrane's two lines so it shows on any wallpaper. */
-private fun DrawScope.germ(shape: Path, outer: Stroke, inner: Stroke) {
-    drawPath(shape, GermBody)
-    drawPath(shape, Membrane.outer, style = outer)
-    drawPath(shape, Membrane.inner, style = inner)
+private fun DrawScope.germ(shape: Path, outer: Stroke, inner: Stroke, alpha: Float = 1f) {
+    drawPath(shape, GermBody, alpha)
+    drawPath(shape, Membrane.outer, alpha, outer)
+    drawPath(shape, Membrane.inner, alpha, inner)
 }
 
 /**
