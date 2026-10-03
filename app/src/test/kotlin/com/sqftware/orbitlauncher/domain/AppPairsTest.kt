@@ -37,6 +37,27 @@ class AppPairsTest {
     }
 
     @Test
+    fun `a flipped pair takes the pair's place in a slot, a folder or on a card, and a copy already there gives way`() {
+        val mailClock = clockMail.flipped()!!
+        assertEquals("Mail | Clock", mailClock.label)
+
+        val home = HomeApps(ring = Ring(listOf(RingSlot.App(clockMail.key), RingSlot.Folder(listOf(maps.key, mailClock.key, clockMail.key)))))
+        val shown = setOf(clock.key, mail.key, maps.key)
+        assertEquals(
+            Ring(listOf(RingSlot.App(mailClock.key), RingSlot.Folder(listOf(maps.key, mailClock.key, clockMail.key)))),
+            home.replace(HomePlace.Ring, clockMail, mailClock, shown).ring,
+        )
+        assertEquals(
+            Ring(listOf(RingSlot.App(clockMail.key), RingSlot.Folder(listOf(maps.key, mailClock.key)))),
+            home.replace(HomePlace.Folder(HomePlace.Ring, 1), clockMail, mailClock, shown).ring,
+        )
+        assertEquals(
+            Favourites(listOf(mailClock.key, maps.key)),
+            Favourites(listOf(clockMail.key, maps.key)).replace(clockMail, mailClock),
+        )
+    }
+
+    @Test
     fun `a pair resolves wherever a key does, in a slot, a folder or on a card, while both its apps are there`() {
         val ring = Ring(listOf(RingSlot.App(clockMail.key), RingSlot.Folder(listOf(clockMail.key, maps.key))))
         val card = Favourites(listOf(clockMail.key, maps.key))

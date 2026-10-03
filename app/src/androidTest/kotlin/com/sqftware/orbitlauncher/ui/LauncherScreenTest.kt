@@ -1028,6 +1028,24 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aPairsMenuFlipsItsOrderInPlaceOnTheRingAndOnACard() {
+        val pair = pairOf(clock, mail)!!
+        val flipped = pairOf(mail, clock)!!
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(pair.key), RingSlot.App(clock.key))))
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(pair.key, clock.key)))))
+        show()
+
+        compose.ringSlot(pair).performTouchInput { longClick() }
+        compose.onNodeWithText("Flip order").performClick()
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(RingSlot.App(flipped.key), RingSlot.App(clock.key)))), homeApps) }
+
+        goToCollections()
+        compose.collectionApp(tools, pair).performTouchInput { longClick() }
+        compose.onNodeWithText("Flip order").performClick()
+        compose.runOnIdle { assertEquals(Favourites(listOf(flipped.key, clock.key)), collections.card(tools)!!.apps) }
+    }
+
+    @Test
     fun theDrawerMenuAddsAnAppToEachHomePlaceItIsNotIn() {
         show()
         compose.drawerHandle().performClick()

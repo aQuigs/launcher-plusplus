@@ -80,11 +80,11 @@ class AppOptionsTest {
     }
 
     @Test
-    fun `a pair offers only what takes it off where it is, or puts it on the ring or the dock, and each app's badge`() {
+    fun `a pair offers only what takes it off where it is, or puts it on the ring or the dock, a flip and each app's badge`() {
         val music = app("Music")
         val pair = pairOf(maps, music)!!
         assertEquals(
-            listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder),
+            listOf(AppOption.Remove(HomePlace.Ring), AppOption.NewFolder, AppOption.Flip),
             options(pair, AppSpot.Home(HomePlace.Ring), hasStorePage = true),
         )
         val tools = CollectionKind.Category(AppCategory.Tools)
@@ -93,6 +93,7 @@ class AppOptionsTest {
                 AppOption.RemoveFromCard(tools),
                 AppOption.AddTo(HomePlace.Ring),
                 AppOption.AddTo(HomePlace.Dock),
+                AppOption.Flip,
                 AppOption.Badge(isOff = true, maps),
                 AppOption.Badge(isOff = false, music),
             ),

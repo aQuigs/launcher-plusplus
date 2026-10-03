@@ -159,6 +159,7 @@ private val AppOption.label
             HomePlace.Dock -> "Add to the dock"
         }
         AppOption.SplitWith -> "Split with…"
+        AppOption.Flip -> "Flip order"
         is AppOption.Badge -> listOfNotNull(if (isOff) "Show" else "Hide", member?.label, "badge").joinToString(" ")
         is AppOption.BuiltInCards -> if (isOff) "Show in New & Most Used" else "Hide from New & Most Used"
         AppOption.PlayStore -> "Open in Play Store"
@@ -173,9 +174,12 @@ private val AppOption.icon
         is AppOption.RemoveFromCard -> Icons.Default.Close
         is AppOption.AddTo -> Icons.Default.Add
         AppOption.SplitWith -> SplitGlyph
+        AppOption.Flip -> SwapGlyph
         is AppOption.Badge -> Icons.Default.Notifications
         is AppOption.BuiltInCards -> Icons.Default.Star
         AppOption.PlayStore -> Icons.Default.ShoppingCart
         AppOption.AppInfo -> Icons.Default.Info
         AppOption.Uninstall -> Icons.Default.Delete
     }
+
+private val SwapGlyph = materialGlyph("SwapVert", "M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z")
