@@ -191,6 +191,7 @@ data class HomePress(val launcherInFront: Boolean)
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
  * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * show whether it shares usage data and flip it ([shareUsage], [onShareUsageChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -238,6 +239,8 @@ fun LauncherScreen(
     onOpenUpdate: () -> Unit,
     checkForUpdates: Boolean,
     onCheckForUpdatesChange: (Boolean) -> Unit,
+    shareUsage: Boolean,
+    onShareUsageChange: (Boolean) -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPage: WidgetPage,
@@ -299,6 +302,8 @@ fun LauncherScreen(
     val latestOnRestart by rememberUpdatedState(onRestart)
     val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
     val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
+    val latestShareUsage by rememberUpdatedState(shareUsage)
+    val latestOnShareUsageChange by rememberUpdatedState(onShareUsageChange)
 
     // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
     // through this screen's BackHandler.
@@ -835,6 +840,12 @@ fun LauncherScreen(
                                 on = latestCheckForUpdates,
                                 flips = true,
                                 onClick = { latestOnCheckForUpdatesChange(!latestCheckForUpdates) },
+                            ),
+                            LauncherMenuRow(
+                                "Share usage data",
+                                on = latestShareUsage,
+                                flips = true,
+                                onClick = { latestOnShareUsageChange(!latestShareUsage) },
                             ),
                             LauncherMenuRow("Restart launcher") { latestOnRestart() },
                             LauncherMenuRow("Reset launcher") { confirmingReset = true },

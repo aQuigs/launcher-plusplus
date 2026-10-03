@@ -139,6 +139,7 @@ class LauncherScreenTest {
     private var updateAvailable by mutableStateOf(false)
     private var updatesOpened = 0
     private var checkForUpdates by mutableStateOf(true)
+    private var shareUsage by mutableStateOf(true)
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -237,6 +238,8 @@ class LauncherScreenTest {
             onOpenUpdate = { updatesOpened++ },
             checkForUpdates = checkForUpdates,
             onCheckForUpdatesChange = { checkForUpdates = it },
+            shareUsage = shareUsage,
+            onShareUsageChange = { shareUsage = it },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPage = widgetPage,
@@ -1899,6 +1902,17 @@ class LauncherScreenTest {
         compose.runOnIdle { assertFalse(checkForUpdates) }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Check for updates").assertIsOff()
+    }
+
+    @Test
+    fun theLauncherMenusUsageDataRowShowsWhetherItSharesAndATapFlipsIt() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Share usage data").assertIsOn().performClick()
+
+        compose.runOnIdle { assertFalse(shareUsage) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Share usage data").assertIsOff()
     }
 
     @Test
