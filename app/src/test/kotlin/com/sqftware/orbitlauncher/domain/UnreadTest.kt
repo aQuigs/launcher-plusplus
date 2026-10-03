@@ -84,6 +84,16 @@ class UnreadTest {
     }
 
     @Test
+    fun `a badge says dismissed when any app behind it holds dismissed notifications`() {
+        val counts = UnreadCounts(mapOf(chat.packageName to 4, mail.packageName to 1), dismissed = setOf(mail.packageName))
+
+        assertEquals(Unread(4, dismissed = false), counts.badge(chat))
+        assertEquals(Unread(1, dismissed = true), counts.badge(mail))
+        assertEquals(Unread(5, dismissed = true), counts.badge(listOf(chat, mail)))
+        assertEquals(Unread(4, dismissed = false), counts.badge(listOf(chat)))
+    }
+
+    @Test
     fun `a dismissed notification is kept, a tapped one clears its app and a withdrawn one changes nothing`() {
         val kept = Kept().afterRemoval("m1", posted(mail), Removal.Dismissed).afterRemoval("c1", posted(chat), Removal.Dismissed)
         assertEquals(dismissed(mail to 1, chat to 1), kept.counts)

@@ -464,7 +464,7 @@ private fun AppGrid(
                                 .reorderSlot(rearrange, index, moving?.at == index),
                             menu = menu,
                             drag = rearrange?.drag(index),
-                            unread = unread[app],
+                            unread = unread.badge(app),
                             onClearBadge = unread.clearing(app, onClearBadge),
                         )
                         if (named) AppLabel(app.label)

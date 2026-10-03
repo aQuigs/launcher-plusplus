@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 
 object FolderTags {
@@ -92,7 +93,7 @@ fun FolderIcon(
     onOpen: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,
     menu: FolderMenu? = null,
-    unread: Int = 0,
+    unread: Unread = Unread(0),
     drag: ItemDrag<RingItem.Folder>? = null,
 ) {
     val count = folder.apps.size
@@ -109,7 +110,7 @@ fun FolderIcon(
                 onClick = { if (count > 0) onOpen(folder) },
             )
             .itemDrag(folder, drag)
-            .semantics { contentDescription = name.withUnread(unread) },
+            .semantics { contentDescription = name.withUnread(unread.count) },
     ) {
         LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses) { 1f }
         menu?.content?.invoke(folder)
@@ -170,8 +171,8 @@ internal fun SlotIcon(
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
     when (item) {
-        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread[item.app], drag, unread.clearing(item.app, onClearBadge))
-        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.sum(item.apps), drag)
+        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, unread.clearing(item.app, onClearBadge))
+        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.badge(item.apps), drag)
     }
 }
 

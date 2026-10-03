@@ -10,6 +10,12 @@ data class PostedNotification(
 )
 
 /**
+ * What an icon's badge says: [count] unread, and whether some of them were [dismissed] unread rather than all still being
+ * in the shade, which is what a double tap on the icon would clear.
+ */
+data class Unread(val count: Int, val dismissed: Boolean = false)
+
+/**
  * How many unread notifications each package has, which an entry's badge counts for its [AppEntry.badgePackages]: a pair
  * counts its two apps', as an app kept only in a pair has no other icon on home to show them. A package with none is
  * absent. [dismissed] holds the packages whose count includes notifications the user dismissed unread.
@@ -22,6 +28,11 @@ data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismis
 
     /** The count for a folder of [apps]: each package counted once, however many of its activities and pairs are in there. */
     fun sum(apps: List<AppEntry>): Int = apps.flatMapTo(HashSet()) { it.badgePackages }.sumOf { byPackage[it] ?: 0 }
+
+    fun badge(app: AppEntry) = Unread(this[app], hasDismissed(app))
+
+    /** The badge for a folder of [apps]. */
+    fun badge(apps: List<AppEntry>) = Unread(sum(apps), apps.any(::hasDismissed))
 
     operator fun plus(other: UnreadCounts) = UnreadCounts(
         (byPackage.keys + other.byPackage.keys).associateWith { (byPackage[it] ?: 0) + (other.byPackage[it] ?: 0) },

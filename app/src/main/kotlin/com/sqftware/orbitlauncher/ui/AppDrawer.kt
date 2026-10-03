@@ -514,7 +514,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
 @Composable
 private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier: Modifier = Modifier) {
     val picking = entry.picking
-    val unread = entry.unread[app]
+    val unread = entry.unread.badge(app)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -524,7 +524,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
     ) {
         Box(Modifier.size(GRID_ICON_SIZE)) {
             IconDisc(modifier = Modifier.fillMaxSize()) { AppImage(app, entry.icon, Modifier.fillMaxSize()) }
-            UnreadBadge(unread, Modifier.align(Alignment.TopEnd).clearAndSetSemantics { text = AnnotatedString("$unread unread") })
+            UnreadBadge(unread, Modifier.align(Alignment.TopEnd).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {
                     PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))
