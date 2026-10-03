@@ -28,8 +28,9 @@ private val BADGE_RING = 2.dp
 
 /**
  * A bubble saying how many notifications are [unread], meant for an icon's top-end corner, or nothing for none. It is
- * filled when it holds some the user dismissed unread, which a double tap clears, and a ring when all are still in the
- * shade, so a double tap is not tried where it does nothing.
+ * filled when it holds some the user dismissed unread, which a double tap on an app clears, and a ring when all are
+ * still in the shade, so a double tap is not tried where it does nothing. A folder's is filled when an app in it is.
+ * The ring's fill is opaque, as it overlaps the icon and the digits must not hang on what is beneath.
  */
 @Composable
 fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
@@ -49,7 +50,7 @@ fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
                 if (unread.dismissed) {
                     Modifier.background(colors.error, CircleShape)
                 } else {
-                    Modifier.background(colors.surface, CircleShape).border(BADGE_RING, colors.error, CircleShape)
+                    Modifier.background(colors.surfaceContainerHigh, CircleShape).border(BADGE_RING, colors.error, CircleShape)
                 },
             )
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
