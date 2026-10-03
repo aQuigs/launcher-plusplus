@@ -49,7 +49,9 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.toOffset
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppCategory
@@ -1842,6 +1844,23 @@ class LauncherScreenTest {
         compose.launcherMenu().assertDoesNotExist()
         compose.runOnIdle { assertEquals(1, badgeSettingsOpened) }
         assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
+    fun aLongPressOnTheEmblemOpensTheLauncherMenuAtItsCentreRatherThanThePicker() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        show()
+
+        compose.emblem().performTouchInput { longClick() }
+
+        // On screen, since the menu is a window of its own. It may open above or below the spot, so only its span is checked.
+        val emblem = compose.emblem().fetchSemanticsNode()
+        val centre = emblem.positionOnScreen + emblem.size.center.toOffset()
+        val menu = compose.launcherMenu().fetchSemanticsNode()
+        val slack = with(compose.density) { 16.dp.toPx() }
+        assertEquals(centre.x, menu.positionOnScreen.x, slack)
+        assertTrue(centre.y in menu.positionOnScreen.y - slack..menu.positionOnScreen.y + menu.size.height + slack)
+        assertDrawerOpen(false)
     }
 
     // Flipped twice, so a row that kept the style it first showed would ask for the same one again.

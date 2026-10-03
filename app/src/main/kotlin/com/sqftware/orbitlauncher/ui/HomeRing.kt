@@ -8,7 +8,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -49,8 +48,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -59,7 +60,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.util.lerp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
@@ -140,7 +143,7 @@ private sealed interface Part {
 /**
  * The [ring] of favourite apps and folders round an emblem, both drawn as the theme's [LocalThemeArt] draws them. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
- * the emblem to choose the favourites on the ring and in the dock. With a [hint] the emblem says what a tap there does
+ * the emblem to choose the favourites on the ring and in the dock, or long-press it for [onEmblemLongPress], given its centre in root coordinates. With a [hint] the emblem says what a tap there does
  * instead of showing its mark. While [highlighted], the disc the ring fills glows as the place an app being dragged would
  * land. A folder is a planet: an [openFolder] glides from its slot into the centre in the emblem's place, its apps
  * spiralling out round it into the slots, each with the [folderAppMenu], while the ring drifts outward and fades; a tap
@@ -171,6 +174,7 @@ fun HomeRing(
     menu: AppMenu? = null,
     folderMenu: FolderMenu? = null,
     folderAppMenu: AppMenu? = null,
+    onEmblemLongPress: ((Offset) -> Unit)? = null,
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
     rearrange: Rearrange? = null,
@@ -232,7 +236,7 @@ fun HomeRing(
     Layout(
         content = {
             if (openFolder == null || spreadingOut) {
-                Emblem(hint, { slowTurn.value }, { fastTurn.value }, minuteOfDay, onEdit, Modifier.layoutId(Part.Emblem))
+                Emblem(hint, { slowTurn.value }, { fastTurn.value }, minuteOfDay, onEdit, onEmblemLongPress, Modifier.layoutId(Part.Emblem))
             }
             centred?.let { folder ->
                 key(Part.Planet) {
@@ -405,7 +409,7 @@ private fun Modifier.inert(): Modifier = clearAndSetSemantics {}.pointerInput(Un
 
 /**
  * The ring's centre: the theme's emblem in a disc edged by a hairline, or the [hint] over it. Quiet, so the icons stay
- * the eye's first stop.
+ * the eye's first stop. A long press calls [onLongPress] with its centre in root coordinates.
  */
 @Composable
 private fun Emblem(
@@ -414,16 +418,24 @@ private fun Emblem(
     fastTurn: () -> Float,
     minuteOfDay: () -> Int,
     onClick: () -> Unit,
+    onLongPress: ((Offset) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val art = LocalThemeArt.current
     val edgeMark = LocalRingColors.current.mark
+    var placed by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .clip(CircleShape)
-            .clickable(onClickLabel = hint ?: "Choose the apps on the home screen", onClick = onClick)
+            .onPlaced { placed = it }
+            .combinedClickable(
+                onClickLabel = hint ?: "Choose the apps on the home screen",
+                onLongClickLabel = onLongPress?.let { "Launcher settings" },
+                onLongClick = onLongPress?.let { open -> { placed?.let { open(it.localToRoot(it.size.center.toOffset())) } } },
+                onClick = onClick,
+            )
             .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (hint == null) contentDescription = "Favourites" },
