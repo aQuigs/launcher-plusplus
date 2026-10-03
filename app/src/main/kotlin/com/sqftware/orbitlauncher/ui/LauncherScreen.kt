@@ -99,6 +99,7 @@ import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.appOptions
+import com.sqftware.orbitlauncher.domain.flipped
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
@@ -600,6 +601,13 @@ fun LauncherScreen(
                             }
                             is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
                             AppOption.SplitWith -> pickPartner(app, spot)
+                            AppOption.Flip -> app.flipped()?.let { flipped ->
+                                when (spot) {
+                                    is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, app, flipped, shown) } }
+                                    is AppSpot.Card -> changeCollections { replaceApp(spot.kind, app, flipped) }
+                                    AppSpot.Drawer, AppSpot.MostUsedRow -> Unit
+                                }
+                            }
                             is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(option.member ?: app))
                             is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
                             AppOption.PlayStore -> actions.openStorePage(app)

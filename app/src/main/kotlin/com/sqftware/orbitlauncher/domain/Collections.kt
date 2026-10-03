@@ -188,6 +188,8 @@ data class CollectionsPage(
 
     fun removeApp(kind: CollectionKind, app: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.remove(app)) }
 
+    fun replaceApp(kind: CollectionKind, app: AppEntry, with: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.replace(app, with)) }
+
     /** Adds [app] at the end of the card of [kind], or takes it off if it is already there. */
     fun toggleApp(kind: CollectionKind, app: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.toggle(app)) }
 

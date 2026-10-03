@@ -30,6 +30,9 @@ sealed interface AppOption {
     /** Picks a second app to pair the app with in split screen. */
     data object SplitWith : AppOption
 
+    /** Swaps which of a pair's apps opens on top. */
+    data object Flip : AppOption
+
     /** Turns the app's unread badge off, or back on when it [isOff]; on a pair, its [member]'s, wherever that app is. */
     data class Badge(val isOff: Boolean, val member: AppEntry? = null) : AppOption
 
@@ -49,7 +52,7 @@ sealed interface AppOption {
  * the dock start a folder in its slot; a hand-picked card takes it off the card. Anywhere but home, the menu adds the app
  * to the ring or the dock where it has no slot of its own yet. A plain app can be split with another. A pinned shortcut
  * wears no badge and is on no card, so offers neither setting. A pair belongs to no one app, so offers only where it is,
- * and each of its apps' badge, which the pair's own adds up.
+ * flipping its order there, and each of its apps' badge, which the pair's own adds up.
  */
 fun appOptions(
     app: AppEntry,
@@ -70,8 +73,10 @@ fun appOptions(
         if (badgesEnabled) add(AppOption.Badge(settings.isBadgeOff(app)))
         add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
     }
-    if (badgesEnabled && app.kind is EntryKind.AppPair) app.opens.forEach { add(AppOption.Badge(settings.isBadgeOff(it), it)) }
-    if (app.kind !is EntryKind.AppPair) {
+    if (app.kind is EntryKind.AppPair) {
+        if (place != null || card is CollectionKind.HandPicked) add(AppOption.Flip)
+        if (badgesEnabled) app.opens.forEach { add(AppOption.Badge(settings.isBadgeOff(it), it)) }
+    } else {
         if (hasStorePage) add(AppOption.PlayStore)
         add(AppOption.AppInfo)
     }

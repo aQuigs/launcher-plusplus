@@ -109,6 +109,10 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
     fun remove(place: HomePlace, app: AppEntry, shown: Set<String>): HomeApps =
         Draft(this).apply { put(place, app.key, GAP) }.build(shown)
 
+    /** Puts [with] in [app]'s stead at [place]; a copy of [with] already there gives way to it. */
+    fun replace(place: HomePlace, app: AppEntry, with: AppEntry, shown: Set<String>): HomeApps =
+        Draft(this).apply { leave(place, app.key, with.key) }.build(shown)
+
     /**
      * Whether [app] from [from], another home place or the drawer without one, can land [to]: not in the place it is in,
      * nor into itself, a copy of itself or the folder it left. It may land by that folder, as between any two slots.

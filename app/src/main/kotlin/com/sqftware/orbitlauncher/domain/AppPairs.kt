@@ -15,3 +15,6 @@ fun pairOf(first: AppEntry, second: AppEntry): AppEntry? {
         kind = EntryKind.AppPair(first, second),
     )
 }
+
+/** This pair the other way round, so the app below opens on top, or null if it is not a pair. */
+fun AppEntry.flipped(): AppEntry? = (kind as? EntryKind.AppPair)?.let { pairOf(it.second, it.first) }
