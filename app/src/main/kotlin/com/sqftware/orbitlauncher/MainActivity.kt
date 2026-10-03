@@ -26,9 +26,9 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesAmbientMotionStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
-import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeAppsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
@@ -44,10 +44,13 @@ import com.sqftware.orbitlauncher.apps.WindowSystemBars
 import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
-import com.sqftware.orbitlauncher.domain.HomeApps
+import com.sqftware.orbitlauncher.domain.LauncherPage
+import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
+import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.suggestSetup
@@ -85,7 +88,7 @@ class MainActivity : ComponentActivity() {
         val lightAtStart = wallpaper.isLight()
         showBarsFor(lightAtStart)
         repository = LauncherAppsRepository(this)
-        val homeAppsStore = SharedPreferencesHomeAppsStore(this)
+        val ringPagesStore = SharedPreferencesRingPagesStore(this)
         val wallClock = SystemWallClock(this)
         val hourStyleStore = SharedPreferencesHourStyleStore(this)
         val themeStore = SharedPreferencesThemeStore(this)
@@ -107,14 +110,16 @@ class MainActivity : ComponentActivity() {
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
-        val widgetActions = WidgetActions(
-            view = widgetHost::view,
-            add = widgetHost::add,
-            remove = widgetHost::remove,
-            resize = widgetHost::resize,
-            move = widgetHost::move,
-            sizing = widgetHost::sizing,
-        )
+        val widgetActions = { page: String ->
+            WidgetActions(
+                view = widgetHost::view,
+                add = { pageRows, columnWidthDp, rowHeightDp -> widgetHost.add(page, pageRows, columnWidthDp, rowHeightDp) },
+                remove = widgetHost::remove,
+                resize = widgetHost::resize,
+                move = widgetHost::move,
+                sizing = widgetHost::sizing,
+            )
+        }
         val layout = PageLayout()
         val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageName) } }
         val actions = AppActions(
@@ -155,7 +160,7 @@ class MainActivity : ComponentActivity() {
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
                 // as folders come and go.
-                var homeApps by remember { mutableStateOf(homeAppsStore.load().withPlanetsKept()) }
+                var ringPages by remember { mutableStateOf(ringPagesStore.load().withPlanetsKept()) }
                 var twentyFourHour by remember { mutableStateOf(hourStyleStore.load()) }
                 var folderLooks by remember { mutableStateOf(folderLookStore.load()) }
                 var reorderMode by remember { mutableStateOf(reorderModeStore.load()) }
@@ -185,10 +190,10 @@ class MainActivity : ComponentActivity() {
                 val pinnedShortcuts by produceState<List<AppEntry>?>(null, isHomeApp) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { repository.pinnedShortcuts().collect { value = it } }
                 }
-                LaunchedEffect(homeApps, isHomeApp) { repository.unpinAllBut(homeApps) }
+                LaunchedEffect(ringPages, isHomeApp) { repository.unpinAllBut(ringPages) }
                 // The widgets only draw their updates while the launcher is visible, like the clock. A change reaches the
                 // page at once rather than a dispatch later, so a widget let go is drawn where it landed in that frame.
-                val widgetPage by produceState(remember { widgetHost.page() }) {
+                val widgetPages by produceState(remember { widgetHost.pages() }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) {
                         withContext(Dispatchers.Main.immediate) { widgetHost.updates().collect { value = it } }
                     }
@@ -201,7 +206,7 @@ class MainActivity : ComponentActivity() {
                 val unread by produceState(UnreadCounts()) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
                 }
-                var collections by remember { mutableStateOf(collectionsStore.load()) }
+                var collectionPages by remember { mutableStateOf(collectionsStore.load()) }
                 var appSettings by remember { mutableStateOf(appSettingsStore.load()) }
                 // Usage access is granted in Settings, so each return to the front reads the grant and the week's usage
                 // again. The grant is read before the first frame, so a granted card does not ask for it while the usage
@@ -209,12 +214,12 @@ class MainActivity : ComponentActivity() {
                 val foregroundTime by produceState(remember { if (appUsage.isUsageAccessGranted()) ForegroundTime() else null }) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { appUsage.foregroundTime().collect { value = it } }
                 }
-                fun changeHomeApps(changed: HomeApps) {
-                    homeApps = changed.withPlanetsKept()
-                    homeAppsStore.save(homeApps)
+                fun changeRingPages(changed: RingPages) {
+                    ringPages = changed.withPlanetsKept()
+                    ringPagesStore.save(ringPages)
                 }
-                fun changeCollections(changed: CollectionsPage) {
-                    collections = changed
+                fun changeCollectionPages(changed: CollectionPages) {
+                    collectionPages = changed
                     collectionsStore.save(changed)
                 }
 
@@ -226,9 +231,12 @@ class MainActivity : ComponentActivity() {
                     val time = async { appUsage.foregroundTime().first() }
                     val (found, used) = defaults.await() to time.await()
                     // Read after the wait, so apps picked by hand meanwhile, or a second tap, keep what is there.
-                    val setup = suggestSetup(homeApps, collections, apps ?: return@launch, found, used) ?: return@launch
-                    changeHomeApps(setup.home)
-                    changeCollections(setup.collections)
+                    val home = LauncherPage.Home.id
+                    val cards = layout.first(PageKind.Collections)?.id
+                    val collections = cards?.let(collectionPages::on) ?: CollectionsPage(emptyList())
+                    val setup = suggestSetup(ringPages.on(home), collections, apps ?: return@launch, found, used) ?: return@launch
+                    changeRingPages(ringPages.with(home, setup.home))
+                    if (cards != null) changeCollectionPages(collectionPages.with(cards, setup.collections))
                 }
                 // Asks for usage access first, which the guess leans on, then sets up once back from Settings, granted or
                 // not, or at once should Settings never open.
@@ -247,8 +255,8 @@ class MainActivity : ComponentActivity() {
                     pinRequests = pinRequests,
                     apps = apps,
                     pinnedShortcuts = pinnedShortcuts,
-                    homeApps = homeApps,
-                    onHomeAppsChange = ::changeHomeApps,
+                    ringPages = ringPages,
+                    onRingPagesChange = ::changeRingPages,
                     onSetUpHome = {
                         if (appUsage.isUsageAccessGranted()) {
                             setUpHome()
@@ -308,10 +316,10 @@ class MainActivity : ComponentActivity() {
                     },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
-                    widgetPage = widgetPage,
+                    widgetPages = widgetPages,
                     widgets = widgetActions,
-                    collections = collections,
-                    onCollectionsChange = ::changeCollections,
+                    collectionPages = collectionPages,
+                    onCollectionPagesChange = ::changeCollectionPages,
                     foregroundTime = foregroundTime,
                     onOpenUsageSettings = appUsage::openUsageSettings,
                     unread = appSettings.badges(unread),

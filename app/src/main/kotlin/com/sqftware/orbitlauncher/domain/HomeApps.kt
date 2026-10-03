@@ -159,16 +159,6 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
         }
         return if (target is RingItem.Folder && target.at.holder != to.holder) -1 else slots.slotOf(target)
     }
-
-    /**
-     * The pins to set so that no shortcut stays pinned once it is nowhere on the home screen. [pinned] is the ids pinned
-     * now, by package; the result holds, for each package with a pin that has gone, the ids of its pins still here.
-     */
-    fun keptPins(pinned: Map<String, List<String>>): Map<String, List<String>> {
-        val here = keys
-        return pinned.mapValues { (packageName, ids) -> ids.filter { shortcutKey(packageName, it) in here } }
-            .filter { (packageName, kept) -> kept.size < pinned.getValue(packageName).size }
-    }
 }
 
 /** A key no app has. It holds the place of an app that has left, so no slot shifts until an edit is done. */

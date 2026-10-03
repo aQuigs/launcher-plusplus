@@ -3,7 +3,9 @@ package com.sqftware.orbitlauncher.apps
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sqftware.orbitlauncher.domain.HostedWidget
+import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.WidgetPage
+import com.sqftware.orbitlauncher.domain.WidgetPages
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -17,23 +19,28 @@ class WidgetPageStoreTest {
 
     @After
     fun emptyStore() {
-        store.save(WidgetPage())
+        store.save(WidgetPages())
         store.savePick(null)
     }
 
     @Test
-    fun thePageComesBackWithItsPlaces() {
-        val page = WidgetPage(listOf(HostedWidget(12, row = 0, column = 1, rows = 2, columns = 3), HostedWidget(3, row = 4, column = 0, rows = 1, columns = 2)))
+    fun eachPageComesBackWithItsPlaces() {
+        val pages = WidgetPages(
+            mapOf(
+                LauncherPage.Widgets.id to WidgetPage(listOf(HostedWidget(12, row = 0, column = 1, rows = 2, columns = 3))),
+                "widgets-2" to WidgetPage(listOf(HostedWidget(3, row = 4, column = 0, rows = 1, columns = 2))),
+            ),
+        )
 
-        store.save(page)
+        store.save(pages)
 
-        assertEquals(page, SharedPreferencesWidgetPageStore(context).load())
+        assertEquals(pages, SharedPreferencesWidgetPageStore(context).load())
     }
 
     @Test
     fun thePickInProgressComesBackUntilItIsCleared() {
-        store.savePick(WidgetPick(id = 14, pageRows = 9, columnWidthDp = 90.5f, rowHeightDp = 84.25f))
-        assertEquals(WidgetPick(14, 9, 90.5f, 84.25f), SharedPreferencesWidgetPageStore(context).loadPick())
+        store.savePick(WidgetPick(id = 14, page = "widgets-2", pageRows = 9, columnWidthDp = 90.5f, rowHeightDp = 84.25f))
+        assertEquals(WidgetPick(14, "widgets-2", 9, 90.5f, 84.25f), SharedPreferencesWidgetPageStore(context).loadPick())
 
         store.savePick(null)
 

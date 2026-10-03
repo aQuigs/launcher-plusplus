@@ -85,6 +85,23 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
     }
 }
 
+/** The widgets on every widget page, by page id. A widget's id is the system's, so it is on one page at most. */
+data class WidgetPages(val pages: Map<String, WidgetPage> = emptyMap()) {
+    operator fun get(page: String): WidgetPage = pages[page] ?: WidgetPage()
+
+    val ids: Set<Int> get() = pages.values.flatMapTo(mutableSetOf()) { it.ids }
+
+    /** These pages with [page] as [change] leaves it. */
+    fun change(page: String, change: WidgetPage.() -> WidgetPage): WidgetPages = WidgetPages(pages + (page to this[page].change()))
+
+    /** These pages with the one holding the widget [id], if any, as [change] leaves it. */
+    fun changeHolding(id: Int, change: WidgetPage.() -> WidgetPage): WidgetPages =
+        pages.entries.find { id in it.value.ids }?.let { change(it.key, change) } ?: this
+
+    /** These pages with only the widgets whose ids are in [held]. */
+    fun keeping(held: Set<Int>): WidgetPages = WidgetPages(pages.mapValues { (_, page) -> WidgetPage(page.widgets.filter { it.id in held }) })
+}
+
 /**
  * The cells, [cellDp] each with a gap between two, that a widget needs to be at least [minDp] long: at least one, and
  * no more than [most].

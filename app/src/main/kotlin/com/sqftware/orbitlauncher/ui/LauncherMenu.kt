@@ -70,11 +70,11 @@ class LauncherMenuRow(
 
 /**
  * The empty space of a page. Laid behind the page's content, it only gets the touches nothing on the page claims, since
- * hit testing stops at the first sibling that claims the finger. A tap calls [onTap]; a long press opens [menu] where
+ * hit testing stops at the first sibling that claims the finger. A tap calls [onTap]; a long press opens [menu], if any, where
  * the finger is. It shows the menu wherever that was opened.
  */
 @Composable
-fun EmptySpace(menu: LauncherMenu, onTap: () -> Unit, modifier: Modifier = Modifier) {
+fun EmptySpace(menu: LauncherMenu?, onTap: () -> Unit, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     var placed by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val origin = { placed?.positionInRoot() ?: Offset.Zero }
@@ -87,15 +87,17 @@ fun EmptySpace(menu: LauncherMenu, onTap: () -> Unit, modifier: Modifier = Modif
             .pointerInput(menu) {
                 detectTapGestures(
                     onTap = { currentOnTap() },
-                    onLongPress = { position ->
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        menu.onOpen(origin() + position)
+                    onLongPress = menu?.let { menu ->
+                        { position ->
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menu.onOpen(origin() + position)
+                        }
                     },
                 )
             },
     ) {
         // Read at placement, not here: every page moves on every frame of a page swipe.
-        menu.content(origin)
+        menu?.content(origin)
     }
 }
 

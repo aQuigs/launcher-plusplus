@@ -31,7 +31,9 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasStateDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -64,6 +66,7 @@ import com.sqftware.orbitlauncher.domain.CardLook
 import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
+import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
@@ -80,15 +83,18 @@ import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.LauncherPage
+import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
 import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.ReorderMode
+import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
+import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.pairOf
 import kotlin.math.abs
@@ -108,15 +114,21 @@ class LauncherScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val layout = PageLayout()
-    private val pager = PagerState(currentPage = layout.homeIndex) { layout.pages.size }
+    // Set before showing the screen, which starts on its home page.
+    private var layout = PageLayout()
+    private val pager by lazy { PagerState(currentPage = layout.homeIndex) { layout.pages.size } }
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     private val pinRequests = MutableSharedFlow<PinRequest>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
     private var pinnedShortcuts by mutableStateOf<List<AppEntry>?>(emptyList())
     private val squoosh = AppEntry("Squoosh", "com.example.browser", "com.example.browser.Main", canUninstall = false, kind = EntryKind.Shortcut("squoosh"))
     private var accepts = 0
-    private var homeApps by mutableStateOf(HomeApps())
+    private var ringPages by mutableStateOf(RingPages())
+    private var homeApps: HomeApps
+        get() = ringPages.on(LauncherPage.Home.id)
+        set(value) {
+            ringPages = ringPages.with(LauncherPage.Home.id, value)
+        }
     private var homeAppsChanges = 0
     private var setUps = 0
     private val work = folderOf(clock, mail)
@@ -151,18 +163,34 @@ class LauncherScreenTest {
     private val uninstalled = mutableListOf<AppEntry>()
     private var shortcutsLoaded = CompletableDeferred(Unit)
     private val search = HostedWidget(id = 3, row = 0, column = 0, rows = 1, columns = 4)
-    private var widgetPage by mutableStateOf(WidgetPage())
+    private var widgetPages by mutableStateOf(WidgetPages())
+    private var widgetPage: WidgetPage
+        get() = widgetPages[LauncherPage.Widgets.id]
+        set(value) {
+            widgetPages = WidgetPages(widgetPages.pages + (LauncherPage.Widgets.id to value))
+        }
     private val widgetsAdded = mutableListOf<Int>()
-    private val widgets = WidgetActions(
-        view = { context, _ -> View(context) },
-        add = { rows, _, _ -> widgetsAdded += rows },
-        remove = {},
-        resize = { _, _, _ -> },
-        move = { _, _, _ -> },
-        sizing = { WidgetSizing() },
-    )
+    private val widgetPagesAddedTo = mutableListOf<String>()
+    private val widgets = { page: String ->
+        WidgetActions(
+            view = { context, _ -> View(context) },
+            add = { rows, _, _ ->
+                widgetsAdded += rows
+                widgetPagesAddedTo += page
+            },
+            remove = {},
+            resize = { _, _, _ -> },
+            move = { _, _, _ -> },
+            sizing = { WidgetSizing() },
+        )
+    }
     // Empty rather than the default page, so the built-in cards do not double the apps the other tests look for.
-    private var collections by mutableStateOf(CollectionsPage(emptyList()))
+    private var collectionPages by mutableStateOf(CollectionPages(mapOf(LauncherPage.Collections.id to CollectionsPage(emptyList()))))
+    private var collections: CollectionsPage
+        get() = collectionPages.on(LauncherPage.Collections.id)
+        set(value) {
+            collectionPages = collectionPages.with(LauncherPage.Collections.id, value)
+        }
     private var foregroundTime by mutableStateOf<ForegroundTime?>(null)
     private var usageSettingsOpened = 0
     private var unread by mutableStateOf(UnreadCounts())
@@ -203,9 +231,9 @@ class LauncherScreenTest {
             pinRequests = pinRequests,
             apps = apps,
             pinnedShortcuts = pinnedShortcuts,
-            homeApps = homeApps,
-            onHomeAppsChange = {
-                homeApps = it
+            ringPages = ringPages,
+            onRingPagesChange = {
+                ringPages = it
                 homeAppsChanges++
             },
             onSetUpHome = { setUps++ },
@@ -239,10 +267,10 @@ class LauncherScreenTest {
             onCheckForUpdatesChange = { checkForUpdates = it },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
-            widgetPage = widgetPage,
+            widgetPages = widgetPages,
             widgets = widgets,
-            collections = collections,
-            onCollectionsChange = { collections = it },
+            collectionPages = collectionPages,
+            onCollectionPagesChange = { collectionPages = it },
             foregroundTime = foregroundTime,
             onOpenUsageSettings = { usageSettingsOpened++ },
             unread = unread,
@@ -2899,5 +2927,94 @@ class LauncherScreenTest {
 
         Espresso.pressBack()
         assertSettledOn(LauncherPage.Home)
+    }
+
+    private fun onPage(page: LauncherPage, tag: String) =
+        compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag(LauncherTags.page(page))))
+
+    @Test
+    fun anotherRingPageHasItsOwnRingWithoutTheClockOrTheDockAndAppsPickedThereStayThere() {
+        val second = LauncherPage("ring-2", PageKind.Ring)
+        layout = PageLayout(listOf(LauncherPage.Home, second))
+        homeApps = HomeApps(ring = ringOf(clock), dock = ringOf(clock))
+        show()
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(second)
+        onPage(second, HomeClockTags.TIME).assertDoesNotExist()
+        onPage(second, DockTags.DOCK).assertDoesNotExist()
+
+        onPage(second, HomeRingTags.EMBLEM).performClick()
+        assertDrawerOpen(true)
+        compose.drawerRow("Mail").performClick()
+        Espresso.pressBack()
+
+        onPage(second, HomeRingTags.slot(mail)).assertIsDisplayed()
+        onPage(second, HomeRingTags.slot(clock)).assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(ringOf(mail), ringPages.on(second.id).ring)
+            assertEquals(HomeApps(ring = ringOf(clock), dock = ringOf(clock)), homeApps)
+        }
+    }
+
+    @Test
+    fun aFolderOpensOnItsOwnRingPageAloneAndBackClosesItBeforeGoingHome() {
+        val second = LauncherPage("ring-2", PageKind.Ring)
+        layout = PageLayout(listOf(LauncherPage.Home, second))
+        ringPages = RingPages(rings = mapOf(LauncherPage.Home.id to Ring(listOf(work)), second.id to Ring(listOf(work))))
+        show()
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(second)
+
+        onPage(second, HomeRingTags.folder(0)).performClick()
+        onPage(second, HomeRingTags.EMBLEM).assertDoesNotExist()
+        onPage(LauncherPage.Home, HomeRingTags.EMBLEM).assertExists()
+
+        Espresso.pressBack()
+        onPage(second, HomeRingTags.EMBLEM).assertIsDisplayed()
+        assertSettledOn(second)
+    }
+
+    @Test
+    fun anAppOnTwoRingPagesOpensOneMenu() {
+        val second = LauncherPage("ring-2", PageKind.Ring)
+        layout = PageLayout(listOf(LauncherPage.Home, second))
+        ringPages = RingPages(rings = mapOf(LauncherPage.Home.id to ringOf(mail), second.id to ringOf(mail)))
+        show()
+
+        onPage(LauncherPage.Home, HomeRingTags.slot(mail)).performTouchInput { longClick() }
+
+        compose.appOptionsMenu().assertIsDisplayed()
+    }
+
+    @Test
+    fun eachCollectionsPageKeepsItsOwnCards() {
+        val second = LauncherPage("collections-2", PageKind.Collections)
+        layout = PageLayout(listOf(LauncherPage.Home, LauncherPage.Collections, second))
+        val page = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key)))))
+        collectionPages = CollectionPages(mapOf(LauncherPage.Collections.id to page, second.id to page))
+        show()
+        compose.swipePager { swipeLeft() }
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(second)
+
+        onPage(second, CollectionTags.chevron(tools)).performClick()
+
+        compose.runOnIdle {
+            assertTrue(collectionPages.on(second.id).card(tools)!!.expanded)
+            assertFalse(collections.card(tools)!!.expanded)
+        }
+    }
+
+    @Test
+    fun aWidgetIsAddedToTheWidgetPageInView() {
+        val second = LauncherPage("widgets-2", PageKind.Widgets)
+        layout = PageLayout(listOf(LauncherPage.Widgets, LauncherPage.Home, second))
+        show()
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(second)
+
+        onPage(second, WidgetTags.ADD).performClick()
+
+        compose.runOnIdle { assertEquals(listOf(second.id), widgetPagesAddedTo) }
     }
 }
