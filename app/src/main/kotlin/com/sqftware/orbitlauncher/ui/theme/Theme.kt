@@ -50,7 +50,7 @@ class RingColors(val mark: Color, val starLine: Color, val lit: Color)
 class DiscEdge(val outer: Color, val inner: Color)
 
 /** Everything a theme sets for one kind of wallpaper, a dark or a light one. */
-internal class LauncherLook(val colors: ColorScheme, val ring: RingColors, val drawerMark: Color, val tonalEdge: Color)
+internal class LauncherLook(val colors: ColorScheme, val ring: RingColors, val panelMark: Color, val tonalEdge: Color)
 
 internal fun lookOf(colourway: Colourway, lightWallpaper: Boolean): LauncherLook {
     val palette = paletteOf(colourway)
@@ -87,11 +87,11 @@ private fun paletteOf(colourway: Colourway): Palette = when (colourway) {
 val LocalRingColors = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).ring }
 
 /**
- * The faint marks the theme scatters over the drawer's veil, at their brightest; each is dimmer by its own share. Pale
- * on the night's dark veil, and on the day's frosted one the accent inked towards the deep, so they show without
- * turning the drawer busy.
+ * The faint marks the theme scatters over a full-screen panel's veil, at their brightest; each is dimmer by its own
+ * share. Pale on the night's dark veil, and on the day's frosted one the accent inked towards the deep, so they show
+ * without turning a panel busy.
  */
-val LocalDrawerMark = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).drawerMark }
+val LocalPanelMark = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).panelMark }
 
 /** The rim of a tonal button, whose tint is too faint to hold its edge on a light wallpaper. */
 val LocalTonalEdge = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).tonalEdge }
@@ -102,12 +102,12 @@ val GlyphFill = Color.Black
 /**
  * Built with the full constructor, so no role is left on Material's stock greys. The surfaces come in two tiers of the
  * deep. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
- * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) ask for the veil of
- * `surfaceDim` by name, so a container on one never stacks a second veil. What floats over other content (menus, dialogs,
- * sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit deep, or the icons beneath would
- * show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night and frost by day, rimmed by
- * the tonal edge, so it shows on a light wallpaper without drawing the eye. Content colours are all opaque, so their
- * contrast does not hang on the wallpaper.
+ * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) take the veil of
+ * `surfaceDim` from their one `PanelGround`, so a container on one never stacks a second veil. What floats over other
+ * content (menus, dialogs, sheets, a bin, edit handles) takes `surfaceContainerLow` and up, which are opaque lit deep,
+ * or the icons beneath would show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night
+ * and frost by day, rimmed by the tonal edge, so it shows on a light wallpaper without drawing the eye. Content colours
+ * are all opaque, so their contrast does not hang on the wallpaper.
  */
 private fun Palette.nightLook() = LauncherLook(
     colors = ColorScheme(
@@ -162,7 +162,7 @@ private fun Palette.nightLook() = LauncherLook(
         onTertiaryFixedVariant = lerp(deep, warm, 0.3f),
     ),
     ring = RingColors(mark = ringMark, starLine = accent.copy(alpha = 0.7f), lit = spark),
-    drawerMark = pale.copy(alpha = 0.5f),
+    panelMark = pale.copy(alpha = 0.5f),
     tonalEdge = deep.copy(alpha = 0.5f),
 )
 
@@ -212,7 +212,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
             surfaceContainerHighest = pale,
         ),
         ring = RingColors(mark = deep, starLine = dayAccent.copy(alpha = 0.7f), lit = dayWarm),
-        drawerMark = dayAccent.copy(alpha = 0.4f),
+        panelMark = dayAccent.copy(alpha = 0.4f),
         tonalEdge = night.tonalEdge,
     )
 }
@@ -225,7 +225,7 @@ fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Compo
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides look.colors.onBackground,
             LocalRingColors provides look.ring,
-            LocalDrawerMark provides look.drawerMark,
+            LocalPanelMark provides look.panelMark,
             LocalTonalEdge provides look.tonalEdge,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
