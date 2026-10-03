@@ -1,8 +1,10 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -189,6 +191,7 @@ private const val MIN_KEPT_LABEL_SCALE = 0.75f
 private const val MIN_LABEL_SCALE = 0.25f
 private val TILE_PADDING = 4.dp
 private const val NOTICE_MILLIS = 2_000L
+private const val EXPAND_MILLIS = 200
 
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
@@ -317,7 +320,7 @@ private fun CollectionCardView(
             }
             .testTag(CollectionTags.card(card.kind)),
     ) {
-        Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
+        Column(Modifier.animateContentSize(tween(EXPAND_MILLIS)).padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
             CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onSettings, onEdit)
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
@@ -340,7 +343,7 @@ private fun CardHeader(
     onEdit: (() -> Unit)?,
 ) {
     val latestOnMove by rememberUpdatedState(onMove)
-    val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f, tween(EXPAND_MILLIS), label = "chevron")
 
     BoxWithConstraints(Modifier.fillMaxWidth().height(HEADER_BUTTON)) {
         // In the middle, unless a narrow card would put it under the buttons. Room is left for all three on every card, so
