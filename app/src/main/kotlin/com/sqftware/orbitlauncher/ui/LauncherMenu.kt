@@ -4,10 +4,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -32,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -49,8 +52,11 @@ object LauncherMenuTags {
     const val LOOK_DIALOG = "launcher_folder_look_dialog"
 }
 
-/** The launcher's own long-press menu, opened at the spot pressed on a page's empty space and shown there. */
-typealias LauncherMenu = LongPressMenu<Offset>
+/**
+ * The launcher's own long-press menu, opened at a spot in root coordinates (where a page's empty space was pressed, or the
+ * ring's emblem) and shown there. The empty space hosts its [content], handing it the host's origin in root coordinates.
+ */
+class LauncherMenu(val onOpen: (Offset) -> Unit, val content: @Composable (origin: () -> Offset) -> Unit)
 
 /**
  * One row of the launcher's menu: [label] beside a switch showing [on], or beside the [value] it is set to, or alone for an
@@ -67,36 +73,43 @@ class LauncherMenuRow(
 /**
  * The empty space of a page. Laid behind the page's content, it only gets the touches nothing on the page claims, since
  * hit testing stops at the first sibling that claims the finger. A tap calls [onTap]; a long press opens [menu] where
- * the finger is.
+ * the finger is. It shows the menu wherever that was opened.
  */
 @Composable
 fun EmptySpace(menu: LauncherMenu, onTap: () -> Unit, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
-    var pressedAt by remember { mutableStateOf(Offset.Zero) }
+    var placed by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val origin = { placed?.positionInRoot() ?: Offset.Zero }
     val currentOnTap by rememberUpdatedState(onTap)
 
     Box(
-        modifier.fillMaxSize().pointerInput(menu) {
-            detectTapGestures(
-                onTap = { currentOnTap() },
-                onLongPress = { position ->
-                    pressedAt = position
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    menu.onOpen(position)
-                },
-            )
-        },
+        modifier
+            .fillMaxSize()
+            .onPlaced { placed = it }
+            .pointerInput(menu) {
+                detectTapGestures(
+                    onTap = { currentOnTap() },
+                    onLongPress = { position ->
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        menu.onOpen(origin() + position)
+                    },
+                )
+            },
     ) {
-        // A point-sized anchor at the spot pressed, so the popup opens under the finger rather than under the page.
-        Box(Modifier.offset { pressedAt.round() }) { menu.content(pressedAt) }
+        // Read at placement, not here: every page moves on every frame of a page swipe.
+        menu.content(origin)
     }
 }
 
-/** The launcher's menu of [rows]. Choosing a row dismisses the menu, then hands on the choice. */
+/** The launcher's menu of [rows], shown [at] an offset in its host. Choosing a row dismisses the menu, then hands on the choice. */
 @Composable
-fun LauncherOptionsMenu(expanded: Boolean, rows: List<LauncherMenuRow>, onDismiss: () -> Unit) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.MENU)) {
-        rows.forEach { row -> LauncherMenuItem(row, expanded, onDismiss) }
+fun LauncherOptionsMenu(expanded: Boolean, at: () -> Offset, rows: List<LauncherMenuRow>, onDismiss: () -> Unit) {
+    // A point-sized anchor at the spot, so the popup opens under the finger rather than under the host. Absolute, since
+    // the spot is in root coordinates, which right-to-left layouts do not mirror.
+    Box(Modifier.absoluteOffset { at().round() }) {
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.MENU)) {
+            rows.forEach { row -> LauncherMenuItem(row, expanded, onDismiss) }
+        }
     }
 }
 

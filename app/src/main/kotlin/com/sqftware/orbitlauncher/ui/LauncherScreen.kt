@@ -790,11 +790,12 @@ fun LauncherScreen(
 
     val launcherMenu = remember {
         LauncherMenu(
-            onOpen = { openMenuUnlessDragging { openMenu = OpenMenu.Launcher() } },
-            content = {
+            onOpen = { at -> openMenuUnlessDragging { openMenu = OpenMenu.Launcher(at) } },
+            content = { origin ->
                 (openMenu as? OpenMenu.Launcher)?.let { shown ->
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
+                        at = { shown.at - origin() },
                         rows = listOfNotNull(
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
@@ -1114,6 +1115,7 @@ fun LauncherScreen(
                                                 menu = ringMenu,
                                                 folderMenu = folderMenu,
                                                 folderAppMenu = folderAppMenu,
+                                                onEmblemLongPress = launcherMenu.onOpen,
                                                 unread = unread,
                                                 onClearBadge = actions.clearBadge,
                                                 rearrange = if (open != null) folderRearrange else ringRearrange,
@@ -1411,8 +1413,8 @@ private sealed interface OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 
-    /** The launcher's own menu, from the home page's empty space. */
-    data class Launcher(override val expanded: Boolean = true) : OpenMenu {
+    /** The launcher's own menu, opened [at] a spot in root coordinates on the home page's empty space or the ring's emblem. */
+    data class Launcher(val at: Offset, override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 
