@@ -106,14 +106,25 @@ class CollectionsTest {
     }
 
     @Test
+    fun `a compact card marks the apps it holds past its rows, unless expanded or set to no mark`() {
+        assertEquals(listOf(0, 0, 3), listOf(4, 5, 8).map { CardLook().hiddenApps(it, expanded = false) })
+        assertEquals(0, CardLook().hiddenApps(8, expanded = true))
+        assertEquals(0, CardLook(more = MoreMark.None).hiddenApps(8, expanded = false))
+    }
+
+    @Test
     fun `a setting missing or not one of its choices is the default, and whatever follows them is ignored`() {
-        val text = "NewApps\t0,\nMostUsed\t1,9,15\nTools\t0,3,,Always,x\ta/A"
+        val text = "NewApps\t0,\nMostUsed\t1,9,15\nTools\t0,3,,Always,Dots,x\ta/A"
 
         assertEquals(
             listOf(
                 CollectionCard(NewApps),
                 CollectionCard(MostUsed, expanded = true, own = mapOf(CardSetting.Limit to 15)),
-                CollectionCard(tools, Favourites(listOf("a/A")), own = mapOf(CardSetting.Rows to 3, CardSetting.Names to AppNames.Always)),
+                CollectionCard(
+                    tools,
+                    Favourites(listOf("a/A")),
+                    own = mapOf(CardSetting.Rows to 3, CardSetting.Names to AppNames.Always, CardSetting.More to MoreMark.Dots),
+                ),
             ),
             decodeCollectionsPage(text).cards,
         )
@@ -121,9 +132,9 @@ class CollectionsTest {
 
     @Test
     fun `the defaults come back as they went, and one unreadable is the first default`() {
-        val defaults = CardLook(rows = 2, limit = 20, names = AppNames.Never)
+        val defaults = CardLook(rows = 2, limit = 20, names = AppNames.Never, more = MoreMark.Dots)
 
-        assertEquals("2,20,Never", defaults.encode())
+        assertEquals("2,20,Never,Dots", defaults.encode())
         assertEquals(defaults, decodeCardLook(defaults.encode()))
         assertEquals(CardLook(rows = 2), decodeCardLook("2,7"))
         assertEquals(CardLook(), decodeCardLook(""))
@@ -214,10 +225,10 @@ class CollectionsTest {
     fun `a page comes back as it went`() {
         val page = CollectionsPage().toggleExpanded(NewApps).set(MostUsed, CardSetting.Rows, 2)
             .add(tools, Favourites(listOf(clock.key, mail.key))).set(tools, CardSetting.Rows, 4).set(tools, CardSetting.Names, AppNames.Never)
-            .add(photos).set(MostUsed, CardSetting.Limit, 20)
+            .add(photos).set(MostUsed, CardSetting.Limit, 20).set(photos, CardSetting.More, MoreMark.None)
 
         assertEquals(
-            "NewApps\t1\nMostUsed\t0,2,20\nTools\t0,4,,Never\t${clock.key}\t${mail.key}\nPhotos\t0",
+            "NewApps\t1\nMostUsed\t0,2,20\nTools\t0,4,,Never\t${clock.key}\t${mail.key}\nPhotos\t0,,,,None",
             page.encode(),
         )
         assertEquals(page, decodeCollectionsPage(page.encode()))

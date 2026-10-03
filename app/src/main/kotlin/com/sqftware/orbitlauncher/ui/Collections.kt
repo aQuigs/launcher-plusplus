@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -129,6 +130,7 @@ import com.sqftware.orbitlauncher.domain.CollectionKind
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.MAX_COLLECTION_NAME
+import com.sqftware.orbitlauncher.domain.MoreMark
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
@@ -154,6 +156,8 @@ object CollectionTags {
     fun handle(kind: CollectionKind) = "collection_handle_${kind.name}"
 
     fun chevron(kind: CollectionKind) = "collection_chevron_${kind.name}"
+
+    fun more(kind: CollectionKind) = "collection_more_${kind.name}"
 
     fun edit(kind: CollectionKind) = "collection_edit_${kind.name}"
 
@@ -184,6 +188,8 @@ private val CARD_GAP = 12.dp
 private val CARD_ICON_SIZE = 48.dp
 private val HEADER_BUTTON = 48.dp
 private val ROW_GAP = 12.dp
+private val MORE_APPS_HEIGHT = 24.dp
+private const val SHOW_ALL = "Show all"
 private val BIN_SIZE = 72.dp
 // Arc's three columns, down to two once three would shrink the names below this share of the size the user chose.
 private const val PICKER_COLUMNS = 3
@@ -197,7 +203,8 @@ private const val EXPAND_MILLIS = 200
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
  * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], a gear that
  * calls [onSettings], and a chevron that calls [onToggleExpanded]: a compact card shows the rows its look sets of its
- * first apps, an expanded one every app, each named as its look says. The built-in cards work out as many apps as their
+ * first apps, with a mark along its bottom when it holds more, and an expanded one every app, each named as its look
+ * says. The built-in cards work out as many apps as their
  * look allows from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], pairs included, and Most Used
  * asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
  * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
@@ -320,13 +327,15 @@ private fun CollectionCardView(
             }
             .testTag(CollectionTags.card(card.kind)),
     ) {
-        Column(Modifier.animateContentSize(tween(EXPAND_MILLIS)).padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
+        val hidden = apps?.let { look.hiddenApps(it.size, card.expanded) } ?: 0
+        Column(Modifier.animateContentSize(tween(EXPAND_MILLIS)).padding(start = 12.dp, end = 4.dp)) {
             CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onSettings, onEdit)
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
             } else {
                 AppGrid(card.kind, apps, card.expanded, look, icon, onLaunch, rearrange, menu, unread, onClearBadge)
             }
+            if (hidden > 0) MoreApps(card.kind, hidden, look.more, onToggleExpanded) else Spacer(Modifier.height(12.dp))
         }
     }
 }
@@ -411,9 +420,33 @@ private fun CardHeader(
             IconButton(onClick = onToggleExpanded, modifier = Modifier.testTag(CollectionTags.chevron(kind))) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Show fewer" else "Show all",
+                    contentDescription = if (expanded) "Show fewer" else SHOW_ALL,
                     modifier = Modifier.graphicsLayer { rotationZ = rotation },
                 )
+            }
+        }
+    }
+}
+
+/** A quiet mark along a compact card's bottom edge, dots or a count as [mark] says, that a tap expands like the chevron. */
+@Composable
+private fun MoreApps(kind: CollectionKind, hidden: Int, mark: MoreMark, onExpand: () -> Unit) {
+    val colour = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = 8.dp)
+            .height(MORE_APPS_HEIGHT)
+            .clickable(onClickLabel = SHOW_ALL, role = Role.Button, onClick = onExpand)
+            .semantics { contentDescription = if (hidden == 1) "1 more app" else "$hidden more apps" }
+            .testTag(CollectionTags.more(kind)),
+    ) {
+        if (mark == MoreMark.Count) {
+            Text("+$hidden", style = MaterialTheme.typography.labelSmall, color = colour)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                repeat(3) { Box(Modifier.size(4.dp).background(colour, CircleShape)) }
             }
         }
     }
@@ -824,6 +857,7 @@ private val CardSetting<*>.title: String
         CardSetting.Rows -> "Rows when collapsed"
         CardSetting.Limit -> "App limit"
         CardSetting.Names -> "App names"
+        CardSetting.More -> "More apps"
     }
 
 @Composable

@@ -25,6 +25,7 @@ import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.ForegroundTime
+import com.sqftware.orbitlauncher.domain.MoreMark
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -168,6 +169,30 @@ class CollectionsColumnTest {
     }
 
     @Test
+    fun aCompactCardWithMoreAppsThanItShowsMarksItsBottomAndATapThereExpandsIt() {
+        foregroundTime = ForegroundTime(mapOf(clock.packageName to 1L))
+        show()
+
+        compose.collectionMore(MostUsed).assertDoesNotExist()
+        compose.collectionMore(NewApps).assertIsDisplayed().performClick()
+
+        compose.onNodeWithText("R12").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(page.card(NewApps)!!.expanded) }
+        compose.collectionMore(NewApps).assertDoesNotExist()
+    }
+
+    @Test
+    fun aCardCountsItsHiddenAppsByDefaultOrLeavesTheMarkOutWhenSetToNone() {
+        show()
+
+        compose.onNodeWithText("+5").assertIsDisplayed()
+
+        page = page.set(NewApps, CardSetting.More, MoreMark.None)
+
+        compose.collectionMore(NewApps).assertDoesNotExist()
+    }
+
+    @Test
     fun aCompactCardOfThreeRowsShowsThatManyRowsOfItsApps() {
         page = CollectionsPage().set(NewApps, CardSetting.Rows, 3).set(NewApps, CardSetting.Limit, 15)
         show()
@@ -175,6 +200,7 @@ class CollectionsColumnTest {
         // Twelve apps fill two rows and part of a third, still without labels.
         recent.forEach { compose.collectionApp(NewApps, it).assertIsDisplayed() }
         compose.onNodeWithText("R12").assertDoesNotExist()
+        compose.collectionMore(NewApps).assertDoesNotExist()
         val first = compose.collectionApp(NewApps, recent[11]).getUnclippedBoundsInRoot()
         val third = compose.collectionApp(NewApps, recent[1]).getUnclippedBoundsInRoot()
         assertTrue("$first, $third", third.top > first.bottom && third.left == first.left)
