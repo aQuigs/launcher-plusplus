@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -104,7 +103,7 @@ fun AppOptionsMenu(
 ) {
     fun choose(choice: () -> Unit) = chooseFrom(expanded, onDismiss, choice)
 
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(AppOptionsTags.MENU)) {
+    GroundMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(AppOptionsTags.MENU)) {
         shortcuts.forEach { shortcut ->
             DropdownMenuItem(
                 text = { Text(shortcut.label) },

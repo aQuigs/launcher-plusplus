@@ -44,6 +44,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -104,7 +106,6 @@ import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
-import com.sqftware.orbitlauncher.ui.theme.LocalDrawerMark
 import java.io.Serializable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -895,8 +896,7 @@ fun LauncherScreen(
     // finger in root coordinates, which this box may not start at: the origin is measured after the padding clear of
     // the system bars, so it is the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val panel = MaterialTheme.colorScheme.surfaceDim
-    val drawerMark = LocalDrawerMark.current
+    val ground = panelGround()
     // How far the drawer's list has been dragged and flung, for the stars to follow. A jump by the letter rail is a cut,
     // after which no one could tell where the stars ought to be, so it need not count.
     val drawerScrolled = remember { mutableFloatStateOf(0f) }
@@ -917,7 +917,6 @@ fun LauncherScreen(
     val navigationBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
     // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back.
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
-    val art = LocalThemeArt.current
     WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -941,11 +940,7 @@ fun LauncherScreen(
                     // A fling into the end of the list settles the open sheet with a bounce past the top. The sheet is placed
                     // at its rounded offset, so the gap is rounded too, or the join shows a seam.
                     val lifted = (-offset.roundToInt()).coerceAtLeast(0)
-                    drawRect(
-                        panel.copy(alpha = panel.alpha * open),
-                        Offset(0f, size.height - lifted),
-                        Size(size.width, bottom - size.height + lifted),
-                    )
+                    with(ground) { drawVeil(open, Offset(0f, size.height - lifted), Size(size.width, bottom - size.height + lifted)) }
                 },
         ) {
             BottomSheetScaffold(
@@ -965,10 +960,12 @@ fun LauncherScreen(
                             // The drawer under the strip is as tall as it travels, like the pages.
                             val travel = size.height - strip
                             val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
-                            drawRect(panel.copy(alpha = panel.alpha * open), size = Size(size.width, strip))
-                            drawRect(panel, Offset(0f, strip))
-                            // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
-                            with(art) { drawBackdrop(drawerMark.copy(alpha = drawerMark.alpha * open), drawerScrolled.floatValue) }
+                            with(ground) {
+                                drawVeil(open, size = Size(size.width, strip))
+                                drawVeil(topLeft = Offset(0f, strip), size = Size(size.width, size.height - strip))
+                                // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
+                                drawMarks(open, drawerScrolled.floatValue)
+                            }
                         }.nestedScroll(drawerScroll),
                     ) {
                         DrawerHandle(
@@ -1037,7 +1034,10 @@ fun LauncherScreen(
                 },
                 // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
                 // navigation-bar inset.
-                modifier = Modifier.clipToBounds().alpha(if (pickingCollection) 0f else 1f),
+                // Hidden from TalkBack and key focus too, which alpha alone leaves reaching the launcher under the picker.
+                modifier = Modifier
+                    .clipToBounds()
+                    .then(if (pickingCollection) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
             ) { padding ->
                 HorizontalPager(
                     state = pagerState,

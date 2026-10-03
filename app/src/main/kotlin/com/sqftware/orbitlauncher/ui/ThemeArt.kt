@@ -30,7 +30,7 @@ import com.sqftware.orbitlauncher.ui.theme.RingColors
 
 /**
  * The shapes a theme draws its own way, where its colours alone would not make it: the ring's centre, the marks round the
- * ring, a folder, and what lies on the drawer's veil. Their colours still come from `ui/theme`.
+ * ring, a folder, and what lies on a full-screen panel's veil. Their colours still come from `ui/theme`.
  */
 interface ThemeArt {
     /**
@@ -80,7 +80,7 @@ interface ThemeArt {
         inner: () -> Float,
     )
 
-    /** The faint pattern over the drawer's veil, in [colour] at its brightest, drifting by a share of how far the list has [scrolled]. */
+    /** The faint pattern over a panel's veil, in [colour] at its brightest, drifting by a share of how far the list has [scrolled]. */
     fun DrawScope.drawBackdrop(colour: Color, scrolled: Float)
 
     /** The theme's world as a scene the launcher's menu offers to set as the wallpaper, if it has one. */

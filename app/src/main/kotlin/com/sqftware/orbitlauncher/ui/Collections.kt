@@ -51,8 +51,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -87,6 +85,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -645,7 +644,7 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
     val kind = page.custom(name)
     val taken = kind == null && name.isNotBlank()
 
-    AlertDialog(
+    GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
         title = { Text(CREATE_YOUR_OWN) },
@@ -710,13 +709,13 @@ fun CollectionSettingsDialog(
         }
     }
 
-    AlertDialog(
+    GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
         title = { Text("${kind.title} settings") },
         text = {
             Column {
-                SecondaryTabRow(selectedTabIndex = pager.targetPage, containerColor = AlertDialogDefaults.containerColor) {
+                SecondaryTabRow(selectedTabIndex = pager.targetPage, containerColor = Color.Transparent) {
                     SETTINGS_TABS.forEachIndexed { index, title ->
                         Tab(
                             selected = pager.targetPage == index,
