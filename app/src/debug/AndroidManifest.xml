@@ -5,4 +5,12 @@
          never requested at runtime, so the debug build stays as quiet as the release build unless a test grants it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Emulator runs and device tests would otherwise count as users. Deactivated, unlike disabled, cannot be turned back
+         on at runtime, so the menu's switch does not undo it. -->
+    <application>
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
+    </application>
+
 </manifest>

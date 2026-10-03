@@ -38,10 +38,16 @@ class SystemRelauncher(private val context: Context) : Relauncher {
         restart()
     }
 
-    // Committed rather than applied, since the process ends next.
+    // Committed rather than applied, since the process ends next. Libraries keep files of their own, Firebase its analytics
+    // identity and unsent events among them, which go too; only the running code's own directories stay.
     internal fun erase() {
         File(context.dataDir, "shared_prefs").list().orEmpty().filter { it.endsWith(".xml") }.forEach { file ->
             context.getSharedPreferences(file.removeSuffix(".xml"), Context.MODE_PRIVATE).edit(commit = true) { clear() }
         }
+        context.dataDir.listFiles().orEmpty().filter { it.name !in KEPT_DIRS }.forEach { it.deleteRecursively() }
+    }
+
+    private companion object {
+        val KEPT_DIRS = setOf("shared_prefs", "code_cache", "lib")
     }
 }

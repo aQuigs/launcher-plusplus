@@ -40,6 +40,9 @@ class RelauncherTest {
         SharedPreferencesHourStyleStore(context).save(twentyFourHour = true)
         // A store added later, which no one told the reset about.
         context.getSharedPreferences("later", Context.MODE_PRIVATE).edit(commit = true) { putString("key", "value") }
+        // What a library keeps outside preferences, as Firebase does.
+        val libraryFiles = listOf(File(context.filesDir, "library.json"), File(context.dataDir, "databases/library.db"))
+        libraryFiles.forEach { it.parentFile!!.mkdirs(); it.writeText("data") }
         waitForTheStoresToWrite()
 
         SystemRelauncher(context).erase()
@@ -54,5 +57,6 @@ class RelauncherTest {
         for (file in File(context.dataDir, "shared_prefs").listFiles().orEmpty()) {
             assertFalse("${file.name} still holds data", "name=" in file.readText())
         }
+        libraryFiles.forEach { assertFalse("${it.name} is still there", it.exists()) }
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.sqftware.orbitlauncher.apps.FirebaseUsageSharing
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.PlayAppUpdates
@@ -97,6 +98,7 @@ class MainActivity : ComponentActivity() {
         val ringer = SystemRinger(this)
         val appUpdates = PlayAppUpdates(this)
         val updateCheckStore = SharedPreferencesUpdateCheckStore(this)
+        val usageSharing = FirebaseUsageSharing(this)
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
         val collectionsStore = SharedPreferencesCollectionsStore(this)
@@ -172,6 +174,7 @@ class MainActivity : ComponentActivity() {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { ringer.modes().collect { value = it } }
                 }
                 var checkForUpdates by remember { mutableStateOf(updateCheckStore.load()) }
+                var shareUsage by remember { mutableStateOf(usageSharing.load()) }
                 // Play tells no one of a new release, so it is asked, only while the launcher is visible, like the clock.
                 val updateAvailable by produceState(false, checkForUpdates) {
                     if (checkForUpdates) repeatOnLifecycle(Lifecycle.State.STARTED) { appUpdates.available().collect { value = it } }
@@ -305,6 +308,11 @@ class MainActivity : ComponentActivity() {
                     onCheckForUpdatesChange = {
                         checkForUpdates = it
                         updateCheckStore.save(it)
+                    },
+                    shareUsage = shareUsage,
+                    onShareUsageChange = {
+                        shareUsage = it
+                        usageSharing.save(it)
                     },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
