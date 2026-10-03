@@ -3,6 +3,7 @@ package com.sqftware.orbitlauncher.ui
 import android.view.View
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -115,8 +116,9 @@ class LauncherScreenTest {
     val compose = createComposeRule()
 
     // Set before showing the screen, which starts on its home page.
-    private var layout = PageLayout()
-    private val pager by lazy { PagerState(currentPage = layout.homeIndex) { layout.pages.size } }
+    private var layout by mutableStateOf(PageLayout())
+    // Counts the pages of the layout the screen was handed, as the screen's own does, not of one set since.
+    private lateinit var pager: PagerState
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     private val pinRequests = MutableSharedFlow<PinRequest>(extraBufferCapacity = 1)
     private var apps by mutableStateOf<List<AppEntry>?>(listOf(clock, mail))
@@ -225,8 +227,11 @@ class LauncherScreenTest {
 
     @Composable
     private fun Screen(modifier: Modifier) = CompositionLocalProvider(LocalThemeArt provides art) {
+        val shown = layout
+        pager = rememberPagerState(shown.homeIndex) { shown.pages.size }
         LauncherScreen(
-            layout = layout,
+            layout = shown,
+            onLayoutChange = { layout = it },
             homePresses = homePresses,
             pinRequests = pinRequests,
             apps = apps,
@@ -2972,6 +2977,66 @@ class LauncherScreenTest {
         Espresso.pressBack()
         onPage(second, HomeRingTags.EMBLEM).assertIsDisplayed()
         assertSettledOn(second)
+    }
+
+    @Test
+    fun editPagesInTheLauncherMenuAddsAPageWhereTheEditorSaysAndATapOnItGoesThere() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Edit pages").assert(hasText("3 pages")).performClick()
+
+        compose.onNodeWithTag(PageEditorTags.add(atStart = false)).performScrollTo().performClick()
+        compose.addPageOf(PageKind.Ring)
+        val added = layout.pages.last()
+        assertEquals(PageKind.Ring, added.kind)
+        compose.onNodeWithTag(PageEditorTags.page(added)).performScrollTo().performClick()
+
+        compose.onNodeWithTag(PageEditorTags.EDITOR).assertDoesNotExist()
+        assertSettledOn(added)
+    }
+
+    @Test
+    fun backAndHomeCloseThePageEditorAndAPageAddedBeforeTheOneInViewLeavesItInView() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Edit pages").performClick()
+        compose.onNodeWithTag(PageEditorTags.add(atStart = true)).performClick()
+        compose.addPageOf(PageKind.Widgets)
+
+        Espresso.pressBack()
+
+        compose.onNodeWithTag(PageEditorTags.EDITOR).assertDoesNotExist()
+        assertSettledOn(LauncherPage.Home)
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Edit pages").performClick()
+        pressHome(launcherInFront = true)
+        compose.onNodeWithTag(PageEditorTags.EDITOR).assertDoesNotExist()
+    }
+
+    @Test
+    fun aDragFromTheDrawerAfterAPageIsAddedBeforeHomeStaysOnHome() {
+        show()
+        layout = layout.add(PageKind.Ring, atStart = true)
+
+        startDraggingFromDrawer(mail)
+        dragTo(centreOf(onPage(LauncherPage.Home, HomeRingTags.EMBLEM)))
+        letGo()
+
+        assertSettledOn(LauncherPage.Home)
+        compose.runOnIdle { assertTrue(mail.key in homeApps.keys) }
+    }
+
+    @Test
+    fun pageDotsShowWhileSwipingOnlyOnceAPageIsTwoSwipesFromHome() {
+        show()
+        compose.swipePager { down(center); moveBy(Offset(-width / 4f, 0f)) }
+        compose.onNodeWithTag(PAGE_DOTS).assertDoesNotExist()
+        compose.swipePager { up() }
+
+        layout = layout.add(PageKind.Ring, atStart = false)
+        compose.swipePager { down(center); moveBy(Offset(-width / 4f, 0f)) }
+        compose.onNodeWithTag(PAGE_DOTS).assertIsDisplayed()
+        compose.swipePager { up() }
     }
 
     @Test

@@ -168,18 +168,19 @@ fun SceneDialog(scene: ThemeScene, onSet: () -> Unit, onDismiss: () -> Unit) {
 }
 
 /**
- * Asks which of [choices] to have, each named by its [label], with [chosen] marked. A tap on one hands it to [onChoose];
- * Cancel, Back and a tap outside call [onDismiss].
+ * Asks which of [choices] to have, each named by its [label] over its [description], if any, with [chosen] marked, if any.
+ * A tap on one hands it to [onChoose]; Cancel, Back and a tap outside call [onDismiss].
  */
 @Composable
 fun <T> ChoiceDialog(
     title: String,
     choices: List<T>,
-    chosen: T,
+    chosen: T?,
     label: (T) -> String,
     onChoose: (T) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    description: (T) -> String? = { null },
 ) {
     GroundDialog(
         onDismissRequest = onDismiss,
@@ -196,8 +197,13 @@ fun <T> ChoiceDialog(
                             .selectable(selected = choice == chosen, role = Role.RadioButton) { onChoose(choice) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = choice == chosen, onClick = null)
-                        Text(label(choice), Modifier.padding(start = 16.dp))
+                        if (chosen != null) RadioButton(selected = choice == chosen, onClick = null, Modifier.padding(end = 16.dp))
+                        Column(Modifier.padding(vertical = 8.dp)) {
+                            Text(label(choice))
+                            description(choice)?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
             }

@@ -221,14 +221,18 @@ data class CollectionsPage(
 }
 
 /**
- * The cards on every collections page, by page id, and the [defaults] every card on any of them starts from. A page with
- * nothing stored holds the built-in cards, as a page never touched does.
+ * The cards on every collections page, by page id, and the [defaults] every card on any of them starts from. With nothing
+ * stored, the first collections page, as the launcher came, holds the built-in cards, and one the user added holds none.
  */
 data class CollectionPages(val pages: Map<String, CollectionsPage> = emptyMap(), val defaults: CardLook = CardLook()) {
-    fun on(page: String): CollectionsPage = (pages[page] ?: CollectionsPage()).copy(defaults = defaults)
+    fun on(page: String): CollectionsPage =
+        (pages[page] ?: if (page == LauncherPage.Collections.id) CollectionsPage() else CollectionsPage(emptyList())).copy(defaults = defaults)
 
     /** These pages with [page] as [changed] has it, whose defaults become every page's. */
     fun with(page: String, changed: CollectionsPage): CollectionPages = CollectionPages(pages + (page to changed), changed.defaults)
+
+    /** These pages with only the cards of the pages in [ids]. */
+    fun keepingPages(ids: Set<String>): CollectionPages = copy(pages = pages.filterKeys { it in ids })
 }
 
 /** How many apps a built-in card lists at least. */

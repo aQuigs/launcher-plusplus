@@ -11,6 +11,8 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.CollectionKind
@@ -198,3 +201,6 @@ fun SemanticsNodeInteractionsProvider.createCollectionName() = onNodeWithTag(Col
 // A card on the page behind the drawer can show the same label, so a row is told apart by the list it is in.
 fun SemanticsNodeInteractionsProvider.drawerRow(label: String) =
     onNode(hasText(label) and hasAnyAncestor(hasTestTag(AppDrawerTags.LIST)))
+
+// The kind's name is a page's label in the editor behind the dialog too.
+fun SemanticsNodeInteractionsProvider.addPageOf(kind: PageKind) = onNode(hasText(kind.name) and hasAnyAncestor(isDialog())).performClick()

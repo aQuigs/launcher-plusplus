@@ -97,7 +97,7 @@ fun FolderIcon(
 ) {
     val count = folder.apps.size
     val presses = remember { MutableInteractionSource() }
-    val name = "Folder, $count ${if (count == 1) "app" else "apps"}"
+    val name = "Folder, ${counted(count, "app")}"
 
     Box(
         modifier

@@ -55,9 +55,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.structuralEqualityPolicy
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,7 +94,6 @@ import com.sqftware.orbitlauncher.domain.heldDrag
 import com.sqftware.orbitlauncher.domain.nearestCells
 import com.sqftware.orbitlauncher.domain.roomFor
 import com.sqftware.orbitlauncher.domain.widgetRowsWithin
-import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 
 object WidgetTags {
@@ -275,18 +272,7 @@ fun WidgetGrid(
         val follower = edge.stretch ?: heldFollower
         val zone = with(density) { EDGE_ZONE.toPx() }
         val speed = with(density) { EDGE_SPEED.toPx() }
-        fun pull() = edgePull(finger, scroll.viewportSize.toFloat(), zone)
-        fun canScroll() = pull().let { it != 0f && follower.room(it) != 0f && if (it > 0f) scroll.canScrollForward else scroll.canScrollBackward }
-        // Frames run only while there is somewhere to scroll to, so a widget held still leaves the page idle.
-        while (true) {
-            snapshotFlow { canScroll() }.first { it }
-            var last = withFrameNanos { it }
-            while (canScroll()) {
-                val now = withFrameNanos { it }
-                follower.follow(scroll.dispatchRawDelta(follower.room(pull() * speed * (now - last) / 1_000_000_000f)))
-                last = now
-            }
-        }
+        scroll.scrollAtEdges(speed, pull = { edgePull(finger, scroll.viewportSize.toFloat(), zone) }, room = follower.room, follow = follower.follow)
     }
 
     Box(

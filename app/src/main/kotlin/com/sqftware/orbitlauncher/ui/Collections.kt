@@ -294,13 +294,6 @@ private fun CollectionCardView(
 ) {
     val dragged = reorder.dragging == index
     val colours = MaterialTheme.colorScheme
-    // The others slide aside while a card is dragged, and snap back the moment it lands: they are then laid out where they
-    // slid to, and animating from there would take them somewhere else first.
-    val shift by animateFloatAsState(
-        targetValue = if (dragged) 0f else reorder.shift(index),
-        animationSpec = if (reorder.dragging == null) snap() else spring(),
-        label = "card_shift",
-    )
 
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -308,13 +301,8 @@ private fun CollectionCardView(
         colors = CardDefaults.cardColors(containerColor = if (dragged) colours.surfaceContainerHigh else colours.surfaceVariant),
         modifier = Modifier
             .fillMaxWidth()
-            // Measured outside the layer below, so the card's resting place is recorded, not where it has been dragged to.
-            .onGloballyPositioned { reorder.place(index, it.positionInParent().y, it.size.height.toFloat()) }
-            .zIndex(if (dragged) 1f else 0f)
-            .graphicsLayer {
-                translationY = if (dragged) reorder.offset else shift
-                alpha = if (dragged) 0.7f else 1f
-            }
+            .reorderItem(reorder, index)
+            .graphicsLayer { alpha = if (dragged) 0.7f else 1f }
             .testTag(CollectionTags.card(card.kind)),
     ) {
         Column(Modifier.padding(start = 12.dp, end = 4.dp, bottom = 12.dp)) {
@@ -380,7 +368,7 @@ private fun CardHeader(
                         // Not verticalDrag, which leaves a move straight across to the pager and so loses the card to it.
                         try {
                             val dragged = drag(start.id) {
-                                reorder.offset += it.positionChange().y
+                                reorder.moveBy(it.positionChange().y)
                                 it.consume()
                             }
                             if (dragged) {

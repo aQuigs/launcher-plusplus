@@ -161,11 +161,11 @@ class WidgetPageTest {
 
     @Test
     fun `a finger pulls the page only near an edge, harder the nearer it is`() {
-        assertEquals(0f, edgePull(y = 500f, height = 1000f, zone = 100f))
-        assertEquals(0.5f, edgePull(y = 950f, height = 1000f, zone = 100f))
-        assertEquals(1f, edgePull(y = 1200f, height = 1000f, zone = 100f))
-        assertEquals(-0.5f, edgePull(y = 50f, height = 1000f, zone = 100f))
-        assertEquals(-1f, edgePull(y = -20f, height = 1000f, zone = 100f))
+        assertEquals(0f, edgePull(at = 500f, length = 1000f, zone = 100f))
+        assertEquals(0.5f, edgePull(at = 950f, length = 1000f, zone = 100f))
+        assertEquals(1f, edgePull(at = 1200f, length = 1000f, zone = 100f))
+        assertEquals(-0.5f, edgePull(at = 50f, length = 1000f, zone = 100f))
+        assertEquals(-1f, edgePull(at = -20f, length = 1000f, zone = 100f))
     }
 
     @Test

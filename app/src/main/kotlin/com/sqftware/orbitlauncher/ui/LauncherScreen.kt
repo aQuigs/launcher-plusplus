@@ -106,6 +106,7 @@ import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.appOptions
+import com.sqftware.orbitlauncher.domain.contentsOf
 import com.sqftware.orbitlauncher.domain.flipped
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
@@ -210,6 +211,7 @@ data class HomePress(val launcherInFront: Boolean)
 @Composable
 fun LauncherScreen(
     layout: PageLayout,
+    onLayoutChange: (PageLayout) -> Unit,
     homePresses: Flow<HomePress>,
     pinRequests: Flow<PinRequest>,
     apps: List<AppEntry>?,
@@ -267,7 +269,7 @@ fun LauncherScreen(
     // The ring page and the collections page the screen works on: the one settled in view, else the home page and the
     // first collections page, which an app dragged from the drawer or a pinned shortcut goes to. Only they take part in
     // menus, drags and open folders; the others are drawn as they are.
-    val settled = layout.pages[pagerState.settledPage]
+    val settled = layout.pageAt(pagerState.settledPage)
     val ringPage = settled.takeIf { it.kind == PageKind.Ring } ?: LauncherPage.Home
     val cardsPage = settled.takeIf { it.kind == PageKind.Collections } ?: layout.first(PageKind.Collections)
     val homeApps = remember(ringPages, ringPage) { ringPages.on(ringPage.id) }
@@ -286,6 +288,7 @@ fun LauncherScreen(
     val shown = remember(onHome, homeApps) {
         onHome?.let(::AppsByKey)?.let { lookup -> homeApps.keys.filterTo(HashSet()) { lookup[it] != null } }
     }
+    val latestLayout by rememberUpdatedState(layout)
     val latestRingPage by rememberUpdatedState(ringPage)
     val latestRingPages by rememberUpdatedState(ringPages)
     val latestHomeApps by rememberUpdatedState(homeApps)
@@ -415,12 +418,14 @@ fun LauncherScreen(
     // through, as it does through the drawer; the pages and the drawer's chevron must not, so they go while it is up. Not
     // animated: it comes and goes in a frame, and pages fading back in would be tappable before they could be seen.
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
+    // The page editor covers the whole screen the same way, until Back, HOME or a tap on a page.
+    var editingPages by rememberSaveable { mutableStateOf(false) }
     // The system bars go with the launcher while the wallpaper shows alone.
     var showingWallpaper by rememberSaveable { mutableStateOf(false) }
     val latestOnSystemBarsShownChange by rememberUpdatedState(onSystemBarsShownChange)
     LaunchedEffect(showingWallpaper) { latestOnSystemBarsShownChange(!showingWallpaper) }
     // Every page stays composed, so the ring page must be told when nobody can see it.
-    val ringInSight = settled.kind == PageKind.Ring && !drawerOpen && !pickingCollection && !showingWallpaper
+    val ringInSight = settled.kind == PageKind.Ring && !drawerOpen && !pickingCollection && !editingPages && !showingWallpaper
     // The first frame holds only the page in view, so the others' widgets and cards do not delay it.
     val firstFrameDrawn by produceState(false) {
         withFrameNanos {}
@@ -549,15 +554,16 @@ fun LauncherScreen(
     // a long press that fired as the page left, must not leave an unseen mode taking taps and Back, nor come back with
     // the page. So whatever does not count is let go, as the mode ends when the page goes out of view.
     var editingWidget by remember { mutableStateOf<Int?>(null) }
-    val shownPage = layout.pages[pagerState.currentPage]
+    val shownPage = layout.pageAt(pagerState.currentPage)
     val editedWidget = editingWidget?.takeIf { id -> shownPage.kind == PageKind.Widgets && widgetPages[shownPage.id].widgets.any { it.id == id } }
     LaunchedEffect(editingWidget, editedWidget) { if (editedWidget == null) editingWidget = null }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
-    fun goHome() = scope.launch { pagerState.animateScrollToPage(layout.homeIndex) }
-    fun showRingPage() = scope.launch { pagerState.animateScrollToPage(layout.pages.indexOf(latestRingPage)) }
+    // The latest layout, as both are called from callbacks remembered once.
+    fun goHome() = scope.launch { pagerState.animateScrollToPage(latestLayout.homeIndex) }
+    fun showRingPage() = scope.launch { pagerState.animateScrollToPage(latestLayout.pages.indexOf(latestRingPage)) }
 
     // A search left over from the drawer, or the menu was opened from, would hide the other apps: the drawer may be
     // reopened before it settles closed, which is what ends a search.
@@ -840,6 +846,7 @@ fun LauncherScreen(
                         expanded = shown.expanded,
                         at = { shown.at - origin() },
                         rows = listOfNotNull(
+                            LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
@@ -881,6 +888,7 @@ fun LauncherScreen(
         editingWidget = null
         closeDrawer()
         pickingCollection = false
+        editingPages = false
         confirmingReset = false
         confirmingScene = false
         confirmingPin = null
@@ -890,7 +898,7 @@ fun LauncherScreen(
         settingCard = null
     }
 
-    LaunchedEffect(homePresses, pagerState, drawerState, layout) {
+    LaunchedEffect(homePresses, pagerState, drawerState) {
         homePresses.collect { press ->
             closeAll()
             // Coming back from an app keeps the page you left, like the stock launcher.
@@ -898,7 +906,7 @@ fun LauncherScreen(
         }
     }
     // On the home page, so the shortcut is seen landing on the ring.
-    LaunchedEffect(pinRequests, pagerState, drawerState, layout) {
+    LaunchedEffect(pinRequests, pagerState, drawerState) {
         pinRequests.collect { request ->
             closeAll()
             goHome()
@@ -908,16 +916,18 @@ fun LauncherScreen(
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
     // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search.
     // The open folder closes only while its page is in view, as the drawer and the other pages hide it and a press should
-    // undo something in view; on another page, Back goes home first. With nothing left, the home app still takes Back: left to the system, it would finish the home activity,
-    // which the system then starts afresh, reloading everything on screen. Opened as an app instead, Back leaves it.
+    // undo something in view; on another page, Back goes home first. With nothing left, the home app still takes Back:
+    // left to the system, it would finish the home activity, which the system then starts afresh, reloading everything on
+    // screen. Opened as an app instead, Back leaves it.
     BackHandler(
-        enabled = isHomeApp || showingWallpaper || dragged != null || drawerOpen || pickingCollection ||
+        enabled = isHomeApp || showingWallpaper || dragged != null || drawerOpen || editingPages || pickingCollection ||
             editedWidget != null || pagerState.currentPage != layout.homeIndex || open != null || previewing,
     ) {
         when {
             showingWallpaper -> showingWallpaper = false
             dragged != null -> dragged = null
             drawerOpen -> closeDrawer()
+            editingPages -> editingPages = false
             pickingCollection -> pickingCollection = false
             editedWidget != null -> editingWidget = null
             open != null && settled == ringPage -> openFolder = null
@@ -1068,10 +1078,11 @@ fun LauncherScreen(
                 },
                 // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
                 // navigation-bar inset.
-                // Hidden from TalkBack and key focus too, which alpha alone leaves reaching the launcher under the picker.
+                // Hidden from TalkBack and key focus too, which alpha alone leaves reaching the launcher under the picker or
+                // the page editor.
                 modifier = Modifier
                     .clipToBounds()
-                    .then(if (pickingCollection) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
+                    .then(if (pickingCollection || editingPages) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
             ) { padding ->
                 HorizontalPager(
                     state = pagerState,
@@ -1261,6 +1272,20 @@ fun LauncherScreen(
                         }
                     }
                 }
+            }
+            if (layout.showsDots && !drawerOpen) {
+                PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = DRAWER_PEEK - 8.dp))
+            }
+            if (editingPages) {
+                PageEditor(
+                    layout = layout,
+                    contentsOf = { contentsOf(it, ringPages, collectionPages, widgetPages) },
+                    onLayoutChange = onLayoutChange,
+                    onOpen = { page ->
+                        editingPages = false
+                        scope.launch { pagerState.scrollToPage(layout.pages.indexOf(page)) }
+                    },
+                )
             }
             // Over the hidden scaffold, drawer strip included: a screen of its own until Back or HOME.
             if (pickingCollection) {
