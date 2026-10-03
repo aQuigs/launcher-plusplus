@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.EntryKind
+import com.sqftware.orbitlauncher.domain.Unread
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -53,7 +54,7 @@ fun AppIcon(
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     menu: AppMenu? = null,
-    unread: Int = 0,
+    unread: Unread = Unread.None,
     drag: AppDrag? = null,
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
@@ -61,9 +62,9 @@ fun AppIcon(
 
     Box(
         modifier
-            .launchable(app, onLaunch, menu, presses, onClearBadge)
+            .launchable(app, onLaunch, menu, presses, onClearBadge.clearing(unread))
             .itemDrag(app, drag)
-            .semantics { contentDescription = app.label.withUnread(unread) },
+            .semantics { contentDescription = app.label.withUnread(unread.count) },
     ) {
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
         menu?.content?.invoke(app)

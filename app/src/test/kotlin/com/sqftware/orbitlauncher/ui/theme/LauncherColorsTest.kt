@@ -39,6 +39,7 @@ class LauncherColorsTest {
                     onSurface to surface.compositeOver(wallpaper),
                     onSecondaryContainer to secondaryContainer.compositeOver(wallpaper),
                     onError to error,
+                    error to surfaceContainerHigh,
                 ) + listOf(onSurface, onSurfaceVariant, primary).map { it to veil } + opaque.map { onSurface to it }
                 pairs.forEach { (text, fill) -> assertTrue("$text on $fill", contrast(text, fill) >= 4.5f) }
             }
