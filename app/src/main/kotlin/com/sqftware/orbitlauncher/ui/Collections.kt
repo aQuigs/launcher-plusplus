@@ -27,6 +27,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -73,6 +75,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -131,6 +134,7 @@ import com.sqftware.orbitlauncher.domain.title
 import com.sqftware.orbitlauncher.ui.theme.GlyphFill
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 object CollectionTags {
     const val ADD = "collection_add"
@@ -141,6 +145,7 @@ object CollectionTags {
     const val CREATE_DIALOG = "collection_create_dialog"
     const val CREATE_NAME = "collection_create_name"
     const val SETTINGS_DIALOG = "collection_settings_dialog"
+    const val SETTINGS_PAGES = "collection_settings_pages"
 
     fun card(kind: CollectionKind) = "collection_${kind.name}"
 
@@ -669,7 +674,8 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
 }
 
 /**
- * The settings of [page]'s card of [kind] on one tab, and the defaults every card without its own follows on another.
+ * The settings of [page]'s card of [kind] on one tab, and the defaults every card without its own follows on another;
+ * a sideways swipe moves between them as a tap on a tab does.
  * On the card's tab, a setting it has no use for is left out, and each other one is ticked to use the default until a
  * choice gives the card its own value; ticking it again goes back. Each change goes to [onChange]. Done, Back and a tap
  * outside call [onDismiss].
@@ -682,7 +688,8 @@ fun CollectionSettingsDialog(
     onDismiss: () -> Unit,
 ) {
     val card = page.card(kind) ?: return
-    var onDefaults by rememberSaveable { mutableStateOf(false) }
+    val pager = rememberPagerState { 2 }
+    val scope = rememberCoroutineScope()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -690,24 +697,35 @@ fun CollectionSettingsDialog(
         title = { Text("${kind.title} settings") },
         text = {
             Column {
-                SecondaryTabRow(selectedTabIndex = if (onDefaults) 1 else 0, containerColor = AlertDialogDefaults.containerColor) {
-                    Tab(selected = !onDefaults, onClick = { onDefaults = false }, text = { Text("This collection") })
-                    Tab(selected = onDefaults, onClick = { onDefaults = true }, text = { Text("Defaults") })
-                }
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 16.dp).verticalScroll(rememberScrollState()),
-                ) {
-                    if (onDefaults) {
-                        Text(
-                            text = "Every collection that uses the default follows these.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                SecondaryTabRow(selectedTabIndex = pager.targetPage, containerColor = AlertDialogDefaults.containerColor) {
+                    listOf("This collection", "Defaults").forEachIndexed { index, title ->
+                        Tab(
+                            selected = pager.targetPage == index,
+                            onClick = { scope.launch { pager.animateScrollToPage(index) } },
+                            text = { Text(title) },
                         )
-                        CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
-                    } else {
-                        val look = page.look(card)
-                        CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { OwnChoices(kind, it, look, isOwn = it in card.own, onChange) }
+                    }
+                }
+                HorizontalPager(
+                    state = pager,
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.padding(top = 16.dp).testTag(CollectionTags.SETTINGS_PAGES),
+                ) { index ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                    ) {
+                        if (index == 1) {
+                            Text(
+                                text = "Every collection that uses the default follows these.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
+                        } else {
+                            val look = page.look(card)
+                            CARD_SETTINGS.filter { it.appliesTo(kind) }.forEach { OwnChoices(kind, it, look, isOwn = it in card.own, onChange) }
+                        }
                     }
                 }
             }

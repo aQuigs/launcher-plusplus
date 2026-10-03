@@ -2237,7 +2237,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aCardsGearSetsItsOwnLookOrTheDefaultsOnTheirOwnTab() {
+    fun aCardsGearSetsItsOwnLookOrTheDefaultsOnTabsASwipeMovesBetween() {
         val tools = CollectionKind.Category(AppCategory.Tools)
         collections = CollectionsPage().add(tools)
         show()
@@ -2251,9 +2251,14 @@ class LauncherScreenTest {
         compose.onNodeWithTag(CollectionTags.useDefault(CardSetting.Rows)).assertIsOff().performClick()
         compose.runOnIdle { assertEquals(CollectionsPage().add(tools), collections) }
 
-        compose.onNodeWithText("Defaults").performClick()
+        compose.onNodeWithTag(CollectionTags.SETTINGS_PAGES).performTouchInput { swipeLeft() }
         compose.onNodeWithTag(CollectionTags.choice(CardSetting.Rows, 2)).performClick()
         compose.runOnIdle { assertEquals(CollectionsPage().add(tools).setDefault(CardSetting.Rows, 2), collections) }
+        compose.onNodeWithTag(CollectionTags.SETTINGS_PAGES).performTouchInput { swipeRight() }
+        compose.onNodeWithTag(CollectionTags.useDefault(CardSetting.Rows)).assertIsOn()
+        compose.onNodeWithText("Defaults").performClick()
+        compose.onNodeWithTag(CollectionTags.useDefault(CardSetting.Rows)).assertIsNotDisplayed()
+        assertSettledOn(LauncherPage.Collections)
         compose.onNodeWithText("Done").performClick()
         compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertDoesNotExist()
 
