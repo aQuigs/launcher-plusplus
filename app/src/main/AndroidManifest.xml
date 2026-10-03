@@ -17,6 +17,17 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Firebase Analytics asks for the advertising ID and the Privacy Sandbox's ad attribution, which usage counts do not
+         need and Play would make us declare. -->
+    <uses-permission
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
 
     <queries>
         <intent>
@@ -30,6 +41,10 @@
         android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Orbit">
+
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
 
         <!-- The ring, the dock and the pages are laid out for a tall screen, as Arc's are; sideways, the ring shrinks to a
              thumbnail and the dock stretches across the screen. Android 16 ignores the lock on screens 600dp and wider,

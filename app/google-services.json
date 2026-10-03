@@ -1,0 +1,29 @@
+{
+    "project_info": {
+        "project_number": "607836054111",
+        "project_id": "orbit-launcher-b0f57",
+        "storage_bucket": "orbit-launcher-b0f57.firebasestorage.app"
+    },
+    "client": [
+        {
+            "client_info": {
+                "mobilesdk_app_id": "1:607836054111:android:43989ce032105bdeb4f1ea",
+                "android_client_info": {
+                    "package_name": "com.sqftware.orbitlauncher"
+                }
+            },
+            "oauth_client": [],
+            "api_key": [
+                {
+                    "current_key": "AIzaSyAxWTzPD4E8lMVo5fnUMVNcDcIFINUVPcs"
+                }
+            ],
+            "services": {
+                "appinvite_service": {
+                    "other_platform_oauth_client": []
+                }
+            }
+        }
+    ],
+    "configuration_version": "1"
+}
