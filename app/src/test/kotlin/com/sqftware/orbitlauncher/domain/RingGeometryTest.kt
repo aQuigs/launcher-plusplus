@@ -212,6 +212,23 @@ class RingGeometryTest {
     }
 
     @Test
+    fun `a long name at the ring's side that fits where the ring is keeps the icons their size`() {
+        // A larger ring would give it less room, between the slot and the page's edge.
+        val names = HangingNames(gap, line, air, listOf(NameWidths(40f), NameWidths(100f), NameWidths(40f), NameWidths(40f)))
+        val plain = ringLayout(fullSize, phoneSide, 4, margin)
+        val named = ringLayout(fullSize, phoneSide, 4, margin, names)
+        assertEquals(plain.iconSize, named.iconSize)
+        assertTrue("${named.names}", named.names.all(NameRoom::fits))
+    }
+
+    @Test
+    fun `a name that fits nowhere does not cost the others theirs`() {
+        val widths = listOf(NameWidths(300f)) + List(7) { if (it == 1) NameWidths(100f) else NameWidths(40f) }
+        val named = ringLayout(fullSize, phoneSide, 8, margin, HangingNames(gap, line, air, widths))
+        assertTrue("${named.names}", !named.names[0].fits && named.names.drop(1).all(NameRoom::fits))
+    }
+
+    @Test
     fun `a name too long for one line wraps onto two before it is cut`() {
         // At the foot of a ring of nine, with room below it but not across.
         val names = namesOf(9).let { it.copy(widths = it.widths.mapIndexed { i, name -> if (i == 4) labels.last() else name }) }

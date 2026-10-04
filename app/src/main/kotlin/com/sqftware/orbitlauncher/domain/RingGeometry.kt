@@ -83,14 +83,23 @@ fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float, names: H
         least(size),
         minOf(side * MAX_RING_RADIUS_FRACTION, side / 2 - margin - size / 2, side / 2 + names.spare - size / 2 - names.gap - names.line),
     )
-    fun fit(size: Float, radius: Float) = names.rooms(count, size, radius, side).allFit()
+    // A larger ring gives names more room between icons but less at its sides and foot, so radii are tried nearest the
+    // one the ring takes without names first, rather than searched as if room only grew.
+    fun radii(size: Float): List<Float> {
+        val from = (if (size == plain.iconSize) plain.radius else side * RING_RADIUS_FRACTION).coerceIn(least(size), most(size))
+        val steps = List(RADIUS_STEPS + 1) { least(size) + (most(size) - least(size)) * it / RADIUS_STEPS }
+        return listOf(from) + steps.sortedBy { abs(it - from) }
+    }
+    fun fitting(size: Float) = radii(size).firstOrNull { names.rooms(size, it, side).all(NameRoom::fits) }
 
-    val size = if (fit(plain.iconSize, most(plain.iconSize))) plain.iconSize else meeting(plain.iconSize, plain.iconSize * NAMED_ICON_FLOOR) { fit(it, most(it)) }
-    val start = if (size == plain.iconSize) plain.radius else RING_RADIUS_FRACTION * side
-    val from = start.coerceIn(least(size), most(size))
-    val radius = if (fit(size, from)) from else meeting(from, most(size)) { fit(size, it) }
-    return RingLayout(radius, size, names.rooms(count, size, radius, side))
+    val size = if (fitting(plain.iconSize) != null) plain.iconSize else meeting(plain.iconSize, plain.iconSize * NAMED_ICON_FLOOR) { fitting(it) != null }
+    // Where no radius fits every name, the one that fits most, nearest the usual first.
+    val radius = fitting(size) ?: radii(size).maxBy { radius -> names.rooms(size, radius, side).count(NameRoom::fits) }
+    return RingLayout(radius, size, names.rooms(size, radius, side))
 }
+
+/** How many radii between the least and the most a named ring may take are tried for its names. */
+private const val RADIUS_STEPS = 16
 
 /** The ring of [ringLayout] without names. */
 private fun plainLayout(fullSize: Float, side: Float, count: Int, margin: Float): RingLayout {
@@ -119,20 +128,19 @@ internal fun ringIconSize(fullSize: Float, side: Float, count: Int, radius: Floa
     2 * radius - side * EMBLEM_FRACTION,
 ).coerceAtLeast(0f)
 
-/** Whether every name has room to show in full. */
-private fun List<NameRoom>.allFit() = all { it.fits }
-
 /**
- * The room each of [count] slots on a ring of [radius] gives its name under an icon [size] across, on a page whose
- * shorter side is [side]: on one line if it fits, else two, else one where it is cut.
+ * The room each slot on a ring of [radius] gives its name under an icon [size] across, on a page whose shorter side is
+ * [side]: on one line if it fits, else two, else one where it is cut.
  */
-private fun HangingNames.rooms(count: Int, size: Float, radius: Float, side: Float): List<NameRoom> = List(count) { index ->
-    val name = widths[index] ?: return@List NameRoom(0f, 1)
-    val one = room(index, count, size, radius, side, 1)
-    when {
-        name.oneLine <= one -> NameRoom(one, 1)
-        name.twoLines <= room(index, count, size, radius, side, 2) -> NameRoom(room(index, count, size, radius, side, 2), 2)
-        else -> NameRoom(one, 1, fits = false)
+fun HangingNames.rooms(size: Float, radius: Float, side: Float): List<NameRoom> {
+    val count = widths.size
+    val places = List(count) { at(it, count).let { (x, y) -> x * radius to y * radius } }
+    return List(count) { index ->
+        val name = widths[index] ?: return@List NameRoom(0f, 1)
+        val one = room(index, places, size, side, 1)
+        if (name.oneLine <= one) return@List NameRoom(one, 1)
+        val two = room(index, places, size, side, 2)
+        if (name.twoLines <= two) NameRoom(two, 2) else NameRoom(one, 1, fits = false)
     }
 }
 
@@ -141,9 +149,8 @@ private fun HangingNames.rooms(count: Int, size: Float, radius: Float, side: Flo
  * and of each name beside it, which takes half the gap between them. Names beside are taken to be two lines tall, as any
  * may be.
  */
-private fun HangingNames.room(index: Int, count: Int, size: Float, radius: Float, side: Float, lines: Int): Float {
-    fun place(i: Int) = at(i, count).let { (x, y) -> x * radius to y * radius }
-    val (x, y) = place(index)
+private fun HangingNames.room(index: Int, places: List<Pair<Float, Float>>, size: Float, side: Float, lines: Int): Float {
+    val (x, y) = places[index]
     val top = y + size / 2 + gap
     val bottom = top + lines * line
     if (bottom > side / 2 + spare) return 0f
@@ -157,9 +164,8 @@ private fun HangingNames.room(index: Int, count: Int, size: Float, radius: Float
     }
 
     clear(0f, 0f, side * EMBLEM_FRACTION / 2)
-    for (other in 0 until count) {
-        if (other == index) continue
-        val (ox, oy) = place(other)
+    places.forEachIndexed { other, (ox, oy) ->
+        if (other == index) return@forEachIndexed
         clear(ox, oy, size / 2)
         val otherTop = oy + size / 2 + gap
         if (widths[other] != null && otherTop < bottom + air && otherTop + 2 * line + air > top) half = minOf(half, (abs(ox - x) - air) / 2)
@@ -171,7 +177,7 @@ private fun HangingNames.room(index: Int, count: Int, size: Float, radius: Float
 private fun meeting(from: Float, to: Float, reached: (Float) -> Boolean): Float {
     var before = from
     var after = to
-    repeat(40) {
+    repeat(16) {
         val middle = (before + after) / 2
         if (reached(middle)) after = middle else before = middle
     }
