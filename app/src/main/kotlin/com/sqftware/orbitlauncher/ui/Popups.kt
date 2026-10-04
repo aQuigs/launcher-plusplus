@@ -2,11 +2,14 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,4 +52,24 @@ fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifi
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         content = content,
     )
+}
+
+/**
+ * A text button for a pop-up's own solid ground; its bare text would vanish on the wallpaper, where [TonalButton] goes.
+ * A [destructive] one, which erases what the user keeps, is in the error colour.
+ */
+@Composable
+fun PopupButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    destructive: Boolean = false,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val colors = if (destructive) {
+        ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+    } else {
+        ButtonDefaults.textButtonColors()
+    }
+    TextButton(onClick, modifier, enabled, colors = colors, content = content)
 }

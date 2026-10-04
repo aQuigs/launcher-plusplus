@@ -24,7 +24,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
@@ -139,9 +138,10 @@ private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
         Text(
             text = "$AUTO_SET_UP fills your home with the apps you use most",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = onPickApps, modifier = Modifier.testTag(LauncherTags.PICK_APPS)) { Text("Pick apps myself") }
+        TonalButton(onClick = onPickApps, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.PICK_APPS)) {
+            Text("Pick apps myself")
+        }
     }
 }
 

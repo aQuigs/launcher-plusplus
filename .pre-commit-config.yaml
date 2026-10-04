@@ -37,6 +37,12 @@ repos:
         entry: '\bsurfaceDim\b|\bLocalPanelMark\b|\bdrawBackdrop\(|(?<![\w.])(AlertDialog|DropdownMenu)\('
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Panel\.kt$|Popups\.kt$|\w+Art\.kt$)
+      - id: launcher-buttons
+        name: Text buttons are a TonalButton on the wallpaper and a PopupButton on a pop-up
+        language: pygrep
+        entry: '(?<!\w)(Text|FilledTonal|Outlined|Elevated)?Button\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(TonalButton|Popups)\.kt$
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

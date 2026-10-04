@@ -15,7 +15,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -91,7 +90,7 @@ fun ThemePreviewBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClose, Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
+                PopupButton(onClose, Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
                 TonalButton(onUse, Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
             }
             ChipRow { Chips(Theme.entries, shown, Theme::label, onShow) }

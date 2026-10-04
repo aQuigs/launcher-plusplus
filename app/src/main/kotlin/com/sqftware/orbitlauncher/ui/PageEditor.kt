@@ -23,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -352,8 +351,8 @@ private fun DeletePageDialog(label: String, contents: PageContents, onDelete: ()
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDelete) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { PopupButton(onClick = onDelete, destructive = true) { Text("Delete") } },
+        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Delete $label?") },
         text = {
             Text(

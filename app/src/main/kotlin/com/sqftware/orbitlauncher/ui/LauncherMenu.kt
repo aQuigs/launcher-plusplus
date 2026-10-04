@@ -18,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -145,8 +144,8 @@ fun LauncherMenuItem(row: LauncherMenuRow, expanded: Boolean, onDismiss: () -> U
 fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onReset) { Text("Reset") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { PopupButton(onClick = onReset, destructive = true) { Text("Reset") } },
+        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Reset Orbit?") },
         text = {
             Text("This clears the ring, the dock, folders, collections, widgets and your settings, then restarts. Permissions stay.")
@@ -160,8 +159,8 @@ fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
 fun SceneDialog(scene: ThemeScene, onSet: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onSet) { Text("Set") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { PopupButton(onClick = onSet) { Text("Set") } },
+        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Set the ${scene.name} as wallpaper?") },
         text = { Text("It replaces the home screen's wallpaper.") },
     )
@@ -185,7 +184,7 @@ fun <T> ChoiceDialog(
     GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text(title) },
         text = {
             Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {

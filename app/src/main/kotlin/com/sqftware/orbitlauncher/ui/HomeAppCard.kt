@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,9 +30,9 @@ fun HomeAppCard(onBecomeHomeApp: () -> Unit, modifier: Modifier = Modifier) {
             Text(
                 text = "Orbit is not your home app yet",
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
             )
-            TextButton(onClick = onBecomeHomeApp, modifier = Modifier.testTag(HomeAppCardTags.BUTTON)) {
+            TonalButton(onClick = onBecomeHomeApp, modifier = Modifier.testTag(HomeAppCardTags.BUTTON)) {
                 Text("Set as home")
             }
         }

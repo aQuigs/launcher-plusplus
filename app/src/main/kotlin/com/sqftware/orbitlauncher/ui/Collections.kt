@@ -68,7 +68,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -670,7 +669,7 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
+        confirmButton = { PopupButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
         title = { Text(CREATE_YOUR_OWN) },
         text = {
             // In the dialog's own window, and only once that window has focus: a text field focused before then gets no
@@ -735,7 +734,7 @@ fun CollectionSettingsDialog(
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { PopupButton(onClick = onDismiss) { Text("Done") } },
         title = { Text("${kind.title} settings") },
         text = {
             Column {

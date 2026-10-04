@@ -86,7 +86,7 @@ fun SemanticsNodeInteractionsProvider.ringer() = onNodeWithTag(HomeClockTags.RIN
 
 fun SemanticsNodeInteractionsProvider.emblem() = onNodeWithTag(HomeRingTags.EMBLEM)
 
-fun SemanticsNodeInteractionsProvider.pickAppsLink() = onNodeWithTag(LauncherTags.PICK_APPS)
+fun SemanticsNodeInteractionsProvider.pickAppsButton() = onNodeWithTag(LauncherTags.PICK_APPS)
 
 fun SemanticsNodeInteractionsProvider.wallpaper() = onNodeWithTag(LauncherTags.WALLPAPER)
 
