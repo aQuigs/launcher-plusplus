@@ -324,6 +324,10 @@ fun LauncherScreen(
     // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
     // through this screen's BackHandler.
     var openFolder by remember { mutableStateOf<PageFolder?>(null) }
+    // A dock folder stays in the dock while open, so a second tap on it closes it.
+    fun tapFolder(page: String, at: HomePlace.Folder) {
+        openFolder = PageFolder(page, at).takeIf { it != openFolder }
+    }
 
     // Callbacks built once read the home apps through the latest state, so what they change is always the current ring.
     // The open folder is named by its slot, so it closes once another folder may show there: a dock folder's neighbours
@@ -1168,7 +1172,7 @@ fun LauncherScreen(
                                                     },
                                                     icon = actions.icon,
                                                     onLaunch = actions.launch,
-                                                    onOpenFolder = { if (active) openFolder = PageFolder(page.id, it.at) },
+                                                    onOpenFolder = { if (active) tapFolder(page.id, it.at) },
                                                     onCloseFolder = { if (active) openFolder = null },
                                                     onEdit = {
                                                         when {
@@ -1224,7 +1228,7 @@ fun LauncherScreen(
                                                     items = dock,
                                                     icon = actions.icon,
                                                     onLaunch = actions.launch,
-                                                    onOpenFolder = { if (active) openFolder = PageFolder(page.id, it.at) },
+                                                    onOpenFolder = { if (active) tapFolder(page.id, it.at) },
                                                     modifier = Modifier.dropZone(page) { copy(dock = it) },
                                                     highlighted = active && dropPlace == HomePlace.Dock,
                                                     menu = dockMenu.takeIf { active },

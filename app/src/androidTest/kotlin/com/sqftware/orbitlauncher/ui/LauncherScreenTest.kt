@@ -1605,6 +1605,20 @@ class LauncherScreenTest {
         compose.mainClock.autoAdvance = true
     }
 
+    @Test
+    fun aTapOnAnOpenDockFolderClosesIt() {
+        apps = listOf(clock, mail)
+        homeApps = HomeApps(dock = Ring(listOf(folderOf(clock, mail))))
+        show()
+        compose.dockFolder(0).performClick()
+        compose.ringSlot(clock).assertIsDisplayed()
+
+        compose.dockFolder(0).performClick()
+
+        compose.emblem().assertIsDisplayed()
+        compose.ringSlot(clock).assertDoesNotExist()
+    }
+
     // A folder is named by its slot: the dock app ahead of it going would otherwise open the next folder in its stead.
     @Test
     fun removingADockAppAheadOfAnOpenDockFolderClosesIt() {
