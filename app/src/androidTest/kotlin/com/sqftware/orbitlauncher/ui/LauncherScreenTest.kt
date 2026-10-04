@@ -638,11 +638,13 @@ class LauncherScreenTest {
 
     @Test
     fun anEmptyDockTakesNoSpace() {
+        // Not an empty home, whose set-up choice would leave as the dock arrives and confound the measure.
+        homeApps = HomeApps(ring = ringOf(clock))
         show()
         compose.dock().assertDoesNotExist()
         val undocked = compose.emblem().getUnclippedBoundsInRoot().bottom
 
-        homeApps = HomeApps(dock = ringOf(mail))
+        homeApps = HomeApps(ring = ringOf(clock), dock = ringOf(mail))
 
         compose.dockSlot(mail).assertIsDisplayed()
         assertTrue("the dock takes space", compose.emblem().getUnclippedBoundsInRoot().bottom < undocked)
