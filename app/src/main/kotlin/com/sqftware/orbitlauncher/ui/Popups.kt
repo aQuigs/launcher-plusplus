@@ -2,11 +2,13 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,4 +51,13 @@ fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifi
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         content = content,
     )
+}
+
+/**
+ * A text button for a pop-up's own solid ground, such as a dialog's or the theme preview's bar. Its bare text would
+ * vanish on a patch of wallpaper, so a button there is a [TonalButton] instead.
+ */
+@Composable
+fun PopupButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+    TextButton(onClick, modifier, enabled, content = content)
 }

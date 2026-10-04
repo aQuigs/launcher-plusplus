@@ -48,6 +48,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 ## Conventions
 
 - The look follows the wallpaper: a light one gets the day scheme and day ring colours. Colours come from the scheme's roles or `LocalRingColors`, never from an assumption that the launcher is dark.
+- A button on the wallpaper is a `TonalButton`, rimmed so it reads on any wallpaper; one on a pop-up's own solid ground (a dialog, the theme preview's bar) is a `PopupButton`. Material's buttons appear only inside those two (held by the `launcher-buttons` hook).
 - Colours live in `ui/theme`: components take a `colorScheme` role or a theme token, never a literal or a surface alpha copy, and a look changes by changing its role there (held by the `theme-colours-only` hook and `LauncherColorsTest`).
 
 ## Themes
