@@ -38,9 +38,9 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Panel\.kt$|Popups\.kt$|\w+Art\.kt$)
       - id: launcher-buttons
-        name: Buttons are a TonalButton on the wallpaper and a PopupButton on a pop-up
+        name: Text buttons are a TonalButton on the wallpaper and a PopupButton on a pop-up
         language: pygrep
-        entry: '(?<![\w.])(TextButton|Button|FilledTonalButton|OutlinedButton|ElevatedButton)\('
+        entry: '(?<!\w)(TextButton|Button|FilledTonalButton|OutlinedButton|ElevatedButton)\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(TonalButton|Popups)\.kt$
       - id: check-markdown
