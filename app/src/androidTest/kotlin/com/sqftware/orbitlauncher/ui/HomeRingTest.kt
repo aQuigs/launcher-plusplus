@@ -5,11 +5,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -21,6 +25,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -50,6 +55,8 @@ class HomeRingTest {
     private var theme by mutableStateOf(Theme.Space)
     private var folderLook by mutableStateOf(FolderLook.Rim)
     private var shownHint by mutableStateOf<String?>(null)
+    private var names by mutableStateOf(false)
+    private var direction by mutableStateOf(LayoutDirection.Ltr)
 
     private fun show(
         favourites: List<AppEntry>,
@@ -71,7 +78,7 @@ class HomeRingTest {
         shownHint = hint
         compose.setContent {
             Themed(theme, theme.colourways.first(), lightWallpaper = false) {
-                CompositionLocalProvider(LocalFolderStyle provides FolderStyle(folderLook)) {
+                CompositionLocalProvider(LocalFolderStyle provides FolderStyle(folderLook), LocalLayoutDirection provides direction) {
                     HomeRing(
                         ring = ring,
                         hint = shownHint,
@@ -83,6 +90,7 @@ class HomeRingTest {
                         openFolder = openFolder,
                         unread = unread,
                         onClearBadge = onClearBadge,
+                        names = names,
                     )
                 }
             }
@@ -164,6 +172,25 @@ class HomeRingTest {
             val top = compose.ringSlot(alphabet[0]).getUnclippedBoundsInRoot()
             assertEquals("the size of $count icons", expected.iconSize, top.width.value, 1f)
             assertEquals("the radius of $count icons", expected.radius, (page.top + page.bottom - top.top - top.bottom).value / 2, 1f)
+        }
+    }
+
+    @Test
+    fun anAppsNameHangsCentredUnderItsIconEitherWayRound() {
+        names = true
+        show(listOf(clock, mail))
+
+        LayoutDirection.entries.forEach { way ->
+            direction = way
+            compose.waitForIdle()
+
+            listOf(clock, mail).forEach { app ->
+                val icon = compose.ringSlot(app).getUnclippedBoundsInRoot()
+                val name = compose.onNode(hasText(app.label) and hasAnyAncestor(hasTestTag(HomeRingTags.slot(app))), useUnmergedTree = true)
+                    .getUnclippedBoundsInRoot()
+                assertEquals("$way: ${app.label} centred", icon.middle.x, name.middle.x, 1f)
+                assertTrue("$way: ${app.label} under its icon", name.top >= icon.bottom - 0.5.dp)
+            }
         }
     }
 

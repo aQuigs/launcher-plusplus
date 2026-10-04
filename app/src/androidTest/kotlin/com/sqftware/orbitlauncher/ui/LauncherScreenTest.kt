@@ -146,6 +146,7 @@ class LauncherScreenTest {
             folderLooks = folderLooks.with(previewTheme ?: theme, look)
         }
     private var ambientMotion by mutableStateOf(true)
+    private var appNames by mutableStateOf(false)
     private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
@@ -260,6 +261,8 @@ class LauncherScreenTest {
             onColourwaysChange = { colourways = it },
             ambientMotion = ambientMotion,
             onAmbientMotionChange = { ambientMotion = it },
+            appNames = appNames,
+            onAppNamesChange = { appNames = it },
             drawerStyle = drawerStyle,
             onDrawerStyleChange = { drawerStyle = it },
             onOpenClock = { opened += "clock" },
@@ -938,6 +941,33 @@ class LauncherScreenTest {
         assertDrawerOpen(false)
         compose.ringSlot(other).assertIsDisplayed()
         compose.closeFolder().assertIsDisplayed()
+    }
+
+    @Test
+    fun theFolderMenuRenamesAFolderWhoseNameHangsUnderItWhileTheRingShowsNames() {
+        homeApps = HomeApps(ring = Ring(listOf(work)))
+        appNames = true
+        show()
+        compose.folderSlot(0).performTouchInput { longClick() }
+        compose.onNodeWithText("Rename").performClick()
+        compose.onNodeWithTag(FolderTags.NAME).performTextReplacement("Work")
+        compose.onNodeWithText("Save").performClick()
+
+        compose.onNodeWithTag(FolderTags.NAME_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(work.copy(name = "Work")))), homeApps) }
+        compose.folderSlot(0).assertContentDescriptionEquals("Work folder, 2 apps")
+        compose.onNode(hasText("Work") and hasAnyAncestor(hasTestTag(HomeRingTags.folder(0))), useUnmergedTree = true).assertExists()
+    }
+
+    // The dock shows no names, so a name given there would never be seen.
+    @Test
+    fun aDockFoldersMenuOffersNoRename() {
+        homeApps = HomeApps(dock = Ring(listOf(work)))
+        show()
+        compose.dockFolder(0).performTouchInput { longClick() }
+
+        compose.folderOptionsMenu().assertIsDisplayed()
+        compose.onNodeWithText("Rename").assertDoesNotExist()
     }
 
     @Test
@@ -1935,6 +1965,22 @@ class LauncherScreenTest {
         compose.onNodeWithText("Ambient motion").assertIsOn().performClick()
 
         compose.runOnIdle { assertFalse(ambientMotion) }
+    }
+
+    @Test
+    fun theLauncherMenusAppNamesRowNamesTheAppsOnTheRingAndInAnOpenFolder() {
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(mail.key), folderOf(clock))))
+        fun nameOn(app: AppEntry) = compose.onNode(hasText(app.label) and hasAnyAncestor(hasTestTag(HomeRingTags.slot(app))), useUnmergedTree = true)
+        show()
+        nameOn(mail).assertDoesNotExist()
+
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Names on the ring").assertIsOff().performClick()
+
+        compose.runOnIdle { assertTrue(appNames) }
+        nameOn(mail).assertExists()
+        compose.onNodeWithTag(HomeRingTags.folder(1)).performClick()
+        nameOn(clock).assertExists()
     }
 
     @Test

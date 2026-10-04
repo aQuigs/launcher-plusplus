@@ -6,21 +6,30 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -31,9 +40,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.MAX_FOLDER_NAME
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -44,6 +56,8 @@ import kotlin.math.roundToInt
 object FolderTags {
     const val MENU = "folder_options"
     const val PLANET_DIALOG = "folder_planet_dialog"
+    const val NAME_DIALOG = "folder_name_dialog"
+    const val NAME = "folder_name"
 }
 
 /** A folder's long-press menu, opened and shown like an [AppMenu]. */
@@ -52,6 +66,7 @@ typealias FolderMenu = LongPressMenu<RingItem.Folder>
 /** What a folder's long-press menu offers, in menu order. */
 enum class FolderOption(val label: String, val icon: ImageVector) {
     AddApps("Add apps", Icons.Default.Add),
+    Rename("Rename", Icons.Default.Edit),
     Planet("Change planet", Icons.Default.Star),
     Remove("Remove folder", Icons.Default.Close),
 }
@@ -86,7 +101,8 @@ private const val PREVIEW_REACH = 0.3f
 /**
  * A slot on the ring or in the dock holding [folder]: a planet the size of an app, in the look the user chose, wearing a
  * badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, a long
- * press opens its [menu], and a long press that goes on becomes a [drag].
+ * press opens its [menu], and a long press that goes on becomes a [drag]. Given a [nameWidth], the name the user gave
+ * it, if any, hangs under it as an app's does.
  */
 @Composable
 fun FolderIcon(
@@ -97,10 +113,11 @@ fun FolderIcon(
     menu: FolderMenu? = null,
     unread: Unread = Unread.None,
     drag: ItemDrag<RingItem.Folder>? = null,
+    nameWidth: NameWidth? = null,
 ) {
     val count = folder.apps.size
     val presses = remember { MutableInteractionSource() }
-    val name = "Folder, ${counted(count, "app")}"
+    val name = (if (folder.name.isEmpty()) "Folder" else "${folder.name} folder") + ", " + counted(count, "app")
 
     Box(
         modifier
@@ -117,7 +134,36 @@ fun FolderIcon(
         LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses) { 1f }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+        if (folder.name.isNotEmpty()) nameWidth?.let { HangingName(folder.name, it) }
     }
+}
+
+/**
+ * Asks what to call a folder, starting from its [name]: Save hands what was typed to [onRename], which takes a blank
+ * one as no name; Cancel, Back and a tap outside call [onDismiss].
+ */
+@Composable
+fun FolderNameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
+    var typed by rememberSaveable { mutableStateOf(name) }
+
+    GroundDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { PopupButton(onClick = { onRename(typed) }) { Text("Save") } },
+        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text("Folder name") },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it.take(MAX_FOLDER_NAME) },
+                label = { Text("Name") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onRename(typed) }),
+                modifier = Modifier.focusRequester(rememberShownFocus()).testTag(FolderTags.NAME),
+            )
+        },
+        modifier = Modifier.testTag(FolderTags.NAME_DIALOG),
+    )
 }
 
 /** [folder]'s disc of previews, filling the item: [presses] ripple it, and [inner] fades the previews. */
@@ -167,7 +213,8 @@ fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBit
 /**
  * What a slot on the ring or in the dock shows: [item] as an app, launched by a tap and wearing its [unread] count, or as
  * a folder, opened by a tap and wearing its apps' sum. A long press opens the app's [menu] or the folder's [folderMenu],
- * and one that goes on becomes a [drag].
+ * and one that goes on becomes a [drag]. Given a [nameWidth], an app's name, or the name the user gave a folder, hangs
+ * under it.
  */
 @Composable
 internal fun SlotIcon(
@@ -181,10 +228,11 @@ internal fun SlotIcon(
     unread: UnreadCounts,
     drag: ItemDrag<Any?>?,
     onClearBadge: ((AppEntry) -> Unit)? = null,
+    nameWidth: NameWidth? = null,
 ) {
     when (item) {
-        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, onClearBadge)
-        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.badge(item.apps), drag)
+        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, onClearBadge, nameWidth)
+        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.badge(item.apps), drag, nameWidth)
     }
 }
 

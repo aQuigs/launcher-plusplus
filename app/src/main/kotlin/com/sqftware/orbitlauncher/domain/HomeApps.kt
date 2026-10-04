@@ -73,10 +73,16 @@ data class HomeApps(val ring: Ring = Ring(), val dock: Ring = Ring()) {
     /** These home apps with the folder at [place] made the planet [pick] names. */
     fun pick(place: HomePlace.Folder, pick: PlanetPick): HomeApps = change(place.holder) { pick(place.index, pick) }
 
+    /** These home apps with the folder at [place] called [name] (see [Ring.rename]). */
+    fun rename(place: HomePlace.Folder, name: String): HomeApps = change(place.holder) { rename(place.index, name) }
+
+    /** The folder at [place], if it is there. */
+    fun folder(place: HomePlace.Folder): RingSlot.Folder? = slots(place.holder).folder(place.index)
+
     /** The apps at [place]: those in slots of their own for the ring or the dock, and none for a folder that is not there. */
     operator fun get(place: HomePlace): Favourites = when (place) {
         is HomePlace.Slots -> slots(place).apps
-        is HomePlace.Folder -> Favourites(slots(place.holder).folder(place.index)?.keys.orEmpty())
+        is HomePlace.Folder -> Favourites(folder(place)?.keys.orEmpty())
     }
 
     /** Adds [app] to [place], unless it is already there. The other places are left as they are. */

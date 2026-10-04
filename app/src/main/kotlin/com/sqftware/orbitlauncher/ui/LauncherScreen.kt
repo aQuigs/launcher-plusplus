@@ -195,7 +195,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -234,6 +234,8 @@ fun LauncherScreen(
     onColourwaysChange: (Colourways) -> Unit,
     ambientMotion: Boolean,
     onAmbientMotionChange: (Boolean) -> Unit,
+    appNames: Boolean,
+    onAppNamesChange: (Boolean) -> Unit,
     drawerStyle: DrawerStyle,
     onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
@@ -317,6 +319,8 @@ fun LauncherScreen(
     fun changeFolderLook(look: FolderLook) = onFolderLooksChange(folderLooks.with(theme, look))
     val latestAmbientMotion by rememberUpdatedState(ambientMotion)
     val latestOnAmbientMotionChange by rememberUpdatedState(onAmbientMotionChange)
+    val latestAppNames by rememberUpdatedState(appNames)
+    val latestOnAppNamesChange by rememberUpdatedState(onAppNamesChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
     val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
     val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
@@ -552,6 +556,7 @@ fun LauncherScreen(
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
+    var renamingFolder by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     // By the card's stored name, which survives the activity being recreated.
     var settingCard by rememberSaveable { mutableStateOf<String?>(null) }
     // The widget in edit mode counts only while it is on the page and the page is in view: one gone with its provider, or
@@ -683,11 +688,19 @@ fun LauncherScreen(
                     }
                     FolderOptionsMenu(
                         expanded = shown.expanded,
-                        // Only the Solar system gives each folder a planet of its own.
-                        options = if (latestFolderLook == FolderLook.SolarSystem) FolderOption.entries else FolderOption.entries - FolderOption.Planet,
+                        options = FolderOption.entries.filter { option ->
+                            when (option) {
+                                // Only the Solar system gives each folder a planet of its own.
+                                FolderOption.Planet -> latestFolderLook == FolderLook.SolarSystem
+                                // Only the ring shows names.
+                                FolderOption.Rename -> folder.at.holder == HomePlace.Ring
+                                else -> true
+                            }
+                        },
                         onOption = { option ->
                             when (option) {
                                 FolderOption.AddApps -> pickFor(folder.at)
+                                FolderOption.Rename -> renamingFolder = folder.at
                                 FolderOption.Planet -> choosingPlanet = folder.at
                                 FolderOption.Remove -> {
                                     // The next folder along inherits this slot's number, and would inherit the fading menu too.
@@ -863,6 +876,12 @@ fun LauncherScreen(
                             LauncherMenuRow("Theme", value = latestTheme.label) { latestOnPreviewThemeChange(latestTheme) },
                             LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
                             LauncherMenuRow(
+                                "Names on the ring",
+                                on = latestAppNames,
+                                flips = true,
+                                onClick = { latestOnAppNamesChange(!latestAppNames) },
+                            ),
+                            LauncherMenuRow(
                                 "Ambient motion",
                                 on = latestAmbientMotion,
                                 flips = true,
@@ -899,6 +918,7 @@ fun LauncherScreen(
         latestOnPreviewThemeChange(null)
         choosingLook = false
         choosingPlanet = null
+        renamingFolder = null
         settingCard = null
     }
 
@@ -1197,6 +1217,7 @@ fun LauncherScreen(
                                                     held = (dragged as? Drag.OutOfFolder)?.app.takeIf { active },
                                                     inSight = active && ringInSight,
                                                     turns = active && ambient,
+                                                    names = appNames,
                                                     minuteOfDay = { latestMinuteOfDay },
                                                     dock = pageDock,
                                                     dockSlot = { dockRearrange.boundsOf(it, dock) },
@@ -1350,6 +1371,16 @@ fun LauncherScreen(
                     },
                     onDismiss = { choosingPlanet = null },
                     modifier = Modifier.testTag(FolderTags.PLANET_DIALOG),
+                )
+            }
+            renamingFolder?.let { folder ->
+                FolderNameDialog(
+                    name = homeApps.folder(folder)?.name.orEmpty(),
+                    onRename = { name ->
+                        renamingFolder = null
+                        changeHomeApps { rename(folder, name) }
+                    },
+                    onDismiss = { renamingFolder = null },
                 )
             }
             settingCard?.let(CollectionKind::named)?.let { kind ->

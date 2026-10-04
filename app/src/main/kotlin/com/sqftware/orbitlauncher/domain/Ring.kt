@@ -4,8 +4,8 @@ package com.sqftware.orbitlauncher.domain
 sealed interface RingSlot {
     data class App(val key: String) : RingSlot
 
-    /** [pick] is the planet it is in the Solar system look, which travels with it. */
-    data class Folder(val keys: List<String>, val pick: PlanetPick = PlanetPick.Auto) : RingSlot {
+    /** [pick] is the planet it is in the Solar system look, which travels with it, and [name] what the user called it, if anything. */
+    data class Folder(val keys: List<String>, val pick: PlanetPick = PlanetPick.Auto, val name: String = "") : RingSlot {
         /** Whether it shows none of the apps whose keys are [shown], holding only missing ones or none at all. */
         fun showsNone(shown: Set<String>): Boolean = keys.none(shown::contains)
     }
@@ -16,8 +16,11 @@ sealed interface RingItem {
     data class App(val app: AppEntry) : RingItem
 
     /** [at] is the folder's place and slot, which is how the picker and the folder's menu name it. */
-    data class Folder(val at: HomePlace.Folder, val apps: List<AppEntry>, val pick: PlanetPick = PlanetPick.Auto) : RingItem
+    data class Folder(val at: HomePlace.Folder, val apps: List<AppEntry>, val pick: PlanetPick = PlanetPick.Auto, val name: String = "") : RingItem
 }
+
+/** The longest name a folder keeps. */
+const val MAX_FOLDER_NAME = 30
 
 /** Slots in order: round the emblem on the ring, or along the dock, which holds apps and folders alike. */
 data class Ring(val slots: List<RingSlot> = emptyList()) {
@@ -64,6 +67,9 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
     /** Makes the folder at [index] the planet [pick] names; a slot that is not a folder is left alone. */
     fun pick(index: Int, pick: PlanetPick): Ring = folder(index)?.let { replace(index, it.copy(pick = pick)) } ?: this
 
+    /** Calls the folder at [index] [name], cleaned (see [cleanName]); a blank one takes its name away, and a slot that is not a folder is left alone. */
+    fun rename(index: Int, name: String): Ring = folder(index)?.let { replace(index, it.copy(name = cleanName(name, MAX_FOLDER_NAME))) } ?: this
+
     /** Drops the slot at [index]; a folder goes with its apps. */
     fun remove(index: Int): Ring = Ring(slots.filterIndexed { i, _ -> i != index })
 
@@ -83,7 +89,7 @@ data class Ring(val slots: List<RingSlot> = emptyList()) {
         return slots.mapIndexedNotNull { index, slot ->
             when (slot) {
                 is RingSlot.App -> byKey[slot.key]?.let(RingItem::App)
-                is RingSlot.Folder -> RingItem.Folder(HomePlace.Folder(place, index), slot.keys.mapNotNull(byKey::get), slot.pick)
+                is RingSlot.Folder -> RingItem.Folder(HomePlace.Folder(place, index), slot.keys.mapNotNull(byKey::get), slot.pick, slot.name)
             }
         }
     }

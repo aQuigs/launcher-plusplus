@@ -53,6 +53,18 @@ class HomeFormatTest {
     }
 
     @Test
+    fun `a folder's name follows its pick, comes back, and goes when blanked`() {
+        val named = ringOf(clock, mail).newFolder(mail).pick(1, PlanetPick.Of(Planet.Saturn)).rename(1, "  Work\tstuff\n")
+        val unpicked = Ring(listOf(folder(clock))).rename(0, "Mars")
+
+        assertEquals("pkg.Clock/pkg.Clock.Main\nSaturn\u001FWork stuff\tpkg.Mail/pkg.Mail.Main", named.encode())
+        assertEquals(named, decodeRing(named.encode()))
+        assertEquals(unpicked, decodeRing(unpicked.encode()))
+        assertEquals(PlanetPick.Auto, decodeRing(unpicked.encode()).folder(0)?.pick)
+        assertEquals("\tpkg.Clock/pkg.Clock.Main", unpicked.rename(0, " \n ").encode())
+    }
+
+    @Test
     fun `a shortcut whose id holds a line break or a tab cannot be stored`() {
         assertTrue(isStorable(shortcutKey("web", "da8ed822-1ea0")))
         assertFalse(isStorable(shortcutKey("web", "two\nlines")))

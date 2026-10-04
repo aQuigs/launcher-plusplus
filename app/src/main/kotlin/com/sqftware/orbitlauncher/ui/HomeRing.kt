@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -72,6 +73,7 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.folderSlotOffset
 import com.sqftware.orbitlauncher.domain.ringLayout
+import com.sqftware.orbitlauncher.domain.ringNameWidth
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
 import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
 import kotlin.math.min
@@ -154,7 +156,8 @@ private sealed interface Part {
  * turns, turns slowly while the ring [turns], and holds still otherwise; a theme that tells the time shows [minuteOfDay]. A folder opened or closed out of sight, or
  * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
  * still found, and [dockSlot] where the dock shows a folder, in root coordinates, so its planet leaves from there and
- * goes back there.
+ * goes back there. With [names], each app on the ring and in the open folder, and each folder the user named, has its
+ * name under it, kept clear of its neighbours, the emblem and the ring's box.
  */
 @Composable
 fun HomeRing(
@@ -183,6 +186,7 @@ fun HomeRing(
     minuteOfDay: () -> Int = { 0 },
     dock: List<RingItem> = emptyList(),
     dockSlot: (RingItem.Folder) -> Bounds? = { null },
+    names: Boolean = false,
 ) {
     val arrival = rearrange?.arriving
     val making = if (openFolder == null) arrival?.preview(ring) else null
@@ -194,7 +198,10 @@ fun HomeRing(
     val turning = turns && hint == null && openFolder == null
     val fastTurn = turnAngle(turning, FAST_TURN_MILLIS)
     val slowTurn = turnAngle(turning, SLOW_TURN_MILLIS)
-    fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx())
+    val below = if (names) hangingNameRoom else 0.dp
+    fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx(), below.toPx())
+    val belowPx = with(LocalDensity.current) { below.toPx() }
+    val nameWidth: NameWidth? = remember(names, belowPx) { if (names) ({ icon -> ringNameWidth(icon.toFloat(), belowPx).roundToInt() }) else null }
 
     // How far the open folder's planet has come from its slot: 0 there, 1 in the centre with its apps round it. The
     // [planet] is the folder open, or last open until it is back in its slot.
@@ -259,7 +266,7 @@ fun HomeRing(
                     } else {
                         Modifier.layoutId(Part.Held).alpha(0f)
                     }
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge)
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge, nameWidth)
                 }
             }
             // Only pictures of what is going: the ring stepping aside for an opening folder, and a closed folder's apps
@@ -267,14 +274,14 @@ fun HomeRing(
             if (spreadingOut) {
                 ring.forEachIndexed { index, item ->
                     key(item.tag) {
-                        SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Leaving(index)).inert(), null, null, unread, null)
+                        SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Leaving(index)).inert(), null, null, unread, null, nameWidth = nameWidth)
                     }
                 }
             }
             folding?.apps?.forEachIndexed { index, app ->
                 val item = RingItem.App(app)
                 key(item.tag) {
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Folding(index)).inert(), null, null, unread, null)
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Folding(index)).inert(), null, null, unread, null, nameWidth = nameWidth)
                 }
             }
             if (spreadingOut) Spacer(Modifier.layoutId(Part.Shield).inert())

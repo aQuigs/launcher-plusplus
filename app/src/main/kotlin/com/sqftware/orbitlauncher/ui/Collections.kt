@@ -79,11 +79,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
@@ -99,7 +97,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
@@ -136,7 +133,6 @@ import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
 import com.sqftware.orbitlauncher.ui.theme.GlyphFill
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 object CollectionTags {
@@ -672,14 +668,6 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
         confirmButton = { PopupButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
         title = { Text(CREATE_YOUR_OWN) },
         text = {
-            // In the dialog's own window, and only once that window has focus: a text field focused before then gets no
-            // keyboard.
-            val focus = remember { FocusRequester() }
-            val window = LocalWindowInfo.current
-            LaunchedEffect(window) {
-                snapshotFlow { window.isWindowFocused }.first { it }
-                focus.requestFocus()
-            }
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.take(MAX_COLLECTION_NAME) },
@@ -689,7 +677,7 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
                 supportingText = if (taken) ({ Text("That name is taken") }) else null,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { kind?.let(onCreate) }),
-                modifier = Modifier.focusRequester(focus).testTag(CollectionTags.CREATE_NAME),
+                modifier = Modifier.focusRequester(rememberShownFocus()).testTag(CollectionTags.CREATE_NAME),
             )
         },
         modifier = Modifier.testTag(CollectionTags.CREATE_DIALOG),

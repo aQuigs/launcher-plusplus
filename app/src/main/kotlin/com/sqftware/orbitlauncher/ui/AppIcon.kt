@@ -29,11 +29,15 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -45,7 +49,9 @@ import kotlin.math.roundToInt
 /**
  * One app as a round icon, named by its label for screen readers, with a badge for its [unread] notifications. A tap
  * launches it, a double tap [clears][onClearBadge] what its badge holds of the notifications dismissed unread, a long
- * press opens its [menu], and a long press that goes on becomes a [drag]; its parent decides the size.
+ * press opens its [menu], and a long press that goes on becomes a [drag]; its parent decides the size. Given a
+ * [nameWidth], its name hangs under that size, outside it, so the slot keeps its place and the name moves and fades
+ * with it.
  */
 @Composable
 fun AppIcon(
@@ -57,6 +63,7 @@ fun AppIcon(
     unread: Unread = Unread.None,
     drag: AppDrag? = null,
     onClearBadge: ((AppEntry) -> Unit)? = null,
+    nameWidth: NameWidth? = null,
 ) {
     val presses = remember { MutableInteractionSource() }
 
@@ -69,7 +76,33 @@ fun AppIcon(
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
         menu?.content?.invoke(app)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+        nameWidth?.let { HangingName(app.label, it) }
     }
+}
+
+/** How wide a name hanging under an icon may be, given the icon's width, both in pixels: what room its neighbours leave. */
+typealias NameWidth = (iconWidth: Int) -> Int
+
+/** How far a hanging name reaches under its icon. */
+internal val hangingNameRoom: Dp
+    @Composable get() = APP_LABEL_GAP + with(LocalDensity.current) { appLabelStyle.lineHeight.toDp() }
+
+/**
+ * [label] as an [AppLabel] [width] wide, centred under its parent and outside it, taking no height. Not a target, and
+ * hidden from screen readers, which hear the icon's own name.
+ */
+@Composable
+internal fun HangingName(label: String, width: NameWidth) {
+    AppLabel(
+        label,
+        Modifier
+            .layout { measurable, constraints ->
+                val name = measurable.measure(Constraints.fixedWidth(width(constraints.maxWidth)))
+                // As wide as its parent, so it starts where the parent does either way round and centres the same.
+                layout(constraints.maxWidth, 0) { name.place((constraints.maxWidth - name.width) / 2, constraints.maxHeight) }
+            }
+            .semantics { hideFromAccessibility() },
+    )
 }
 
 /**
@@ -95,16 +128,20 @@ fun IconDisc(
     )
 }
 
+private val APP_LABEL_GAP = 4.dp
+
+private val appLabelStyle @Composable get() = MaterialTheme.typography.labelMedium
+
 /** An app's name under its icon, on one line. */
 @Composable
 fun AppLabel(label: String, modifier: Modifier = Modifier) {
     Text(
         text = label,
-        style = MaterialTheme.typography.labelMedium,
+        style = appLabelStyle,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         textAlign = TextAlign.Center,
-        modifier = modifier.padding(top = 4.dp),
+        modifier = modifier.padding(top = APP_LABEL_GAP),
     )
 }
 

@@ -113,4 +113,34 @@ class RingGeometryTest {
             }
         }
     }
+
+    @Test
+    fun `what hangs below icons stays clear of the emblem, the page edge and the next icon on any page`() {
+        val below = 20f
+        sides.forEach { side ->
+            counts.forEach { count ->
+                val (radius, size) = ringLayout(fullSize, side, count, margin, below)
+                // A page too small for the names has no room for icons either.
+                if (size == 0f) return@forEach
+                assertTrue("$count named icons on $side reach the emblem", radius - size / 2 - below >= side * EMBLEM_FRACTION / 2 - 1e-3f)
+                assertTrue("$count named icons on $side come within the margin", radius + size / 2 + below <= side / 2 - margin + 1e-3f)
+                if (count > 1) {
+                    assertTrue("$count named icons on $side meet", size + below <= 2 * radius * sin(PI / count).toFloat())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `neighbours' names never meet side by side on a page that keeps the usual spacing`() {
+        val below = 20f
+        sides.filter { it > 260f }.forEach { side ->
+            (2..30).forEach { count ->
+                val (radius, size) = ringLayout(fullSize, side, count, margin, below)
+                if (size == 0f) return@forEach
+                val apart = 2 * radius * sin(PI / count).toFloat()
+                assertTrue("$count named icons on $side", ringNameWidth(size, below) <= apart + 1e-3f)
+            }
+        }
+    }
 }
