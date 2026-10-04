@@ -6,6 +6,7 @@ import org.junit.Test
 import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class RingGeometryTest {
     private val fullSize = 64f
@@ -33,6 +34,18 @@ class RingGeometryTest {
         assertOffset(1f to 0f, ringSlotOffset(1, 4))
         assertOffset(0f to 1f, ringSlotOffset(2, 4))
         assertOffset(-1f to 0f, ringSlotOffset(3, 4))
+    }
+
+    @Test
+    fun `a folder's first slots sit either side of the top`() {
+        val half = sqrt(0.5f)
+        assertOffset(0f to -1f, folderSlotOffset(0, 1))
+        assertOffset(-1f to 0f, folderSlotOffset(0, 2))
+        assertOffset(1f to 0f, folderSlotOffset(1, 2))
+        assertOffset(0f to 1f, folderSlotOffset(2, 3))
+        listOf(-half to -half, half to -half, half to half, -half to half).forEachIndexed { index, corner ->
+            assertOffset(corner, folderSlotOffset(index, 4))
+        }
     }
 
     @Test
