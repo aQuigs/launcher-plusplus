@@ -50,11 +50,12 @@ fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float, below: F
     // And under the bottom icon toward the edge; the ring stays centred, so it keeps that clear at every edge.
     val room = side - 2 * (margin + below)
     val grip = grip(fullSize, side, count)
+    val spacing = spacing(count)
 
     // Icons grow with the radius until they are full size, and until they meet the edge, which closes in as it grows.
-    val toFullSize = maxOf((fullSize + below) / grip, (fullSize + emblem) / 2)
+    val toFullSize = maxOf(fullSize / grip, (fullSize + below) / spacing, (fullSize + emblem) / 2)
     val fullSizeFits = (room - fullSize) / 2
-    val toEdge = maxOf((room + below) / (2 + grip), (room + emblem) / 4)
+    val toEdge = maxOf(room / (2 + grip), (room + below) / (2 + spacing), (room + emblem) / 4)
     val best = if (toFullSize <= fullSizeFits) usual.coerceIn(toFullSize, fullSizeFits) else toEdge
     val radius = minOf(best, side * MAX_RING_RADIUS_FRACTION)
     return RingLayout(radius, ringIconSize(fullSize, side, count, radius, margin, below))
@@ -67,24 +68,26 @@ fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float, below: F
  */
 internal fun ringIconSize(fullSize: Float, side: Float, count: Int, radius: Float, margin: Float, below: Float = 0f): Float = minOf(
     fullSize,
-    // Beside the ring the next icon is under this one, where its name hangs.
-    grip(fullSize, side, count) * radius - below,
+    grip(fullSize, side, count) * radius,
+    // Beside the ring the next icon is under this one, so its name hangs in the gap neighbours keep rather than adding to it.
+    spacing(count) * radius - below,
     side - 2 * (margin + below) - 2 * radius,
     2 * radius - side * EMBLEM_FRACTION - 2 * below,
 ).coerceAtLeast(0f)
 
 /**
- * How wide the name hanging [below] an icon [iconSize] across may be: as far as neighbours' centres are apart once the
- * ring is crowded enough to space its icons by their names, so neighbours' names never meet side by side. Pages too small
- * to keep [RING_ICON_FILL] crowd closer, as the icons do.
+ * How wide the name hanging [below] an icon [iconSize] across may be: no wider than neighbours' centres are apart, as
+ * both the gap icons keep and the room their names take tell, so neighbours' names never meet side by side. Pages too
+ * small to keep [RING_ICON_FILL] crowd closer, as the icons do.
  */
-fun ringNameWidth(iconSize: Float, below: Float): Float = (iconSize + below) / RING_ICON_FILL
+fun ringNameWidth(iconSize: Float, below: Float): Float = maxOf(iconSize / RING_ICON_FILL, iconSize + below)
+
+/** How far apart neighbours' centres are per unit of the ring's radius, which for a lone icon is as far as for two. */
+private fun spacing(count: Int): Float = 2 * sin(PI / maxOf(count, 2)).toFloat()
 
 /** How large each of [count] icons may be per unit of the ring's radius and still keep apart. */
 private fun grip(fullSize: Float, side: Float, count: Int): Float {
-    // How far apart neighbours' centres are per unit of radius, which for a lone icon is as far as for two.
-    val spacing = 2 * sin(PI / maxOf(count, 2)).toFloat()
     // A small page lets icons crowd as close as six of the largest that fit on the usual ring, as they always could.
     val usual = side * RING_RADIUS_FRACTION
-    return spacing * maxOf(RING_ICON_FILL, minOf(fullSize, side - 2 * usual) / usual)
+    return spacing(count) * maxOf(RING_ICON_FILL, minOf(fullSize, side - 2 * usual) / usual)
 }

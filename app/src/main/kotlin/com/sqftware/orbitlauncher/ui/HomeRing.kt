@@ -93,6 +93,9 @@ internal val RING_ICON_SIZE = 56.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
+/** Air a ring icon's name keeps from the icon under it, more than it keeps from its own so it reads as that one's. */
+private val RING_NAME_AIR = 6.dp
+
 /**
  * How long what the emblem turns fast (Space's spark) takes to turn once: slow enough to read as drift, not a spinner.
  * It is the clock every emblem's motion keeps, so changing it changes them all.
@@ -198,7 +201,7 @@ fun HomeRing(
     val turning = turns && hint == null && openFolder == null
     val fastTurn = turnAngle(turning, FAST_TURN_MILLIS)
     val slowTurn = turnAngle(turning, SLOW_TURN_MILLIS)
-    val below = if (names) hangingNameRoom else 0.dp
+    val below = if (names) hangingNameRoom + RING_NAME_AIR else 0.dp
     fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx(), below.toPx())
     val belowPx = with(LocalDensity.current) { below.toPx() }
     val nameWidth: NameWidth? = remember(names, belowPx) { if (names) ({ icon -> ringNameWidth(icon.toFloat(), belowPx).roundToInt() }) else null }

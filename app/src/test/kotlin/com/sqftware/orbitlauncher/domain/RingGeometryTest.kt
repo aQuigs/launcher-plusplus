@@ -132,6 +132,15 @@ class RingGeometryTest {
     }
 
     @Test
+    fun `names hang in the gap crowded neighbours keep, so icons stay close to their size without them`() {
+        (10..16).forEach { count ->
+            val plain = ringLayout(fullSize, phoneSide, count, margin).iconSize
+            val named = ringLayout(fullSize, phoneSide, count, margin, 20f).iconSize
+            assertTrue("$count icons: $named named, $plain without", named >= 0.85f * plain)
+        }
+    }
+
+    @Test
     fun `neighbours' names never meet side by side on a page that keeps the usual spacing`() {
         val below = 20f
         sides.filter { it > 260f }.forEach { side ->
