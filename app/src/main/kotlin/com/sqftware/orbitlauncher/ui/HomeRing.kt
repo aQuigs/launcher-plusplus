@@ -68,12 +68,13 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.HangingNames
+import com.sqftware.orbitlauncher.domain.NameRoom
+import com.sqftware.orbitlauncher.domain.RingLayout
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.folderSlotOffset
 import com.sqftware.orbitlauncher.domain.ringLayout
-import com.sqftware.orbitlauncher.domain.ringNameWidth
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
 import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
 import kotlin.math.min
@@ -201,15 +202,18 @@ fun HomeRing(
     val turning = turns && hint == null && openFolder == null
     val fastTurn = turnAngle(turning, FAST_TURN_MILLIS)
     val slowTurn = turnAngle(turning, SLOW_TURN_MILLIS)
-    val below = hangingNameRoom
-    fun Density.layoutOn(side: Float, count: Int) = ringLayout(
-        RING_ICON_SIZE.toPx(),
-        side,
-        count,
-        RING_EDGE_MARGIN.toPx(),
-        if (names) HangingNames(below.toPx(), RING_NAME_AIR.toPx()) else null,
-    )
-    val nameWidth: NameWidth? = remember(names) { if (names) ({ icon -> ringNameWidth(icon.toFloat()).roundToInt() }) else null }
+    val nameLine = hangingNameLine
+    val nameWidths = rememberNameWidths()
+    // On a box [width] by [height], whose shorter side the ring takes, and whose longer reaches past it for the bottom name.
+    fun Density.layoutOn(width: Float, height: Float, items: List<RingItem>, at: (Int, Int) -> Pair<Float, Float> = ::ringSlotOffset): RingLayout {
+        val side = min(width, height)
+        val shown = items.map { it.hangingName?.let(nameWidths) }
+        val hanging = if (names) HangingNames(APP_LABEL_GAP.toPx(), nameLine.toPx(), RING_NAME_AIR.toPx(), shown, at, (height - side) / 2) else null
+        return ringLayout(RING_ICON_SIZE.toPx(), side, items.size, RING_EDGE_MARGIN.toPx(), hanging)
+    }
+    // The room each slot gives its name, which only measuring the ring tells, so the names read it from there.
+    var rooms by remember { mutableStateOf(NameRooms()) }
+    fun nameRoom(index: Int, of: NameRooms.() -> List<NameRoom>): (() -> NameRoom?)? = if (names) ({ rooms.of().getOrNull(index) }) else null
 
     // How far the open folder's planet has come from its slot: 0 there, 1 in the centre with its apps round it. The
     // [planet] is the folder open, or last open until it is back in its slot.
@@ -274,7 +278,7 @@ fun HomeRing(
                     } else {
                         Modifier.layoutId(Part.Held).alpha(0f)
                     }
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge, nameWidth)
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge, nameRoom(index, NameRooms::slots))
                 }
             }
             // Only pictures of what is going: the ring stepping aside for an opening folder, and a closed folder's apps
@@ -282,14 +286,14 @@ fun HomeRing(
             if (spreadingOut) {
                 ring.forEachIndexed { index, item ->
                     key(item.tag) {
-                        SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Leaving(index)).inert(), null, null, unread, null, nameWidth = nameWidth)
+                        SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Leaving(index)).inert(), null, null, unread, null, nameRoom = nameRoom(index, NameRooms::leaving))
                     }
                 }
             }
             folding?.apps?.forEachIndexed { index, app ->
                 val item = RingItem.App(app)
                 key(item.tag) {
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Folding(index)).inert(), null, null, unread, null, nameWidth = nameWidth)
+                    SlotIcon(item, icon, onLaunch, onOpenFolder, Modifier.layoutId(Part.Folding(index)).inert(), null, null, unread, null, nameRoom = nameRoom(index, NameRooms::folding))
                 }
             }
             if (spreadingOut) Spacer(Modifier.layoutId(Part.Shield).inert())
@@ -298,15 +302,16 @@ fun HomeRing(
             .fillMaxSize()
             // Cached, so the glow and the planet moving do not lay the ring out again every frame.
             .drawWithCache {
-                fun marksFor(count: Int, slotOffset: (Int, Int) -> Pair<Float, Float>): DrawScope.(Float, Float) -> Unit {
-                    val (radius, iconSize) = layoutOn(size.minDimension, count)
+                fun marksFor(items: List<RingItem>, slotOffset: (Int, Int) -> Pair<Float, Float>): DrawScope.(Float, Float) -> Unit {
+                    val count = items.size
+                    val (radius, iconSize) = layoutOn(size.width, size.height, items, slotOffset)
                     val slots = List(count) { index -> slotOffset(index, count).let { (dx, dy) -> size.center + Offset(dx, dy) * radius } }
                     return with(art) { ringMarks(size.center, slots, radius, iconSize, marks) }
                 }
 
                 // An app on its way in from another place makes way for itself among the ring's.
-                val ringMarks = marksFor(making?.size ?: ring.size) { index, count -> ringSlotOffset(index, count) }
-                val folderMarks = centred?.apps?.size?.let { marksFor(it) { index, count -> folderSlotOffset(index, count) } }
+                val ringMarks = marksFor(making ?: ring) { index, count -> ringSlotOffset(index, count) }
+                val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> folderSlotOffset(index, count) } }
                 onDrawBehind {
                     val out = spread.value
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
@@ -321,9 +326,15 @@ fun HomeRing(
             },
     ) { measurables, constraints ->
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
-        val (radius, iconSize) = layoutOn(side, slots)
-        val (ringRadius, ringIconSize) = layoutOn(side, ring.size)
-        val (folderRadius, folderIconSize) = layoutOn(side, centred?.apps?.size ?: 1)
+        val boxWidth = constraints.maxWidth.toFloat()
+        val boxHeight = constraints.maxHeight.toFloat()
+        val laid = layoutOn(boxWidth, boxHeight, items.take(slots)) { index, count -> if (openFolder != null) folderSlotOffset(index, count) else ringSlotOffset(index, count) }
+        val ringLaid = layoutOn(boxWidth, boxHeight, ring)
+        val folderLaid = layoutOn(boxWidth, boxHeight, centred?.apps.orEmpty().map(RingItem::App)) { index, count -> folderSlotOffset(index, count) }
+        NameRooms(laid.names, ringLaid.names, folderLaid.names).let { if (it != rooms) rooms = it }
+        val (radius, iconSize) = laid
+        val (ringRadius, ringIconSize) = ringLaid
+        val (folderRadius, folderIconSize) = folderLaid
         val centreSize = (side * EMBLEM_FRACTION).roundToInt()
         val placeables = measurables.map { measurable ->
             val part = measurable.layoutId as Part
@@ -407,6 +418,16 @@ fun HomeRing(
         }
     }
 }
+
+/** The room the slots of each of the ring's layouts give their names, as [RingLayout.names] holds it. */
+private data class NameRooms(val slots: List<NameRoom> = emptyList(), val leaving: List<NameRoom> = emptyList(), val folding: List<NameRoom> = emptyList())
+
+/** The name that hangs under [this] when the ring shows names: an app's label, or the name the user gave a folder, if any. */
+private val RingItem.hangingName: String?
+    get() = when (this) {
+        is RingItem.App -> app.label
+        is RingItem.Folder -> name.ifEmpty { null }
+    }
 
 /** The folder at [at] as [ring] or [dock] shows it now, if it is there. */
 private fun folderAt(at: HomePlace.Folder, ring: List<RingItem>, dock: List<RingItem>) =

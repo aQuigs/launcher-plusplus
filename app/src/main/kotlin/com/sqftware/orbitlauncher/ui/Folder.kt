@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.MAX_FOLDER_NAME
+import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -101,7 +102,7 @@ private const val PREVIEW_REACH = 0.3f
 /**
  * A slot on the ring or in the dock holding [folder]: a planet the size of an app, in the look the user chose, wearing a
  * badge for the [unread] notifications of all its apps. A tap opens the folder, unless it is empty, a long
- * press opens its [menu], and a long press that goes on becomes a [drag]. Given a [nameWidth], the name the user gave
+ * press opens its [menu], and a long press that goes on becomes a [drag]. Given a [nameRoom], the name the user gave
  * it, if any, hangs under it as an app's does.
  */
 @Composable
@@ -113,7 +114,7 @@ fun FolderIcon(
     menu: FolderMenu? = null,
     unread: Unread = Unread.None,
     drag: ItemDrag<RingItem.Folder>? = null,
-    nameWidth: NameWidth? = null,
+    nameRoom: (() -> NameRoom?)? = null,
 ) {
     val count = folder.apps.size
     val presses = remember { MutableInteractionSource() }
@@ -134,7 +135,7 @@ fun FolderIcon(
         LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses) { 1f }
         menu?.content?.invoke(folder)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
-        if (folder.name.isNotEmpty()) nameWidth?.let { HangingName(folder.name, it) }
+        if (folder.name.isNotEmpty()) nameRoom?.let { HangingName(folder.name, it) }
     }
 }
 
@@ -213,7 +214,7 @@ fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBit
 /**
  * What a slot on the ring or in the dock shows: [item] as an app, launched by a tap and wearing its [unread] count, or as
  * a folder, opened by a tap and wearing its apps' sum. A long press opens the app's [menu] or the folder's [folderMenu],
- * and one that goes on becomes a [drag]. Given a [nameWidth], an app's name, or the name the user gave a folder, hangs
+ * and one that goes on becomes a [drag]. Given a [nameRoom], an app's name, or the name the user gave a folder, hangs
  * under it.
  */
 @Composable
@@ -228,11 +229,11 @@ internal fun SlotIcon(
     unread: UnreadCounts,
     drag: ItemDrag<Any?>?,
     onClearBadge: ((AppEntry) -> Unit)? = null,
-    nameWidth: NameWidth? = null,
+    nameRoom: (() -> NameRoom?)? = null,
 ) {
     when (item) {
-        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, onClearBadge, nameWidth)
-        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.badge(item.apps), drag, nameWidth)
+        is RingItem.App -> AppIcon(item.app, icon, onLaunch, modifier, menu, unread.badge(item.app), drag, onClearBadge, nameRoom)
+        is RingItem.Folder -> FolderIcon(item, icon, onOpenFolder, modifier, folderMenu, unread.badge(item.apps), drag, nameRoom)
     }
 }
 

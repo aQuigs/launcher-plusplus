@@ -115,37 +115,73 @@ class RingGeometryTest {
         }
     }
 
-    private val names = HangingNames(below = 20f, air = 6f)
+    private val gap = 4f
+    private val line = 16f
+    private val air = 6f
 
-    /** How far the box of [a]'s name, under its icon [size] across, keeps from [b]'s icon and from [b]'s name; negative where they overlap. */
-    private fun nameClearance(a: Pair<Float, Float>, b: Pair<Float, Float>, size: Float): Float {
-        val half = ringNameWidth(size) / 2
-        fun nameBox(c: Pair<Float, Float>) = floatArrayOf(c.first - half, c.first + half, c.second + size / 2, c.second + size / 2 + names.below)
-        val box = nameBox(a)
-        val x = b.first.coerceIn(box[0], box[1])
-        val y = b.second.coerceIn(box[2], box[3])
-        val fromIcon = hypot(b.first - x, b.second - y) - size / 2
-        val other = nameBox(b)
-        val dx = maxOf(other[0] - box[1], box[0] - other[1])
-        val dy = maxOf(other[2] - box[3], box[2] - other[3])
-        val fromName = if (dx < 0 && dy < 0) maxOf(dx, dy) else hypot(maxOf(dx, 0f), maxOf(dy, 0f))
-        return minOf(fromIcon, fromName)
+    /** Names as wide as phone labels run: short ones, and a few long enough to need two lines on a crowded ring. */
+    private val labels = listOf(
+        NameWidths(48f),
+        NameWidths(44f),
+        NameWidths(55f),
+        NameWidths(64f, 34f),
+        NameWidths(34f),
+        NameWidths(30f),
+        NameWidths(66f),
+        NameWidths(46f),
+        NameWidths(57f, 26f),
+        NameWidths(60f),
+        NameWidths(59f),
+        NameWidths(35f),
+        NameWidths(43f),
+        null,
+        NameWidths(130f, 60f),
+    )
+
+    private fun namesOf(count: Int, at: (Int, Int) -> Pair<Float, Float> = ::ringSlotOffset) =
+        HangingNames(gap, line, air, List(count) { labels[it % labels.size] }, at)
+
+    /** The box each name shows in, under its icon: as wide as it is if it fits, on the lines it takes, else cut to its room. */
+    private fun shownBoxes(layout: RingLayout, names: HangingNames, count: Int): List<FloatArray?> = List(count) { i ->
+        val name = names.widths[i] ?: return@List null
+        val room = layout.names[i]
+        val width = when {
+            !room.fits -> room.width
+            room.lines == 1 -> name.oneLine
+            else -> name.twoLines
+        }
+        val (x, y) = names.at(i, count).let { (dx, dy) -> dx * layout.radius to dy * layout.radius }
+        val top = y + layout.iconSize / 2 + gap
+        floatArrayOf(x - width / 2, x + width / 2, top, top + room.lines * line)
+    }
+
+    private fun clearOfDisc(box: FloatArray, cx: Float, cy: Float, radius: Float): Float =
+        hypot(cx - cx.coerceIn(box[0], box[1]), cy - cy.coerceIn(box[2], box[3])) - radius
+
+    private fun clearOfBox(a: FloatArray, b: FloatArray): Float {
+        val dx = maxOf(b[0] - a[1], a[0] - b[1])
+        val dy = maxOf(b[2] - a[3], a[2] - b[3])
+        return if (dx < 0 && dy < 0) maxOf(dx, dy) else hypot(maxOf(dx, 0f), maxOf(dy, 0f))
     }
 
     @Test
-    fun `names stay clear of the emblem, the page edge, other icons and other names on any page, however the ring turns`() {
-        sides.forEach { side ->
-            counts.forEach { count ->
-                val (radius, size) = ringLayout(fullSize, side, count, margin, names)
-                // A page too small for the names has no room for icons either.
-                if (size == 0f) return@forEach
-                assertTrue("$count named icons on $side reach the emblem", radius - size / 2 - names.below >= side * EMBLEM_FRACTION / 2 - 1e-3f)
-                assertTrue("$count named icons on $side come within the margin", radius + size / 2 + names.below <= side / 2 - margin + 1e-3f)
-                listOf(0.0, 0.3, PI / maxOf(count, 1)).forEach { turn ->
-                    val slots = List(count) { ringSlotOffset(it, count, turn).let { (x, y) -> x * radius to y * radius } }
-                    slots.forEachIndexed { i, a ->
-                        slots.forEachIndexed { j, b ->
-                            if (i != j) assertTrue("$count named icons on $side, $i by $j", nameClearance(a, b, size) >= names.air - 1e-2f)
+    fun `names show clear of the icons, each other, the emblem and the page, on any page and in a folder`() {
+        sides.filter { it >= 200f }.forEach { side ->
+            (1..24).forEach { count ->
+                listOf(::ringSlotOffset, ::folderSlotOffset).forEach { at ->
+                    val names = namesOf(count) { i, c -> at(i, c, 0.0) }
+                    val layout = ringLayout(fullSize, side, count, margin, names)
+                    val boxes = shownBoxes(layout, names, count)
+                    val slots = List(count) { names.at(it, count).let { (x, y) -> x * layout.radius to y * layout.radius } }
+                    boxes.forEachIndexed { i, box ->
+                        if (box == null || box[1] - box[0] < 1e-3f) return@forEachIndexed
+                        val what = "$count named icons on $side, name $i"
+                        assertTrue("$what reaches the emblem", clearOfDisc(box, 0f, 0f, side * EMBLEM_FRACTION / 2) >= air - 1e-2f)
+                        assertTrue("$what leaves the page", box[0] >= -side / 2 - 1e-2f && box[1] <= side / 2 + 1e-2f && box[3] <= side / 2 + 1e-2f)
+                        slots.forEachIndexed { j, (x, y) ->
+                            if (j == i) return@forEachIndexed
+                            assertTrue("$what meets icon $j", clearOfDisc(box, x, y, layout.iconSize / 2) >= air - 1e-2f)
+                            boxes[j]?.let { assertTrue("$what meets name $j", clearOfBox(box, it) >= air - 1e-2f) }
                         }
                     }
                 }
@@ -154,12 +190,32 @@ class RingGeometryTest {
     }
 
     @Test
-    fun `names cost a crowded ring only the room they need`() {
-        // Taking a name's whole line out of the gap neighbours keep left 12 icons under two thirds of their size.
-        (10..14).forEach { count ->
-            val plain = ringLayout(fullSize, phoneSide, count, margin).iconSize
-            val named = ringLayout(fullSize, phoneSide, count, margin, names).iconSize
-            assertTrue("$count icons: $named named, $plain without", named >= 0.7f * plain)
+    fun `names leave icons at least 85 percent of their size without them, and never more`() {
+        sides.forEach { side ->
+            counts.forEach { count ->
+                val plain = ringLayout(fullSize, side, count, margin).iconSize
+                val named = ringLayout(fullSize, side, count, margin, namesOf(count)).iconSize
+                assertTrue("$count icons on $side: $named named, $plain without", named >= 0.85f * plain - 1e-2f && named <= plain + 1e-3f)
+            }
         }
+    }
+
+    @Test
+    fun `a ring whose names fit keeps its icons' size, drawn in at most as far as the bottom name needs`() {
+        (1..6).forEach { count ->
+            val plain = ringLayout(fullSize, phoneSide, count, margin)
+            val named = ringLayout(fullSize, phoneSide, count, margin, namesOf(count))
+            assertEquals("$count icons", plain.iconSize, named.iconSize)
+            assertTrue("$count icons: $named", named.radius <= plain.radius && named.radius >= plain.radius - gap - line)
+            assertTrue("$count icons", named.names.all { it.fits && it.lines == 1 })
+        }
+    }
+
+    @Test
+    fun `a name too long for one line wraps onto two before it is cut`() {
+        // At the foot of a ring of nine, with room below it but not across.
+        val names = namesOf(9).let { it.copy(widths = it.widths.mapIndexed { i, name -> if (i == 4) labels.last() else name }) }
+        val longest = ringLayout(fullSize, phoneSide, 9, margin, names).names[4]
+        assertTrue("$longest", longest.fits && longest.lines == 2)
     }
 }
