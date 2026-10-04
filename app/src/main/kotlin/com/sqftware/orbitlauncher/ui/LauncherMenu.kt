@@ -144,7 +144,7 @@ fun LauncherMenuItem(row: LauncherMenuRow, expanded: Boolean, onDismiss: () -> U
 fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onReset) { Text("Reset") } },
+        confirmButton = { PopupButton(onClick = onReset, destructive = true) { Text("Reset") } },
         dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Reset Orbit?") },
         text = {

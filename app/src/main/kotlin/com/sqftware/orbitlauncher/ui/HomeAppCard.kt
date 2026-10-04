@@ -30,7 +30,7 @@ fun HomeAppCard(onBecomeHomeApp: () -> Unit, modifier: Modifier = Modifier) {
             Text(
                 text = "Orbit is not your home app yet",
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
             )
             TonalButton(onClick = onBecomeHomeApp, modifier = Modifier.testTag(HomeAppCardTags.BUTTON)) {
                 Text("Set as home")

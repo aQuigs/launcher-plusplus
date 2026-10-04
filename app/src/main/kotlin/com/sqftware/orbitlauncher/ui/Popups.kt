@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -54,10 +55,21 @@ fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifi
 }
 
 /**
- * A text button for a pop-up's own solid ground, such as a dialog's or the theme preview's bar. Its bare text would
- * vanish on a patch of wallpaper, so a button there is a [TonalButton] instead.
+ * A text button for a pop-up's own solid ground; its bare text would vanish on the wallpaper, where [TonalButton] goes.
+ * A [destructive] one, which erases what the user keeps, is in the error colour.
  */
 @Composable
-fun PopupButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    TextButton(onClick, modifier, enabled, content = content)
+fun PopupButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    destructive: Boolean = false,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val colors = if (destructive) {
+        ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+    } else {
+        ButtonDefaults.textButtonColors()
+    }
+    TextButton(onClick, modifier, enabled, colors = colors, content = content)
 }

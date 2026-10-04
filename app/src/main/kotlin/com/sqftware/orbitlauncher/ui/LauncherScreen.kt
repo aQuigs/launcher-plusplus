@@ -138,7 +138,6 @@ private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
         Text(
             text = "$AUTO_SET_UP fills your home with the apps you use most",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TonalButton(onClick = onPickApps, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.PICK_APPS)) {
             Text("Pick apps myself")
