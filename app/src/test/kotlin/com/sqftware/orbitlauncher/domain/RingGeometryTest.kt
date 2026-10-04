@@ -37,14 +37,14 @@ class RingGeometryTest {
     }
 
     @Test
-    fun `an open folder's ring puts its apps where the previews show them`() {
+    fun `a folder's first slots sit either side of the top`() {
         val half = sqrt(0.5f)
-        assertOffset(0f to -1f, ringSlotOffset(0, 1, folderRingTurn(1)))
-        assertOffset(-1f to 0f, ringSlotOffset(0, 2, folderRingTurn(2)))
-        assertOffset(1f to 0f, ringSlotOffset(1, 2, folderRingTurn(2)))
-        assertOffset(0f to 1f, ringSlotOffset(2, 3, folderRingTurn(3)))
+        assertOffset(0f to -1f, folderSlotOffset(0, 1))
+        assertOffset(-1f to 0f, folderSlotOffset(0, 2))
+        assertOffset(1f to 0f, folderSlotOffset(1, 2))
+        assertOffset(0f to 1f, folderSlotOffset(2, 3))
         listOf(-half to -half, half to -half, half to half, -half to half).forEachIndexed { index, corner ->
-            assertOffset(corner, ringSlotOffset(index, 4, folderRingTurn(4)))
+            assertOffset(corner, folderSlotOffset(index, 4))
         }
     }
 

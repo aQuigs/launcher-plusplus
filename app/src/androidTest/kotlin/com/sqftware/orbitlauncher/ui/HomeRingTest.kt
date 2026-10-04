@@ -246,16 +246,20 @@ class HomeRingTest {
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail, alphabet[0]))
         showItems(listOf(RingItem.App(clock), work), onCloseFolder = { closes++ })
         val emblem = compose.emblem().getUnclippedBoundsInRoot()
-        val slotOfClock = compose.ringSlot(clock).getUnclippedBoundsInRoot()
+        val iconWidth = iconWidth(clock)
 
         openFolder = work
 
         compose.emblem().assertDoesNotExist()
         compose.ringSlot(clock).assertDoesNotExist()
         compose.folderSlot(1).assertDoesNotExist()
-        assertEquals("the first app takes the top slot", slotOfClock, compose.ringSlot(mail).getUnclippedBoundsInRoot())
+        // Side by side, as the closed folder's previews show them.
+        val first = compose.ringSlot(mail).getUnclippedBoundsInRoot()
         val second = compose.ringSlot(alphabet[0]).getUnclippedBoundsInRoot()
-        assertTrue("the second app sits at the bottom", second.top > emblem.bottom)
+        assertTrue("the first app sits left of the centre", first.right < emblem.left)
+        assertTrue("the second app sits right of the centre", second.left > emblem.right)
+        assertEquals("level with each other", first.top, second.top)
+        assertEquals("each the size of a ring slot", iconWidth, first.width)
         assertEquals("the close target is the emblem's size", emblem, compose.closeFolder().getUnclippedBoundsInRoot())
 
         compose.closeFolder().performClick()
@@ -270,18 +274,19 @@ class HomeRingTest {
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 2), listOf(mail, alphabet[0]))
         showItems(listOf(RingItem.App(clock), work), onLaunch = launched::add)
         val planet = compose.folderSlot(2).getUnclippedBoundsInRoot().middle
-        val slotOfClock = compose.ringSlot(clock).getUnclippedBoundsInRoot()
+        val emblem = compose.emblem().getUnclippedBoundsInRoot()
         compose.mainClock.autoAdvance = false
 
         openFolder = work
         compose.mainClock.advanceTimeByFrame()
 
         val leaving = compose.ringSlot(mail).getUnclippedBoundsInRoot().middle
-        assertTrue("the first app starts at its planet", (leaving - planet).getDistance() < (leaving - slotOfClock.middle).getDistance())
         compose.onRoot().performTouchInput { click(Offset(planet.x.dp.toPx(), planet.y.dp.toPx())) }
         assertEquals("a second tap on the planet launches nothing unseen", emptyList<AppEntry>(), launched)
         compose.mainClock.advanceTimeBy(1_000)
-        assertEquals("then reaches its slot", slotOfClock, compose.ringSlot(mail).getUnclippedBoundsInRoot())
+        val slot = compose.ringSlot(mail).getUnclippedBoundsInRoot()
+        assertTrue("the first app starts at its planet", (leaving - planet).getDistance() < (leaving - slot.middle).getDistance())
+        assertTrue("then reaches its slot", slot.right < emblem.left)
 
         openFolder = null
         compose.mainClock.advanceTimeByFrame()

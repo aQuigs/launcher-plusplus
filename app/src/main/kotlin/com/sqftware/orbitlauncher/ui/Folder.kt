@@ -3,9 +3,7 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -28,15 +26,20 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.folderSlotOffset
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 object FolderTags {
     const val MENU = "folder_options"
@@ -72,14 +75,13 @@ val FolderGlyph: ImageVector = materialIcon("Folder") {
 }
 
 private const val PREVIEWS = 4
-private const val PREVIEWS_PER_ROW = 2
 
 /**
- * The square of the disc the previews fill, and the share of it each preview takes; the rest spaces them out. Four fill
- * the disc as in Arc, their outer corners just inside its edge.
+ * The share of the disc's side each preview takes, and how far out from its middle they sit. Four fill the disc as in
+ * Arc, their outer edges just inside its edge.
  */
-private const val PREVIEWS_FRACTION = 0.86f
-private const val PREVIEW_FRACTION = 0.45f
+private const val PREVIEW_FRACTION = 0.39f
+private const val PREVIEW_REACH = 0.3f
 
 /**
  * A slot on the ring or in the dock holding [folder]: a planet the size of an app, in the look the user chose, wearing a
@@ -135,25 +137,32 @@ fun FolderDisc(
 }
 
 /**
- * Up to four of [folder]'s icons in rows of two, spaced out in the middle: one alone, two side by side, three as a
- * triangle, four as a grid, going clockwise from the top left as the open folder's ring does. Spaced by shares of the square rather than fixed gaps, so a shrunken ring's small discs fit
- * them too.
+ * Up to four of [folder]'s icons, one alone in the middle, more where the open folder's ring puts them: two side by
+ * side, three as a triangle, four as a square. Sized by shares of the disc rather than fixed gaps, so a shrunken ring's
+ * small discs fit them too.
  */
 @Composable
 fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBitmap?) {
-    FlowRow(
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalArrangement = Arrangement.SpaceAround,
-        maxItemsInEachRow = PREVIEWS_PER_ROW,
-        modifier = Modifier.fillMaxSize(PREVIEWS_FRACTION),
-    ) {
+    val previews = folder.apps.take(PREVIEWS)
+    Layout(
         // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
-        clockwise(folder.apps.take(PREVIEWS)).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
+        content = { previews.forEach { AppImage(it, icon, Modifier.clip(CircleShape)) } },
+        modifier = Modifier.fillMaxSize(),
+    ) { measurables, constraints ->
+        val side = min(constraints.maxWidth, constraints.maxHeight)
+        val size = (side * PREVIEW_FRACTION).roundToInt()
+        val reach = if (previews.size > 1) side * PREVIEW_REACH else 0f
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            measurables.forEachIndexed { index, measurable ->
+                val (dx, dy) = folderSlotOffset(index, previews.size)
+                measurable.measure(Constraints.fixed(size, size)).place(
+                    ((constraints.maxWidth - size) / 2f + dx * reach).roundToInt(),
+                    ((constraints.maxHeight - size) / 2f + dy * reach).roundToInt(),
+                )
+            }
+        }
     }
 }
-
-/** A grid of four in the order a ring goes round it, which swaps its second row. */
-private fun <T> clockwise(previews: List<T>) = if (previews.size == PREVIEWS) listOf(previews[0], previews[1], previews[3], previews[2]) else previews
 
 /**
  * What a slot on the ring or in the dock shows: [item] as an app, launched by a tap and wearing its [unread] count, or as

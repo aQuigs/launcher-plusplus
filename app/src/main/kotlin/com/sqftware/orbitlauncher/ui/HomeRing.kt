@@ -70,15 +70,12 @@ import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.folderSlotOffset
 import com.sqftware.orbitlauncher.domain.ringLayout
-import com.sqftware.orbitlauncher.domain.folderRingTurn
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
 import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 object HomeRingTags {
     const val EMBLEM = "ring_emblem"
@@ -286,15 +283,15 @@ fun HomeRing(
             .fillMaxSize()
             // Cached, so the glow and the planet moving do not lay the ring out again every frame.
             .drawWithCache {
-                fun marksFor(count: Int, turn: Double = 0.0): DrawScope.(Float, Float) -> Unit {
+                fun marksFor(count: Int, slotOffset: (Int, Int) -> Pair<Float, Float>): DrawScope.(Float, Float) -> Unit {
                     val (radius, iconSize) = layoutOn(size.minDimension, count)
-                    val slots = List(count) { index -> ringSlotOffset(index, count, turn).let { (dx, dy) -> size.center + Offset(dx, dy) * radius } }
+                    val slots = List(count) { index -> slotOffset(index, count).let { (dx, dy) -> size.center + Offset(dx, dy) * radius } }
                     return with(art) { ringMarks(size.center, slots, radius, iconSize, marks) }
                 }
 
                 // An app on its way in from another place makes way for itself among the ring's.
-                val ringMarks = marksFor(making?.size ?: ring.size)
-                val folderMarks = centred?.apps?.size?.let { marksFor(it, folderRingTurn(it)) }
+                val ringMarks = marksFor(making?.size ?: ring.size) { index, count -> ringSlotOffset(index, count) }
+                val folderMarks = centred?.apps?.size?.let { marksFor(it) { index, count -> folderSlotOffset(index, count) } }
                 onDrawBehind {
                     val out = spread.value
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
@@ -353,8 +350,8 @@ fun HomeRing(
 
             // On its way out of the planet, [out] of the way: at 0 small and unseen at its heart, at 1 in [slot] of [count].
             fun Placeable.placeSpiralling(index: Int, count: Int, radius: Float) {
-                val angle = 2 * PI * index / count + folderRingTurn(count) + (1f - out) * SPIRAL
-                placeAt(planetAt + Offset(sin(angle).toFloat(), -cos(angle).toFloat()) * (radius * out)) {
+                val (dx, dy) = folderSlotOffset(index, count, (1.0 - out) * SPIRAL)
+                placeAt(planetAt + Offset(dx, dy) * (radius * out)) {
                     scaleX = lerp(FOLDED_SCALE, 1f, out)
                     scaleY = scaleX
                     alpha = (out * 1.6f).coerceAtMost(1f)

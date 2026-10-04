@@ -29,10 +29,12 @@ fun ringSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Floa
 }
 
 /**
- * How far an open folder of [count] apps turns its ring, so its first apps land where the closed folder's previews show
- * them: two side by side, three as a triangle on its point, four as a square, the first top left. A lone app stays on top.
+ * Where slot [index] of a folder of [count] apps sits, as [ringSlotOffset] gives it turned back half a slot, plus [turn]:
+ * the first two either side of the top, or a lone app on top, so two sit side by side, three make a triangle on its point and four a square.
+ * The closed folder's previews and the open folder's ring both place apps here, so each app opens where it was shown.
  */
-fun folderRingTurn(count: Int): Double = if (count < 2) 0.0 else -PI / count
+fun folderSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Float> =
+    ringSlotOffset(index, count, if (count > 1) turn - PI / count else turn)
 
 /**
  * Lays [count] icons out on a page whose shorter side is [side], keeping them [margin] inside its edges, all in the unit
