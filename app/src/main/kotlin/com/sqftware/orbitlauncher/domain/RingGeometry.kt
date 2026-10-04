@@ -21,12 +21,18 @@ data class RingLayout(val radius: Float, val iconSize: Float)
 
 /**
  * Where slot [index] out of [count] sits, as a unit offset from the centre in screen axes (x right, y down): the first
- * slot at the top, the rest clockwise.
+ * slot at the top, turned [turn] radians clockwise, the rest clockwise from it.
  */
-fun ringSlotOffset(index: Int, count: Int): Pair<Float, Float> {
-    val angle = 2 * PI * index / count
+fun ringSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Float> {
+    val angle = 2 * PI * index / count + turn
     return sin(angle).toFloat() to -cos(angle).toFloat()
 }
+
+/**
+ * How far an open folder of [count] apps turns its ring, so its first apps land where the closed folder's previews show
+ * them: two side by side, three as a triangle on its point, four as a square, the first top left. A lone app stays on top.
+ */
+fun folderRingTurn(count: Int): Double = if (count < 2) 0.0 else -PI / count
 
 /**
  * Lays [count] icons out on a page whose shorter side is [side], keeping them [margin] inside its edges, all in the unit

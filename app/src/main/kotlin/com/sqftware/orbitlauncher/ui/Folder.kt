@@ -136,7 +136,7 @@ fun FolderDisc(
 
 /**
  * Up to four of [folder]'s icons in rows of two, spaced out in the middle: one alone, two side by side, three as a
- * triangle, four as a grid. Spaced by shares of the square rather than fixed gaps, so a shrunken ring's small discs fit
+ * triangle, four as a grid, going clockwise from the top left as the open folder's ring does. Spaced by shares of the square rather than fixed gaps, so a shrunken ring's small discs fit
  * them too.
  */
 @Composable
@@ -148,9 +148,12 @@ fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBit
         modifier = Modifier.fillMaxSize(PREVIEWS_FRACTION),
     ) {
         // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
-        folder.apps.take(PREVIEWS).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
+        clockwise(folder.apps.take(PREVIEWS)).forEach { AppImage(it, icon, Modifier.fillMaxSize(PREVIEW_FRACTION).clip(CircleShape)) }
     }
 }
+
+/** A grid of four in the order a ring goes round it, which swaps its second row. */
+private fun <T> clockwise(previews: List<T>) = if (previews.size == PREVIEWS) listOf(previews[0], previews[1], previews[3], previews[2]) else previews
 
 /**
  * What a slot on the ring or in the dock shows: [item] as an app, launched by a tap and wearing its [unread] count, or as
