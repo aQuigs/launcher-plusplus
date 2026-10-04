@@ -46,7 +46,8 @@ data class HangingNames(val below: Float, val air: Float)
  * of [fullSize]. Icons keep [fullSize] and the ring its usual radius while neighbours have room; a more crowded ring
  * first grows toward the edges, and only once it can grow no further do its icons shrink. On a page too small for
  * [fullSize] at the usual radius, the ring moves to wherever the icons can be largest between the emblem and the edge.
- * With [names], each icon's name is kept clear of the edge, the emblem and its neighbours too.
+ * With [names], each icon's name is kept clear of its neighbours and their names, and the top and bottom ones' of the
+ * emblem and the edge; a slot's corner between them can still reach over the emblem's rim on a small page.
  */
 fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float, names: HangingNames? = null): RingLayout {
     val usual = side * RING_RADIUS_FRACTION

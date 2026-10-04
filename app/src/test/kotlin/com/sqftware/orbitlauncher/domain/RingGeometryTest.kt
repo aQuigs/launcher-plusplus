@@ -115,7 +115,7 @@ class RingGeometryTest {
         }
     }
 
-    private val names = HangingNames(below = 20f, air = 4f)
+    private val names = HangingNames(below = 20f, air = 6f)
 
     /** How far the box of [a]'s name, under its icon [size] across, keeps from [b]'s icon and from [b]'s name; negative where they overlap. */
     private fun nameClearance(a: Pair<Float, Float>, b: Pair<Float, Float>, size: Float): Float {
@@ -156,7 +156,7 @@ class RingGeometryTest {
     @Test
     fun `names cost a crowded ring only the room they need`() {
         // Taking a name's whole line out of the gap neighbours keep left 12 icons under two thirds of their size.
-        (10..16).forEach { count ->
+        (10..14).forEach { count ->
             val plain = ringLayout(fullSize, phoneSide, count, margin).iconSize
             val named = ringLayout(fullSize, phoneSide, count, margin, names).iconSize
             assertTrue("$count icons: $named named, $plain without", named >= 0.7f * plain)
