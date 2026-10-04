@@ -52,7 +52,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -68,6 +67,7 @@ import androidx.compose.ui.util.lerp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
+import com.sqftware.orbitlauncher.domain.HangingNames
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -93,7 +93,7 @@ internal val RING_ICON_SIZE = 56.dp
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
 
-/** Air a ring icon's name keeps from the icon under it, more than it keeps from its own so it reads as that one's. */
+/** Air a ring icon's name keeps from its neighbours and their names, more than from its own icon so it reads as that one's. */
 private val RING_NAME_AIR = 6.dp
 
 /**
@@ -201,10 +201,15 @@ fun HomeRing(
     val turning = turns && hint == null && openFolder == null
     val fastTurn = turnAngle(turning, FAST_TURN_MILLIS)
     val slowTurn = turnAngle(turning, SLOW_TURN_MILLIS)
-    val below = if (names) hangingNameRoom + RING_NAME_AIR else 0.dp
-    fun Density.layoutOn(side: Float, count: Int) = ringLayout(RING_ICON_SIZE.toPx(), side, count, RING_EDGE_MARGIN.toPx(), below.toPx())
-    val belowPx = with(LocalDensity.current) { below.toPx() }
-    val nameWidth: NameWidth? = remember(names, belowPx) { if (names) ({ icon -> ringNameWidth(icon.toFloat(), belowPx).roundToInt() }) else null }
+    val below = hangingNameRoom
+    fun Density.layoutOn(side: Float, count: Int) = ringLayout(
+        RING_ICON_SIZE.toPx(),
+        side,
+        count,
+        RING_EDGE_MARGIN.toPx(),
+        if (names) HangingNames(below.toPx(), RING_NAME_AIR.toPx()) else null,
+    )
+    val nameWidth: NameWidth? = remember(names) { if (names) ({ icon -> ringNameWidth(icon.toFloat()).roundToInt() }) else null }
 
     // How far the open folder's planet has come from its slot: 0 there, 1 in the centre with its apps round it. The
     // [planet] is the folder open, or last open until it is back in its slot.

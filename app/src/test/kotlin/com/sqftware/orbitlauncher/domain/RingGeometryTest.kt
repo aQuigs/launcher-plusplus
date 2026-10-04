@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
+import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -114,42 +115,51 @@ class RingGeometryTest {
         }
     }
 
+    private val names = HangingNames(below = 20f, air = 4f)
+
+    /** How far the box of [a]'s name, under its icon [size] across, keeps from [b]'s icon and from [b]'s name; negative where they overlap. */
+    private fun nameClearance(a: Pair<Float, Float>, b: Pair<Float, Float>, size: Float): Float {
+        val half = ringNameWidth(size) / 2
+        fun nameBox(c: Pair<Float, Float>) = floatArrayOf(c.first - half, c.first + half, c.second + size / 2, c.second + size / 2 + names.below)
+        val box = nameBox(a)
+        val x = b.first.coerceIn(box[0], box[1])
+        val y = b.second.coerceIn(box[2], box[3])
+        val fromIcon = hypot(b.first - x, b.second - y) - size / 2
+        val other = nameBox(b)
+        val dx = maxOf(other[0] - box[1], box[0] - other[1])
+        val dy = maxOf(other[2] - box[3], box[2] - other[3])
+        val fromName = if (dx < 0 && dy < 0) maxOf(dx, dy) else hypot(maxOf(dx, 0f), maxOf(dy, 0f))
+        return minOf(fromIcon, fromName)
+    }
+
     @Test
-    fun `what hangs below icons stays clear of the emblem, the page edge and the next icon on any page`() {
-        val below = 20f
+    fun `names stay clear of the emblem, the page edge, other icons and other names on any page, however the ring turns`() {
         sides.forEach { side ->
             counts.forEach { count ->
-                val (radius, size) = ringLayout(fullSize, side, count, margin, below)
+                val (radius, size) = ringLayout(fullSize, side, count, margin, names)
                 // A page too small for the names has no room for icons either.
                 if (size == 0f) return@forEach
-                assertTrue("$count named icons on $side reach the emblem", radius - size / 2 - below >= side * EMBLEM_FRACTION / 2 - 1e-3f)
-                assertTrue("$count named icons on $side come within the margin", radius + size / 2 + below <= side / 2 - margin + 1e-3f)
-                if (count > 1) {
-                    assertTrue("$count named icons on $side meet", size + below <= 2 * radius * sin(PI / count).toFloat())
+                assertTrue("$count named icons on $side reach the emblem", radius - size / 2 - names.below >= side * EMBLEM_FRACTION / 2 - 1e-3f)
+                assertTrue("$count named icons on $side come within the margin", radius + size / 2 + names.below <= side / 2 - margin + 1e-3f)
+                listOf(0.0, 0.3, PI / maxOf(count, 1)).forEach { turn ->
+                    val slots = List(count) { ringSlotOffset(it, count, turn).let { (x, y) -> x * radius to y * radius } }
+                    slots.forEachIndexed { i, a ->
+                        slots.forEachIndexed { j, b ->
+                            if (i != j) assertTrue("$count named icons on $side, $i by $j", nameClearance(a, b, size) >= names.air - 1e-2f)
+                        }
+                    }
                 }
             }
         }
     }
 
     @Test
-    fun `names hang in the gap crowded neighbours keep, so icons stay close to their size without them`() {
+    fun `names cost a crowded ring only the room they need`() {
+        // Taking a name's whole line out of the gap neighbours keep left 12 icons under two thirds of their size.
         (10..16).forEach { count ->
             val plain = ringLayout(fullSize, phoneSide, count, margin).iconSize
-            val named = ringLayout(fullSize, phoneSide, count, margin, 20f).iconSize
-            assertTrue("$count icons: $named named, $plain without", named >= 0.85f * plain)
-        }
-    }
-
-    @Test
-    fun `neighbours' names never meet side by side on a page that keeps the usual spacing`() {
-        val below = 20f
-        sides.filter { it > 260f }.forEach { side ->
-            (2..30).forEach { count ->
-                val (radius, size) = ringLayout(fullSize, side, count, margin, below)
-                if (size == 0f) return@forEach
-                val apart = 2 * radius * sin(PI / count).toFloat()
-                assertTrue("$count named icons on $side", ringNameWidth(size, below) <= apart + 1e-3f)
-            }
+            val named = ringLayout(fullSize, phoneSide, count, margin, names).iconSize
+            assertTrue("$count icons: $named named, $plain without", named >= 0.7f * plain)
         }
     }
 }
