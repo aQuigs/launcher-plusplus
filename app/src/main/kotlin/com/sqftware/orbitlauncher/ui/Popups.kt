@@ -11,9 +11,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.first
 
 // Every dialog and menu of the launcher is one of these, so each sits on the drawer's ground (held by the
 // panel-ground-only hook) and a theme reaches them all.
@@ -72,4 +78,19 @@ fun PopupButton(
         ButtonDefaults.textButtonColors()
     }
     TextButton(onClick, modifier, enabled, colors = colors, content = content)
+}
+
+/**
+ * Focus for a text field in a pop-up, requested once the pop-up's own window has focus: a text field focused before then
+ * gets no keyboard.
+ */
+@Composable
+fun rememberShownFocus(): FocusRequester {
+    val focus = remember { FocusRequester() }
+    val window = LocalWindowInfo.current
+    LaunchedEffect(window) {
+        snapshotFlow { window.isWindowFocused }.first { it }
+        focus.requestFocus()
+    }
+    return focus
 }

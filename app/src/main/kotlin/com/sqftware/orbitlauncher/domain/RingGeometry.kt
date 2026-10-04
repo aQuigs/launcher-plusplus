@@ -41,32 +41,44 @@ fun folderSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Fl
  * of [fullSize]. Icons keep [fullSize] and the ring its usual radius while neighbours have room; a more crowded ring
  * first grows toward the edges, and only once it can grow no further do its icons shrink. On a page too small for
  * [fullSize] at the usual radius, the ring moves to wherever the icons can be largest between the emblem and the edge.
+ * What hangs [below] each icon, its name, is kept clear of the edge and of the emblem too.
  */
-fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float): RingLayout {
+fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float, below: Float = 0f): RingLayout {
     val usual = side * RING_RADIUS_FRACTION
-    val emblem = side * EMBLEM_FRACTION
-    val room = side - 2 * margin
+    // What hangs under the top icon reaches toward the emblem as if the emblem were that much larger.
+    val emblem = side * EMBLEM_FRACTION + 2 * below
+    // And under the bottom icon toward the edge; the ring stays centred, so it keeps that clear at every edge.
+    val room = side - 2 * (margin + below)
     val grip = grip(fullSize, side, count)
 
     // Icons grow with the radius until they are full size, and until they meet the edge, which closes in as it grows.
-    val toFullSize = maxOf(fullSize / grip, (fullSize + emblem) / 2)
+    val toFullSize = maxOf((fullSize + below) / grip, (fullSize + emblem) / 2)
     val fullSizeFits = (room - fullSize) / 2
-    val toEdge = maxOf(room / (2 + grip), (room + emblem) / 4)
+    val toEdge = maxOf((room + below) / (2 + grip), (room + emblem) / 4)
     val best = if (toFullSize <= fullSizeFits) usual.coerceIn(toFullSize, fullSizeFits) else toEdge
     val radius = minOf(best, side * MAX_RING_RADIUS_FRACTION)
-    return RingLayout(radius, ringIconSize(fullSize, side, count, radius, margin))
+    return RingLayout(radius, ringIconSize(fullSize, side, count, radius, margin, below))
 }
 
 /**
  * The largest of [count] icons, up to [fullSize], that fit on a ring of [radius] on a page whose shorter side is [side]:
- * apart from each other, clear of the emblem, and [margin] inside the page's edges.
+ * apart from each other, and with what hangs [below] them clear of the next icon, the emblem and [margin] inside the
+ * page's edges.
  */
-internal fun ringIconSize(fullSize: Float, side: Float, count: Int, radius: Float, margin: Float): Float = minOf(
+internal fun ringIconSize(fullSize: Float, side: Float, count: Int, radius: Float, margin: Float, below: Float = 0f): Float = minOf(
     fullSize,
-    grip(fullSize, side, count) * radius,
-    side - 2 * margin - 2 * radius,
-    2 * radius - side * EMBLEM_FRACTION,
+    // Beside the ring the next icon is under this one, where its name hangs.
+    grip(fullSize, side, count) * radius - below,
+    side - 2 * (margin + below) - 2 * radius,
+    2 * radius - side * EMBLEM_FRACTION - 2 * below,
 ).coerceAtLeast(0f)
+
+/**
+ * How wide the name hanging [below] an icon [iconSize] across may be: as far as neighbours' centres are apart once the
+ * ring is crowded enough to space its icons by their names, so neighbours' names never meet side by side. Pages too small
+ * to keep [RING_ICON_FILL] crowd closer, as the icons do.
+ */
+fun ringNameWidth(iconSize: Float, below: Float): Float = (iconSize + below) / RING_ICON_FILL
 
 /** How large each of [count] icons may be per unit of the ring's radius and still keep apart. */
 private fun grip(fullSize: Float, side: Float, count: Int): Float {

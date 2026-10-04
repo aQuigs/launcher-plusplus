@@ -23,6 +23,7 @@ import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.PlayAppUpdates
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAmbientMotionStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesAppNamesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
@@ -99,6 +100,7 @@ class MainActivity : ComponentActivity() {
         val reorderModeStore = SharedPreferencesReorderModeStore(this)
         val drawerStyleStore = SharedPreferencesDrawerStyleStore(this)
         val ambientMotionStore = SharedPreferencesAmbientMotionStore(this)
+        val appNamesStore = SharedPreferencesAppNamesStore(this)
         val ringer = SystemRinger(this)
         val appUpdates = PlayAppUpdates(this)
         val updateCheckStore = SharedPreferencesUpdateCheckStore(this)
@@ -168,6 +170,7 @@ class MainActivity : ComponentActivity() {
                 var reorderMode by remember { mutableStateOf(reorderModeStore.load()) }
                 var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
+                var appNames by remember { mutableStateOf(appNamesStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
                 val clock by produceState(remember { wallClock.face(twentyFourHour) }, twentyFourHour) {
@@ -312,6 +315,11 @@ class MainActivity : ComponentActivity() {
                     onAmbientMotionChange = {
                         ambientMotion = it
                         ambientMotionStore.save(it)
+                    },
+                    appNames = appNames,
+                    onAppNamesChange = {
+                        appNames = it
+                        appNamesStore.save(it)
                     },
                     drawerStyle = drawerStyle,
                     onDrawerStyleChange = {

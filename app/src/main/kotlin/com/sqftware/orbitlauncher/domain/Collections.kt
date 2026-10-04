@@ -55,24 +55,6 @@ const val CREATE_YOUR_OWN = "Create Your Own"
 /** The longest name a custom collection keeps. */
 const val MAX_COLLECTION_NAME = 30
 
-/**
- * [raw] as a custom collection's name: every run of whitespace (a tab or line break, which would split the stored text,
- * or a no-break space) made one space, invisible formatting and control characters dropped, trimmed, and cut to
- * [MAX_COLLECTION_NAME].
- */
-private fun cleanName(raw: String): String {
-    val spaced = buildString {
-        raw.forEach { c ->
-            when {
-                c.isWhitespace() -> append(' ')
-                c.category != CharCategory.FORMAT && c.category != CharCategory.CONTROL -> append(c)
-            }
-        }
-    }
-    val cut = spaced.split(' ').filter(String::isNotEmpty).joinToString(" ").take(MAX_COLLECTION_NAME)
-    return (if (cut.lastOrNull()?.isHighSurrogate() == true) cut.dropLast(1) else cut).trimEnd()
-}
-
 // Case and spaces aside, so "lifestyle" and "Most Used" are taken as well as "Life Style" and "Most Used Apps".
 private fun nameKey(name: String) = name.lowercase().filterNot { it == ' ' }
 
@@ -80,7 +62,7 @@ private val reservedNames: Set<String> =
     (CollectionKind.all.flatMap { listOf(it.name, it.title) } + CREATE_YOUR_OWN).map(::nameKey).toSet()
 
 private fun customNamed(raw: String): CollectionKind.Custom? =
-    cleanName(raw).takeIf { it.isNotEmpty() && nameKey(it) !in reservedNames }?.let(CollectionKind::Custom)
+    cleanName(raw, MAX_COLLECTION_NAME).takeIf { it.isNotEmpty() && nameKey(it) !in reservedNames }?.let(CollectionKind::Custom)
 
 val AppCategory.label: String
     get() = if (this == AppCategory.LifeStyle) "Life Style" else name
