@@ -2402,6 +2402,28 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aCardsGearRemovesItOnlyOnceTheQuestionIsAnswered() {
+        val work = CollectionKind.Custom("Work")
+        collections = CollectionsPage().add(work)
+        show()
+        goToCollections()
+
+        compose.collectionSettingsButton(work).performClick()
+        compose.onNodeWithTag(CollectionTags.REMOVE).performClick()
+        compose.onNodeWithText("Remove Work?").assertIsDisplayed()
+        Espresso.pressBack()
+        compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(CollectionsPage().add(work), collections) }
+
+        compose.onNodeWithTag(CollectionTags.REMOVE).performClick()
+        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithTag(CollectionTags.REMOVE_DIALOG).assertDoesNotExist()
+        compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(CollectionsPage(), collections) }
+        assertSettledOn(LauncherPage.Collections)
+    }
+
+    @Test
     fun aSwatchGivesOneCardItsOwnBackgroundColour() {
         collections = CollectionsPage()
         show()
