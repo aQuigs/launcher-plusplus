@@ -114,7 +114,7 @@ class CollectionsTest {
 
     @Test
     fun `a setting missing or not one of its choices is the default, and whatever follows them is ignored`() {
-        val text = "NewApps\t0,\nMostUsed\t1,9,15\nTools\t0,3,,Always,Dots,x\ta/A"
+        val text = "NewApps\t0,\nMostUsed\t1,9,15\nTools\t0,3,,Always,Dots,Teal,x\ta/A"
 
         assertEquals(
             listOf(
@@ -123,7 +123,12 @@ class CollectionsTest {
                 CollectionCard(
                     tools,
                     Favourites(listOf("a/A")),
-                    own = mapOf(CardSetting.Rows to 3, CardSetting.Names to AppNames.Always, CardSetting.More to MoreMark.Dots),
+                    own = mapOf(
+                        CardSetting.Rows to 3,
+                        CardSetting.Names to AppNames.Always,
+                        CardSetting.More to MoreMark.Dots,
+                        CardSetting.Colour to CardColour.Teal,
+                    ),
                 ),
             ),
             decodeCollectionsPage(text).cards,
@@ -132,9 +137,9 @@ class CollectionsTest {
 
     @Test
     fun `the defaults come back as they went, and one unreadable is the first default`() {
-        val defaults = CardLook(rows = 2, limit = 20, names = AppNames.Never, more = MoreMark.Dots)
+        val defaults = CardLook(rows = 2, limit = 20, names = AppNames.Never, more = MoreMark.Dots, colour = CardColour.Blue)
 
-        assertEquals("2,20,Never,Dots", defaults.encode())
+        assertEquals("2,20,Never,Dots,Blue", defaults.encode())
         assertEquals(defaults, decodeCardLook(defaults.encode()))
         assertEquals(CardLook(rows = 2), decodeCardLook("2,7"))
         assertEquals(CardLook(), decodeCardLook(""))

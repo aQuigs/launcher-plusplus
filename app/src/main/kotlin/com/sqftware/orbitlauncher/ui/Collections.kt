@@ -33,6 +33,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,6 +91,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
@@ -118,6 +123,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.CARD_ROW_APPS
 import com.sqftware.orbitlauncher.domain.CREATE_YOUR_OWN
+import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.CardLook
 import com.sqftware.orbitlauncher.domain.CARD_SETTINGS
 import com.sqftware.orbitlauncher.domain.CardSetting
@@ -132,6 +138,7 @@ import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
 import com.sqftware.orbitlauncher.ui.theme.GlyphFill
+import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -299,11 +306,15 @@ private fun CollectionCardView(
 ) {
     val dragged = reorder.dragging == index
     val colours = MaterialTheme.colorScheme
+    val tint = LocalCardTints.current.of(look.colour)
 
     Card(
         shape = RoundedCornerShape(20.dp),
         // Solid while dragged, so the card it passes over does not show through it.
-        colors = CardDefaults.cardColors(containerColor = if (dragged) colours.surfaceContainerHigh else colours.surfaceVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (dragged) tint.compositeOver(colours.surfaceContainerHigh) else tint,
+            contentColor = colours.onSurface,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .reorderItem(reorder, index)
@@ -794,25 +805,63 @@ private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T
             .padding(12.dp),
     ) {
         Text(setting.title, style = MaterialTheme.typography.titleSmall)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            setting.choices.forEachIndexed { index, choice ->
-                SegmentedButton(
-                    selected = choice == value,
-                    onClick = { onChoose(choice) },
-                    shape = SegmentedButtonDefaults.itemShape(index, setting.choices.size),
-                    // Lit as the picker's tiles are: the default fill barely shows against the dialog.
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
-                    // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
-                    icon = {},
-                    label = { Text(choice.toString(), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    modifier = Modifier.testTag(CollectionTags.choice(setting, choice)),
-                )
-            }
+        // Every setting named, so a new one does not compile until it is given a way to be chosen.
+        when (setting) {
+            CardSetting.Colour -> Swatches(setting, value, onChoose)
+            CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More -> Segments(setting, value, onChoose)
         }
         footer()
+    }
+}
+
+@Composable
+private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        setting.choices.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = choice == value,
+                onClick = { onChoose(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index, setting.choices.size),
+                // Lit as the picker's tiles are: the default fill barely shows against the dialog.
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+                // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
+                icon = {},
+                label = { Text(choice.toString(), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                modifier = Modifier.testTag(CollectionTags.choice(setting, choice)),
+            )
+        }
+    }
+}
+
+/**
+ * A round swatch per colour of [setting], which is only ever [CardSetting.Colour], in the card's own tint so the choice
+ * looks as the card will; the chosen one is ringed.
+ */
+@Composable
+private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
+    val tints = LocalCardTints.current
+    val colours = MaterialTheme.colorScheme
+
+    // Wrapping rather than squeezed into one row, so each swatch keeps a full touch target.
+    FlowRow(maxItemsInEachRow = 5, modifier = Modifier.fillMaxWidth().selectableGroup()) {
+        setting.choices.forEach { choice ->
+            val selected = choice == value
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .selectable(selected, role = Role.RadioButton) { onChoose(choice) }
+                    .border(2.dp, if (selected) colours.primary else Color.Transparent, CircleShape)
+                    .padding(5.dp)
+                    .border(1.dp, colours.outline, CircleShape)
+                    .background(tints.swatch(choice as CardColour), CircleShape)
+                    .semantics { contentDescription = choice.name }
+                    .testTag(CollectionTags.choice(setting, choice)),
+            )
+        }
     }
 }
 
@@ -833,6 +882,7 @@ private val CardSetting<*>.title: String
         CardSetting.Limit -> "App limit"
         CardSetting.Names -> "App names"
         CardSetting.More -> "More apps"
+        CardSetting.Colour -> "Background"
     }
 
 @Composable

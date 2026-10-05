@@ -63,6 +63,7 @@ import com.sqftware.orbitlauncher.domain.AppNames
 import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.ClockFace
+import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.CardLook
 import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionCard
@@ -2398,6 +2399,22 @@ class LauncherScreenTest {
         compose.collectionSettingsButton(tools).performClick()
         compose.onNodeWithText("App limit").assertDoesNotExist()
         compose.onNodeWithTag(CollectionTags.useDefault(CardSetting.Names)).assertIsOn()
+    }
+
+    @Test
+    fun aSwatchGivesOneCardItsOwnBackgroundColour() {
+        collections = CollectionsPage()
+        show()
+        goToCollections()
+
+        compose.collectionSettingsButton(MostUsed).performClick()
+        val teal = compose.onNodeWithTag(CollectionTags.choice(CardSetting.Colour, CardColour.Teal))
+        teal.performScrollTo().performClick()
+        teal.assertIsSelected()
+        compose.runOnIdle {
+            assertEquals(CardColour.Teal, collections.look(collections.card(MostUsed)!!).colour)
+            assertEquals(CardColour.Plain, collections.look(collections.card(NewApps)!!).colour)
+        }
     }
 
     @Test

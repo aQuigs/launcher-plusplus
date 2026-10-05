@@ -9,7 +9,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
+import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.Colourway
 
 // Only this package names a colour, and the rest of the app reaches them through the scheme's roles or the tokens here.
@@ -49,8 +51,47 @@ class RingColors(val mark: Color, val starLine: Color, val lit: Color)
  */
 class DiscEdge(val outer: Color, val inner: Color)
 
-/** Everything a theme sets for one kind of wallpaper, a dark or a light one. */
-internal class LauncherLook(val colors: ColorScheme, val ring: RingColors, val panelMark: Color, val tonalEdge: Color)
+/**
+ * The background of a collection card of each [CardColour]: the scheme's glass for [CardColour.Plain], and for the rest
+ * their hue drawn into the glass, deep by night and frosted by day, so the card's text reads as it does on plain glass.
+ */
+class CardTints internal constructor(glass: Color, wallpaper: Color, alpha: Float) {
+    private val tints = CardColour.entries.map { colour -> colour.hue?.let { lerp(wallpaper, it, 0.35f).copy(alpha = alpha) } ?: glass }
+    private val swatches = tints.map { it.compositeOver(wallpaper) }
+
+    fun of(colour: CardColour): Color = tints[colour.ordinal]
+
+    /** [colour] made opaque as a card shows it on the wallpaper its scheme is for, so a swatch on any ground looks like the card. */
+    fun swatch(colour: CardColour): Color = swatches[colour.ordinal]
+}
+
+// Every colour named here, so a new one does not compile until it has its hue.
+private val CardColour.hue: Color?
+    get() = when (this) {
+        CardColour.Plain -> null
+        CardColour.Red -> Color(0xFFE53935)
+        CardColour.Orange -> Color(0xFFFB8C00)
+        CardColour.Yellow -> Color(0xFFD4B000)
+        CardColour.Green -> Color(0xFF43A047)
+        CardColour.Teal -> Color(0xFF00ACC1)
+        CardColour.Blue -> Color(0xFF1E88E5)
+        CardColour.Purple -> Color(0xFF8E24AA)
+        CardColour.Pink -> Color(0xFFEC407A)
+    }
+
+/**
+ * Everything a theme sets for one kind of wallpaper, a dark or a light one. A card's tint is its hue drawn into the
+ * scheme's scrim, the deep by night and frost by day as the wallpaper is, at [cardAlpha]; a plain card is the card glass.
+ */
+internal class LauncherLook(
+    val colors: ColorScheme,
+    val ring: RingColors,
+    val panelMark: Color,
+    val tonalEdge: Color,
+    cardAlpha: Float,
+) {
+    val cardTints = CardTints(colors.surfaceVariant, colors.scrim, cardAlpha)
+}
 
 internal fun lookOf(colourway: Colourway, lightWallpaper: Boolean): LauncherLook {
     val palette = paletteOf(colourway)
@@ -95,6 +136,8 @@ val LocalPanelMark = staticCompositionLocalOf { lookOf(Colourway.Midnight, light
 
 /** The rim of a tonal button, whose tint is too faint to hold its edge on a light wallpaper. */
 val LocalTonalEdge = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).tonalEdge }
+
+val LocalCardTints = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).cardTints }
 
 /** What a glyph is drawn in before `Icon` tints it, as Material's own icons are. */
 val GlyphFill = Color.Black
@@ -165,6 +208,7 @@ private fun Palette.nightLook() = LauncherLook(
     ring = RingColors(mark = ringMark, starLine = accent.copy(alpha = 0.7f), lit = spark),
     panelMark = pale.copy(alpha = 0.5f),
     tonalEdge = deep.copy(alpha = 0.5f),
+    cardAlpha = 0.7f,
 )
 
 /**
@@ -215,6 +259,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
         ring = RingColors(mark = deep, starLine = dayAccent.copy(alpha = 0.7f), lit = dayWarm),
         panelMark = dayAccent.copy(alpha = 0.4f),
         tonalEdge = night.tonalEdge,
+        cardAlpha = 0.75f,
     )
 }
 
@@ -228,6 +273,7 @@ fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Compo
             LocalRingColors provides look.ring,
             LocalPanelMark provides look.panelMark,
             LocalTonalEdge provides look.tonalEdge,
+            LocalCardTints provides look.cardTints,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
             content = content,

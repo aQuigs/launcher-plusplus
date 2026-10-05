@@ -6,6 +6,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.Colourway
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -42,6 +43,18 @@ class LauncherColorsTest {
                     error to surfaceContainerHigh,
                 ) + listOf(onSurface, onSurfaceVariant, primary).map { it to veil } + opaque.map { onSurface to it }
                 pairs.forEach { (text, fill) -> assertTrue("$text on $fill", contrast(text, fill) >= 4.5f) }
+            }
+        }
+    }
+
+    // On the theme's own ground (its deep by night, frost by day) rather than pure black and white, which flatter the tints.
+    @Test
+    fun `a card's text reads on every card colour over the wallpaper its scheme is for`() {
+        listOf(false, true).flatMap { light -> Colourway.entries.map { lookOf(it, light) } }.forEach { look ->
+            CardColour.entries.forEach { colour ->
+                listOf(look.colors.onSurface, look.colors.onSurfaceVariant).forEach { text ->
+                    assertTrue("$text on $colour", contrast(text, look.cardTints.swatch(colour)) >= 4.5f)
+                }
             }
         }
     }
