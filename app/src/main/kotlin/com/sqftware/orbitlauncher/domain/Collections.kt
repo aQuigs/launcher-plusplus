@@ -84,15 +84,19 @@ enum class AppNames { Never, Expanded, Always }
 /** How a compact card marks that it holds more apps than it shows. */
 enum class MoreMark { Dots, Count, None }
 
+/** What a card's background is tinted with; [Plain] is the glass every card had before cards took a colour. */
+enum class CardColour { Plain, Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink }
+
 /**
  * How a card lays out its apps: [rows] of them while compact, marked as [more] says when it holds more, at most [limit]
- * if it works them out, named as [names] says.
+ * if it works them out, named as [names] says, on a background of [colour].
  */
 data class CardLook(
     val rows: Int = 1,
     val limit: Int = BUILT_IN_CARD_APPS,
     val names: AppNames = AppNames.Expanded,
     val more: MoreMark = MoreMark.Count,
+    val colour: CardColour = CardColour.Plain,
 ) {
     /** How many apps it shows while compact. */
     val compactApps: Int get() = rows * CARD_ROW_APPS
@@ -128,10 +132,12 @@ sealed class CardSetting<T : Any>(val choices: List<T>, private val get: (CardLo
     data object Names : CardSetting<AppNames>(AppNames.entries, CardLook::names, { look, it -> look.copy(names = it) })
 
     data object More : CardSetting<MoreMark>(MoreMark.entries, CardLook::more, { look, it -> look.copy(more = it) })
+
+    data object Colour : CardSetting<CardColour>(CardColour.entries, CardLook::colour, { look, it -> look.copy(colour = it) })
 }
 
 /** Every [CardSetting], in the order they are stored and offered; a new one goes last, so stored looks still read. */
-val CARD_SETTINGS: List<CardSetting<*>> = listOf(CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More)
+val CARD_SETTINGS: List<CardSetting<*>> = listOf(CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More, CardSetting.Colour)
 
 /**
  * One card: its [kind], the apps it keeps if [CollectionKind.HandPicked], whether it shows them all, and the settings it
