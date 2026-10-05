@@ -2408,8 +2408,9 @@ class LauncherScreenTest {
         goToCollections()
 
         compose.collectionSettingsButton(MostUsed).performClick()
-        compose.onNodeWithTag(CollectionTags.choice(CardSetting.Colour, CardColour.Teal)).performScrollTo().performClick()
-        compose.onNodeWithTag(CollectionTags.choice(CardSetting.Colour, CardColour.Teal)).assertIsSelected()
+        val teal = compose.onNodeWithTag(CollectionTags.choice(CardSetting.Colour, CardColour.Teal))
+        teal.performScrollTo().performClick()
+        teal.assertIsSelected()
         compose.runOnIdle {
             assertEquals(CardColour.Teal, collections.look(collections.card(MostUsed)!!).colour)
             assertEquals(CardColour.Plain, collections.look(collections.card(NewApps)!!).colour)

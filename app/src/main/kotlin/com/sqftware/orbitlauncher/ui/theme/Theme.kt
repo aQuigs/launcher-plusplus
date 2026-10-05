@@ -55,11 +55,14 @@ class DiscEdge(val outer: Color, val inner: Color)
  * The background of a collection card of each [CardColour]: the scheme's glass for [CardColour.Plain], and for the rest
  * their hue drawn into the glass, deep by night and frosted by day, so the card's text reads as it does on plain glass.
  */
-class CardTints internal constructor(private val glass: Color, private val wallpaper: Color, private val tint: (Color) -> Color) {
-    fun of(colour: CardColour): Color = colour.hue?.let(tint) ?: glass
+class CardTints internal constructor(glass: Color, wallpaper: Color, alpha: Float) {
+    private val tints = CardColour.entries.map { colour -> colour.hue?.let { lerp(wallpaper, it, 0.35f).copy(alpha = alpha) } ?: glass }
+    private val swatches = tints.map { it.compositeOver(wallpaper) }
+
+    fun of(colour: CardColour): Color = tints[colour.ordinal]
 
     /** [colour] made opaque as a card shows it on the wallpaper its scheme is for, so a swatch on any ground looks like the card. */
-    fun swatch(colour: CardColour): Color = of(colour).compositeOver(wallpaper)
+    fun swatch(colour: CardColour): Color = swatches[colour.ordinal]
 }
 
 // Every colour named here, so a new one does not compile until it has its hue.
@@ -68,7 +71,7 @@ private val CardColour.hue: Color?
         CardColour.Plain -> null
         CardColour.Red -> Color(0xFFE53935)
         CardColour.Orange -> Color(0xFFFB8C00)
-        CardColour.Yellow -> Color(0xFFFDD835)
+        CardColour.Yellow -> Color(0xFFD4B000)
         CardColour.Green -> Color(0xFF43A047)
         CardColour.Teal -> Color(0xFF00ACC1)
         CardColour.Blue -> Color(0xFF1E88E5)
@@ -76,14 +79,19 @@ private val CardColour.hue: Color?
         CardColour.Pink -> Color(0xFFEC407A)
     }
 
-/** Everything a theme sets for one kind of wallpaper, a dark or a light one. */
+/**
+ * Everything a theme sets for one kind of wallpaper, a dark or a light one. A card's tint is its hue drawn into the
+ * scheme's scrim, the deep by night and frost by day as the wallpaper is, at [cardAlpha]; a plain card is the card glass.
+ */
 internal class LauncherLook(
     val colors: ColorScheme,
     val ring: RingColors,
     val panelMark: Color,
     val tonalEdge: Color,
-    val cardTints: CardTints,
-)
+    cardAlpha: Float,
+) {
+    val cardTints = CardTints(colors.surfaceVariant, colors.scrim, cardAlpha)
+}
 
 internal fun lookOf(colourway: Colourway, lightWallpaper: Boolean): LauncherLook {
     val palette = paletteOf(colourway)
@@ -200,7 +208,7 @@ private fun Palette.nightLook() = LauncherLook(
     ring = RingColors(mark = ringMark, starLine = accent.copy(alpha = 0.7f), lit = spark),
     panelMark = pale.copy(alpha = 0.5f),
     tonalEdge = deep.copy(alpha = 0.5f),
-    cardTints = CardTints(glass, deep) { lerp(deep, it, 0.35f).copy(alpha = 0.7f) },
+    cardAlpha = 0.7f,
 )
 
 /**
@@ -251,7 +259,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
         ring = RingColors(mark = deep, starLine = dayAccent.copy(alpha = 0.7f), lit = dayWarm),
         panelMark = dayAccent.copy(alpha = 0.4f),
         tonalEdge = night.tonalEdge,
-        cardTints = CardTints(dayGlass, frost) { lerp(frost, it, 0.35f).copy(alpha = 0.75f) },
+        cardAlpha = 0.75f,
     )
 }
 

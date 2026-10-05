@@ -34,7 +34,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
@@ -805,7 +805,11 @@ private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T
             .padding(12.dp),
     ) {
         Text(setting.title, style = MaterialTheme.typography.titleSmall)
-        if (setting == CardSetting.Colour) Swatches(setting, value, onChoose) else Segments(setting, value, onChoose)
+        // Every setting named, so a new one does not compile until it is given a way to be chosen.
+        when (setting) {
+            CardSetting.Colour -> Swatches(setting, value, onChoose)
+            CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More -> Segments(setting, value, onChoose)
+        }
         footer()
     }
 }
@@ -832,23 +836,26 @@ private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) 
     }
 }
 
-/** A round swatch per colour, in the card's own tint so the choice looks as the card will; the chosen one is ringed. */
+/**
+ * A round swatch per colour of [setting], which is only ever [CardSetting.Colour], in the card's own tint so the choice
+ * looks as the card will; the chosen one is ringed.
+ */
 @Composable
 private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
     val tints = LocalCardTints.current
     val colours = MaterialTheme.colorScheme
 
-    Row(modifier = Modifier.fillMaxWidth().selectableGroup()) {
+    // Wrapping rather than squeezed into one row, so each swatch keeps a full touch target.
+    FlowRow(maxItemsInEachRow = 5, modifier = Modifier.fillMaxWidth().selectableGroup()) {
         setting.choices.forEach { choice ->
             val selected = choice == value
             Box(
                 Modifier
-                    .weight(1f)
-                    .aspectRatio(1f)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .selectable(selected, role = Role.RadioButton) { onChoose(choice) }
                     .border(2.dp, if (selected) colours.primary else Color.Transparent, CircleShape)
-                    .padding(3.dp)
+                    .padding(5.dp)
                     .border(1.dp, colours.outline, CircleShape)
                     .background(tints.swatch(choice as CardColour), CircleShape)
                     .semantics { contentDescription = choice.name }
