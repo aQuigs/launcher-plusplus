@@ -713,13 +713,14 @@ fun CollectionSettingsDialog(
     onDismiss: () -> Unit,
 ) {
     val card = page.card(kind) ?: return
+    // Above the question, so Cancel comes back to the tab it was asked from.
+    val pager = rememberPagerState { SETTINGS_TABS.size }
     var removing by rememberSaveable { mutableStateOf(false) }
     if (removing) {
         RemoveCollectionDialog(kind, onRemove = onRemove, onDismiss = { removing = false })
         return
     }
 
-    val pager = rememberPagerState { SETTINGS_TABS.size }
     val scope = rememberCoroutineScope()
     val settings: @Composable (Int) -> Unit = { index ->
         Column(
@@ -786,9 +787,9 @@ private fun RemoveCollectionDialog(kind: CollectionKind, onRemove: () -> Unit, o
         text = {
             Text(
                 when (kind) {
-                    is CollectionKind.Custom -> "This deletes the collection and its list of apps. The apps stay installed."
-                    is CollectionKind.HandPicked -> "This takes the card and the apps picked for it off the page. The apps stay installed."
-                    else -> "This takes the card off the page. Add Collection brings it back."
+                    is CollectionKind.Custom -> "This deletes the collection, its apps and its settings. The apps stay installed."
+                    is CollectionKind.HandPicked -> "This takes the card, its apps and its settings off the page. The apps stay installed."
+                    else -> "This takes the card and its settings off the page."
                 },
             )
         },

@@ -2409,10 +2409,11 @@ class LauncherScreenTest {
         goToCollections()
 
         compose.collectionSettingsButton(work).performClick()
+        compose.onNodeWithText("Defaults").performClick()
         compose.onNodeWithTag(CollectionTags.REMOVE).performClick()
         compose.onNodeWithText("Remove Work?").assertIsDisplayed()
-        Espresso.pressBack()
-        compose.onNodeWithTag(CollectionTags.SETTINGS_DIALOG).assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Every collection that uses the default follows these.").assertIsDisplayed()
         compose.runOnIdle { assertEquals(CollectionsPage().add(work), collections) }
 
         compose.onNodeWithTag(CollectionTags.REMOVE).performClick()
