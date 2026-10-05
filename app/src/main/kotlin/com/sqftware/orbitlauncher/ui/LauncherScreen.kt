@@ -1388,6 +1388,10 @@ fun LauncherScreen(
                     page = collections,
                     kind = kind,
                     onChange = { change -> changeCollections(change = change) },
+                    onRemove = {
+                        settingCard = null
+                        changeCollections { remove(kind) }
+                    },
                     onDismiss = { settingCard = null },
                 )
             }

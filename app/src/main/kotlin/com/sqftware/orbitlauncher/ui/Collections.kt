@@ -152,6 +152,8 @@ object CollectionTags {
     const val CREATE_NAME = "collection_create_name"
     const val SETTINGS_DIALOG = "collection_settings_dialog"
     const val SETTINGS_PAGES = "collection_settings_pages"
+    const val REMOVE = "collection_remove"
+    const val REMOVE_DIALOG = "collection_remove_dialog"
 
     fun card(kind: CollectionKind) = "collection_${kind.name}"
 
@@ -700,17 +702,25 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
  * a sideways swipe moves between them as a tap on a tab does.
  * On the card's tab, a setting it has no use for is left out, and each other one is ticked to use the default until a
  * choice gives the card its own value; ticking it again goes back. Each change goes to [onChange]. Done, Back and a tap
- * outside call [onDismiss].
+ * outside call [onDismiss]. Remove asks first, then calls [onRemove]; Back from the question returns to the settings.
  */
 @Composable
 fun CollectionSettingsDialog(
     page: CollectionsPage,
     kind: CollectionKind,
     onChange: (CollectionsPage.() -> CollectionsPage) -> Unit,
+    onRemove: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val card = page.card(kind) ?: return
+    // Above the question, so Cancel comes back to the tab it was asked from.
     val pager = rememberPagerState { SETTINGS_TABS.size }
+    var removing by rememberSaveable { mutableStateOf(false) }
+    if (removing) {
+        RemoveCollectionDialog(kind, onRemove = onRemove, onDismiss = { removing = false })
+        return
+    }
+
     val scope = rememberCoroutineScope()
     val settings: @Composable (Int) -> Unit = { index ->
         Column(
@@ -734,6 +744,11 @@ fun CollectionSettingsDialog(
     GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = { PopupButton(onClick = onDismiss) { Text("Done") } },
+        dismissButton = {
+            PopupButton(onClick = { removing = true }, destructive = true, modifier = Modifier.testTag(CollectionTags.REMOVE)) {
+                Text("Remove")
+            }
+        },
         title = { Text("${kind.title} settings") },
         text = {
             Column {
@@ -758,6 +773,27 @@ fun CollectionSettingsDialog(
             }
         },
         modifier = Modifier.testTag(CollectionTags.SETTINGS_DIALOG),
+    )
+}
+
+/** Asks before taking the card of [kind] off the page, saying what goes with it. Back and a tap outside call [onDismiss]. */
+@Composable
+private fun RemoveCollectionDialog(kind: CollectionKind, onRemove: () -> Unit, onDismiss: () -> Unit) {
+    GroundDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { PopupButton(onClick = onRemove, destructive = true) { Text("Remove") } },
+        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text("Remove ${kind.title}?") },
+        text = {
+            Text(
+                when (kind) {
+                    is CollectionKind.Custom -> "This deletes the collection, its apps and its settings. The apps stay installed."
+                    is CollectionKind.HandPicked -> "This takes the card, its apps and its settings off the page. The apps stay installed."
+                    else -> "This takes the card and its settings off the page."
+                },
+            )
+        },
+        modifier = Modifier.testTag(CollectionTags.REMOVE_DIALOG),
     )
 }
 
