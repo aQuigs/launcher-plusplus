@@ -3183,7 +3183,7 @@ class LauncherScreenTest {
         val edge = compose.onRoot().fetchSemanticsNode().size.width - 2f
 
         pickUp(compose.ringSlot(mail))
-        dragTo(Offset(edge, centreOf(compose.emblem()).y))
+        dragTo(Offset(edge, centreOf(onPage(LauncherPage.Home, HomeRingTags.EMBLEM)).y))
         rest(PAGE_TURN_MILLIS)
         assertSettledOn(second)
         dragTo(centreOf(onPage(second, HomeRingTags.EMBLEM)))
