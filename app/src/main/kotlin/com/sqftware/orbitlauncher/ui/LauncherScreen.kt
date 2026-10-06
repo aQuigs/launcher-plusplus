@@ -68,6 +68,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
@@ -195,7 +197,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -203,7 +205,8 @@ data class HomePress(val launcherInFront: Boolean)
  * [pinnedShortcuts] are null until they have loaded. The drawer lays
  * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
- * drawer, the collection picker, the folder and a theme's try; one made while the launcher was in front also scrolls to the home page. Back undoes what is on top:
+ * drawer, the collection picker, the folder and a theme's try; one made while the launcher was in front also scrolls to the home page. With [homeOnReturn],
+ * going out of sight does both, unless the launcher left on an errand of its own: adding a widget, app info, a store page, usage access. Back undoes what is on top:
  * it brings the launcher back over the wallpaper, else cancels a drag, else closes the menu or a dialog, then the drawer, then the collection picker,
  * then ends widget editing, then returns to the home page, then closes the folder, then leaves a theme's try. The launcher lays itself out clear of the system bars.
  */
@@ -236,6 +239,8 @@ fun LauncherScreen(
     onAmbientMotionChange: (Boolean) -> Unit,
     appNames: Boolean,
     onAppNamesChange: (Boolean) -> Unit,
+    homeOnReturn: Boolean,
+    onHomeOnReturnChange: (Boolean) -> Unit,
     drawerStyle: DrawerStyle,
     onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
@@ -321,6 +326,8 @@ fun LauncherScreen(
     val latestOnAmbientMotionChange by rememberUpdatedState(onAmbientMotionChange)
     val latestAppNames by rememberUpdatedState(appNames)
     val latestOnAppNamesChange by rememberUpdatedState(onAppNamesChange)
+    val latestHomeOnReturn by rememberUpdatedState(homeOnReturn)
+    val latestOnHomeOnReturnChange by rememberUpdatedState(onHomeOnReturnChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
     val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
     val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
@@ -573,6 +580,14 @@ fun LauncherScreen(
     // The latest layout, as both are called from callbacks remembered once.
     fun goHome() = scope.launch { pagerState.animateScrollToPage(latestLayout.homeIndex) }
     fun showRingPage() = scope.launch { pagerState.animateScrollToPage(latestLayout.pages.indexOf(latestRingPage)) }
+    // Ends when the launcher is next in sight, not in front: the widget picker is drawn over the launcher and hands on to
+    // the widget's own setup, which only then takes the launcher out of sight.
+    var onErrand by remember { mutableStateOf(false) }
+    fun errand(go: () -> Unit) {
+        onErrand = true
+        go()
+    }
+    val openUsageSettings = { errand(onOpenUsageSettings) }
 
     // A search left over from the drawer, or the menu was opened from, would hide the other apps: the drawer may be
     // reopened before it settles closed, which is what ends a search.
@@ -660,8 +675,8 @@ fun LauncherScreen(
                             }
                             is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(option.member ?: app))
                             is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
-                            AppOption.PlayStore -> actions.openStorePage(app)
-                            AppOption.AppInfo -> actions.openAppInfo(app)
+                            AppOption.PlayStore -> errand { actions.openStorePage(app) }
+                            AppOption.AppInfo -> errand { actions.openAppInfo(app) }
                             AppOption.Uninstall -> actions.uninstall(app)
                         }
                     },
@@ -882,6 +897,12 @@ fun LauncherScreen(
                                 onClick = { latestOnAppNamesChange(!latestAppNames) },
                             ),
                             LauncherMenuRow(
+                                "Open on home page",
+                                on = latestHomeOnReturn,
+                                flips = true,
+                                onClick = { latestOnHomeOnReturnChange(!latestHomeOnReturn) },
+                            ),
+                            LauncherMenuRow(
                                 "Ambient motion",
                                 on = latestAmbientMotion,
                                 flips = true,
@@ -920,6 +941,16 @@ fun LauncherScreen(
         choosingPlanet = null
         renamingFolder = null
         settingCard = null
+    }
+
+    // What is open names a slot or a card of the page in view, so it closes first, as for HOME. The page moves at once
+    // rather than in a coroutine, which would run after the activity saved the page it left.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { onErrand = false }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (homeOnReturn && !onErrand) {
+            closeAll()
+            pagerState.requestScrollToPage(layout.homeIndex)
+        }
     }
 
     LaunchedEffect(homePresses, pagerState, drawerState) {
@@ -1061,7 +1092,7 @@ fun LauncherScreen(
                                 },
                             ),
                             foregroundTime = foregroundTime,
-                            onOpenUsageSettings = onOpenUsageSettings,
+                            onOpenUsageSettings = openUsageSettings,
                             picking = when (val pick = picking) {
                                 is DrawerPick.Apps -> {
                                     val place = pick.place
@@ -1267,7 +1298,9 @@ fun LauncherScreen(
                             PageKind.Widgets -> {
                                 WidgetGrid(
                                     page = widgetPages[page.id],
-                                    actions = remember(widgets, page) { widgets(page.id) },
+                                    actions = remember(widgets, page) {
+                                        widgets(page.id).run { copy(add = { rows, width, height -> errand { add(rows, width, height) } }) }
+                                    },
                                     editing = editedWidget,
                                     onEditingChange = { editingWidget = it },
                                 )
@@ -1286,7 +1319,7 @@ fun LauncherScreen(
                                     onMove = { from, to -> changeCollections(page) { move(from, to) } },
                                     onEdit = { pick(DrawerPick.Card(it)) },
                                     onAdd = { pickingCollection = true },
-                                    onOpenUsageSettings = onOpenUsageSettings,
+                                    onOpenUsageSettings = openUsageSettings,
                                     rearrange = { kind -> cardRearrange(kind).takeIf { active } },
                                     menu = { kind -> if (active) cardMenus.getOrPut(kind) { appMenu(AppSpot.Card(kind)) } else null },
                                     bin = if (active && binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,

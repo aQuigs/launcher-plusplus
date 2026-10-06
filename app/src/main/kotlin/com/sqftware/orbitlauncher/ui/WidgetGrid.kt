@@ -110,7 +110,7 @@ object WidgetTags {
  * What the widget page asks of the system: a widget's view, a new one for a page of so many rows of cells so big, a
  * removal, a resize, a move to other cells, and how a widget's provider lets it be resized.
  */
-class WidgetActions(
+data class WidgetActions(
     val view: (Context, Int) -> View,
     val add: (pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) -> Unit,
     val remove: (Int) -> Unit,
