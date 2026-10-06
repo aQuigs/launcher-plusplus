@@ -20,6 +20,17 @@ class PageContentsTest {
     }
 
     @Test
+    fun `a ring page counts its widgets, not its ring, and with only widgets is not empty`() {
+        val ring = HostedWidget(RING_ID, row = 1, column = 0, rows = 5, columns = WIDGET_COLUMNS)
+        val widgets = WidgetPages(mapOf(other.id to WidgetPage(listOf(HostedWidget(7, 0, 0, 1, 4), ring))))
+
+        val held = contentsOf(other, RingPages(), CollectionPages(), widgets)
+
+        assertEquals(PageContents.Ring(slots = 0, apps = 0, folders = 0, widgets = 1), held)
+        assertEquals(false, held.isEmpty)
+    }
+
+    @Test
     fun `a page nothing has been kept for is empty, but for the built-in cards of a collections page`() {
         val fresh = LauncherPage("ring-3", PageKind.Ring)
         val widgets = LauncherPage("widgets-2", PageKind.Widgets)

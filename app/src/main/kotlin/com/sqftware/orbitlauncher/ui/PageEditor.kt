@@ -267,7 +267,11 @@ private fun PageCard(
 private fun PageContents.summary(): String? {
     if (isEmpty) return null
     return when (this) {
-        is PageContents.Ring -> listOfNotNull(counted(apps, "app").takeIf { apps > 0 }, counted(folders, "folder").takeIf { folders > 0 }).joinToString(" and ")
+        is PageContents.Ring -> listOfNotNull(
+            counted(apps, "app").takeIf { apps > 0 },
+            counted(folders, "folder").takeIf { folders > 0 },
+            counted(widgets, "widget").takeIf { widgets > 0 },
+        ).joinToString(" and ")
         is PageContents.Cards -> counted(cards, "collection")
         is PageContents.Widgets -> counted(widgets.size, "widget")
     }

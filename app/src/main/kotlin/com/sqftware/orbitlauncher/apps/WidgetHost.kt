@@ -14,7 +14,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
-import com.sqftware.orbitlauncher.domain.RING_ID
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetPages
@@ -39,8 +38,8 @@ interface WidgetHost {
 
     /**
      * Lets the user pick a widget for the page [page], where it takes the cells its provider asks for, up to [pageRows]
-     * rows and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall. A page with a ring never
-     * lengthens, so there the widget goes only where it fits in those rows.
+     * rows and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall, and goes where
+     * [WidgetPage.add] finds room for it; with none, it is not added.
      */
     fun add(page: String, pageRows: Int, columnWidthDp: Float, rowHeightDp: Float)
 
@@ -49,12 +48,6 @@ interface WidgetHost {
 
     /** Keeps only the widget pages in [ids]: the others' widgets, and a pick on its way to one, give their ids back to the system. */
     fun keepPages(ids: Set<String>)
-
-    /** Makes the widget [id] [rows] tall and [columns] wide. */
-    fun resize(id: Int, rows: Int, columns: Int)
-
-    /** Moves the widget [id]'s top-left cell to [row] and [column]. */
-    fun move(id: Int, row: Int, column: Int)
 
     /** Puts the widgets on [page], and its ring, where [widgets] has them; a widget that has left the page meanwhile stays gone. */
     fun arrange(page: String, widgets: WidgetPage)
@@ -147,12 +140,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         set(kept)
     }
 
-    override fun resize(id: Int, rows: Int, columns: Int) = set(pages.value.changeHolding(id) { resize(id, rows, columns) })
-
-    override fun move(id: Int, row: Int, column: Int) = set(pages.value.changeHolding(id) { move(id, row, column) })
-
-    override fun arrange(page: String, widgets: WidgetPage) =
-        set(pages.value.change(page) { WidgetPage(widgets.widgets.filter { it.id == RING_ID || it.id in ids }) })
+    override fun arrange(page: String, widgets: WidgetPage) = set(pages.value.change(page) { widgets.keeping(ids) })
 
     override fun sizing(id: Int): WidgetSizing {
         val info = manager.getAppWidgetInfo(id) ?: return WidgetSizing(WidgetResize(resizable = false), WidgetResize(resizable = false))
@@ -195,7 +183,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
             pick.id,
             rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp, pick.pageRows),
             columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp, WIDGET_COLUMNS),
-            pageRows = if (page.ring != null) pick.pageRows else Int.MAX_VALUE,
+            pick.pageRows,
         )
         if (placed == page) {
             discard(pick)

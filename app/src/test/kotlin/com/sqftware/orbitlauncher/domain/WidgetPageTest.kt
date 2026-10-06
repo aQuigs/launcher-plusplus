@@ -10,10 +10,10 @@ class WidgetPageTest {
 
     @Test
     fun `a new widget takes the first free cells from the top and then the left`() {
-        assertEquals(clock.copy(id = 20, column = 2), page.add(20, rows = 1, columns = 2).widgets[1])
-        assertEquals(HostedWidget(20, row = 1, column = 0, rows = 1, columns = 4), page.add(20, rows = 1, columns = 4).widgets[1])
-        assertEquals(HostedWidget(20, row = 5, column = 0, rows = 2, columns = 4), page.add(20, rows = 2, columns = 4).widgets.last())
-        assertEquals(HostedWidget(20, row = 0, column = 0, rows = 1, columns = 4), WidgetPage().add(20, rows = 0, columns = 9).widgets.single())
+        assertEquals(clock.copy(id = 20, column = 2), page.add(20, rows = 1, columns = 2, pageRows = 1).widgets[1])
+        assertEquals(HostedWidget(20, row = 1, column = 0, rows = 1, columns = 4), page.add(20, rows = 1, columns = 4, pageRows = 1).widgets[1])
+        assertEquals(HostedWidget(20, row = 5, column = 0, rows = 2, columns = 4), page.add(20, rows = 2, columns = 4, pageRows = 1).widgets.last())
+        assertEquals(HostedWidget(20, row = 0, column = 0, rows = 1, columns = 4), WidgetPage().add(20, rows = 0, columns = 9, pageRows = 1).widgets.single())
     }
 
     @Test

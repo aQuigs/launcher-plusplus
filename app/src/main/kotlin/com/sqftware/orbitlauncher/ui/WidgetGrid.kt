@@ -64,7 +64,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -114,15 +116,13 @@ object WidgetTags {
 
 /**
  * What a page of widgets asks of the system: a widget's view, a new one for a page of so many rows of cells so big, a
- * removal, a resize, a move to other cells, every widget and the ring put where a page has them, and how a widget's
+ * removal, every widget and the ring put where a page has them once one is moved or resized, and how a widget's
  * provider lets it be resized.
  */
 class WidgetActions(
     val view: (Context, Int) -> View,
     val add: (pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) -> Unit,
     val remove: (Int) -> Unit,
-    val resize: (id: Int, rows: Int, columns: Int) -> Unit,
-    val move: (id: Int, row: Int, column: Int) -> Unit,
     val arrange: (WidgetPage) -> Unit,
     val sizing: (Int) -> WidgetSizing,
 )
@@ -152,7 +152,8 @@ private data class Lengthening(override val count: Int) : PageRows {
 
 /** A ring page's rows, which never lengthen, so a widget lands only where it and those in its way fit. */
 private data class Fixed(override val count: Int) : PageRows {
-    override fun reach(page: WidgetPage) = count
+    // Past the last row only for a page stored on a taller screen, so a widget held there has rows to be dragged about.
+    override fun reach(page: WidgetPage) = maxOf(count, page.rows)
 
     override fun move(page: WidgetPage, id: Int, row: Int, column: Int) = page.moveWithin(id, row, column, count)
 
@@ -277,7 +278,9 @@ fun WidgetGrid(
     // As tall as the page is wide, so the ring is the size it has on a page of its own.
     val ringRows = widgetCells(span(WIDGET_COLUMNS, cell.width).value.roundToInt(), cell.height.value, pageRows)
     // Placed only once the page is measured, and stored as placed, so the widgets the host moves are where they show.
-    val laid = remember(page, fixed, ringRows, pageRows, area) { if (fixed && area != DpSize.Zero) page.withRing(ringRows, pageRows) else page }
+    val measured = area != DpSize.Zero
+    val laid = remember(page, fixed, ringRows, pageRows, measured) { if (fixed && measured) page.withRing(ringRows, pageRows) else page }
+    val reach = fit.reach(laid)
     LaunchedEffect(laid) { if (laid != page) actions.arrange(laid) }
     val held = remember { HeldWidget() }
     val edge = remember { EdgeScroll() }
@@ -298,21 +301,13 @@ fun WidgetGrid(
             if (held.id != id) return@release
             val landing = held.preview(latestPage, latestPitch, latestFit)
             held.id = null
-            when {
-                !lifted || landing == latestPage -> Unit
-                latestFit is Fixed -> latestActions.arrange(landing)
-                else -> landing.widgets.find { it.id == id }?.let { latestActions.move(id, it.row, it.column) }
-            }
+            if (lifted && landing != latestPage) latestActions.arrange(landing)
         }
     }
-    // Whether the page took the widget [id] stretched to [newRows] by [newColumns].
-    val resize = { id: Int, newRows: Int, newColumns: Int ->
-        if (fit is Fixed) {
-            fit.resize(laid, id, newRows, newColumns)?.also(actions.arrange) != null
-        } else {
-            actions.resize(id, newRows, newColumns)
-            true
-        }
+    // Whether the page took the widget [id] stretched to [newRows] by [newColumns]. The latest page, since the handle's
+    // gesture keeps the lambda it started with, and a move down the page does not restart it.
+    val resize = remember(held) {
+        { id: Int, newRows: Int, newColumns: Int -> latestFit.resize(latestPage, id, newRows, newColumns)?.also(latestActions.arrange) != null }
     }
     // Whatever ends edit mode, Back and HOME included, puts a held widget back.
     LaunchedEffect(editing == null) { if (editing == null) held.id?.let { release(it, false) } }
@@ -418,9 +413,9 @@ fun WidgetGrid(
                     key(widget.id) {
                         val at = if (held.id == widget.id) widget else places[widget.id] ?: widget
                         if (widget.id == RING_ID) {
-                            ring?.let { RingBlock(widget, at, cell, pitch, pageRows, editing, onEditingChange, held, release, it) }
+                            ring?.let { RingBlock(widget, at, cell, pitch, reach, editing, onEditingChange, held, release, it) }
                         } else {
-                            Widget(widget, at, cell, pitch, fit.reach(laid), actions, resize, pageRows, editing, onEditingChange, held, release, edge)
+                            Widget(widget, at, cell, pitch, reach, actions, resize, pageRows, editing, onEditingChange, held, release, edge)
                         }
                     }
                 }
@@ -443,8 +438,8 @@ fun WidgetGrid(
 }
 
 /**
- * The [ring] as stored, shown in the cells of [at], which [held] drags up and down the page's [pageRows] rows while it
- * is edited, a cell and its gap being [pitch]; [release] lets it go. While a widget is edited, a tap on it ends that.
+ * The [ring] as stored, shown in the cells of [at], which [held] drags up and down the page's first [reach] rows while
+ * it is edited, a cell and its gap being [pitch]; [release] lets it go. While a widget is edited, a tap on it ends that.
  */
 @Composable
 private fun RingBlock(
@@ -452,23 +447,16 @@ private fun RingBlock(
     at: HostedWidget,
     cell: DpSize,
     pitch: Offset,
-    pageRows: Int,
+    reach: Int,
     editing: Int?,
     onEditingChange: (Int?) -> Unit,
     held: HeldWidget,
     release: (id: Int, lifted: Boolean) -> Unit,
     content: @Composable (Modifier) -> Unit,
 ) {
-    val density = LocalDensity.current
-    val dragged = held.id == RING_ID
-    val place = with(density) { cellOffset(at, cell) }
-    val sliding by animateIntOffsetAsState(place, if (held.id == null) snap() else spring(), label = "ring_place")
-
     Box(
         Modifier
-            .offset { if (held.id == null) place else sliding }
-            .zIndex(if (dragged) 2f else if (editing == RING_ID) 1f else 0f)
-            .graphicsLayer { if (dragged) translationY = held.shift(ring, pitch, pageRows).y }
+            .inCells(ring, at, cell, pitch, reach, held, edited = editing == RING_ID)
             .size(span(ring.columns, cell.width), span(ring.rows, cell.height))
             .testTag(WidgetTags.RING),
     ) {
@@ -486,6 +474,28 @@ private fun RingBlock(
             else -> Box(Modifier.fillMaxSize().takeTaps(onTap = { onEditingChange(null) }))
         }
     }
+}
+
+/**
+ * [widget] drawn in the cells of [at], or, while [held] drags it, where the finger has taken it within the page's first
+ * [reach] rows, a cell and its gap being [pitch]; above the others while it is [edited] or dragged.
+ */
+@Composable
+private fun Modifier.inCells(widget: HostedWidget, at: HostedWidget, cell: DpSize, pitch: Offset, reach: Int, held: HeldWidget, edited: Boolean): Modifier {
+    val dragged = held.id == widget.id
+    // The others slide aside while one is dragged. Once it lands they are drawn in their cells at once, since even a
+    // snap would take a frame, in which the one let go would be back where it started.
+    val place = with(LocalDensity.current) { cellOffset(at, cell) }
+    val sliding by animateIntOffsetAsState(place, if (held.id == null) snap() else spring(), label = "widget_place")
+    return offset { if (held.id == null) place else sliding }
+        .zIndex(if (dragged) 2f else if (edited) 1f else 0f)
+        .graphicsLayer {
+            if (dragged) {
+                val shift = held.shift(widget, pitch, reach)
+                translationX = shift.x
+                translationY = shift.y
+            }
+        }
 }
 
 /** Where the top-left cell of [widget] is, on a grid of [cell]s. */
@@ -514,13 +524,7 @@ private fun Widget(
     edge: EdgeScroll,
 ) {
     val haptics = LocalHapticFeedback.current
-    val density = LocalDensity.current
     val edited = editing == widget.id
-    val dragged = held.id == widget.id
-    // The others slide aside while one is dragged. Once it lands they are drawn in their cells at once, since even a
-    // snap would take a frame, in which the one let go would be back where it started.
-    val place = with(density) { cellOffset(at, cell) }
-    val sliding by animateIntOffsetAsState(place, if (held.id == null) snap() else spring(), label = "widget_place")
     // A drag that took the page past the screen's edge leaves the widget partly off it; once it lands it shows in full.
     val landed = remember { BringIntoViewRequester() }
     LaunchedEffect(widget.row, widget.rows, edited) { if (edited && held.id == null) landed.bringIntoView() }
@@ -537,15 +541,7 @@ private fun Widget(
 
     Box(
         Modifier
-            .offset { if (held.id == null) place else sliding }
-            .zIndex(if (dragged) 2f else if (edited) 1f else 0f)
-            .graphicsLayer {
-                if (dragged) {
-                    val shift = held.shift(widget, pitch, reach)
-                    translationX = shift.x
-                    translationY = shift.y
-                }
-            }
+            .inCells(widget, at, cell, pitch, reach, held, edited)
             .size(span(maxOf(columns, widget.columns), cell.width), span(maxOf(rows, widget.rows), cell.height))
             .semantics { contentDescription = "Widget" }
             .testTag(WidgetTags.widget(widget.id))
@@ -727,18 +723,23 @@ private fun Modifier.holdToMove(id: Int, held: HeldWidget, haptics: HapticFeedba
             val press = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
             if (!held.pickUp(id)) return@awaitEachGesture
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            var lifted = false
-            try {
-                // Every move is taken, or the pager would take the touch back.
-                lifted = drag(press.id) {
-                    held.offset += it.positionChange()
-                    it.consume()
-                }
-            } finally {
-                release(id, lifted)
-            }
+            carry(id, press.id, held, release)
         }
     }
+
+/** Moves [id] through [held] with the finger [pointer] until it lifts or is taken, then lets it go through [release]. */
+private suspend fun AwaitPointerEventScope.carry(id: Int, pointer: PointerId, held: HeldWidget, release: (id: Int, lifted: Boolean) -> Unit) {
+    var lifted = false
+    try {
+        // Every move is taken, or the pager would take the touch back.
+        lifted = drag(pointer) {
+            held.offset += it.positionChange()
+            it.consume()
+        }
+    } finally {
+        release(id, lifted)
+    }
+}
 
 /**
  * Moves [id] through [held] with a finger that drags on it, following it from where it went down, until [release]. The
@@ -752,15 +753,7 @@ private fun Modifier.dragToMove(id: Int, held: HeldWidget, release: (id: Int, li
             val start = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() } ?: return@awaitEachGesture
             if (!held.pickUp(id)) return@awaitEachGesture
             held.offset = start.position - down.position
-            var lifted = false
-            try {
-                lifted = drag(start.id) {
-                    held.offset += it.positionChange()
-                    it.consume()
-                }
-            } finally {
-                release(id, lifted)
-            }
+            carry(id, start.id, held, release)
         }
     }
 

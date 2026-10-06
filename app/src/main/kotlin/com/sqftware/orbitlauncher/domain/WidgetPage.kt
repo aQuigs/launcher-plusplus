@@ -33,7 +33,7 @@ data class HostedWidget(val id: Int, val row: Int, val column: Int, val rows: In
  * page, as [RING_ID].
  */
 data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
-    val isEmpty: Boolean get() = ids.isEmpty()
+    val isEmpty: Boolean get() = widgets.all { it.id == RING_ID }
 
     /** The ids of the widgets the system hosts, the ring's left out. */
     val ids: Set<Int> get() = widgets.mapNotNullTo(mutableSetOf()) { it.id.takeIf { id -> id != RING_ID } }
@@ -45,19 +45,24 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
 
     /**
      * The page with the widget [id] in the first free cells, from the top and then the left, that hold [rows] by
-     * [columns], within the first [pageRows] rows; unchanged when there are none.
+     * [columns]. A page with a ring never lengthens, so there they are within its first [pageRows] rows, and the page is
+     * unchanged when there are none.
      */
-    fun add(id: Int, rows: Int, columns: Int, pageRows: Int = Int.MAX_VALUE): WidgetPage {
+    fun add(id: Int, rows: Int, columns: Int, pageRows: Int): WidgetPage {
         val width = columns.coerceIn(1, WIDGET_COLUMNS)
         val height = rows.coerceAtLeast(1)
+        val limit = if (ring == null) Int.MAX_VALUE else pageRows
         val spot = generateSequence(0) { it + 1 }
-            .takeWhile { it <= pageRows - height }
+            .takeWhile { it <= limit - height }
             .flatMap { row -> (0..WIDGET_COLUMNS - width).asSequence().map { HostedWidget(id, row, it, height, width) } }
             .firstOrNull { new -> widgets.none(new::overlaps) } ?: return this
         return WidgetPage((widgets + spot).sortedWith(PLACE))
     }
 
     fun remove(id: Int): WidgetPage = WidgetPage(widgets.filter { it.id != id })
+
+    /** The page with only the widgets whose ids are in [held], and its ring. */
+    fun keeping(held: Set<Int>): WidgetPage = WidgetPage(widgets.filter { it.id in held || it.id == RING_ID })
 
     /**
      * The widget [id] made [rows] by [columns], no wider than the page leaves it from its column. The widgets it now
@@ -98,7 +103,8 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
      * it had, they move down out of its way, past the page's last row.
      */
     fun withRing(rows: Int, pageRows: Int): WidgetPage {
-        val ring = ring?.copy(rows = rows) ?: HostedWidget(RING_ID, (pageRows - rows) / 2, 0, rows, WIDGET_COLUMNS)
+        val ring = ring?.let { it.copy(row = it.row.coerceIn(0, maxOf(pageRows - rows, 0)), rows = rows) }
+            ?: HostedWidget(RING_ID, (pageRows - rows) / 2, 0, rows, WIDGET_COLUMNS)
         val ringed = WidgetPage(listOf(ring) + widgets.filter { it.id != RING_ID })
         return ringed.moveWithin(RING_ID, ring.row, 0, pageRows) ?: ringed.settled()
     }
@@ -157,8 +163,7 @@ data class WidgetPages(val pages: Map<String, WidgetPage> = emptyMap()) {
     fun keepingPages(ids: Set<String>): WidgetPages = WidgetPages(pages.filterKeys { it in ids })
 
     /** These pages with only the widgets whose ids are in [held], and their rings. */
-    fun keeping(held: Set<Int>): WidgetPages =
-        WidgetPages(pages.mapValues { (_, page) -> WidgetPage(page.widgets.filter { it.id in held || it.id == RING_ID }) })
+    fun keeping(held: Set<Int>): WidgetPages = WidgetPages(pages.mapValues { (_, page) -> page.keeping(held) })
 }
 
 /**

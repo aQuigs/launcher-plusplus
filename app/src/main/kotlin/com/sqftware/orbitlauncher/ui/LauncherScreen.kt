@@ -570,6 +570,8 @@ fun LauncherScreen(
     val shownPage = layout.pageAt(pagerState.currentPage)
     val editedWidget = editingWidget?.takeIf { id -> widgetPages[shownPage.id].widgets.any { it.id == id } }
     LaunchedEffect(editingWidget, editedWidget) { if (editedWidget == null) editingWidget = null }
+    // Every ring page but home holds a ring, so the page another is swiped to would otherwise take its ring's edit mode.
+    LaunchedEffect(shownPage.id) { editingWidget = null }
     // A ring page's grid alone knows the cells a widget asked for there would take, so the menu asks it by page id.
     val widgetAdds = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
 
@@ -865,14 +867,13 @@ fun LauncherScreen(
             onOpen = { at -> openMenuUnlessDragging { openMenu = OpenMenu.Launcher(at) } },
             content = { origin ->
                 (openMenu as? OpenMenu.Launcher)?.let { shown ->
+                    val widgetsPage = latestRingPage.takeIf { it != LauncherPage.Home }
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
                         at = { shown.at - origin() },
                         rows = listOfNotNull(
-                            latestRingPage.takeIf { it != LauncherPage.Home }?.let { page ->
-                                LauncherMenuRow("Add widget") { widgetAdds.tryEmit(page.id) }
-                            },
-                            latestRingPage.takeIf { it != LauncherPage.Home }?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
+                            widgetsPage?.let { LauncherMenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
+                            widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
                             LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
