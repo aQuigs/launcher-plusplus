@@ -40,4 +40,13 @@ class DropZonesTest {
         assertNull(DropZones(dock = dock).placeAt(500f, 400f))
         assertNull(DropZones().placeAt(500f, 400f))
     }
+
+    @Test
+    fun `a dragged item turns the pages only within the edge of either side`() {
+        assertEquals(-1, pageTurnAt(10f, width = 1000f, edge = 50f))
+        assertEquals(0, pageTurnAt(50f, width = 1000f, edge = 50f))
+        assertEquals(0, pageTurnAt(500f, width = 1000f, edge = 50f))
+        assertEquals(0, pageTurnAt(950f, width = 1000f, edge = 50f))
+        assertEquals(1, pageTurnAt(990f, width = 1000f, edge = 50f))
+    }
 }

@@ -1298,7 +1298,8 @@ class LauncherScreenTest {
         homeApps = HomeApps(dock = ringOf(clock))
         show()
         val dock = centreOf(compose.dock())
-        goToCollections()
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Widgets)
         compose.drawerHandle().performClick()
         assertDrawerOpen(true)
         val row = centreOf(compose.onNodeWithText(mail.label))
@@ -1311,6 +1312,79 @@ class LauncherScreenTest {
         }
 
         compose.runOnIdle { assertEquals(HomeApps(dock = ringOf(clock, mail)), homeApps) }
+    }
+
+    @Test
+    fun anAppDraggedFromTheDrawerOverTheCollectionsPageGoesOntoAHandPickedCard() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(clock.key)))))
+        show()
+        goToCollections()
+        startDraggingFromDrawer(mail)
+
+        dragTo(centreOf(compose.collectionCard(tools)))
+        letGo()
+
+        assertSettledOn(LauncherPage.Collections)
+        compose.collectionApp(tools, mail).assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(Favourites(listOf(clock.key, mail.key)), collections.card(tools)!!.apps)
+            assertEquals(HomeApps(), homeApps)
+        }
+    }
+
+    @Test
+    fun anAppRestedAtTheScreensEdgeTurnsThePageAndGoesOntoACardThereStayingOnTheRing() {
+        homeApps = HomeApps(ring = ringOf(mail, clock))
+        collections = CollectionsPage(listOf(CollectionCard(tools)))
+        show()
+        val edge = compose.onRoot().fetchSemanticsNode().size.width - 2f
+
+        pickUp(compose.ringSlot(mail))
+        dragTo(Offset(edge, centreOf(compose.emblem()).y))
+        rest(PAGE_TURN_MILLIS)
+        assertSettledOn(LauncherPage.Collections)
+        dragTo(centreOf(compose.collectionCard(tools)))
+        letGo()
+
+        compose.runOnIdle {
+            assertEquals(Favourites(listOf(mail.key)), collections.card(tools)!!.apps)
+            assertEquals(HomeApps(ring = ringOf(mail, clock)), homeApps)
+        }
+    }
+
+    @Test
+    fun aCardsAppTakenHomeByTheScreensEdgeGoesOntoTheRingAndStaysOnItsCard() {
+        collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key)))))
+        show()
+        goToCollections()
+
+        liftFromToolsCard(mail)
+        dragTo(Offset(2f, centreOf(compose.collectionCard(tools)).y))
+        rest(PAGE_TURN_MILLIS)
+        assertSettledOn(LauncherPage.Home)
+        dragTo(centreOf(compose.emblem()))
+        letGo()
+
+        compose.runOnIdle {
+            assertEquals(HomeApps(ring = ringOf(mail)), homeApps)
+            assertEquals(Favourites(listOf(mail.key)), collections.card(tools)!!.apps)
+        }
+    }
+
+    @Test
+    fun anAppFromABuiltInCardGoesOntoAHandPickedCard() {
+        collections = CollectionsPage(listOf(CollectionCard(NewApps), CollectionCard(tools)))
+        show()
+        goToCollections()
+
+        val icon = centreOf(compose.collectionApp(NewApps, mail))
+        compose.onRoot().performTouchInput { liftOut(icon) }
+        compose.dragGhost().assertIsDisplayed()
+        dragTo(centreOf(compose.collectionCard(tools)))
+        letGo()
+
+        compose.collectionApp(tools, mail).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(Favourites(listOf(mail.key)), collections.card(tools)!!.apps) }
     }
 
     @Test

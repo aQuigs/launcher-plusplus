@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -45,6 +46,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.draw.alpha
@@ -67,6 +69,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -86,6 +89,7 @@ import com.sqftware.orbitlauncher.domain.Colourways
 import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
+import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.FolderLooks
@@ -110,6 +114,7 @@ import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.appOptions
 import com.sqftware.orbitlauncher.domain.contentsOf
 import com.sqftware.orbitlauncher.domain.flipped
+import com.sqftware.orbitlauncher.domain.pageTurnAt
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
@@ -154,6 +159,10 @@ private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
 /** How far above the drawer's strip the shade along the bottom edge starts. */
 private val BOTTOM_SHADE_FADE = 32.dp
 
+/** How near either side of the screen what is dragged turns the pages, and how long it rests there before each turn. */
+private val PAGE_TURN_EDGE = 24.dp
+const val PAGE_TURN_MILLIS = 600L
+
 /** A HOME press. [launcherInFront] is false when the press brought the launcher back from another app. */
 data class HomePress(val launcherInFront: Boolean)
 
@@ -171,8 +180,10 @@ data class HomePress(val launcherInFront: Boolean)
  * options; the menu of an app on the ring or in the dock can start a folder in its slot. A folder, on the ring or in the
  * dock, opens in place on the ring, as in Arc: its apps take the ring's slots and the emblem makes way for a target that
  * closes it, and a long press on that target fills it from the drawer; its own menu does too, or removes it. A long
- * press in the drawer that moves on drags the app out: the drawer closes, a ghost of the icon follows the finger over the
- * ring page, and letting go over the ring or the dock adds it there. A widget page shows its widgets through the
+ * press in the drawer or on a built-in card that moves on drags the app out: the drawer closes, a ghost of the icon
+ * follows the finger over the ring page, or the collections page the drawer was opened over, and letting go over the
+ * ring, the dock or a hand-picked card that lacks it adds it there. Whatever is dragged, resting it at either side of the
+ * screen turns the pages that way, and an app from anywhere goes onto a hand-picked card too. A widget page shows its widgets through the
  * [widgets] for its id; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
  * out of view. A collections page shows its cards, the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
@@ -277,12 +288,18 @@ fun LauncherScreen(
     pagerState: PagerState = rememberPagerState(initialPage = layout.homeIndex) { layout.pages.size },
 ) {
     val scope = rememberCoroutineScope()
+    // An app on its way out of the drawer, or an item on the move, and the page it was picked up on, if any.
+    var dragged by remember { mutableStateOf<Drag?>(null) }
+    var draggedFrom by remember { mutableStateOf<LauncherPage?>(null) }
     // The ring page and the collections page the screen works on: the one settled in view, else the home page and the
-    // first collections page, which an app dragged from the drawer or a pinned shortcut goes to. Only they take part in
-    // menus, drags and open folders; the others are drawn as they are.
+    // first collections page, which an app dragged from the drawer or a pinned shortcut goes to. The page an item was
+    // picked up on stays the one of its kind while the item turns the pages, as the drag holds only while its place does.
+    // Only they take part in menus, drags and open folders; the others are drawn as they are.
     val settled = layout.pageAt(pagerState.settledPage)
-    val ringPage = settled.takeIf { it.kind == PageKind.Ring } ?: LauncherPage.Home
-    val cardsPage = settled.takeIf { it.kind == PageKind.Collections } ?: layout.first(PageKind.Collections)
+    val held = draggedFrom.takeIf { dragged != null }
+    fun working(kind: PageKind) = held?.takeIf { it.kind == kind } ?: settled.takeIf { it.kind == kind }
+    val ringPage = working(PageKind.Ring) ?: LauncherPage.Home
+    val cardsPage = working(PageKind.Collections) ?: layout.first(PageKind.Collections)
     val homeApps = remember(ringPages, ringPage) { ringPages.on(ringPage.id) }
     val collections = remember(collectionPages, cardsPage) { cardsPage?.let { collectionPages.on(it.id) } ?: CollectionsPage(emptyList()) }
     val drawerState = rememberStandardBottomSheetState(skipHiddenState = true)
@@ -364,22 +381,25 @@ fun LauncherScreen(
         if (changed != before) latestOnCollectionPagesChange(pages.with(page.id, changed))
     }
 
-    // An app on its way out of the drawer, or an item on the move within its place, the finger holding it and where it
-    // could land, in root coordinates. The finger moves every frame, so only the ghost reads it; the targets under it are
-    // derived, so the ring, the dock, the cards and the bin recompose when the finger changes zone or position, not
-    // whenever it moves. The ring and the dock are measured on the home page and judged where it settles, at the pager's
+    // The finger holding what is dragged and where it could land, in root coordinates. The finger moves every frame, so
+    // only the ghost reads it; the targets under it are derived, so the ring, the dock, the cards and the bin recompose
+    // when the finger changes zone or position, not whenever it moves. The targets are those of the page the pager is on
+    // or on its way to. The ring and the dock are measured on the home page and judged where it settles, at the pager's
     // origin: a drag from another page goes home under the finger, and a drop must not miss because the page has not
     // arrived yet.
-    var dragged by remember { mutableStateOf<Drag?>(null) }
     var finger by remember { mutableStateOf(Offset.Zero) }
+    val inView by remember { derivedStateOf { latestLayout.pageAt(pagerState.targetPage) } }
     val ringPageCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
     var pagerOrigin by remember { mutableStateOf(Offset.Zero) }
     // Each ring page's, so the page coming into view brings its own and none of another's: only home has the dock.
     var pageZones by remember { mutableStateOf(emptyMap<String, DropZones>()) }
     val zones by remember { derivedStateOf { pageZones[latestRingPage.id] ?: DropZones() } }
     var binBounds by remember { mutableStateOf<Bounds?>(null) }
+    // Where an app that only adds, with no home place to leave, lands on the ring page.
     val dropPlace by remember {
-        derivedStateOf { if (dragged is Drag.FromDrawer) (finger - pagerOrigin).let { zones.placeAt(it.x, it.y) } else null }
+        derivedStateOf {
+            if (dragged?.adds == true && inView == latestRingPage) (finger - pagerOrigin).let { zones.placeAt(it.x, it.y) } else null
+        }
     }
 
     fun Modifier.dropZone(page: LauncherPage, place: DropZones.(Bounds) -> DropZones) =
@@ -390,8 +410,8 @@ fun LauncherScreen(
     val overBin by remember { derivedStateOf { binShown && binBounds?.discContains(finger.x, finger.y) == true } }
     // The halves of the reorder switch, and the one the item on the move is over: a rest there flips the mode. The
     // switch overlaps what is under it, the first card's apps among them, so while the item is over it nothing moves.
-    // Only an app from the drawer, which only adds, has no switch.
-    val switchShown by remember { derivedStateOf { dragged.let { it != null && it !is Drag.FromDrawer } } }
+    // Only an app from the drawer or a built-in card, which only adds, has no switch.
+    val switchShown by remember { derivedStateOf { dragged.let { it != null && it !is Drag.Copy } } }
     var switchHalves by remember { mutableStateOf(emptyMap<ReorderMode, Bounds>()) }
     val overSwitch by remember {
         derivedStateOf {
@@ -410,6 +430,27 @@ fun LauncherScreen(
     // shift them under the finger, so that ends the drag.
     val placeChanged by remember { derivedStateOf { dragged?.current?.invoke() == false } }
     LaunchedEffect(placeChanged) { if (placeChanged) dragged = null }
+
+    // Resting what is dragged at either side of the screen turns the pages that way, one more at each rest, so it can be
+    // taken to any page.
+    var pagerWidth by remember { mutableIntStateOf(0) }
+    val edge = with(LocalDensity.current) { PAGE_TURN_EDGE.toPx() }
+    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    val pageTurn by remember(edge, ltr) {
+        derivedStateOf {
+            if (dragged == null) 0 else pageTurnAt(finger.x - pagerOrigin.x, pagerWidth.toFloat(), edge).let { if (ltr) it else -it }
+        }
+    }
+    LaunchedEffect(pageTurn) {
+        if (pageTurn == 0) return@LaunchedEffect
+        while (true) {
+            delay(PAGE_TURN_MILLIS)
+            val next = pagerState.targetPage + pageTurn
+            if (next !in latestLayout.pages.indices) break
+            // In a job of its own, so the finger leaving the edge does not stop the pages between two.
+            scope.launch { pagerState.animateScrollToPage(next) }.join()
+        }
+    }
 
     // Picking and searching are modes of the drawer, so they end however the drawer closes: chevron, drag, Back or HOME.
     // They wait for the drawer to settle closed: a drag moves the target back and forth, and the drawer may still end up
@@ -469,6 +510,8 @@ fun LauncherScreen(
     // The ring's and the dock's positions, so an app can be dragged from one home place to another. Each is registered as
     // it is built, below, with the drag handling that needs these.
     val homePlaces = remember { mutableMapOf<HomePlace.Slots, Rearrange>() }
+    // The hand-picked cards' positions on the collections page the screen works on, so an app can be dropped on one.
+    val cardDrops = remember { CardDrops() }
 
     fun itemsOf(holder: HomePlace.Slots) = if (holder == HomePlace.Ring) latestRing else latestDock
     // What resting the finger has done. A pause off the middle of anything the dragged app could fold into makes its own
@@ -499,11 +542,18 @@ fun LauncherScreen(
         return Landing.Into(holder, item).takeIf { latestHomeApps.lands(app, drag.home, it) }
     }
 
-    fun overFor(drag: Drag): Over? {
-        val own = (drag as? Drag.Within)?.place
-        if (overBin || overSwitch != null) return null
-        // A card's apps move only on their card.
-        if (drag.home == null && own != null) return own.at(finger)?.let { Over.Slot(own, it) }
+    // A card's apps move among themselves on their card; any app goes onto another hand-picked card that lacks it, but a
+    // pinned shortcut, which cards do not list, does not.
+    fun overCards(drag: Drag): Over? {
+        val card = (drag as? Drag.Within)?.place?.takeIf { drag.home == null }
+        card?.at(finger)?.let { return Over.Slot(card, it) }
+        val app = drag.app?.takeIf { it.kind !is EntryKind.Shortcut } ?: return null
+        val kind = cardDrops.at(finger) ?: return null
+        return Over.Card(kind).takeIf { latestCollections.card(kind)?.apps?.contains(app) == false }
+    }
+
+    fun overHome(drag: Drag): Over? {
+        val own = (drag as? Drag.Within)?.place?.takeIf { drag.home != null }
         val onHome = finger - pagerOrigin
         val onEmblem = zones.ring?.discContains(onHome.x, onHome.y, EMBLEM_FRACTION) == true
         if (drag.home is HomePlace.Folder && own != null && onEmblem) return Over.FolderCentre
@@ -522,6 +572,13 @@ fun LauncherScreen(
         if (own !== ringPlace) own?.at(finger)?.let { return Over.Slot(own, it) }
         // Off every slot, as all of an empty ring is.
         return Over.RingEnd.takeIf { drag.app != null && place == HomePlace.Ring }
+    }
+
+    fun overFor(drag: Drag): Over? = when {
+        overBin || overSwitch != null -> null
+        inView == latestCardsPage -> overCards(drag)
+        inView == latestRingPage -> overHome(drag)
+        else -> null
     }
 
     val over by remember { derivedStateOf { dragged?.let(::overFor) } }
@@ -744,6 +801,7 @@ fun LauncherScreen(
         if (dragged != null) return false
         closeMenu()
         dragged = drag
+        draggedFrom = if (drag is Drag.Copy) null else latestLayout.pageAt(pagerState.settledPage)
         finger = position
         makingWay = null
         lit = null
@@ -773,9 +831,10 @@ fun LauncherScreen(
         when {
             drag is Drag.Within && overBin -> drag.remove?.invoke()
             placeChanged -> Unit
+            app != null && target is Over.Card -> changeCollections { addApp(target.kind, app) }
             app != null && foldInto != null -> shown?.let { changeHomeApps { move(app, drag.home, foldInto, it) } }
-            drag is Drag.FromDrawer -> dropPlace?.let { place -> changeHomeApps { add(place, drag.app) } }
             drag is Drag.Within && target is Over.Slot && target.place === drag.place -> drag.move(target.index, latestReorderMode)
+            app != null && drag.adds -> dropPlace?.let { place -> changeHomeApps { add(place, app) } }
             app != null && shown != null -> landing(target)?.let { to -> changeHomeApps { move(app, drag.home, to, shown) } }
         }
         dragged = null
@@ -784,14 +843,22 @@ fun LauncherScreen(
     val dragFromDrawer = remember {
         AppDrag(
             onStart = { app, position ->
-                beginDrag(Drag.FromDrawer(app), position).also { started ->
-                    // The targets are on the ring page, wherever the drawer was opened from.
+                beginDrag(Drag.Copy(app), position).also { started ->
+                    // Onto the cards of the collections page the drawer was opened over, else onto the ring page.
                     if (started) {
                         closeDrawer()
-                        showRingPage()
+                        if (latestLayout.pageAt(pagerState.settledPage).kind != PageKind.Collections) showRingPage()
                     }
                 }
             },
+            onMove = { finger = it },
+            onDrop = ::drop,
+            onCancel = { dragged = null },
+        )
+    }
+    val dragFromBuiltInCard = remember {
+        AppDrag(
+            onStart = { app, position -> beginDrag(Drag.Copy(app), position) },
             onMove = { finger = it },
             onDrop = ::drop,
             onCancel = { dragged = null },
@@ -1163,7 +1230,10 @@ fun LauncherScreen(
                         .graphicsLayer {
                             if (size.height > 0f) alpha = (drawerState.requireOffset() / size.height).coerceIn(0f, 1f)
                         }
-                        .onGloballyPositioned { pagerOrigin = it.positionInRoot() }
+                        .onGloballyPositioned {
+                            pagerOrigin = it.positionInRoot()
+                            pagerWidth = it.size.width
+                        }
                         .testTag(LauncherTags.PAGER),
                 ) { index ->
                     val page = layout.pages[index]
@@ -1303,7 +1373,7 @@ fun LauncherScreen(
                                         // moves rather than jumps.
                                         if (isHome) {
                                             val dockShown = dock.isNotEmpty() || (onHome == null && !pageApps.dock.isEmpty) ||
-                                                active && dragged?.let { it.app != null && (it is Drag.FromDrawer || it.home != null) } == true
+                                                active && dragged?.app != null
                                             AnimatedVisibility(visible = dockShown) {
                                                 Dock(
                                                     items = dock,
@@ -1351,6 +1421,9 @@ fun LauncherScreen(
                                     onOpenUsageSettings = openUsageSettings,
                                     rearrange = { kind -> cardRearrange(kind).takeIf { active } },
                                     menu = { kind -> if (active) cardMenus.getOrPut(kind) { appMenu(AppSpot.Card(kind)) } else null },
+                                    drag = dragFromBuiltInCard.takeIf { active },
+                                    drops = cardDrops.takeIf { active },
+                                    dropTarget = (over as? Over.Card)?.kind?.takeIf { active },
                                     bin = if (active && binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
                                     unread = unread,
                                     onClearBadge = actions.clearBadge,
@@ -1523,11 +1596,14 @@ private sealed interface Drag {
     /** The app dragged, unless it is a folder. */
     val app: AppEntry? get() = (item as? RingItem.App)?.app
 
+    /** Whether it is an app that only adds where it lands, with no home place to leave: from the drawer or a card. */
+    val adds: Boolean get() = app != null && home == null
+
     /** Whether the place it came from still lists what it did, so the positions found there hold; none from the drawer. */
     val current: (() -> Boolean)? get() = null
 
-    /** Out of the drawer, to the ring or the dock. */
-    data class FromDrawer(override val app: AppEntry) : Drag {
+    /** Out of a list the system fills, the drawer or a built-in card, to the ring, the dock or a hand-picked card. */
+    data class Copy(override val app: AppEntry) : Drag {
         override val item = RingItem.App(app)
     }
 
@@ -1580,6 +1656,9 @@ private sealed interface Over {
 
     /** The middle of the ring while a folder is open there, which is the way out of the folder. */
     data object FolderCentre : Over
+
+    /** A hand-picked card the app dragged is not on, which it is added to. */
+    data class Card(val kind: CollectionKind.HandPicked) : Over
 }
 
 /** The long-press menu that is showing. It keeps what it shows while [expanded] turns false, so it animates away whole. */
