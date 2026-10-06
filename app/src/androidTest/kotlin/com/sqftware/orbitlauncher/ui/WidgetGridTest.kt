@@ -3,9 +3,13 @@ package com.sqftware.orbitlauncher.ui
 import android.graphics.Color
 import android.view.View
 import android.view.ViewConfiguration
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -30,6 +34,7 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.HostedWidget
+import com.sqftware.orbitlauncher.domain.RING_ID
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.WIDGET_GAP_DP
 import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
@@ -64,7 +69,9 @@ class WidgetGridTest {
     private var storesAtOnce = true
     private var sizings = emptyMap<Int, WidgetSizing>()
 
-    private fun show() = compose.setContent {
+    private var ringTaps = 0
+
+    private fun show(ring: (@Composable (Modifier) -> Unit)? = null) = compose.setContent {
         WidgetGrid(
             page = page,
             actions = WidgetActions(
@@ -85,12 +92,16 @@ class WidgetGridTest {
                     moved += Triple(id, row, column)
                     page = page.move(id, row, column)
                 },
+                arrange = { page = it },
                 sizing = { sizings[it] ?: WidgetSizing() },
             ),
             editing = editing,
             onEditingChange = { editing = it },
+            ring = ring,
         )
     }
+
+    private fun showRingPage() = show { modifier -> Box(modifier.clickable { ringTaps++ }) }
 
     private val gap = WIDGET_GAP_DP.dp
 
@@ -507,5 +518,45 @@ class WidgetGridTest {
 
         assertTrue("the page scrolled", bounds(search).top < top)
         compose.runOnIdle { assertEquals(search.id, editing) }
+    }
+
+    @Test
+    fun aRingPageShowsTheRingAcrossItsMiddleAndNeitherScrollsNorOffersTheButton() {
+        showRingPage()
+
+        compose.waitUntil(timeoutMillis = 5_000) { page.ring != null }
+        val ring = page.ring!!
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        val shown = compose.onNodeWithTag(WidgetTags.RING).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertNear(screen.width - 32.dp, shown.width)
+        assertTrue("$shown is not about as tall as it is wide", shown.height >= shown.width && ring.row > 0)
+        assertTrue("$shown is not in the middle of $screen", abs((shown.top - screen.top - (screen.bottom - shown.bottom)).value) < shown.height.value / ring.rows * 2)
+        compose.addWidgetButton().assertDoesNotExist()
+        compose.onNode(hasScrollAction()).assertDoesNotExist()
+    }
+
+    @Test
+    fun theEditedRingTakesNoTapsAndDragsUpWhileTheWidgetsMakeWayBelowIt() {
+        showRingPage()
+        compose.waitUntil(timeoutMillis = 5_000) { page.ring != null }
+        val ring = page.ring!!
+        page = page.add(search.id, rows = 1, columns = 4, pageRows = ring.bottom)
+        editing = RING_ID
+        val pitch = with(compose.density) { (compose.onNodeWithTag(WidgetTags.RING).getUnclippedBoundsInRoot().height + gap).toPx() / ring.rows }
+
+        compose.onNodeWithTag(WidgetTags.EDIT).performClick()
+        compose.onNodeWithTag(WidgetTags.EDIT).performTouchInput {
+            down(center)
+            repeat(ring.row * 4) { moveBy(Offset(0f, -pitch / 4)) }
+            moveBy(Offset(0f, -pitch / 4))
+            up()
+        }
+
+        compose.runOnIdle {
+            assertEquals(0, ringTaps)
+            assertEquals(0, page.ring?.row)
+            assertEquals(search.copy(row = ring.rows), page.widgets.single { it.id == search.id })
+            assertEquals("it stays edited", RING_ID, editing)
+        }
     }
 }

@@ -12,6 +12,9 @@ const val WIDGET_ROW_HEIGHT_DP = 80
 /** The space between two cells of the widget page, in dp, which a widget spanning both covers too. */
 const val WIDGET_GAP_DP = 8
 
+/** The id the ring of a ring page goes by among the widgets it holds: one the system never gives a widget. */
+const val RING_ID = 0
+
 /**
  * A widget on the page: the id the system knows it by, the row and column of its top-left cell, and the rows and
  * columns it spans.
@@ -25,23 +28,32 @@ data class HostedWidget(val id: Int, val row: Int, val column: Int, val rows: In
 }
 
 /**
- * The widgets on the widget page, each in cells of its own, top to bottom and then left to right. Cells no widget takes
- * stay empty, so a widget keeps its place when another leaves or moves.
+ * The widgets on a page, each in cells of its own, top to bottom and then left to right. Cells no widget takes stay
+ * empty, so a widget keeps its place when another leaves or moves. On a ring page the ring takes cells too, across the
+ * page, as [RING_ID].
  */
 data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
-    val isEmpty: Boolean get() = widgets.isEmpty()
+    val isEmpty: Boolean get() = ids.isEmpty()
 
-    val ids: Set<Int> get() = widgets.mapTo(mutableSetOf()) { it.id }
+    /** The ids of the widgets the system hosts, the ring's left out. */
+    val ids: Set<Int> get() = widgets.mapNotNullTo(mutableSetOf()) { it.id.takeIf { id -> id != RING_ID } }
+
+    val ring: HostedWidget? get() = widgets.find { it.id == RING_ID }
 
     /** The rows down to the bottom of the lowest widget. */
     val rows: Int get() = widgets.maxOfOrNull { it.bottom } ?: 0
 
-    /** The page with the widget [id] in the first free cells, from the top and then the left, that hold [rows] by [columns]. */
-    fun add(id: Int, rows: Int, columns: Int): WidgetPage {
+    /**
+     * The page with the widget [id] in the first free cells, from the top and then the left, that hold [rows] by
+     * [columns], within the first [pageRows] rows; unchanged when there are none.
+     */
+    fun add(id: Int, rows: Int, columns: Int, pageRows: Int = Int.MAX_VALUE): WidgetPage {
         val width = columns.coerceIn(1, WIDGET_COLUMNS)
+        val height = rows.coerceAtLeast(1)
         val spot = generateSequence(0) { it + 1 }
-            .flatMap { row -> (0..WIDGET_COLUMNS - width).asSequence().map { HostedWidget(id, row, it, rows.coerceAtLeast(1), width) } }
-            .first { new -> widgets.none(new::overlaps) }
+            .takeWhile { it <= pageRows - height }
+            .flatMap { row -> (0..WIDGET_COLUMNS - width).asSequence().map { HostedWidget(id, row, it, height, width) } }
+            .firstOrNull { new -> widgets.none(new::overlaps) } ?: return this
         return WidgetPage((widgets + spot).sortedWith(PLACE))
     }
 
@@ -64,6 +76,49 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
     private fun change(id: Int, change: (HostedWidget) -> HostedWidget): WidgetPage {
         val changed = widgets.find { it.id == id }?.let(change) ?: return this
         return WidgetPage(listOf(changed) + widgets.filter { it.id != id }).settled()
+    }
+
+    /**
+     * On a page of [pageRows] rows that never lengthens, the widget [id] with its top-left cell at [row] and [column], or
+     * as near as the page's edges let it. The widgets it now covers make way as in a list: up into the room it left when
+     * it went down, otherwise down, or the other way where there is no room. Null when one of them fits nowhere.
+     */
+    fun moveWithin(id: Int, row: Int, column: Int, pageRows: Int): WidgetPage? = changeWithin(id, pageRows) {
+        it.copy(row = row.coerceIn(0, maxOf(pageRows - it.rows, 0)), column = column.coerceIn(0, WIDGET_COLUMNS - it.columns))
+    }
+
+    /** As [resize], on a page of [pageRows] rows that never lengthens, the widgets in the way making way as in [moveWithin]. */
+    fun resizeWithin(id: Int, rows: Int, columns: Int, pageRows: Int): WidgetPage? = changeWithin(id, pageRows) {
+        it.copy(rows = rows.coerceIn(1, maxOf(pageRows - it.row, 1)), columns = columns.coerceIn(1, WIDGET_COLUMNS - it.column))
+    }
+
+    /**
+     * The page with the ring across it, [rows] tall, where it was or else in the middle of the [pageRows] rows, the
+     * widgets in its way making way as in [moveWithin]. Where one fits nowhere, as when the screen has fewer rows than
+     * it had, they move down out of its way, past the page's last row.
+     */
+    fun withRing(rows: Int, pageRows: Int): WidgetPage {
+        val ring = ring?.copy(rows = rows) ?: HostedWidget(RING_ID, (pageRows - rows) / 2, 0, rows, WIDGET_COLUMNS)
+        val ringed = WidgetPage(listOf(ring) + widgets.filter { it.id != RING_ID })
+        return ringed.moveWithin(RING_ID, ring.row, 0, pageRows) ?: ringed.settled()
+    }
+
+    private fun changeWithin(id: Int, pageRows: Int, change: (HostedWidget) -> HostedWidget): WidgetPage? {
+        val before = widgets.find { it.id == id } ?: return this
+        val after = change(before)
+        if (after.bottom > pageRows) return null
+        val (inWay, clear) = widgets.filter { it.id != id }.partition(after::overlaps)
+        val placed = (clear + after).toMutableList()
+        val upFirst = after.row > before.row
+        // Nearest the moved one first, so those that make way keep their order.
+        inWay.sortedBy { if (upFirst) -it.row else it.row }.forEach { widget ->
+            val up = (widget.row downTo 0).asSequence()
+            val down = (widget.row + 1..pageRows - widget.rows).asSequence()
+            placed += (if (upFirst) up + down else down + up)
+                .map { widget.copy(row = it) }
+                .firstOrNull { at -> at.bottom <= pageRows && placed.none(at::overlaps) } ?: return null
+        }
+        return WidgetPage(placed.sortedWith(PLACE))
     }
 
     /**
@@ -101,8 +156,9 @@ data class WidgetPages(val pages: Map<String, WidgetPage> = emptyMap()) {
     /** These pages with only the widgets of the pages in [ids]. */
     fun keepingPages(ids: Set<String>): WidgetPages = WidgetPages(pages.filterKeys { it in ids })
 
-    /** These pages with only the widgets whose ids are in [held]. */
-    fun keeping(held: Set<Int>): WidgetPages = WidgetPages(pages.mapValues { (_, page) -> WidgetPage(page.widgets.filter { it.id in held }) })
+    /** These pages with only the widgets whose ids are in [held], and their rings. */
+    fun keeping(held: Set<Int>): WidgetPages =
+        WidgetPages(pages.mapValues { (_, page) -> WidgetPage(page.widgets.filter { it.id in held || it.id == RING_ID }) })
 }
 
 /**
@@ -185,7 +241,7 @@ fun nearestCells(cells: Int, dragDp: Float, pitchDp: Float): Int = cells + (drag
 fun WidgetPage.encode(): String = widgets.joinToString(LINE) { listOf(it.id, it.row, it.column, it.rows, it.columns).joinToString(FIELD) }
 
 /**
- * A line that is not a widget in the page's columns is skipped, and so is a second line for the same id, so a damaged
+ * A line that is not a widget, or the ring, in the page's columns is skipped, and so is a second line for the same id, so a damaged
  * file loses that widget and keeps the rest; widgets that overlap move down out of each other's way. A line of just an
  * id and rows is from before widgets had places: those take the page's width at the top, so they stack down it in the
  * order they come.
@@ -195,10 +251,10 @@ fun decodeWidgetPage(text: String): WidgetPage {
         .mapNotNull { line ->
             val fields = line.split(FIELD).map { it.toIntOrNull()?.takeIf { n -> n >= 0 } ?: return@mapNotNull null }
             when (fields.size) {
-                2 -> HostedWidget(fields[0], 0, 0, fields[1], WIDGET_COLUMNS)
+                2 -> HostedWidget(fields[0], 0, 0, fields[1], WIDGET_COLUMNS).takeIf { it.id != RING_ID }
                 5 -> HostedWidget(fields[0], fields[1], fields[2], fields[3], fields[4])
                 else -> null
-            }?.takeIf { it.id > 0 && it.rows > 0 && it.columns > 0 && it.end <= WIDGET_COLUMNS }
+            }?.takeIf { it.id >= 0 && it.rows > 0 && it.columns > 0 && it.end <= WIDGET_COLUMNS }
         }
         .distinctBy { it.id }
     return WidgetPage(widgets.sortedWith(WidgetPage.PLACE)).settled()

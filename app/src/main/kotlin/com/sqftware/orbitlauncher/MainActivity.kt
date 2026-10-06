@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
                 remove = widgetHost::remove,
                 resize = widgetHost::resize,
                 move = widgetHost::move,
+                arrange = { widgetHost.arrange(page, it) },
                 sizing = widgetHost::sizing,
             )
         }

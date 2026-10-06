@@ -185,6 +185,7 @@ class LauncherScreenTest {
             remove = {},
             resize = { _, _, _ -> },
             move = { _, _, _ -> },
+            arrange = {},
             sizing = { WidgetSizing() },
         )
     }
