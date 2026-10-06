@@ -27,6 +27,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesAppNamesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeOnReturnStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
         val drawerStyleStore = SharedPreferencesDrawerStyleStore(this)
         val ambientMotionStore = SharedPreferencesAmbientMotionStore(this)
         val appNamesStore = SharedPreferencesAppNamesStore(this)
+        val homeOnReturnStore = SharedPreferencesHomeOnReturnStore(this)
         val ringer = SystemRinger(this)
         val appUpdates = PlayAppUpdates(this)
         val updateCheckStore = SharedPreferencesUpdateCheckStore(this)
@@ -171,6 +173,7 @@ class MainActivity : ComponentActivity() {
                 var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
+                var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
                 val clock by produceState(remember { wallClock.face(twentyFourHour) }, twentyFourHour) {
@@ -320,6 +323,11 @@ class MainActivity : ComponentActivity() {
                     onAppNamesChange = {
                         appNames = it
                         appNamesStore.save(it)
+                    },
+                    homeOnReturn = homeOnReturn,
+                    onHomeOnReturnChange = {
+                        homeOnReturn = it
+                        homeOnReturnStore.save(it)
                     },
                     drawerStyle = drawerStyle,
                     onDrawerStyleChange = {

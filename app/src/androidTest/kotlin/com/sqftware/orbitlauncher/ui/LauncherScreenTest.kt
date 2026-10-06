@@ -55,6 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.toOffset
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppCategory
@@ -148,6 +152,7 @@ class LauncherScreenTest {
         }
     private var ambientMotion by mutableStateOf(true)
     private var appNames by mutableStateOf(false)
+    private var homeOnReturn by mutableStateOf(false)
     private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
@@ -223,12 +228,17 @@ class LauncherScreenTest {
         uninstall = uninstalled::add,
     )
 
+    // The screen's own, so a test can take the launcher out of sight and back without the activity.
+    private val sight = object : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry.createUnsafe(this).apply { currentState = Lifecycle.State.RESUMED }
+    }
+
     private fun show(modifier: Modifier = Modifier, restoration: StateRestorationTester? = null) {
         if (restoration != null) restoration.setContent { Screen(modifier) } else compose.setContent { Screen(modifier) }
     }
 
     @Composable
-    private fun Screen(modifier: Modifier) = CompositionLocalProvider(LocalThemeArt provides art) {
+    private fun Screen(modifier: Modifier) = CompositionLocalProvider(LocalThemeArt provides art, LocalLifecycleOwner provides sight) {
         val shown = layout
         pager = rememberPagerState(shown.homeIndex) { shown.pages.size }
         LauncherScreen(
@@ -264,6 +274,8 @@ class LauncherScreenTest {
             onAmbientMotionChange = { ambientMotion = it },
             appNames = appNames,
             onAppNamesChange = { appNames = it },
+            homeOnReturn = homeOnReturn,
+            onHomeOnReturnChange = { homeOnReturn = it },
             drawerStyle = drawerStyle,
             onDrawerStyleChange = { drawerStyle = it },
             onOpenClock = { opened += "clock" },
@@ -307,6 +319,12 @@ class LauncherScreenTest {
             !refused
         }
         assertTrue(pinRequests.tryEmit(request))
+    }
+
+    /** Takes the launcher out of sight, as the screen going off or an app opening does, and brings it back. */
+    private fun leaveAndReturn() {
+        compose.runOnIdle { sight.lifecycle.currentState = Lifecycle.State.CREATED }
+        compose.runOnIdle { sight.lifecycle.currentState = Lifecycle.State.RESUMED }
     }
 
     private fun assertSettledOn(page: LauncherPage) {
@@ -1982,6 +2000,51 @@ class LauncherScreenTest {
         nameOn(mail).assertExists()
         compose.onNodeWithTag(HomeRingTags.folder(1)).performClick()
         nameOn(clock).assertExists()
+    }
+
+    @Test
+    fun theLauncherMenusOpenOnHomeRowFlipsWhetherTheLauncherComesBackOnTheHomePage() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Open on home page").assertIsOff().performClick()
+
+        compose.runOnIdle { assertTrue(homeOnReturn) }
+    }
+
+    @Test
+    fun theLauncherComesBackOnThePageLeftUnlessSetToOpenOnTheHomePage() {
+        show()
+        goToCollections()
+
+        leaveAndReturn()
+        assertSettledOn(LauncherPage.Collections)
+
+        homeOnReturn = true
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(true)
+        // Before the activity saves its state, which follows the stop at once.
+        compose.runOnIdle {
+            sight.lifecycle.currentState = Lifecycle.State.CREATED
+            assertEquals(layout.homeIndex, pager.currentPage)
+        }
+        compose.runOnIdle { sight.lifecycle.currentState = Lifecycle.State.RESUMED }
+        assertSettledOn(LauncherPage.Home)
+        assertDrawerOpen(false)
+    }
+
+    @Test
+    fun anErrandOfTheLaunchersOwnComesBackToItsPageOnceEvenWhenSetToOpenOnTheHomePage() {
+        homeOnReturn = true
+        collections = CollectionsPage()
+        show()
+        goToCollections()
+
+        compose.onNodeWithText("Permission Required").performClick()
+        leaveAndReturn()
+        assertSettledOn(LauncherPage.Collections)
+
+        leaveAndReturn()
+        assertSettledOn(LauncherPage.Home)
     }
 
     @Test
