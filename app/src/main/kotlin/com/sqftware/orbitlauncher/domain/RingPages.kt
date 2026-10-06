@@ -11,6 +11,15 @@ data class RingPages(val rings: Map<String, Ring> = emptyMap(), val dock: Ring =
     /** These pages with [page]'s ring and the dock as [home] has them. */
     fun with(page: String, home: HomeApps): RingPages = RingPages(rings + (page to home.ring), home.dock)
 
+    /**
+     * Moves [app] off [place] on ring page [from] to the end of [to] on ring page [onto], where it is once. A folder it
+     * leaves showing none of the [shown] apps goes.
+     */
+    fun move(app: AppEntry, from: String, place: HomePlace, onto: String, to: HomePlace, shown: Set<String>): RingPages {
+        val left = with(from, on(from).remove(place, app, shown))
+        return left.with(onto, left.on(onto).add(to, app))
+    }
+
     /** These pages with only the rings of the pages in [ids]. */
     fun keepingPages(ids: Set<String>): RingPages = copy(rings = rings.filterKeys { it in ids })
 

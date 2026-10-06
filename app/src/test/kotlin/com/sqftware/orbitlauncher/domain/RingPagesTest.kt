@@ -20,6 +20,18 @@ class RingPagesTest {
     }
 
     @Test
+    fun `an app moved to another page leaves its place, a folder it empties too, and is on the new page once`() {
+        val pages = RingPages(rings = mapOf(HOME to Ring(listOf(RingSlot.App(clock.key), folder(mail))), OTHER to ringOf(mail)))
+        val shown = setOf(clock.key, mail.key)
+
+        val moved = pages.move(mail, HOME, HomePlace.Folder(HomePlace.Ring, 1), OTHER, HomePlace.Ring, shown)
+            .move(clock, HOME, HomePlace.Ring, OTHER, HomePlace.Dock, shown)
+
+        assertEquals(HomeApps(dock = ringOf(clock)), moved.on(HOME))
+        assertEquals(HomeApps(ring = ringOf(mail), dock = ringOf(clock)), moved.on(OTHER))
+    }
+
+    @Test
     fun `a page's folders get planets apart from the home page's, which share theirs with the dock`() {
         val pages = RingPages(rings = mapOf(HOME to Ring(listOf(folder(clock))), OTHER to Ring(listOf(folder(maps)))), dock = Ring(listOf(folder(mail))))
 
