@@ -5,11 +5,11 @@ sealed interface PageContents {
     val isEmpty: Boolean
 
     /**
-     * A ring page's [slots], which hold its [apps], those in its [folders] included. The home page's count the dock too,
-     * which has [dock] slots of its own.
+     * A ring page's [slots], which hold its [apps], those in its [folders] included, and the [widgets] round its ring. The
+     * home page's count the dock too, which has [dock] slots of its own.
      */
-    data class Ring(val slots: Int, val apps: Int, val folders: Int, val dock: Int = 0) : PageContents {
-        override val isEmpty: Boolean get() = slots == 0 && dock == 0
+    data class Ring(val slots: Int, val apps: Int, val folders: Int, val dock: Int = 0, val widgets: Int = 0) : PageContents {
+        override val isEmpty: Boolean get() = slots == 0 && dock == 0 && widgets == 0
     }
 
     data class Cards(val cards: Int) : PageContents {
@@ -30,6 +30,7 @@ fun contentsOf(page: LauncherPage, rings: RingPages, collections: CollectionPage
             apps = held.keys.size,
             folders = (held.ring.slots + held.dock.slots).count { it is RingSlot.Folder },
             dock = held.dock.slots.size,
+            widgets = widgets[page.id].widgets.count { it.id != RING_ID },
         )
     }
     PageKind.Collections -> PageContents.Cards(collections.on(page.id).cards.size)

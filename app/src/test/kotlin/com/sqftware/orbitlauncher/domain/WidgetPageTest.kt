@@ -10,10 +10,10 @@ class WidgetPageTest {
 
     @Test
     fun `a new widget takes the first free cells from the top and then the left`() {
-        assertEquals(clock.copy(id = 20, column = 2), page.add(20, rows = 1, columns = 2).widgets[1])
-        assertEquals(HostedWidget(20, row = 1, column = 0, rows = 1, columns = 4), page.add(20, rows = 1, columns = 4).widgets[1])
-        assertEquals(HostedWidget(20, row = 5, column = 0, rows = 2, columns = 4), page.add(20, rows = 2, columns = 4).widgets.last())
-        assertEquals(HostedWidget(20, row = 0, column = 0, rows = 1, columns = 4), WidgetPage().add(20, rows = 0, columns = 9).widgets.single())
+        assertEquals(clock.copy(id = 20, column = 2), page.add(20, rows = 1, columns = 2, pageRows = 1).widgets[1])
+        assertEquals(HostedWidget(20, row = 1, column = 0, rows = 1, columns = 4), page.add(20, rows = 1, columns = 4, pageRows = 1).widgets[1])
+        assertEquals(HostedWidget(20, row = 5, column = 0, rows = 2, columns = 4), page.add(20, rows = 2, columns = 4, pageRows = 1).widgets.last())
+        assertEquals(HostedWidget(20, row = 0, column = 0, rows = 1, columns = 4), WidgetPage().add(20, rows = 0, columns = 9, pageRows = 1).widgets.single())
     }
 
     @Test
@@ -186,5 +186,65 @@ class WidgetPageTest {
         assertEquals(pages["widgets-2"], moved["widgets-2"])
         assertEquals(pages, pages.changeHolding(99) { remove(99) })
         assertEquals(setOf(notes.id), pages.keeping(setOf(notes.id)).ids)
+    }
+
+    // Eight rows: one widget above a ring five tall, two below.
+    private val ring = HostedWidget(RING_ID, row = 1, column = 0, rows = 5, columns = WIDGET_COLUMNS)
+    private val above = HostedWidget(7, row = 0, column = 0, rows = 1, columns = 4)
+    private val first = HostedWidget(8, row = 6, column = 0, rows = 1, columns = 4)
+    private val second = HostedWidget(9, row = 7, column = 0, rows = 1, columns = 2)
+    private val ringPage = WidgetPage(listOf(above, ring, first, second))
+
+    @Test
+    fun `the ring is not a widget the system hosts, and stays with its page`() {
+        assertEquals(setOf(7, 8, 9), ringPage.ids)
+        assertEquals(ring, ringPage.ring)
+        assertEquals(true, WidgetPage(listOf(ring)).isEmpty)
+        assertEquals(ringPage, decodeWidgetPage(ringPage.encode()))
+        assertEquals(listOf(ring), WidgetPages(mapOf("ring" to ringPage)).keeping(emptySet())["ring"].widgets)
+    }
+
+    @Test
+    fun `a ring goes in the middle of the page and keeps its row after`() {
+        assertEquals(listOf(ring.copy(row = 2, rows = 4)), WidgetPage().withRing(rows = 4, pageRows = 8).widgets)
+        assertEquals(ringPage, ringPage.withRing(rows = 5, pageRows = 8))
+    }
+
+    @Test
+    fun `a ring that grows moves the widgets below it out of its way, past the last row if they fit nowhere`() {
+        assertEquals(listOf(above, ring.copy(rows = 6), first.copy(row = 7), second.copy(row = 8)), ringPage.withRing(rows = 6, pageRows = 8).widgets)
+        assertEquals(
+            listOf(ring.copy(rows = 6), first.copy(row = 7)),
+            WidgetPage(listOf(ring, first)).withRing(rows = 6, pageRows = 8).widgets,
+        )
+    }
+
+    @Test
+    fun `the ring moved down past widgets lets them up into the room it left, in their order`() {
+        assertEquals(
+            listOf(above, first.copy(row = 1), second.copy(row = 2), ring.copy(row = 3)),
+            ringPage.moveWithin(RING_ID, row = 3, column = 2, pageRows = 8)?.widgets,
+        )
+    }
+
+    @Test
+    fun `the ring moved up over a widget sends it down`() {
+        val page = WidgetPage(listOf(above, ring))
+
+        assertEquals(listOf(ring.copy(row = 0), above.copy(row = 5)), page.moveWithin(RING_ID, row = 0, column = 0, pageRows = 8)?.widgets)
+    }
+
+    @Test
+    fun `a move or resize on a page that never lengthens stops at its last row, or cannot be made`() {
+        assertEquals(second.copy(column = 2), ringPage.moveWithin(9, row = 12, column = 2, pageRows = 8)?.widgets?.last())
+        assertEquals(null, ringPage.moveWithin(7, row = 3, column = 0, pageRows = 8))
+        assertEquals(null, ringPage.resizeWithin(8, rows = 2, columns = 4, pageRows = 8))
+        assertEquals(second.copy(columns = 4, rows = 1), ringPage.resizeWithin(9, rows = 3, columns = 4, pageRows = 8)?.widgets?.last())
+    }
+
+    @Test
+    fun `a widget added to a page that never lengthens takes free cells within it, or is not added`() {
+        assertEquals(HostedWidget(20, row = 7, column = 2, rows = 1, columns = 2), ringPage.add(20, rows = 1, columns = 2, pageRows = 8).widgets.last())
+        assertEquals(ringPage, ringPage.add(20, rows = 2, columns = 2, pageRows = 8))
     }
 }

@@ -188,8 +188,7 @@ class LauncherScreenTest {
                 widgetPagesAddedTo += page
             },
             remove = {},
-            resize = { _, _, _ -> },
-            move = { _, _, _ -> },
+            arrange = {},
             sizing = { WidgetSizing() },
         )
     }

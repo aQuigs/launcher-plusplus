@@ -95,6 +95,7 @@ import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Landing
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
+import com.sqftware.orbitlauncher.domain.RING_ID
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
@@ -117,6 +118,9 @@ import java.io.Serializable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -571,8 +575,12 @@ fun LauncherScreen(
     // the page. So whatever does not count is let go, as the mode ends when the page goes out of view.
     var editingWidget by remember { mutableStateOf<Int?>(null) }
     val shownPage = layout.pageAt(pagerState.currentPage)
-    val editedWidget = editingWidget?.takeIf { id -> shownPage.kind == PageKind.Widgets && widgetPages[shownPage.id].widgets.any { it.id == id } }
+    val editedWidget = editingWidget?.takeIf { id -> widgetPages[shownPage.id].widgets.any { it.id == id } }
     LaunchedEffect(editingWidget, editedWidget) { if (editedWidget == null) editingWidget = null }
+    // Every ring page but home holds a ring, so the page another is swiped to would otherwise take its ring's edit mode.
+    LaunchedEffect(shownPage.id) { editingWidget = null }
+    // A ring page's grid alone knows the cells a widget asked for there would take, so the menu asks it by page id.
+    val widgetAdds = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
 
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
@@ -874,10 +882,13 @@ fun LauncherScreen(
             onOpen = { at -> openMenuUnlessDragging { openMenu = OpenMenu.Launcher(at) } },
             content = { origin ->
                 (openMenu as? OpenMenu.Launcher)?.let { shown ->
+                    val widgetsPage = latestRingPage.takeIf { it != LauncherPage.Home }
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
                         at = { shown.at - origin() },
                         rows = listOfNotNull(
+                            widgetsPage?.let { LauncherMenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
+                            widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
                             LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
@@ -1177,9 +1188,59 @@ fun LauncherScreen(
                                         Box(Modifier.weight(1f)) {
                                             // First, so it lies behind the clock, the ring and the card and gets only the touches they
                                             // leave. A tap anywhere there closes an open folder, not only one on the ring's centre.
-                                            EmptySpace(menu = launcherMenu.takeIf { active }, onTap = { if (active) openFolder = null })
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                if (isHome) {
+                                            EmptySpace(
+                                                menu = launcherMenu.takeIf { active },
+                                                onTap = {
+                                                    if (active) openFolder = null
+                                                    editingWidget = null
+                                                },
+                                            )
+                                            val pageRingView: @Composable (Modifier) -> Unit = { ringModifier ->
+                                                HomeRing(
+                                                    ring = pageRing,
+                                                    // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
+                                                    // theirs is there, so neither the hint nor the mark flashes while they load.
+                                                    // A home with nothing stored is known before the first frame, so its offer never flashes.
+                                                    hint = when {
+                                                        isHome && pageApps.isEmpty -> AUTO_SET_UP
+                                                        pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
+                                                        else -> null
+                                                    },
+                                                    icon = actions.icon,
+                                                    onLaunch = actions.launch,
+                                                    onOpenFolder = { if (active) tapFolder(page.id, it.at) },
+                                                    onCloseFolder = { if (active) openFolder = null },
+                                                    onEdit = {
+                                                        when {
+                                                            !active -> Unit
+                                                            isHome && pageApps.isEmpty -> onSetUpHome()
+                                                            else -> pickFor(HomePlace.Ring)
+                                                        }
+                                                    },
+                                                    modifier = ringModifier.dropZone(page) { copy(ring = it) },
+                                                    highlighted = active && dropPlace == HomePlace.Ring,
+                                                    openFolder = open.takeIf { active },
+                                                    // Not mid-drag: a second finger would open the drawer over the app still held.
+                                                    onAddToFolder = if (active && dragged == null) ({ open?.let { pickFor(it.at) } }) else null,
+                                                    menu = ringMenu.takeIf { active },
+                                                    folderMenu = folderMenu.takeIf { active },
+                                                    folderAppMenu = folderAppMenu.takeIf { active },
+                                                    onEmblemLongPress = launcherMenu.onOpen.takeIf { active },
+                                                    unread = unread,
+                                                    onClearBadge = actions.clearBadge,
+                                                    rearrange = (if (open != null) folderRearrange else ringRearrange).takeIf { active },
+                                                    foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Ring }?.index,
+                                                    held = (dragged as? Drag.OutOfFolder)?.app.takeIf { active },
+                                                    inSight = active && ringInSight,
+                                                    turns = active && ambient,
+                                                    names = appNames,
+                                                    minuteOfDay = { latestMinuteOfDay },
+                                                    dock = pageDock,
+                                                    dockSlot = { dockRearrange.boundsOf(it, dock) },
+                                                )
+                                            }
+                                            if (isHome) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                     ClockOrThemePreview(
                                                         bar = if (previewing) ({
                                                             ThemePreviewBar(
@@ -1210,61 +1271,29 @@ fun LauncherScreen(
                                                             }
                                                         }
                                                     }
+                                                    pageRingView(Modifier.weight(1f))
+                                                    // The emblem offers the automatic setup, so picking by hand, which it offers otherwise, moves here.
+                                                    if (pageApps.isEmpty) {
+                                                        SetUpChoice(onPickApps = { pickFor(HomePlace.Ring) }, modifier = Modifier.padding(top = 8.dp))
+                                                    }
+                                                    // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
+                                                    // Under the ring, which sizes itself to the room left, so the two can never overlap.
+                                                    if (!isHomeApp) {
+                                                        HomeAppCard(
+                                                            onBecomeHomeApp = onBecomeHomeApp,
+                                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                                        )
+                                                    }
                                                 }
-                                                HomeRing(
-                                                    ring = pageRing,
-                                                    // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
-                                                    // theirs is there, so neither the hint nor the mark flashes while they load.
-                                                    // A home with nothing stored is known before the first frame, so its offer never flashes.
-                                                    hint = when {
-                                                        isHome && pageApps.isEmpty -> AUTO_SET_UP
-                                                        pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
-                                                        else -> null
-                                                    },
-                                                    icon = actions.icon,
-                                                    onLaunch = actions.launch,
-                                                    onOpenFolder = { if (active) tapFolder(page.id, it.at) },
-                                                    onCloseFolder = { if (active) openFolder = null },
-                                                    onEdit = {
-                                                        when {
-                                                            !active -> Unit
-                                                            isHome && pageApps.isEmpty -> onSetUpHome()
-                                                            else -> pickFor(HomePlace.Ring)
-                                                        }
-                                                    },
-                                                    modifier = Modifier.weight(1f).dropZone(page) { copy(ring = it) },
-                                                    highlighted = active && dropPlace == HomePlace.Ring,
-                                                    openFolder = open.takeIf { active },
-                                                    // Not mid-drag: a second finger would open the drawer over the app still held.
-                                                    onAddToFolder = if (active && dragged == null) ({ open?.let { pickFor(it.at) } }) else null,
-                                                    menu = ringMenu.takeIf { active },
-                                                    folderMenu = folderMenu.takeIf { active },
-                                                    folderAppMenu = folderAppMenu.takeIf { active },
-                                                    onEmblemLongPress = launcherMenu.onOpen.takeIf { active },
-                                                    unread = unread,
-                                                    onClearBadge = actions.clearBadge,
-                                                    rearrange = (if (open != null) folderRearrange else ringRearrange).takeIf { active },
-                                                    foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Ring }?.index,
-                                                    held = (dragged as? Drag.OutOfFolder)?.app.takeIf { active },
-                                                    inSight = active && ringInSight,
-                                                    turns = active && ambient,
-                                                    names = appNames,
-                                                    minuteOfDay = { latestMinuteOfDay },
-                                                    dock = pageDock,
-                                                    dockSlot = { dockRearrange.boundsOf(it, dock) },
+                                            } else {
+                                                WidgetGrid(
+                                                    page = widgetPages[page.id],
+                                                    actions = remember(widgets, page) { widgets(page.id) },
+                                                    editing = editedWidget,
+                                                    onEditingChange = { editingWidget = it },
+                                                    ring = pageRingView,
+                                                    addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
                                                 )
-                                                // The emblem offers the automatic setup, so picking by hand, which it offers otherwise, moves here.
-                                                if (isHome && pageApps.isEmpty) {
-                                                    SetUpChoice(onPickApps = { pickFor(HomePlace.Ring) }, modifier = Modifier.padding(top = 8.dp))
-                                                }
-                                                // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
-                                                // Under the ring, which sizes itself to the room left, so the two can never overlap.
-                                                if (isHome && !isHomeApp) {
-                                                    HomeAppCard(
-                                                        onBecomeHomeApp = onBecomeHomeApp,
-                                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                                                    )
-                                                }
                                             }
                                         }
                                         // Only on the home page, as in Arc, so it slides away with the page and the others reach down

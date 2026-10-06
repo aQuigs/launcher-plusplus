@@ -121,8 +121,7 @@ class MainActivity : ComponentActivity() {
                 view = widgetHost::view,
                 add = { pageRows, columnWidthDp, rowHeightDp -> widgetHost.add(page, pageRows, columnWidthDp, rowHeightDp) },
                 remove = widgetHost::remove,
-                resize = widgetHost::resize,
-                move = widgetHost::move,
+                arrange = { widgetHost.arrange(page, it) },
                 sizing = widgetHost::sizing,
             )
         }
