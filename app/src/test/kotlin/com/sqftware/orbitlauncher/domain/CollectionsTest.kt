@@ -24,6 +24,20 @@ class CollectionsTest {
     }
 
     @Test
+    fun `a hand-picked card takes an app it lacks, but no built-in card and no pinned shortcut`() {
+        val page = CollectionsPage().add(tools, Favourites(listOf(clock.key)))
+        val shortcut = AppEntry("Inbox", "com.google.android.gm", "", kind = EntryKind.Shortcut("inbox"))
+
+        assertTrue(page.takes(tools, mail))
+        assertFalse(page.takes(tools, clock))
+        assertFalse(page.takes(tools, shortcut))
+        assertFalse(page.takes(NewApps, mail))
+        assertFalse(page.takes(photos, mail))
+        assertTrue(page.takesAnywhere(mail))
+        assertFalse(page.takesAnywhere(clock))
+    }
+
+    @Test
     fun `a card joins at the bottom once and leaves with its apps`() {
         val page = CollectionsPage().add(tools, Favourites(listOf(clock.key)))
 

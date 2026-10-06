@@ -24,13 +24,3 @@ data class DropZones(val ring: Bounds? = null, val dock: Bounds? = null) {
         else -> null
     }
 }
-
-/**
- * Which way an item dragged to [x] across a page [width] wide turns the pages, left to right: left (-1) within [edge] of
- * the left side, right (1) within it of the right side, else not at all (0).
- */
-fun pageTurnAt(x: Float, width: Float, edge: Float): Int = when {
-    x < edge -> -1
-    x > width - edge -> 1
-    else -> 0
-}

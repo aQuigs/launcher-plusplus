@@ -189,7 +189,9 @@ class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
 class CardDrops {
     private val placed = mutableMapOf<CollectionKind.HandPicked, LayoutCoordinates>()
 
+    // A card gone from the page leaves coordinates no longer attached, so they go as the next card is placed.
     internal fun place(kind: CollectionKind.HandPicked, coordinates: LayoutCoordinates) {
+        placed.values.removeAll { !it.isAttached }
         placed[kind] = coordinates
     }
 
@@ -294,7 +296,7 @@ fun CollectionsColumn(
                         onMove = onMove,
                         onEdit = handPicked?.let { { onEdit(it) } },
                         rearrange = handPicked?.let(rearrange),
-                        drag = drag.takeIf { handPicked == null },
+                        drag = drag,
                         menu = menu(card.kind),
                         onOpenUsageSettings = onOpenUsageSettings,
                         unread = unread,

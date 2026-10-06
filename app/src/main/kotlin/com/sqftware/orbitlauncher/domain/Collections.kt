@@ -188,6 +188,13 @@ data class CollectionsPage(
     /** Drops the card of [kind], and the apps it kept with it. */
     fun remove(kind: CollectionKind): CollectionsPage = copy(cards = cards.filterNot { it.kind == kind })
 
+    /** Whether the card of [kind] takes [app] dropped on it: a hand-picked one lacking it, unless it is a pinned shortcut, which cards do not list. */
+    fun takes(kind: CollectionKind, app: AppEntry): Boolean =
+        kind is CollectionKind.HandPicked && app.kind !is EntryKind.Shortcut && card(kind)?.apps?.contains(app) == false
+
+    /** Whether any card [takes] [app]. */
+    fun takesAnywhere(app: AppEntry): Boolean = cards.any { takes(it.kind, app) }
+
     /** Adds [app] at the end of the card of [kind], unless it is already there or there is no such card. */
     fun addApp(kind: CollectionKind, app: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.add(app)) }
 
