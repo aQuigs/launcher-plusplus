@@ -50,8 +50,8 @@ object LauncherMenuTags {
 }
 
 /**
- * The launcher's own long-press menu, opened at a spot in root coordinates (where a page's empty space was pressed, or the
- * ring's emblem) and shown there. The empty space hosts its [content], handing it the host's origin in root coordinates.
+ * The launcher's own long-press menu, opened at a spot in root coordinates (where a page's empty space was pressed) and
+ * shown there. The empty space hosts its [content], handing it the host's origin in root coordinates.
  */
 class LauncherMenu(val onOpen: (Offset) -> Unit, val content: @Composable (origin: () -> Offset) -> Unit)
 

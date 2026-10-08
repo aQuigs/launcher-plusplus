@@ -162,7 +162,7 @@ data class HomePress(val launcherInFront: Boolean)
  * The whole launcher: a horizontal pager over [layout] and the app drawer peeking below as a chevron. Each page shows
  * what [ringPages], [collectionPages] or [widgetPages] hold for its id. The home page shows the [clock] over its ring,
  * with the dock at its foot; another ring page shows its ring alone: the time and the date open the clock app
- * and the calendar, and the emblem opens the drawer to pick the apps on the ring or in the dock. Under the date, a tap on
+ * and the calendar, and a tap on the emblem opens the drawer to search, a long press to pick the apps on the ring or in the dock. Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
  * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, the emblem offers to
  * fill them with a guess ([onSetUpHome]), and a link under the ring to pick them by hand. Until [isHomeApp],
@@ -177,7 +177,7 @@ data class HomePress(val launcherInFront: Boolean)
  * [widgets] for its id; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
  * out of view. A collections page shows its cards, the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
- * pencil opens the drawer to pick its apps, as the ring's emblem does, and the button under the cards opens the picker that
+ * pencil opens the drawer to pick its apps, as a long press on the ring's emblem does, and the button under the cards opens the picker that
  * adds and removes cards, whose last tile opens a dialog naming a new custom collection. An app on a card opens its menu at
  * a long press, as anywhere else; lifted off a hand-picked card, dropping it on the bin takes it off the card. A long
  * press that moves on picks up an app or a folder on the ring, an app in the open folder, the dock or a hand-picked
