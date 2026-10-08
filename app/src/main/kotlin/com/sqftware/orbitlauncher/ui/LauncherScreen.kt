@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -599,10 +600,16 @@ fun LauncherScreen(
 
     // A search left over from the drawer, or the menu was opened from, would hide the other apps: the drawer may be
     // reopened before it settles closed, which is what ends a search.
-    fun pick(pick: DrawerPick) {
+    fun pick(pick: DrawerPick?) {
         picking = pick
         query = ""
         openDrawer()
+    }
+
+    val searchFocus = remember { FocusRequester() }
+    fun search() {
+        pick(null)
+        searchFocus.requestFocus()
     }
 
     fun pickFor(place: HomePlace) = pick(DrawerPick.Apps(place))
@@ -1092,6 +1099,7 @@ fun LauncherScreen(
                             drag = dragFromDrawer,
                             query = query,
                             onQueryChange = { query = it },
+                            searchFocus = searchFocus,
                             unread = unread,
                             onClearBadge = actions.clearBadge,
                             controls = DrawerControls(
@@ -1217,6 +1225,7 @@ fun LauncherScreen(
                                                             else -> pickFor(HomePlace.Ring)
                                                         }
                                                     },
+                                                    onSearch = { if (active) search() },
                                                     modifier = ringModifier.dropZone(page) { copy(ring = it) },
                                                     highlighted = active && dropPlace == HomePlace.Ring,
                                                     openFolder = open.takeIf { active },
@@ -1225,7 +1234,6 @@ fun LauncherScreen(
                                                     menu = ringMenu.takeIf { active },
                                                     folderMenu = folderMenu.takeIf { active },
                                                     folderAppMenu = folderAppMenu.takeIf { active },
-                                                    onEmblemLongPress = launcherMenu.onOpen.takeIf { active },
                                                     unread = unread,
                                                     onClearBadge = actions.clearBadge,
                                                     rearrange = (if (open != null) folderRearrange else ringRearrange).takeIf { active },

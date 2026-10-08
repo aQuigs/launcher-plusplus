@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -52,9 +53,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.height
-import androidx.compose.ui.unit.toOffset
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -646,7 +645,7 @@ class LauncherScreenTest {
     fun eachPlaceChecksTheAppsAlreadyThere() {
         homeApps = HomeApps(ring = ringOf(clock), dock = ringOf(mail))
         show()
-        compose.emblem().performClick()
+        compose.emblem().performTouchInput { longClick() }
         assertDrawerOpen(true)
         compose.onNodeWithText("Clock").assertIsOn()
         compose.onNodeWithText("Mail").assertIsOff()
@@ -1944,20 +1943,16 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aLongPressOnTheEmblemOpensTheLauncherMenuAtItsCentreRatherThanThePicker() {
+    fun aTapOnTheEmblemOpensTheDrawerToSearchRatherThanToPick() {
         homeApps = HomeApps(ring = ringOf(mail))
         show()
 
-        compose.emblem().performTouchInput { longClick() }
+        compose.emblem().performClick()
 
-        // On screen, since the menu is a window of its own. It may open above or below the spot, so only its span is checked.
-        val emblem = compose.emblem().fetchSemanticsNode()
-        val centre = emblem.positionOnScreen + emblem.size.center.toOffset()
-        val menu = compose.launcherMenu().fetchSemanticsNode()
-        val slack = with(compose.density) { 16.dp.toPx() }
-        assertEquals(centre.x, menu.positionOnScreen.x, slack)
-        assertTrue(centre.y in menu.positionOnScreen.y - slack..menu.positionOnScreen.y + menu.size.height + slack)
-        assertDrawerOpen(false)
+        assertDrawerOpen(true)
+        compose.searchField().assertIsFocused()
+        compose.placePicker().assertDoesNotExist()
+        compose.launcherMenu().assertDoesNotExist()
     }
 
     // Flipped twice, so a row that kept the style it first showed would ask for the same one again.
