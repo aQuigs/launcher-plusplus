@@ -896,10 +896,12 @@ fun LauncherScreen(
         onDrop = ::drop,
         onCancel = { dragged = null },
     )
-    // Onto a card of the collections page the drawer was opened over, if one takes it, else onto the ring page.
+    // Onto a card of the collections page the drawer was opened over, if one takes it, else onto the ring page. The keyboard
+    // goes too, as it would hide the dock and the lower cards, and its coming and going moves what is under the finger.
     val dragFromDrawer = remember {
         copyDrag(fromPage = false) { app ->
             closeDrawer()
+            focusManager.clearFocus()
             val onCards = latestLayout.pageAt(pagerState.settledPage).kind == PageKind.Collections && latestCollections.takesAnywhere(app)
             if (!onCards) showRingPage()
         }
