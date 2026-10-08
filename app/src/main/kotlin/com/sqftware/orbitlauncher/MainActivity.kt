@@ -3,6 +3,7 @@ package com.sqftware.orbitlauncher
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -30,6 +31,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeOnReturnStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
@@ -103,6 +105,7 @@ class MainActivity : ComponentActivity() {
         val ambientMotionStore = SharedPreferencesAmbientMotionStore(this)
         val appNamesStore = SharedPreferencesAppNamesStore(this)
         val homeOnReturnStore = SharedPreferencesHomeOnReturnStore(this)
+        val pickTipStore = SharedPreferencesPickTipStore(this)
         val ringer = SystemRinger(this)
         val appUpdates = PlayAppUpdates(this)
         val updateCheckStore = SharedPreferencesUpdateCheckStore(this)
@@ -173,6 +176,7 @@ class MainActivity : ComponentActivity() {
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
                 var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
+                var pickTip by remember { mutableStateOf(pickTipStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
                 // The clock ticks only while the launcher is visible, and each return reads it afresh.
                 val clock by produceState(remember { wallClock.face(twentyFourHour) }, twentyFourHour) {
@@ -328,6 +332,12 @@ class MainActivity : ComponentActivity() {
                         homeOnReturn = it
                         homeOnReturnStore.save(it)
                     },
+                    pickTip = pickTip,
+                    onPickTipLearned = {
+                        pickTip = false
+                        pickTipStore.save(false)
+                    },
+                    onToast = { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() },
                     drawerStyle = drawerStyle,
                     onDrawerStyleChange = {
                         drawerStyle = it

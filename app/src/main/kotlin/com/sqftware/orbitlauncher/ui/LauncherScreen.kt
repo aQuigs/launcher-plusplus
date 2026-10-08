@@ -137,6 +137,7 @@ object LauncherTags {
 private val DRAWER_PEEK = 48.dp
 
 const val AUTO_SET_UP = "Auto set up"
+const val PICK_TIP = "Long-press the centre to choose the ring's apps"
 
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
 @Composable
@@ -162,7 +163,8 @@ data class HomePress(val launcherInFront: Boolean)
  * The whole launcher: a horizontal pager over [layout] and the app drawer peeking below as a chevron. Each page shows
  * what [ringPages], [collectionPages] or [widgetPages] hold for its id. The home page shows the [clock] over its ring,
  * with the dock at its foot; another ring page shows its ring alone: the time and the date open the clock app
- * and the calendar, and a tap on the emblem opens the drawer to search, a long press to pick the apps on the ring or in the dock. Under the date, a tap on
+ * and the calendar, and a tap on the emblem opens the drawer to search, a long press to pick the apps on the ring or in the dock; while
+ * [pickTip], the tap also toasts ([onToast]) that a long press picks, until a long press does ([onPickTipLearned]). Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
  * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, the emblem offers to
  * fill them with a guess ([onSetUpHome]), and a link under the ring to pick them by hand. Until [isHomeApp],
@@ -246,6 +248,9 @@ fun LauncherScreen(
     onAppNamesChange: (Boolean) -> Unit,
     homeOnReturn: Boolean,
     onHomeOnReturnChange: (Boolean) -> Unit,
+    pickTip: Boolean,
+    onPickTipLearned: () -> Unit,
+    onToast: (String) -> Unit,
     drawerStyle: DrawerStyle,
     onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
@@ -1204,16 +1209,17 @@ fun LauncherScreen(
                                                 },
                                             )
                                             val pageRingView: @Composable (Modifier) -> Unit = { ringModifier ->
+                                                // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
+                                                // theirs is there, so neither the hint nor the mark flashes while they load.
+                                                // A home with nothing stored is known before the first frame, so its offer never flashes.
+                                                val hint = when {
+                                                    isHome && pageApps.isEmpty -> AUTO_SET_UP
+                                                    pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
+                                                    else -> null
+                                                }
                                                 HomeRing(
                                                     ring = pageRing,
-                                                    // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
-                                                    // theirs is there, so neither the hint nor the mark flashes while they load.
-                                                    // A home with nothing stored is known before the first frame, so its offer never flashes.
-                                                    hint = when {
-                                                        isHome && pageApps.isEmpty -> AUTO_SET_UP
-                                                        pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
-                                                        else -> null
-                                                    },
+                                                    hint = hint,
                                                     icon = actions.icon,
                                                     onLaunch = actions.launch,
                                                     onOpenFolder = { if (active) tapFolder(page.id, it.at) },
@@ -1222,10 +1228,19 @@ fun LauncherScreen(
                                                         when {
                                                             !active -> Unit
                                                             isHome && pageApps.isEmpty -> onSetUpHome()
-                                                            else -> pickFor(HomePlace.Ring)
+                                                            else -> {
+                                                                pickFor(HomePlace.Ring)
+                                                                // Without a hint, only a long press edits; with one, the tap that picks taught nothing.
+                                                                if (hint == null && pickTip) onPickTipLearned()
+                                                            }
                                                         }
                                                     },
-                                                    onSearch = { if (active) search() },
+                                                    onSearch = {
+                                                        if (active) {
+                                                            search()
+                                                            if (pickTip) onToast(PICK_TIP)
+                                                        }
+                                                    },
                                                     modifier = ringModifier.dropZone(page) { copy(ring = it) },
                                                     highlighted = active && dropPlace == HomePlace.Ring,
                                                     openFolder = open.takeIf { active },
