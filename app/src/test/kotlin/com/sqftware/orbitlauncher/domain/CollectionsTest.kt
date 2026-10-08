@@ -24,6 +24,20 @@ class CollectionsTest {
     }
 
     @Test
+    fun `a hand-picked card takes an app it lacks, but no built-in card and no pinned shortcut`() {
+        val page = CollectionsPage().add(tools, Favourites(listOf(clock.key)))
+        val shortcut = AppEntry("Inbox", "com.google.android.gm", "", kind = EntryKind.Shortcut("inbox"))
+
+        assertTrue(page.takes(tools, mail))
+        assertFalse(page.takes(tools, clock))
+        assertFalse(page.takes(tools, shortcut))
+        assertFalse(page.takes(NewApps, mail))
+        assertFalse(page.takes(photos, mail))
+        assertTrue(page.takesAnywhere(mail))
+        assertFalse(page.takesAnywhere(clock))
+    }
+
+    @Test
     fun `a card joins at the bottom once and leaves with its apps`() {
         val page = CollectionsPage().add(tools, Favourites(listOf(clock.key)))
 
@@ -305,6 +319,19 @@ class CollectionsTest {
             listOf(CollectionCard(NewApps, expanded = true), CollectionCard(tools, Favourites(listOf("a/A"))), CollectionCard(MostUsed)),
             decodeCollectionsPage(text).cards,
         )
+    }
+
+    @Test
+    fun `an app moved between cards leaves the one it was on, on its page or another`() {
+        val pages = CollectionPages().with("collections", CollectionsPage().add(tools, Favourites(listOf(clock.key))).add(photos))
+            .with("collections-2", CollectionsPage(emptyList()).add(tools))
+
+        val moved = pages.moveApp(clock, "collections", tools, "collections", photos)
+            .moveApp(clock, "collections", photos, "collections-2", tools)
+
+        assertEquals(Favourites(), moved.on("collections").card(tools)!!.apps)
+        assertEquals(Favourites(), moved.on("collections").card(photos)!!.apps)
+        assertEquals(Favourites(listOf(clock.key)), moved.on("collections-2").card(tools)!!.apps)
     }
 
     @Test

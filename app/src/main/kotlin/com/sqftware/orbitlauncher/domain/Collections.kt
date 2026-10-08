@@ -188,6 +188,13 @@ data class CollectionsPage(
     /** Drops the card of [kind], and the apps it kept with it. */
     fun remove(kind: CollectionKind): CollectionsPage = copy(cards = cards.filterNot { it.kind == kind })
 
+    /** Whether the card of [kind] takes [app] dropped on it: a hand-picked one lacking it, unless it is a pinned shortcut, which cards do not list. */
+    fun takes(kind: CollectionKind, app: AppEntry): Boolean =
+        kind is CollectionKind.HandPicked && app.kind !is EntryKind.Shortcut && card(kind)?.apps?.contains(app) == false
+
+    /** Whether any card [takes] [app]. */
+    fun takesAnywhere(app: AppEntry): Boolean = cards.any { takes(it.kind, app) }
+
     /** Adds [app] at the end of the card of [kind], unless it is already there or there is no such card. */
     fun addApp(kind: CollectionKind, app: AppEntry): CollectionsPage = update(kind) { copy(apps = apps.add(app)) }
 
@@ -235,6 +242,12 @@ data class CollectionPages(val pages: Map<String, CollectionsPage> = emptyMap(),
 
     /** These pages with [page] as [changed] has it, whose defaults become every page's. */
     fun with(page: String, changed: CollectionsPage): CollectionPages = CollectionPages(pages + (page to changed), changed.defaults)
+
+    /** Moves [app] off the card of [kind] on [from] to the end of the card of [onto] on page [to], where it is once. */
+    fun moveApp(app: AppEntry, from: String, kind: CollectionKind, to: String, onto: CollectionKind): CollectionPages {
+        val left = with(from, on(from).removeApp(kind, app))
+        return left.with(to, left.on(to).addApp(onto, app))
+    }
 
     /** These pages with only the cards of the pages in [ids]. */
     fun keepingPages(ids: Set<String>): CollectionPages = copy(pages = pages.filterKeys { it in ids })

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -98,8 +99,10 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -179,6 +182,24 @@ object CollectionTags {
 /** The bin a lifted app can be dropped on: whether the finger is over it, and where it lies, in root coordinates. */
 class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
 
+/**
+ * Where the hand-picked cards lie, so an app dragged from anywhere can be dropped on one. Their coordinates rather than
+ * their bounds, as with a place's positions: a page scrolling past would otherwise write them every frame.
+ */
+class CardDrops {
+    private val placed = mutableMapOf<CollectionKind.HandPicked, LayoutCoordinates>()
+
+    // A card gone from the page leaves coordinates no longer attached, so they go as the next card is placed.
+    internal fun place(kind: CollectionKind.HandPicked, coordinates: LayoutCoordinates) {
+        placed.values.removeAll { !it.isAttached }
+        placed[kind] = coordinates
+    }
+
+    /** The card under [finger], in root coordinates. */
+    fun at(finger: Offset): CollectionKind.HandPicked? =
+        placed.entries.find { (_, card) -> card.isAttached && card.rootBounds().contains(finger.x, finger.y) }?.key
+}
+
 /** What a card says instead of apps when it has none: some are filled by hand, the built-in ones by the system. */
 private val CollectionKind.emptyText: String
     get() = when (this) {
@@ -213,7 +234,8 @@ private const val EXPAND_MILLIS = 200
  * asks for the usage access it lacks with a body that calls [onOpenUsageSettings]. A tap launches
  * an app and a long press opens that card's [menu]; on a hand-picked card, a long press that moves on lifts the app
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
- * to drop it there. While one of its apps is on the move, a card shows where they would be if it
+ * to drop it there; on a built-in card, it lifts the app as a [drag]. Each hand-picked card says where it lies to the
+ * [drops], and the [dropTarget] is outlined. While one of its apps is on the move, a card shows where they would be if it
  * were dropped. Apps wear their [unread] counts.
  */
 @Composable
@@ -233,6 +255,9 @@ fun CollectionsColumn(
     modifier: Modifier = Modifier,
     rearrange: (CollectionKind.HandPicked) -> Rearrange? = { null },
     menu: (CollectionKind) -> AppMenu? = { null },
+    drag: AppDrag? = null,
+    drops: CardDrops? = null,
+    dropTarget: CollectionKind? = null,
     bin: BinTarget? = null,
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
@@ -271,10 +296,13 @@ fun CollectionsColumn(
                         onMove = onMove,
                         onEdit = handPicked?.let { { onEdit(it) } },
                         rearrange = handPicked?.let(rearrange),
+                        drag = drag,
                         menu = menu(card.kind),
                         onOpenUsageSettings = onOpenUsageSettings,
                         unread = unread,
                         onClearBadge = onClearBadge,
+                        dropTarget = card.kind == dropTarget,
+                        modifier = if (handPicked != null && drops != null) Modifier.onPlaced { drops.place(handPicked, it) } else Modifier,
                     )
                 }
             }
@@ -301,10 +329,13 @@ private fun CollectionCardView(
     onMove: (from: Int, to: Int) -> Unit,
     onEdit: (() -> Unit)?,
     rearrange: Rearrange?,
+    drag: AppDrag?,
     menu: AppMenu?,
     onOpenUsageSettings: () -> Unit,
     unread: UnreadCounts,
     onClearBadge: ((AppEntry) -> Unit)?,
+    dropTarget: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val dragged = reorder.dragging == index
     val colours = MaterialTheme.colorScheme
@@ -317,7 +348,8 @@ private fun CollectionCardView(
             containerColor = if (dragged) tint.compositeOver(colours.surfaceContainerHigh) else tint,
             contentColor = colours.onSurface,
         ),
-        modifier = Modifier
+        border = if (dropTarget) BorderStroke(2.dp, colours.primary) else null,
+        modifier = modifier
             .fillMaxWidth()
             .reorderItem(reorder, index)
             .graphicsLayer { alpha = if (dragged) 0.7f else 1f }
@@ -329,7 +361,7 @@ private fun CollectionCardView(
             if (apps == null) {
                 PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
             } else {
-                AppGrid(card.kind, apps, card.expanded, look, icon, onLaunch, rearrange, menu, unread, onClearBadge)
+                AppGrid(card.kind, apps, card.expanded, look, icon, onLaunch, rearrange, drag, menu, unread, onClearBadge)
             }
             if (hidden > 0) MoreApps(card.kind, hidden, look.more, onToggleExpanded) else Spacer(Modifier.height(12.dp))
         }
@@ -462,6 +494,7 @@ private fun AppGrid(
     icon: suspend (AppEntry) -> ImageBitmap?,
     onLaunch: (AppEntry) -> Unit,
     rearrange: Rearrange?,
+    drag: AppDrag?,
     menu: AppMenu?,
     unread: UnreadCounts,
     onClearBadge: ((AppEntry) -> Unit)?,
@@ -495,7 +528,7 @@ private fun AppGrid(
                                 .testTag(CollectionTags.app(kind, app))
                                 .reorderSlot(rearrange, index, moving?.at == index),
                             menu = menu,
-                            drag = rearrange?.drag(index),
+                            drag = rearrange?.drag(index) ?: drag,
                             unread = unread.badge(app),
                             onClearBadge = onClearBadge,
                         )
