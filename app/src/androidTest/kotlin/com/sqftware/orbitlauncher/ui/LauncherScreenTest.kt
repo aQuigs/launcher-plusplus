@@ -1332,7 +1332,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun anAppRestedAtTheScreensEdgeTurnsThePageAndGoesOntoACardThereStayingOnTheRing() {
+    fun anAppRestedAtTheScreensEdgeTurnsThePageAndMovesOntoACardThere() {
         homeApps = HomeApps(ring = ringOf(mail, clock))
         collections = CollectionsPage(listOf(CollectionCard(tools)))
         show()
@@ -1347,12 +1347,12 @@ class LauncherScreenTest {
 
         compose.runOnIdle {
             assertEquals(Favourites(listOf(mail.key)), collections.card(tools)!!.apps)
-            assertEquals(HomeApps(ring = ringOf(mail, clock)), homeApps)
+            assertEquals(HomeApps(ring = ringOf(clock)), homeApps)
         }
     }
 
     @Test
-    fun aCardsAppTakenHomeByTheScreensEdgeGoesOntoTheRingAndStaysOnItsCard() {
+    fun aCardsAppTakenHomeByTheScreensEdgeMovesOntoTheRing() {
         collections = CollectionsPage(listOf(CollectionCard(tools, Favourites(listOf(mail.key)))))
         show()
         goToCollections()
@@ -1366,7 +1366,7 @@ class LauncherScreenTest {
 
         compose.runOnIdle {
             assertEquals(HomeApps(ring = ringOf(mail)), homeApps)
-            assertEquals(Favourites(listOf(mail.key)), collections.card(tools)!!.apps)
+            assertEquals(Favourites(), collections.card(tools)!!.apps)
         }
     }
 

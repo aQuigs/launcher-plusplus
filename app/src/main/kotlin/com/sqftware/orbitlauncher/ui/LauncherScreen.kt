@@ -187,7 +187,8 @@ data class HomePress(val launcherInFront: Boolean)
  * press in the drawer or on a built-in card that moves on drags the app out: the drawer closes, a ghost of the icon
  * follows the finger over the ring page, or the collections page the drawer was opened over, and letting go over the
  * ring, the dock or a hand-picked card that lacks it adds it there. Whatever is dragged, resting it at either side of the
- * screen turns the pages that way, and an app from anywhere goes onto a hand-picked card too. A widget page shows its widgets through the
+ * screen turns the pages that way, and an app from anywhere goes onto a hand-picked card too, leaving the ring, the dock,
+ * the folder or the hand-picked card it came from. A widget page shows its widgets through the
  * [widgets] for its id; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
  * out of view. A collections page shows its cards, the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
@@ -383,11 +384,16 @@ fun LauncherScreen(
         if (changed == before) this else with(page.id, changed)
     }
 
-    fun changeCollections(page: LauncherPage? = latestCardsPage, change: CollectionsPage.() -> CollectionsPage) {
+    fun changeCollectionPages(change: CollectionPages.() -> CollectionPages) {
         val pages = latestCollectionPages
-        val before = pages.on((page ?: return).id)
+        val after = pages.change()
+        if (after != pages) latestOnCollectionPagesChange(after)
+    }
+
+    fun changeCollections(page: LauncherPage? = latestCardsPage, change: CollectionsPage.() -> CollectionsPage) = changeCollectionPages {
+        val before = on((page ?: return@changeCollectionPages this).id)
         val changed = before.change()
-        if (changed != before) latestOnCollectionPagesChange(pages.with(page.id, changed))
+        if (changed == before) this else with(page.id, changed)
     }
 
     // The finger holding what is dragged and where it could land, in root coordinates. The finger moves every frame, so
@@ -855,13 +861,28 @@ fun LauncherScreen(
         val shown = latestShown
         val place = dropPlace
         val home = drag.home
+        val card = drag.card
+        val cardsPage = latestCardsPage
+        // An app from a card leaves it for the ring or the dock, as one from there leaves for a card.
+        fun leaveCard() = card?.let { kind -> app?.let { changeCollections { removeApp(kind, it) } } }
         when {
             drag is Drag.Within && overBin -> drag.remove?.invoke()
             placeChanged -> Unit
-            app != null && target is Over.Card -> changeCollections(target.page) { addApp(target.kind, app) }
-            app != null && foldInto != null -> shown?.let { changeHomeApps { move(app, drag.home, foldInto, it) } }
+            app != null && target is Over.Card && card != null && cardsPage != null ->
+                changeCollectionPages { moveApp(app, cardsPage.id, card, target.page.id, target.kind) }
+            app != null && target is Over.Card -> {
+                changeCollections(target.page) { addApp(target.kind, app) }
+                if (home != null) shown?.let { changeHomeApps { remove(home, app, it) } }
+            }
+            app != null && foldInto != null -> shown?.let {
+                changeHomeApps { move(app, drag.home, foldInto, it) }
+                leaveCard()
+            }
             drag is Drag.Within && target is Over.Slot && target.place === drag.place -> drag.move(target.index, latestReorderMode)
-            app != null && drag.adds -> place?.let { changeHomeApps(inView) { add(it, app) } }
+            app != null && drag.adds -> place?.let {
+                changeHomeApps(inView) { add(it, app) }
+                leaveCard()
+            }
             app != null && home != null && place != null && shown != null ->
                 changeRingPages { move(app, latestRingPage.id, home, inView.id, place, shown) }
             app != null && shown != null -> landing(target)?.let { to -> changeHomeApps { move(app, drag.home, to, shown) } }
@@ -892,6 +913,7 @@ fun LauncherScreen(
      */
     fun <T> rearrange(
         home: HomePlace?,
+        card: CollectionKind.HandPicked? = null,
         items: () -> List<T>,
         look: (T) -> RingItem,
         move: (T, T, ReorderMode) -> Unit,
@@ -909,6 +931,7 @@ fun LauncherScreen(
                         item = look(it),
                         label = label?.invoke(it),
                         home = home,
+                        card = card,
                         move = { to, mode -> move(it, listed[to], mode) },
                         remove = remove?.let { r -> { r(it) } },
                         current = { items() == listed },
@@ -953,6 +976,7 @@ fun LauncherScreen(
             byKind.getOrPut(kind) {
                 rearrange(
                     home = null,
+                    card = kind,
                     items = { latestCollections.card(kind)?.apps?.resolve(latestApps.orEmpty()).orEmpty() },
                     look = RingItem::App,
                     move = { app, target, mode -> changeCollections { moveApp(kind, app, target, mode) } },
@@ -1610,13 +1634,16 @@ private sealed interface Drag {
     val item: RingItem
     val label: String? get() = null
 
-    /** The home place it leaves if it lands in another; none for one from the drawer or a card. */
+    /** The home place it leaves if it lands in another or on a card; none for one from the drawer or a card. */
     val home: HomePlace? get() = null
+
+    /** The hand-picked card it leaves if it lands on another or on the ring or the dock. */
+    val card: CollectionKind.HandPicked? get() = null
 
     /** The app dragged, unless it is a folder. */
     val app: AppEntry? get() = (item as? RingItem.App)?.app
 
-    /** Whether it is an app that only adds where it lands, with no home place to leave: from the drawer or a card. */
+    /** Whether it is an app with no home place to leave, which the ring and the dock add: from the drawer or a card. */
     val adds: Boolean get() = app != null && home == null
 
     /** Whether the place it came from still lists what it did, so the positions found there hold; none from the drawer. */
@@ -1628,7 +1655,7 @@ private sealed interface Drag {
     }
 
     /**
-     * The item at [from] in [place], one of the [home] places or a card: to another of its positions, which [move] takes
+     * The item at [from] in [place], one of the [home] places or a [card]: to another of its positions, which [move] takes
      * it to, or, for a place with a bin, onto the bin, which [remove]s it.
      */
     class Within(
@@ -1637,6 +1664,7 @@ private sealed interface Drag {
         override val item: RingItem,
         override val label: String?,
         override val home: HomePlace?,
+        override val card: CollectionKind.HandPicked?,
         val move: (to: Int, ReorderMode) -> Unit,
         val remove: (() -> Unit)?,
         override val current: () -> Boolean,

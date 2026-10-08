@@ -243,6 +243,12 @@ data class CollectionPages(val pages: Map<String, CollectionsPage> = emptyMap(),
     /** These pages with [page] as [changed] has it, whose defaults become every page's. */
     fun with(page: String, changed: CollectionsPage): CollectionPages = CollectionPages(pages + (page to changed), changed.defaults)
 
+    /** Moves [app] off the card of [kind] on [from] to the end of the card of [onto] on page [to], where it is once. */
+    fun moveApp(app: AppEntry, from: String, kind: CollectionKind, to: String, onto: CollectionKind): CollectionPages {
+        val left = with(from, on(from).removeApp(kind, app))
+        return left.with(to, left.on(to).addApp(onto, app))
+    }
+
     /** These pages with only the cards of the pages in [ids]. */
     fun keepingPages(ids: Set<String>): CollectionPages = copy(pages = pages.filterKeys { it in ids })
 }

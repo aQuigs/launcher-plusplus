@@ -322,6 +322,19 @@ class CollectionsTest {
     }
 
     @Test
+    fun `an app moved between cards leaves the one it was on, on its page or another`() {
+        val pages = CollectionPages().with("collections", CollectionsPage().add(tools, Favourites(listOf(clock.key))).add(photos))
+            .with("collections-2", CollectionsPage(emptyList()).add(tools))
+
+        val moved = pages.moveApp(clock, "collections", tools, "collections", photos)
+            .moveApp(clock, "collections", photos, "collections-2", tools)
+
+        assertEquals(Favourites(), moved.on("collections").card(tools)!!.apps)
+        assertEquals(Favourites(), moved.on("collections").card(photos)!!.apps)
+        assertEquals(Favourites(listOf(clock.key)), moved.on("collections-2").card(tools)!!.apps)
+    }
+
+    @Test
     fun `each collections page keeps its own cards, and a default set on one is every page's`() {
         val pages = CollectionPages().with("collections", CollectionsPage().add(tools))
 
