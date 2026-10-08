@@ -862,14 +862,13 @@ fun LauncherScreen(
         val place = dropPlace
         val home = drag.home
         val card = drag.card
-        val cardsPage = latestCardsPage
         // An app from a card leaves it for the ring or the dock, as one from there leaves for a card.
-        fun leaveCard() = card?.let { kind -> app?.let { changeCollections { removeApp(kind, it) } } }
+        fun leaveCard() = card?.let { from -> app?.let { changeCollections(from.page) { removeApp(from.kind, it) } } }
         when {
             drag is Drag.Within && overBin -> drag.remove?.invoke()
             placeChanged -> Unit
-            app != null && target is Over.Card && card != null && cardsPage != null ->
-                changeCollectionPages { moveApp(app, cardsPage.id, card, target.page.id, target.kind) }
+            app != null && target is Over.Card && card != null ->
+                changeCollectionPages { moveApp(app, card.page.id, card.kind, target.page.id, target.kind) }
             app != null && target is Over.Card -> {
                 changeCollections(target.page) { addApp(target.kind, app) }
                 if (home != null) shown?.let { changeHomeApps { remove(home, app, it) } }
@@ -933,7 +932,7 @@ fun LauncherScreen(
                         item = look(it),
                         label = label?.invoke(it),
                         home = home,
-                        card = card,
+                        card = card?.let { kind -> latestCardsPage?.let { Over.Card(it, kind) } },
                         move = { to, mode -> move(it, listed[to], mode) },
                         remove = remove?.let { r -> { r(it) } },
                         current = { items() == listed },
@@ -1639,8 +1638,8 @@ private sealed interface Drag {
     /** The home place it leaves if it lands in another or on a card; none for one from the drawer or a card. */
     val home: HomePlace? get() = null
 
-    /** The hand-picked card it leaves if it lands on another or on the ring or the dock. */
-    val card: CollectionKind.HandPicked? get() = null
+    /** The hand-picked card, and its page, it leaves if it lands on another or on the ring or the dock. */
+    val card: Over.Card? get() = null
 
     /** The app dragged, unless it is a folder. */
     val app: AppEntry? get() = (item as? RingItem.App)?.app
@@ -1666,7 +1665,7 @@ private sealed interface Drag {
         override val item: RingItem,
         override val label: String?,
         override val home: HomePlace?,
-        override val card: CollectionKind.HandPicked?,
+        override val card: Over.Card?,
         val move: (to: Int, ReorderMode) -> Unit,
         val remove: (() -> Unit)?,
         override val current: () -> Boolean,
