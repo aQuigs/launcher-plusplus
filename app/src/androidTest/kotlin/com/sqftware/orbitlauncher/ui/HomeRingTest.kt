@@ -366,7 +366,19 @@ class HomeRingTest {
 
         // Caught by a tap, it stops under the finger instead of launching what the finger lands on.
         compose.ringSlot(four[1]).performTouchInput { click() }
-        compose.mainClock.advanceTimeBy(15_000)
+        // It eases all the way in: once it creeps, no frame moves it more than the pixel it is rounded to.
+        val pixel = 1 / compose.density.density
+        var at = topNow()
+        var moved = false
+        var crept = false
+        repeat(15_000 / 16) {
+            compose.mainClock.advanceTimeByFrame()
+            val step = (topNow() - at).getDistance()
+            at = topNow()
+            if (crept) assertTrue("a jump of ${step / pixel} px at rest", step < 1.5f * pixel)
+            if (step > 2 * pixel) moved = true
+            if (moved && step < pixel / 2) crept = true
+        }
         assertEquals(emptyList<AppEntry>(), launched)
         assertEquals("back where it was", rest.x, topNow().x, 0.5f)
         assertEquals(rest.y, topNow().y, 0.5f)
