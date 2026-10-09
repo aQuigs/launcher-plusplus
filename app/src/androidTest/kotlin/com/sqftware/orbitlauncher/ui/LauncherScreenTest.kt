@@ -151,6 +151,7 @@ class LauncherScreenTest {
         }
     private var ambientMotion by mutableStateOf(true)
     private var appNames by mutableStateOf(false)
+    private var ringSpin by mutableStateOf(true)
     private var homeOnReturn by mutableStateOf(false)
     private var pickTip by mutableStateOf(false)
     private val toasts = mutableListOf<String>()
@@ -274,6 +275,8 @@ class LauncherScreenTest {
             onAmbientMotionChange = { ambientMotion = it },
             appNames = appNames,
             onAppNamesChange = { appNames = it },
+            ringSpin = ringSpin,
+            onRingSpinChange = { ringSpin = it },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
@@ -2094,6 +2097,28 @@ class LauncherScreenTest {
         nameOn(mail).assertExists()
         compose.onNodeWithTag(HomeRingTags.folder(1)).performClick()
         nameOn(clock).assertExists()
+    }
+
+    @Test
+    fun theLauncherMenusSpinRowTurnsSpinningOffSoADragRoundTheRingTurnsThePageAgain() {
+        homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
+        show()
+        val top = centreOf(compose.ringSlot(clock))
+        fun dragRoundTheTop() = compose.onRoot().performTouchInput {
+            val across = Offset(60.dp.toPx(), 0f)
+            swipe(top + across, top - across, 80)
+        }
+
+        dragRoundTheTop()
+        assertSettledOn(LauncherPage.Home)
+
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Spin the ring").assertIsOn().performClick()
+        compose.runOnIdle { assertFalse(ringSpin) }
+        Espresso.pressBack()
+
+        dragRoundTheTop()
+        assertSettledOn(LauncherPage.Collections)
     }
 
     @Test

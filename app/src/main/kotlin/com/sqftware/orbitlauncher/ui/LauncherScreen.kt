@@ -220,7 +220,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -262,6 +262,8 @@ fun LauncherScreen(
     onAmbientMotionChange: (Boolean) -> Unit,
     appNames: Boolean,
     onAppNamesChange: (Boolean) -> Unit,
+    ringSpin: Boolean,
+    onRingSpinChange: (Boolean) -> Unit,
     homeOnReturn: Boolean,
     onHomeOnReturnChange: (Boolean) -> Unit,
     pickTip: Boolean,
@@ -359,6 +361,8 @@ fun LauncherScreen(
     val latestOnAmbientMotionChange by rememberUpdatedState(onAmbientMotionChange)
     val latestAppNames by rememberUpdatedState(appNames)
     val latestOnAppNamesChange by rememberUpdatedState(onAppNamesChange)
+    val latestRingSpin by rememberUpdatedState(ringSpin)
+    val latestOnRingSpinChange by rememberUpdatedState(onRingSpinChange)
     val latestHomeOnReturn by rememberUpdatedState(homeOnReturn)
     val latestOnHomeOnReturnChange by rememberUpdatedState(onHomeOnReturnChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
@@ -1032,6 +1036,12 @@ fun LauncherScreen(
                                 onClick = { latestOnAppNamesChange(!latestAppNames) },
                             ),
                             LauncherMenuRow(
+                                "Spin the ring",
+                                on = latestRingSpin,
+                                flips = true,
+                                onClick = { latestOnRingSpinChange(!latestRingSpin) },
+                            ),
+                            LauncherMenuRow(
                                 "Open on home page",
                                 on = latestHomeOnReturn,
                                 flips = true,
@@ -1314,7 +1324,7 @@ fun LauncherScreen(
                                             .onPlaced { ringPageCoordinates[page.id] = it }
                                             .verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() }),
                                     ) {
-                                        Box(Modifier.weight(1f).spinsRing(spin)) {
+                                        Box(Modifier.weight(1f).then(if (ringSpin) Modifier.spinsRing(spin) else Modifier)) {
                                             // First, so it lies behind the clock, the ring and the card and gets only the touches they
                                             // leave. A tap anywhere there closes an open folder, not only one on the ring's centre.
                                             EmptySpace(
