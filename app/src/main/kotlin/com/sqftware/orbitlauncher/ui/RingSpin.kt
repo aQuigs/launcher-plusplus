@@ -20,6 +20,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.unit.center
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
 import com.sqftware.orbitlauncher.domain.goesRound
 import com.sqftware.orbitlauncher.domain.restingTurn
@@ -28,6 +29,7 @@ import com.sqftware.orbitlauncher.domain.turnRate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * How fast a ring let go slows, per second: its speed falls by e every 1 / this seconds, so it coasts a few seconds,
@@ -40,6 +42,15 @@ private const val COAST_RATE = 1.4f
  * threshold of a hundredth is several pixels, which showed as a jump when the ring came to rest.
  */
 private const val REST_THRESHOLD = 0.001f
+
+/** How briskly a caught ring swings back home once the finger lets go: in well under a second, so the catch reads as a stop. */
+private const val SETTLE_STIFFNESS = Spring.StiffnessLow
+
+/**
+ * How fast the ring's rim must still move for a touch to catch it. Slower, its last creep home is all but invisible,
+ * so a tap there opens what it lands on, as it would on a ring at rest.
+ */
+private val CATCH_SPEED = 30.dp
 
 /**
  * The ring's fidget spin: a quick drag round the ring turns it, and let go it coasts on and settles on the nearest
@@ -56,12 +67,15 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
         set(value) {
             field = value
             if (!value) {
-                stop()
+                glide?.cancel()
                 turn = 0f
             }
         }
 
     private var glide: Job? = null
+
+    /** How fast [glide] turns the ring, in radians a second. */
+    private var speed = 0f
 
     // Read only by the gesture, so not state: the ring as its layout last placed it, the band round its centre a drag
     // starts a spin from, and the area the drag is made in.
@@ -84,20 +98,20 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
         return area.localToRoot(position) - ring.localToRoot(ring.size.center.toOffset())
     }
 
-    /** Stops a spin under the finger, as a spinner caught in the hand does. Whether it was spinning. */
-    private fun stop(): Boolean {
-        val spinning = glide?.isActive == true
-        glide?.cancel()
-        return spinning
-    }
-
     /** Lets the ring go at [velocity], in radians a second, to coast as far as a spinner would and settle on a whole turn. */
-    private fun letGo(velocity: Float) {
+    private fun letGo(velocity: Float) = glide(restingTurn(turn + velocity / COAST_RATE), velocity, COAST_RATE * COAST_RATE)
+
+    /** Swings a caught ring back to the nearest whole turn. */
+    private fun settle() = glide(restingTurn(turn), 0f, SETTLE_STIFFNESS)
+
+    private fun glide(rest: Float, velocity: Float, stiffness: Float) {
         val from = turn
-        val rest = restingTurn(from + velocity / COAST_RATE)
         glide = scope.launch {
-            // Critically damped at the coast rate, a spring slows as an exponential coast does, but lands on the rest.
-            animate(from, rest, velocity, spring(Spring.DampingRatioNoBouncy, COAST_RATE * COAST_RATE, REST_THRESHOLD)) { value, _ -> turn = value }
+            // Critically damped, a spring slows as an exponential coast does, but lands on the rest.
+            animate(from, rest, velocity, spring(Spring.DampingRatioNoBouncy, stiffness, REST_THRESHOLD)) { value, now ->
+                turn = value
+                speed = now
+            }
             turn = 0f
         }
     }
@@ -109,16 +123,22 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             val start = fromCentre(down.position)?.takeIf { it.getDistance() in inner..outer } ?: return@awaitEachGesture
             // Caught, it stops under the finger as a spinner does, before what the finger lands on sees the touch, so the
             // catch launches nothing.
-            val caught = stop()
-            if (caught) down.consume()
+            val caught = glide?.isActive == true && abs(speed) * outer >= CATCH_SPEED.toPx()
+            if (caught) {
+                glide?.cancel()
+                down.consume()
+            }
             // What the finger lands on takes the press for a tap, which the wait below would read as the touch taken.
             awaitPointerEvent(PointerEventPass.Final)
             // The touch slop crossed going round the ring makes the touch a spin; anything else is left to the rest.
             var crossing = awaitSlop(down.id, down.position)
             if (crossing == null || (crossing.position - down.position).let { !goesRound(start.x, start.y, it.x, it.y) }) {
-                if (caught) letGo(0f)
+                if (caught) settle()
                 return@awaitEachGesture
             }
+
+            // A touch too slow to catch the ring leaves its creep home running, which would fight the finger.
+            glide?.cancel()
 
             val velocity = VelocityTracker()
             var at = start

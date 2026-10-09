@@ -340,48 +340,99 @@ class HomeRingTest {
         compose.mainClock.autoAdvance = true
     }
 
+    /** Flings the ring, at rest, clockwise round. */
+    private fun fling() {
+        val rest = topNow()
+        val ring = compose.onRoot().getUnclippedBoundsInRoot().middle
+        val reach = ring.y - rest.y
+        compose.onRoot().performTouchInput { swipe(px(Offset(ring.x - reach / 2, rest.y)), px(Offset(ring.x + reach / 2, rest.y)), 80) }
+        compose.mainClock.advanceTimeByFrame()
+    }
+
+    /** How far, in dp, the next frame moves the top app. */
+    private fun stepFrame(): Float {
+        val before = topNow()
+        compose.mainClock.advanceTimeByFrame()
+        return (topNow() - before).getDistance()
+    }
+
+    private fun topNow() = compose.ringSlot(alphabet[0]).getUnclippedBoundsInRoot().middle
+
+    private fun px(at: Offset) = at * compose.density.density
+
+    private val pixel get() = 1 / compose.density.density
+
     @Test
     fun aQuickDragRoundTheRingSpinsItOnAndItSettlesWhereItWasButADragOutDoesNot() {
         val launched = mutableListOf<AppEntry>()
-        val four = alphabet.take(4)
-        show(four, onLaunch = launched::add)
+        show(alphabet.take(4), onLaunch = launched::add)
         compose.mainClock.autoAdvance = false
-        val top = four[0]
-        val rest = compose.ringSlot(top).getUnclippedBoundsInRoot().middle
+        val rest = topNow()
         val ring = compose.onRoot().getUnclippedBoundsInRoot().middle
-        fun topNow() = compose.ringSlot(top).getUnclippedBoundsInRoot().middle
-        fun px(at: Offset) = at * compose.density.density
-
         compose.onRoot().performTouchInput { swipe(px(Offset(ring.x, rest.y - 10f)), px(Offset(ring.x, rest.y - 160f)), 80) }
         compose.mainClock.advanceTimeBy(300)
         assertEquals("a drag outward leaves it", rest.x, topNow().x, 0.5f)
 
-        val reach = ring.y - rest.y
-        compose.onRoot().performTouchInput { swipe(px(Offset(ring.x - reach / 2, rest.y)), px(Offset(ring.x + reach / 2, rest.y)), 80) }
-        compose.mainClock.advanceTimeByFrame()
+        fling()
         val letGo = topNow()
         compose.mainClock.advanceTimeBy(300)
         assertTrue("turned clockwise with the finger", letGo.x > rest.x + 20f)
         assertTrue("still turning after the finger left", (topNow() - letGo).getDistance() > 10f)
 
-        // Caught by a tap, it stops under the finger instead of launching what the finger lands on.
-        compose.ringSlot(four[1]).performTouchInput { click() }
         // It eases all the way in: once it creeps, no frame moves it more than the pixel it is rounded to.
-        val pixel = 1 / compose.density.density
-        var at = topNow()
-        var moved = false
         var crept = false
         repeat(15_000 / 16) {
-            compose.mainClock.advanceTimeByFrame()
-            val step = (topNow() - at).getDistance()
-            at = topNow()
+            val step = stepFrame()
             if (crept) assertTrue("a jump of ${step / pixel} px at rest", step < 1.5f * pixel)
-            if (step > 2 * pixel) moved = true
-            if (moved && step < pixel / 2) crept = true
+            if (step < pixel / 2) crept = true
         }
         assertEquals(emptyList<AppEntry>(), launched)
         assertEquals("back where it was", rest.x, topNow().x, 0.5f)
         assertEquals(rest.y, topNow().y, 0.5f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    fun aTapCatchesASpinningRingWhichStopsUnderTheFingerAndSwingsStraightHome() {
+        val launched = mutableListOf<AppEntry>()
+        show(alphabet.take(4), onLaunch = launched::add)
+        compose.mainClock.autoAdvance = false
+        val rest = topNow()
+        fling()
+        compose.mainClock.advanceTimeBy(300)
+
+        val second = compose.ringSlot(alphabet[1])
+        second.performTouchInput { down(center) }
+        val caught = topNow()
+        compose.mainClock.advanceTimeBy(300)
+        assertEquals("stopped under the finger", caught.x, topNow().x, 0.5f)
+        assertEquals(caught.y, topNow().y, 0.5f)
+        second.performTouchInput { up() }
+
+        compose.mainClock.advanceTimeBy(1_000)
+        assertEquals(emptyList<AppEntry>(), launched)
+        assertEquals("home within a second", rest.x, topNow().x, 0.5f)
+        assertEquals(rest.y, topNow().y, 0.5f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    fun aTapOnARingCreepingTheLastBitHomeOpensWhatItLandsOn() {
+        val launched = mutableListOf<AppEntry>()
+        show(alphabet.take(4), onLaunch = launched::add)
+        compose.mainClock.autoAdvance = false
+        fling()
+
+        var still = 0
+        var frames = 0
+        while (still < 10) {
+            still = if (stepFrame() < pixel / 2) still + 1 else 0
+            assertTrue("never creeps", ++frames < 15_000 / 16)
+        }
+        compose.ringSlot(alphabet[1]).performTouchInput { click() }
+        compose.mainClock.advanceTimeByFrame()
+
+        assertEquals(listOf(alphabet[1]), launched)
         compose.mainClock.autoAdvance = true
     }
 
