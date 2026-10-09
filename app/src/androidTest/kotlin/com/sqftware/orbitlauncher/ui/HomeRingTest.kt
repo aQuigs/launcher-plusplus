@@ -358,11 +358,11 @@ class HomeRingTest {
 
         val reach = ring.y - rest.y
         compose.onRoot().performTouchInput { swipe(px(Offset(ring.x - reach / 2, rest.y)), px(Offset(ring.x + reach / 2, rest.y)), 80) }
+        compose.mainClock.advanceTimeByFrame()
+        val letGo = topNow()
         compose.mainClock.advanceTimeBy(300)
-        val coasting = topNow()
-        compose.mainClock.advanceTimeBy(300)
-        assertTrue("turned clockwise", coasting.x > rest.x + 20f)
-        assertTrue("still turning after the finger left", topNow().x != coasting.x)
+        assertTrue("turned clockwise with the finger", letGo.x > rest.x + 20f)
+        assertTrue("still turning after the finger left", (topNow() - letGo).getDistance() > 10f)
 
         // Caught by a tap, it stops under the finger instead of launching what the finger lands on.
         compose.ringSlot(four[1]).performTouchInput { click() }

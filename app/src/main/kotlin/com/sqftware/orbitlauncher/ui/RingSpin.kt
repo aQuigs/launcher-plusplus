@@ -45,23 +45,35 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
     var turn by mutableFloatStateOf(0f)
         private set
 
+    /** Whether the ring may spin: off, it is back in place at once, since its slots are hit where they are shown. */
+    internal var spins = true
+        set(value) {
+            field = value
+            if (!value) {
+                stop()
+                turn = 0f
+            }
+        }
+
     private var glide: Job? = null
 
-    // Read only by the gesture, so not state: the ring as its layout last placed it, null while it cannot spin, and the
-    // band round its centre a drag starts a spin from.
+    // Read only by the gesture, so not state: the ring as its layout last placed it, the band round its centre a drag
+    // starts a spin from, and the area the drag is made in.
     private var ring: LayoutCoordinates? = null
-    private var band = 0f..0f
+    private var inner = 0f
+    private var outer = 0f
     private var area: LayoutCoordinates? = null
 
-    /** Where the ring is: [coordinates] centred on it, null while it cannot spin, and its band from [inner] to [outer] from the centre. */
-    internal fun place(coordinates: LayoutCoordinates?, inner: Float, outer: Float) {
+    /** Where the ring is: [coordinates] centred on it, with its band from [inner] to [outer] from the centre. */
+    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float) {
         ring = coordinates
-        band = inner..outer
+        this.inner = inner
+        this.outer = outer
     }
 
     /** [position] in the area the spin is dragged in, as an offset from the ring's centre, if the ring can spin. */
     private fun fromCentre(position: Offset): Offset? {
-        val ring = ring?.takeIf { it.isAttached } ?: return null
+        val ring = ring?.takeIf { spins && it.isAttached } ?: return null
         val area = area?.takeIf { it.isAttached } ?: return null
         return area.localToRoot(position) - ring.localToRoot(ring.size.center.toOffset())
     }
@@ -84,10 +96,11 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
         }
     }
 
-    internal fun Modifier.spinArea(): Modifier = onPlaced { area = it }.pointerInput(this@RingSpin) {
+    /** Where a drag round the ring spins it: a node over the ring and what lies behind it, so the gap between its icons takes a drag too. */
+    internal val modifier: Modifier = Modifier.onPlaced { area = it }.pointerInput(this) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            val start = fromCentre(down.position)?.takeIf { it.getDistance() in band } ?: return@awaitEachGesture
+            val start = fromCentre(down.position)?.takeIf { it.getDistance() in inner..outer } ?: return@awaitEachGesture
             // Caught, it stops under the finger as a spinner does, before what the finger lands on sees the touch, so the
             // catch launches nothing.
             val caught = stop()
@@ -107,9 +120,11 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             while (crossing != null && crossing.pressed) {
                 crossing.consume()
                 val now = fromCentre(crossing.position) ?: break
-                val step = turnBetween(at.x, at.y, now.x, now.y)
-                turn += step
-                at = now
+                // Over the emblem the finger's angle swings wildly, and at the very centre it has none.
+                if (now.getDistance() >= inner) {
+                    turn += turnBetween(at.x, at.y, now.x, now.y)
+                    at = now
+                }
                 velocity.addPosition(crossing.uptimeMillis, crossing.position)
                 crossing = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
             }
@@ -125,5 +140,4 @@ fun rememberRingSpin(): RingSpin {
     return remember(scope) { RingSpin(scope) }
 }
 
-/** Where a drag round [spin]'s ring spins it: a node over the ring and what lies behind it, so the gap between its icons takes a drag too. */
-fun Modifier.spinsRing(spin: RingSpin): Modifier = with(spin) { spinArea() }
+fun Modifier.spinsRing(spin: RingSpin): Modifier = then(spin.modifier)
