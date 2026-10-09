@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -158,7 +159,8 @@ private sealed interface Part {
  * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
  * still found, and [dockSlot] where the dock shows a folder, in root coordinates, so its planet leaves from there and
  * goes back there. With [names], each app on the ring and in the open folder, and each folder the user named, has its
- * name under it, kept clear of its neighbours, the emblem and the ring's box.
+ * name under it, kept clear of its neighbours, the emblem and the ring's box. The ring shows turned as far as [spin]
+ * says, which spins it only while neither a folder is open nor anything is on the move.
  */
 @Composable
 fun HomeRing(
@@ -188,6 +190,7 @@ fun HomeRing(
     dock: List<RingItem> = emptyList(),
     dockSlot: (RingItem.Folder) -> Bounds? = { null },
     names: Boolean = false,
+    spin: RingSpin = rememberRingSpin(),
 ) {
     val arrival = rearrange?.arriving
     val making = if (openFolder == null) arrival?.preview(ring) else null
@@ -247,6 +250,9 @@ fun HomeRing(
         else -> moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
     }
     val landsAt = arrival?.to ?: moving?.at
+    // Slots are hit by where they are shown, so the ring is back in place at once when anything else moves its items.
+    val spins = centred == null && moving == null && arrival == null && held == null && hint == null && ring.isNotEmpty()
+    SideEffect { spin.spins = spins }
 
     Layout(
         content = {
@@ -314,7 +320,7 @@ fun HomeRing(
                     val out = spread.value
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     if (centred == null) {
-                        ringMarks(glow, 1f)
+                        rotate(Math.toDegrees(spin.turn.toDouble()).toFloat()) { ringMarks(glow, 1f) }
                     } else {
                         val drift = 1f + DRIFT * out
                         scale(drift, drift) { ringMarks(glow, 1f - out) }
@@ -367,6 +373,8 @@ fun HomeRing(
         layout(constraints.maxWidth, constraints.maxHeight) {
             val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
             val out = spread.value
+            val turn = spin.turn.toDouble()
+            coordinates?.let { spin.place(it, centreSize / 2f, ringRadius + ringIconSize / 2) }
             // Where the planet's slot is, as an offset from the centre, and how large: on the ring, or in the dock, which
             // lies outside the ring's box and is read where the dock placed it.
             val dockBounds = centred?.takeIf { it.at.holder == HomePlace.Dock }?.let(dockSlot)
@@ -379,7 +387,7 @@ fun HomeRing(
             }
             val slotSize = dockBounds?.let { it.right - it.left } ?: ringIconSize
             val planetAt = middle + planetSlot * (1f - out)
-            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
+            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count, turn).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
 
             fun Placeable.placeAt(at: Offset, layer: (GraphicsLayerScope.() -> Unit)? = null) {
                 val x = (at.x - width / 2f).roundToInt()
@@ -420,7 +428,8 @@ fun HomeRing(
                     is Part.Slot -> when {
                         openFolder != null -> placeable.placeSpiralling(part.index, slots, radius)
                         folding != null -> placeable.placeDrifting(part.index)
-                        else -> placeable.placeAt(slotAt(part.index, slots, radius))
+                        // On a layer, so a spin moves it without drawing the ring again.
+                        else -> placeable.placeAt(slotAt(part.index, slots, radius)) {}
                     }
                     Part.Held -> placeable.place(0, 0)
                     is Part.Leaving -> placeable.placeDrifting(part.index)

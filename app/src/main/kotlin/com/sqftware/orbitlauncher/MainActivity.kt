@@ -33,6 +33,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
@@ -104,6 +105,7 @@ class MainActivity : ComponentActivity() {
         val drawerStyleStore = SharedPreferencesDrawerStyleStore(this)
         val ambientMotionStore = SharedPreferencesAmbientMotionStore(this)
         val appNamesStore = SharedPreferencesAppNamesStore(this)
+        val ringSpinStore = SharedPreferencesRingSpinStore(this)
         val homeOnReturnStore = SharedPreferencesHomeOnReturnStore(this)
         val pickTipStore = SharedPreferencesPickTipStore(this)
         val ringer = SystemRinger(this)
@@ -175,6 +177,7 @@ class MainActivity : ComponentActivity() {
                 var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
+                var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
                 var pickTip by remember { mutableStateOf(pickTipStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
@@ -326,6 +329,11 @@ class MainActivity : ComponentActivity() {
                     onAppNamesChange = {
                         appNames = it
                         appNamesStore.save(it)
+                    },
+                    ringSpin = ringSpin,
+                    onRingSpinChange = {
+                        ringSpin = it
+                        ringSpinStore.save(it)
                     },
                     homeOnReturn = homeOnReturn,
                     onHomeOnReturnChange = {

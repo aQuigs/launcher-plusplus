@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -25,6 +27,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -82,20 +85,24 @@ class HomeRingTest {
         compose.setContent {
             Themed(theme, theme.colourways.first(), lightWallpaper = false) {
                 CompositionLocalProvider(LocalFolderStyle provides FolderStyle(folderLook), LocalLayoutDirection provides direction) {
-                    HomeRing(
-                        ring = ring,
-                        hint = shownHint,
-                        icon = { null },
-                        onLaunch = onLaunch,
-                        onOpenFolder = onOpenFolder,
-                        onCloseFolder = onCloseFolder,
-                        onEdit = onEdit,
-                        onSearch = onSearch,
-                        openFolder = openFolder,
-                        unread = unread,
-                        onClearBadge = onClearBadge,
-                        names = names,
-                    )
+                    val spin = rememberRingSpin()
+                    Box(Modifier.spinsRing(spin)) {
+                        HomeRing(
+                            ring = ring,
+                            hint = shownHint,
+                            icon = { null },
+                            onLaunch = onLaunch,
+                            onOpenFolder = onOpenFolder,
+                            onCloseFolder = onCloseFolder,
+                            onEdit = onEdit,
+                            onSearch = onSearch,
+                            openFolder = openFolder,
+                            unread = unread,
+                            onClearBadge = onClearBadge,
+                            names = names,
+                            spin = spin,
+                        )
+                    }
                 }
             }
         }
@@ -330,6 +337,39 @@ class HomeRingTest {
 
         compose.folderSlot(2).assertExists()
         compose.onNodeWithContentDescription(mail.label).assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    fun aQuickDragRoundTheRingSpinsItOnAndItSettlesWhereItWasButADragOutDoesNot() {
+        val launched = mutableListOf<AppEntry>()
+        val four = alphabet.take(4)
+        show(four, onLaunch = launched::add)
+        compose.mainClock.autoAdvance = false
+        val top = four[0]
+        val rest = compose.ringSlot(top).getUnclippedBoundsInRoot().middle
+        val ring = compose.onRoot().getUnclippedBoundsInRoot().middle
+        fun topNow() = compose.ringSlot(top).getUnclippedBoundsInRoot().middle
+        fun px(at: Offset) = at * compose.density.density
+
+        compose.onRoot().performTouchInput { swipe(px(Offset(ring.x, rest.y - 10f)), px(Offset(ring.x, rest.y - 160f)), 80) }
+        compose.mainClock.advanceTimeBy(300)
+        assertEquals("a drag outward leaves it", rest.x, topNow().x, 0.5f)
+
+        val reach = ring.y - rest.y
+        compose.onRoot().performTouchInput { swipe(px(Offset(ring.x - reach / 2, rest.y)), px(Offset(ring.x + reach / 2, rest.y)), 80) }
+        compose.mainClock.advanceTimeByFrame()
+        val letGo = topNow()
+        compose.mainClock.advanceTimeBy(300)
+        assertTrue("turned clockwise with the finger", letGo.x > rest.x + 20f)
+        assertTrue("still turning after the finger left", (topNow() - letGo).getDistance() > 10f)
+
+        // Caught by a tap, it stops under the finger instead of launching what the finger lands on.
+        compose.ringSlot(four[1]).performTouchInput { click() }
+        compose.mainClock.advanceTimeBy(15_000)
+        assertEquals(emptyList<AppEntry>(), launched)
+        assertEquals("back where it was", rest.x, topNow().x, 0.5f)
+        assertEquals(rest.y, topNow().y, 0.5f)
         compose.mainClock.autoAdvance = true
     }
 
