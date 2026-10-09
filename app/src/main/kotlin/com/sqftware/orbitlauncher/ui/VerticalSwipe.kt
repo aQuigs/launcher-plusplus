@@ -44,7 +44,7 @@ fun Modifier.verticalSwipe(onDown: () -> Unit, onUp: () -> Unit): Modifier = poi
  * It decides at that first crossing, where Compose's awaitTouchSlopOrCancellation watches on: once the pager follows a
  * page swipe, the finger barely moves across the page it drags, and its drift up or down alone would read as a swipe.
  */
-private suspend fun AwaitPointerEventScope.awaitSlop(pointer: PointerId, start: Offset): PointerInputChange? {
+internal suspend fun AwaitPointerEventScope.awaitSlop(pointer: PointerId, start: Offset): PointerInputChange? {
     while (true) {
         val change = awaitPointerEvent().changes.firstOrNull { it.id == pointer }
         if (change == null || change.isConsumed || !change.pressed) return null

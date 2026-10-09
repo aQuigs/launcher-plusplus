@@ -1306,6 +1306,7 @@ fun LauncherScreen(
                                 val pageStyle = remember(folderLook, pageRing, pageDock) {
                                     FolderStyle(folderLook, planetsOf(pageRing, pageDock)) { sky.value.value / 360f * 60f }
                                 }
+                                val spin = rememberRingSpin()
                                 CompositionLocalProvider(LocalFolderStyle provides pageStyle) {
                                     Column(
                                         Modifier
@@ -1313,7 +1314,7 @@ fun LauncherScreen(
                                             .onPlaced { ringPageCoordinates[page.id] = it }
                                             .verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() }),
                                     ) {
-                                        Box(Modifier.weight(1f)) {
+                                        Box(Modifier.weight(1f).spinsRing(spin)) {
                                             // First, so it lies behind the clock, the ring and the card and gets only the touches they
                                             // leave. A tap anywhere there closes an open folder, not only one on the ring's centre.
                                             EmptySpace(
@@ -1372,6 +1373,7 @@ fun LauncherScreen(
                                                     inSight = active && ringInSight,
                                                     turns = active && ambient,
                                                     names = appNames,
+                                                    spin = spin,
                                                     minuteOfDay = { latestMinuteOfDay },
                                                     dock = pageDock,
                                                     dockSlot = { dockRearrange.boundsOf(it, dock) },

@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -158,7 +159,8 @@ private sealed interface Part {
  * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
  * still found, and [dockSlot] where the dock shows a folder, in root coordinates, so its planet leaves from there and
  * goes back there. With [names], each app on the ring and in the open folder, and each folder the user named, has its
- * name under it, kept clear of its neighbours, the emblem and the ring's box.
+ * name under it, kept clear of its neighbours, the emblem and the ring's box. The ring shows turned as far as [spin]
+ * says, and tells it where it is while it can spin: neither a folder open nor anything on the move.
  */
 @Composable
 fun HomeRing(
@@ -188,6 +190,7 @@ fun HomeRing(
     dock: List<RingItem> = emptyList(),
     dockSlot: (RingItem.Folder) -> Bounds? = { null },
     names: Boolean = false,
+    spin: RingSpin? = null,
 ) {
     val arrival = rearrange?.arriving
     val making = if (openFolder == null) arrival?.preview(ring) else null
@@ -312,12 +315,13 @@ fun HomeRing(
                 val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> folderSlotOffset(index, count) } }
                 onDrawBehind {
                     val out = spread.value
+                    val turned = Math.toDegrees((spin?.turn ?: 0f).toDouble()).toFloat()
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     if (centred == null) {
-                        ringMarks(glow, 1f)
+                        rotate(turned) { ringMarks(glow, 1f) }
                     } else {
                         val drift = 1f + DRIFT * out
-                        scale(drift, drift) { ringMarks(glow, 1f - out) }
+                        scale(drift, drift) { rotate(turned) { ringMarks(glow, 1f - out) } }
                         folderMarks?.invoke(this, glow, out * out)
                     }
                 }
@@ -367,6 +371,9 @@ fun HomeRing(
         layout(constraints.maxWidth, constraints.maxHeight) {
             val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
             val out = spread.value
+            val turn = (spin?.turn ?: 0f).toDouble()
+            val still = centred == null && moving == null && arrival == null && held == null && hint == null && ring.isNotEmpty()
+            spin?.place(coordinates.takeIf { still }, centreSize / 2f, ringRadius + ringIconSize / 2)
             // Where the planet's slot is, as an offset from the centre, and how large: on the ring, or in the dock, which
             // lies outside the ring's box and is read where the dock placed it.
             val dockBounds = centred?.takeIf { it.at.holder == HomePlace.Dock }?.let(dockSlot)
@@ -374,12 +381,12 @@ fun HomeRing(
                 dockBounds != null -> coordinates?.let {
                     Offset((dockBounds.left + dockBounds.right) / 2, (dockBounds.top + dockBounds.bottom) / 2) - it.localToRoot(middle)
                 } ?: Offset.Zero
-                planetIndex >= 0 -> ringSlotOffset(planetIndex, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
+                planetIndex >= 0 -> ringSlotOffset(planetIndex, ring.size, turn).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
                 else -> Offset.Zero
             }
             val slotSize = dockBounds?.let { it.right - it.left } ?: ringIconSize
             val planetAt = middle + planetSlot * (1f - out)
-            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
+            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count, turn).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
 
             fun Placeable.placeAt(at: Offset, layer: (GraphicsLayerScope.() -> Unit)? = null) {
                 val x = (at.x - width / 2f).roundToInt()
