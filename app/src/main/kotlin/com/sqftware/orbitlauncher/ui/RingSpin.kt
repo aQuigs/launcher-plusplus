@@ -36,6 +36,12 @@ import kotlinx.coroutines.launch
 private const val COAST_RATE = 1.4f
 
 /**
+ * How close, in radians, the coast comes to its rest before it ends there: under half a pixel on a phone. The stock
+ * threshold of a hundredth is several pixels, which showed as a jump when the ring came to rest.
+ */
+private const val REST_THRESHOLD = 0.001f
+
+/**
  * The ring's fidget spin: a quick drag round the ring turns it, and let go it coasts on and settles on the nearest
  * whole turn, so it always ends as it shows otherwise. Only how the ring looks turns, never the order of its items.
  */
@@ -91,7 +97,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
         val rest = restingTurn(from + velocity / COAST_RATE)
         glide = scope.launch {
             // Critically damped at the coast rate, a spring slows as an exponential coast does, but lands on the rest.
-            animate(from, rest, velocity, spring(Spring.DampingRatioNoBouncy, COAST_RATE * COAST_RATE)) { value, _ -> turn = value }
+            animate(from, rest, velocity, spring(Spring.DampingRatioNoBouncy, COAST_RATE * COAST_RATE, REST_THRESHOLD)) { value, _ -> turn = value }
             turn = 0f
         }
     }
