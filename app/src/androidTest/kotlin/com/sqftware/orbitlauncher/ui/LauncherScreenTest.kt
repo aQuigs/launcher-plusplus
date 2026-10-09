@@ -152,6 +152,8 @@ class LauncherScreenTest {
     private var ambientMotion by mutableStateOf(true)
     private var appNames by mutableStateOf(false)
     private var homeOnReturn by mutableStateOf(false)
+    private var pickTip by mutableStateOf(false)
+    private val toasts = mutableListOf<String>()
     private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
@@ -274,6 +276,9 @@ class LauncherScreenTest {
             onAppNamesChange = { appNames = it },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
+            pickTip = pickTip,
+            onPickTipLearned = { pickTip = false },
+            onToast = { toasts += it },
             drawerStyle = drawerStyle,
             onDrawerStyleChange = { drawerStyle = it },
             onOpenClock = { opened += "clock" },
@@ -2026,6 +2031,28 @@ class LauncherScreenTest {
         compose.searchField().assertIsFocused()
         compose.placePicker().assertDoesNotExist()
         compose.launcherMenu().assertDoesNotExist()
+    }
+
+    @Test
+    fun aTapOnTheEmblemTellsOfTheLongPressUntilALongPressHasPicked() {
+        homeApps = HomeApps(ring = ringOf(mail))
+        pickTip = true
+        show()
+
+        compose.emblem().performClick()
+        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(false)
+
+        compose.emblem().performTouchInput { longClick() }
+        compose.placePicker().assertIsDisplayed()
+        compose.runOnIdle { assertFalse(pickTip) }
+        compose.drawerHandle().performClick()
+        assertDrawerOpen(false)
+
+        compose.emblem().performClick()
+        assertDrawerOpen(true)
+        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
     }
 
     // Flipped twice, so a row that kept the style it first showed would ask for the same one again.
