@@ -55,6 +55,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -160,7 +162,7 @@ data class DrawerControls(
  * its [menu], or in the most used row the [mostUsedMenu], unless the drawer is [picking]; a long press that moves on
  * becomes a [drag]. A change of style starts the list again at its top. A search field heads the
  * list: with a [query] the list holds only the matching apps, without sections or rail, and the keyboard's search key
- * acts on the first of them as a tap would. An app with [unread] notifications shows their number, in full at the end of
+ * acts on the first of them as a tap would; [searchFocus] puts the keyboard in the field. An app with [unread] notifications shows their number, in full at the end of
  * its row, since a row has the room a badge lacks, or as a badge on its icon in the grid.
  */
 @Composable
@@ -176,6 +178,7 @@ fun AppDrawer(
     drag: AppDrag? = null,
     query: String,
     onQueryChange: (String) -> Unit,
+    searchFocus: FocusRequester = remember { FocusRequester() },
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
     controls: DrawerControls? = null,
@@ -245,7 +248,10 @@ fun AppDrawer(
                 onSearch = {
                     if (picking == null) matches.firstOrNull()?.let(onLaunch) else matches.firstOrNull(picking.isPickable)?.let(picking.onToggle)
                 },
-                modifier = Modifier.weight(1f).padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp)
+                    .focusRequester(searchFocus),
             )
             controls?.let { StyleButtons(it) }
         }

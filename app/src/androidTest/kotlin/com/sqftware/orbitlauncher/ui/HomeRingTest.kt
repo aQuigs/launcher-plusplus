@@ -18,6 +18,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -63,13 +64,15 @@ class HomeRingTest {
         hint: String? = null,
         onLaunch: (AppEntry) -> Unit = {},
         onEdit: () -> Unit = {},
-    ) = showItems(favourites.asRingItems(), hint, onLaunch, onEdit)
+        onSearch: () -> Unit = {},
+    ) = showItems(favourites.asRingItems(), hint, onLaunch, onEdit, onSearch)
 
     private fun showItems(
         items: List<RingItem>,
         hint: String? = null,
         onLaunch: (AppEntry) -> Unit = {},
         onEdit: () -> Unit = {},
+        onSearch: () -> Unit = {},
         onOpenFolder: (RingItem.Folder) -> Unit = {},
         onCloseFolder: () -> Unit = {},
         onClearBadge: (AppEntry) -> Unit = {},
@@ -87,6 +90,7 @@ class HomeRingTest {
                         onOpenFolder = onOpenFolder,
                         onCloseFolder = onCloseFolder,
                         onEdit = onEdit,
+                        onSearch = onSearch,
                         openFolder = openFolder,
                         unread = unread,
                         onClearBadge = onClearBadge,
@@ -137,13 +141,19 @@ class HomeRingTest {
     }
 
     @Test
-    fun tappingTheEmblemEditsTheRing() {
+    fun tappingTheEmblemSearchesAndALongPressEditsTheRingButAHintTapEdits() {
         var edits = 0
-        show(listOf(clock), onEdit = { edits++ })
+        var searches = 0
+        show(listOf(clock), onEdit = { edits++ }, onSearch = { searches++ })
 
         compose.emblem().assertContentDescriptionEquals("Favourites").performClick()
+        assertEquals(1 to 0, searches to edits)
+        compose.emblem().performTouchInput { longClick() }
+        assertEquals(1 to 1, searches to edits)
 
-        assertEquals(1, edits)
+        shownHint = "Add apps"
+        compose.emblem().performClick()
+        assertEquals(1 to 2, searches to edits)
     }
 
     @Test
