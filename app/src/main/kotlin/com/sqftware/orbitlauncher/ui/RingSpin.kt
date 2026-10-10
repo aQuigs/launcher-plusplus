@@ -59,7 +59,7 @@ private val CATCH_SPEED = 30.dp
 private const val HOLD_MILLIS = 200L
 
 /**
- * The ring's fidget spin: a drag round the ring after a brief press turns it, and let go it coasts on and settles on the nearest
+ * The ring's fidget spin: a drag round the ring, after a brief press if [pressFirst], turns it, and let go it coasts on and settles on the nearest
  * whole turn, so it always ends as it shows otherwise. Only how the ring looks turns, never the order of its items.
  */
 @Stable

@@ -364,7 +364,6 @@ fun LauncherScreen(
     val latestAppNames by rememberUpdatedState(appNames)
     val latestOnAppNamesChange by rememberUpdatedState(onAppNamesChange)
     val latestRingSpin by rememberUpdatedState(ringSpin)
-    val latestOnRingSpinChange by rememberUpdatedState(onRingSpinChange)
     val latestHomeOnReturn by rememberUpdatedState(homeOnReturn)
     val latestOnHomeOnReturnChange by rememberUpdatedState(onHomeOnReturnChange)
     val latestOnRestart by rememberUpdatedState(onRestart)
