@@ -2100,19 +2100,28 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theLauncherMenusSpinRowTurnsSpinningOffSoAPressAndDragRoundTheRingTurnsThePageAgain() {
+    fun aDragDownTheRingsSideSpinsItUntilTheMenusSpinRowTurnsSpinningOffWhileASwipeAcrossTheTopTurnsThePage() {
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         val top = centreOf(compose.ringSlot(clock))
-        fun dragRoundTheTop() = compose.onRoot().performTouchInput {
-            val across = Offset(60.dp.toPx(), 0f)
-            down(top + across)
-            advanceEventTime(250)
-            for (step in 1..8) moveTo(top + across - across * (step / 4f), delayMillis = 10)
-            up()
+        // Two apps sit at the top and the bottom, so the ring's right side is half their gap out from its centre.
+        val bottom = centreOf(compose.ringSlot(mail))
+        val side = (top + bottom) / 2f + Offset((bottom.y - top.y) / 2, 0f)
+        fun dragDownTheSide() = compose.onRoot().performTouchInput {
+            val along = Offset(0f, 60.dp.toPx())
+            swipe(side - along, side + along, 80)
         }
 
-        dragRoundTheTop()
+        dragDownTheSide()
+        assertSettledOn(LauncherPage.Home)
+        compose.runOnIdle { assertEquals(0, notificationsOpened) }
+
+        compose.onRoot().performTouchInput {
+            val across = Offset(60.dp.toPx(), 0f)
+            swipe(top + across, top - across, 80)
+        }
+        assertSettledOn(LauncherPage.Collections)
+        compose.swipePager { swipeRight() }
         assertSettledOn(LauncherPage.Home)
 
         compose.longPressEmptyHomeSpace()
@@ -2120,8 +2129,8 @@ class LauncherScreenTest {
         compose.runOnIdle { assertFalse(ringSpin) }
         Espresso.pressBack()
 
-        dragRoundTheTop()
-        assertSettledOn(LauncherPage.Collections)
+        dragDownTheSide()
+        compose.runOnIdle { assertEquals(1, notificationsOpened) }
     }
 
     @Test

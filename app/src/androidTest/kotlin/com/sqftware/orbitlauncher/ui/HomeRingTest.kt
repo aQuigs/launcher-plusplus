@@ -340,19 +340,17 @@ class HomeRingTest {
         compose.mainClock.autoAdvance = true
     }
 
-    /** Presses the ring, at rest, by its top and flings it clockwise round, or only swipes across it unless [held]. */
-    private fun fling(held: Boolean = true) {
+    /** Flings the ring, at rest, clockwise down its right side, or with [across] only swipes across its top. */
+    private fun fling(across: Boolean = false) {
         val rest = topNow()
         val ring = compose.onRoot().getUnclippedBoundsInRoot().middle
         val reach = ring.y - rest.y
-        val from = px(Offset(ring.x - reach / 2, rest.y))
-        val to = px(Offset(ring.x + reach / 2, rest.y))
-        compose.onRoot().performTouchInput {
-            down(from)
-            if (held) advanceEventTime(250)
-            for (step in 1..8) moveTo(from + (to - from) * (step / 8f), delayMillis = 10)
-            up()
+        val (from, to) = if (across) {
+            Offset(ring.x - reach / 2, rest.y) to Offset(ring.x + reach / 2, rest.y)
+        } else {
+            Offset(ring.x + reach, ring.y - reach / 2) to Offset(ring.x + reach, ring.y + reach / 2)
         }
+        compose.onRoot().performTouchInput { swipe(px(from), px(to), 80) }
         compose.mainClock.advanceTimeByFrame()
     }
 
@@ -370,7 +368,7 @@ class HomeRingTest {
     private val pixel get() = 1 / compose.density.density
 
     @Test
-    fun aPressAndDragRoundTheRingSpinsItOnAndItSettlesWhereItWasButASwipeDoesNot() {
+    fun aDragDownTheRingsSideSpinsItOnAndItSettlesWhereItWasButASwipeAcrossItDoesNot() {
         val launched = mutableListOf<AppEntry>()
         show(alphabet.take(4), onLaunch = launched::add)
         compose.mainClock.autoAdvance = false
@@ -379,9 +377,9 @@ class HomeRingTest {
         compose.onRoot().performTouchInput { swipe(px(Offset(ring.x, rest.y - 10f)), px(Offset(ring.x, rest.y - 160f)), 80) }
         compose.mainClock.advanceTimeBy(300)
         assertEquals("a drag outward leaves it", rest.x, topNow().x, 0.5f)
-        fling(held = false)
+        fling(across = true)
         compose.mainClock.advanceTimeBy(300)
-        assertEquals("so does a swipe across it with no press first", rest.x, topNow().x, 0.5f)
+        assertEquals("so does a swipe across its top", rest.x, topNow().x, 0.5f)
 
         fling()
         val letGo = topNow()
