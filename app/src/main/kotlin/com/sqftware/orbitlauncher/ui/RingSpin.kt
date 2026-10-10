@@ -53,14 +53,8 @@ private const val SETTLE_STIFFNESS = Spring.StiffnessLow
 private val CATCH_SPEED = 30.dp
 
 /**
- * How long a finger rests on the ring before a drag round it spins it. A swipe moves at once, so one that crosses the
- * ring still turns the page; the rest stays well short of a long press, which opens an app's menu.
- */
-private const val HOLD_MILLIS = 200L
-
-/**
- * The ring's fidget spin: a drag round the ring after a brief press turns it, and let go it coasts on and settles on the nearest
- * whole turn, so it always ends as it shows otherwise. Only how the ring looks turns, never the order of its items.
+ * The ring's fidget spin: a drag up or down round the ring's sides turns it, and let go it coasts on and settles on the
+ * nearest whole turn, so it always ends as it shows otherwise. Only how the ring looks turns, never the order of its items.
  */
 @Stable
 class RingSpin internal constructor(private val scope: CoroutineScope) {
@@ -136,11 +130,13 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             }
             // What the finger lands on takes the press for a tap, which the wait below would read as the touch taken.
             awaitPointerEvent(PointerEventPass.Final)
-            // The touch slop crossed going round the ring, after a rest or from a catch, makes the touch a spin; anything
-            // else is left to the rest. A caught ring is already in hand, so it needs no rest.
+            // The touch slop crossed going round the ring makes the touch a spin, but only up or down its sides, so a swipe
+            // across its top or bottom still turns the page; a caught ring is in hand, and any drag round it spins it.
+            // Anything else is left to the rest.
             var crossing = awaitSlop(down.id, down.position)
-            val rested = caught || crossing != null && crossing.uptimeMillis - down.uptimeMillis >= HOLD_MILLIS
-            if (crossing == null || !rested || (crossing.position - down.position).let { !goesRound(start.x, start.y, it.x, it.y) }) {
+            val moved = crossing?.let { it.position - down.position }
+            val spun = moved != null && goesRound(start.x, start.y, moved.x, moved.y) && (caught || abs(moved.y) >= abs(moved.x))
+            if (!spun) {
                 if (caught) settle()
                 return@awaitEachGesture
             }
