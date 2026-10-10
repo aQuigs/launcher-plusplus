@@ -96,6 +96,7 @@ import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.RingSlot
+import com.sqftware.orbitlauncher.domain.RingSpinMode
 import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
@@ -151,7 +152,7 @@ class LauncherScreenTest {
         }
     private var ambientMotion by mutableStateOf(true)
     private var appNames by mutableStateOf(false)
-    private var ringSpin by mutableStateOf(true)
+    private var ringSpin by mutableStateOf(RingSpinMode.AfterPress)
     private var homeOnReturn by mutableStateOf(false)
     private var pickTip by mutableStateOf(false)
     private val toasts = mutableListOf<String>()
@@ -2100,27 +2101,35 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theLauncherMenusSpinRowTurnsSpinningOffSoAPressAndDragRoundTheRingTurnsThePageAgain() {
+    fun theLauncherMenusSpinRowPicksWhatSpinsTheRingAndOffLeavesTheDragToThePage() {
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         val top = centreOf(compose.ringSlot(clock))
-        fun dragRoundTheTop() = compose.onRoot().performTouchInput {
+        fun dragRoundTheTop(rest: Long) = compose.onRoot().performTouchInput {
             val across = Offset(60.dp.toPx(), 0f)
             down(top + across)
-            advanceEventTime(250)
+            advanceEventTime(rest)
             for (step in 1..8) moveTo(top + across - across * (step / 4f), delayMillis = 10)
             up()
         }
+        fun pick(mode: String) {
+            compose.longPressEmptyHomeSpace()
+            compose.onNodeWithText("Spin the ring").performClick()
+            compose.onNodeWithTag(LauncherMenuTags.SPIN_DIALOG).assertIsDisplayed()
+            compose.onNodeWithText(mode).performClick()
+        }
 
-        dragRoundTheTop()
+        dragRoundTheTop(rest = 250)
         assertSettledOn(LauncherPage.Home)
 
-        compose.longPressEmptyHomeSpace()
-        compose.onNodeWithText("Spin the ring").assertIsOn().performClick()
-        compose.runOnIdle { assertFalse(ringSpin) }
-        Espresso.pressBack()
+        pick("Any drag")
+        compose.runOnIdle { assertEquals(RingSpinMode.AnyDrag, ringSpin) }
+        dragRoundTheTop(rest = 0)
+        assertSettledOn(LauncherPage.Home)
 
-        dragRoundTheTop()
+        pick("Off")
+        compose.runOnIdle { assertEquals(RingSpinMode.Off, ringSpin) }
+        dragRoundTheTop(rest = 250)
         assertSettledOn(LauncherPage.Collections)
     }
 

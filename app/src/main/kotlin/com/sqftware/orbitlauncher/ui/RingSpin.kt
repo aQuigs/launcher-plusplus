@@ -78,6 +78,9 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             }
         }
 
+    /** Whether a drag must start with a rest on the ring to spin it, so a page swipe across the ring still turns the page. */
+    internal var pressFirst = true
+
     private var glide: Job? = null
 
     /** How fast [glide] turns the ring, in radians a second. */
@@ -136,10 +139,10 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             }
             // What the finger lands on takes the press for a tap, which the wait below would read as the touch taken.
             awaitPointerEvent(PointerEventPass.Final)
-            // The touch slop crossed going round the ring, after a rest or from a catch, makes the touch a spin; anything
-            // else is left to the rest. A caught ring is already in hand, so it needs no rest.
+            // The touch slop crossed going round the ring, after a rest if one is asked for or from a catch, makes the
+            // touch a spin; anything else is left to the rest. A caught ring is already in hand, so it needs no rest.
             var crossing = awaitSlop(down.id, down.position)
-            val rested = caught || crossing != null && crossing.uptimeMillis - down.uptimeMillis >= HOLD_MILLIS
+            val rested = caught || !pressFirst || crossing != null && crossing.uptimeMillis - down.uptimeMillis >= HOLD_MILLIS
             if (crossing == null || !rested || (crossing.position - down.position).let { !goesRound(start.x, start.y, it.x, it.y) }) {
                 if (caught) settle()
                 return@awaitEachGesture
