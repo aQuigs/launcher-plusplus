@@ -2100,13 +2100,16 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theLauncherMenusSpinRowTurnsSpinningOffSoADragRoundTheRingTurnsThePageAgain() {
+    fun theLauncherMenusSpinRowTurnsSpinningOffSoAPressAndDragRoundTheRingTurnsThePageAgain() {
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         val top = centreOf(compose.ringSlot(clock))
         fun dragRoundTheTop() = compose.onRoot().performTouchInput {
             val across = Offset(60.dp.toPx(), 0f)
-            swipe(top + across, top - across, 80)
+            down(top + across)
+            advanceEventTime(250)
+            for (step in 1..8) moveTo(top + across - across * (step / 4f), delayMillis = 10)
+            up()
         }
 
         dragRoundTheTop()
