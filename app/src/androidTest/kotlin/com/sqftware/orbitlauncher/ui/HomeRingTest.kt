@@ -340,12 +340,19 @@ class HomeRingTest {
         compose.mainClock.autoAdvance = true
     }
 
-    /** Flings the ring, at rest, clockwise round. */
-    private fun fling() {
+    /** Presses the ring, at rest, by its top and flings it clockwise round, or only swipes across it unless [held]. */
+    private fun fling(held: Boolean = true) {
         val rest = topNow()
         val ring = compose.onRoot().getUnclippedBoundsInRoot().middle
         val reach = ring.y - rest.y
-        compose.onRoot().performTouchInput { swipe(px(Offset(ring.x - reach / 2, rest.y)), px(Offset(ring.x + reach / 2, rest.y)), 80) }
+        val from = px(Offset(ring.x - reach / 2, rest.y))
+        val to = px(Offset(ring.x + reach / 2, rest.y))
+        compose.onRoot().performTouchInput {
+            down(from)
+            if (held) advanceEventTime(250)
+            for (step in 1..8) moveTo(from + (to - from) * (step / 8f), delayMillis = 10)
+            up()
+        }
         compose.mainClock.advanceTimeByFrame()
     }
 
@@ -363,7 +370,7 @@ class HomeRingTest {
     private val pixel get() = 1 / compose.density.density
 
     @Test
-    fun aQuickDragRoundTheRingSpinsItOnAndItSettlesWhereItWasButADragOutDoesNot() {
+    fun aPressAndDragRoundTheRingSpinsItOnAndItSettlesWhereItWasButASwipeDoesNot() {
         val launched = mutableListOf<AppEntry>()
         show(alphabet.take(4), onLaunch = launched::add)
         compose.mainClock.autoAdvance = false
@@ -372,6 +379,9 @@ class HomeRingTest {
         compose.onRoot().performTouchInput { swipe(px(Offset(ring.x, rest.y - 10f)), px(Offset(ring.x, rest.y - 160f)), 80) }
         compose.mainClock.advanceTimeBy(300)
         assertEquals("a drag outward leaves it", rest.x, topNow().x, 0.5f)
+        fling(held = false)
+        compose.mainClock.advanceTimeBy(300)
+        assertEquals("so does a swipe across it with no press first", rest.x, topNow().x, 0.5f)
 
         fling()
         val letGo = topNow()
