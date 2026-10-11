@@ -445,6 +445,30 @@ class HomeRingTest {
     }
 
     @Test
+    fun anOpenFolderSpinsAsTheRingDoesAndSettlesWhereItWas() {
+        val launched = mutableListOf<AppEntry>()
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), alphabet.take(4))
+        openFolder = work
+        showItems(listOf(RingItem.App(clock), work), onLaunch = launched::add)
+        compose.mainClock.autoAdvance = false
+        val rest = topNow()
+        val centre = compose.onRoot().getUnclippedBoundsInRoot().middle
+        val reach = (rest - centre).getDistance()
+
+        compose.onRoot().performTouchInput {
+            swipe(px(Offset(centre.x + reach, centre.y - reach / 2)), px(Offset(centre.x + reach, centre.y + reach / 2)), 80)
+        }
+        compose.mainClock.advanceTimeBy(300)
+        assertTrue("turned clockwise with the finger", topNow().x > rest.x + 20f)
+
+        compose.mainClock.advanceTimeBy(15_000)
+        assertEquals(emptyList<AppEntry>(), launched)
+        assertEquals("back where it was", rest.x, topNow().x, 0.5f)
+        assertEquals(rest.y, topNow().y, 0.5f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
     fun aFolderThatGoesWhileOpenClosesAtOnce() {
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail))
         openFolder = work
