@@ -159,8 +159,8 @@ private sealed interface Part {
  * closed because it changed or went, is in place at once; the [dock]'s items are where a dock folder that closes is
  * still found, and [dockSlot] where the dock shows a folder, in root coordinates, so its planet leaves from there and
  * goes back there. With [names], each app on the ring and in the open folder, and each folder the user named, has its
- * name under it, kept clear of its neighbours, the emblem and the ring's box. The ring shows turned as far as [spin]
- * says, which spins it only while neither a folder is open nor anything is on the move.
+ * name under it, kept clear of its neighbours, the emblem and the ring's box. The ring, or an open folder once its apps
+ * are out, shows turned as far as [spin] says, which spins it only while nothing is on the move.
  */
 @Composable
 fun HomeRing(
@@ -250,9 +250,13 @@ fun HomeRing(
         else -> moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
     }
     val landsAt = arrival?.to ?: moving?.at
-    // Slots are hit by where they are shown, so the ring is back in place at once when anything else moves its items.
-    val spins = centred == null && moving == null && arrival == null && held == null && hint == null && ring.isNotEmpty()
-    SideEffect { spin.spins = spins }
+    // The ring spins, or an open folder once its apps are all out, while nothing else moves their items; the hint is the
+    // ring's, which an open folder hides.
+    val spins = (centred == null && hint == null || openFolder != null && !spreadingOut) &&
+        moving == null && arrival == null && held == null && slots > 0
+    SideEffect { spin.spinning = if (spins) openFolder?.at ?: HomePlace.Ring else null }
+    // A folder closing as it spins folds in from where it was left, though the spin itself is over.
+    val foldTurn = remember(folding?.at) { Snapshot.withoutReadObservation { spin.turn } }
 
     Layout(
         content = {
@@ -324,7 +328,8 @@ fun HomeRing(
                     } else {
                         val drift = 1f + DRIFT * out
                         scale(drift, drift) { ringMarks(glow, 1f - out) }
-                        folderMarks?.invoke(this, glow, out * out)
+                        val folderTurn = if (openFolder != null) spin.turn else foldTurn
+                        rotate(Math.toDegrees(folderTurn.toDouble()).toFloat()) { folderMarks?.invoke(this, glow, out * out) }
                     }
                 }
             },
@@ -374,7 +379,7 @@ fun HomeRing(
             val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
             val out = spread.value
             val turn = spin.turn.toDouble()
-            coordinates?.let { spin.place(it, centreSize / 2f, ringRadius + ringIconSize / 2) }
+            coordinates?.let { spin.place(it, centreSize / 2f, radius + iconSize / 2) }
             // Where the planet's slot is, as an offset from the centre, and how large: on the ring, or in the dock, which
             // lies outside the ring's box and is read where the dock placed it.
             val dockBounds = centred?.takeIf { it.at.holder == HomePlace.Dock }?.let(dockSlot)
@@ -396,8 +401,8 @@ fun HomeRing(
             }
 
             // On its way out of the planet, [out] of the way: at 0 small and unseen at its heart, at 1 in [slot] of [count].
-            fun Placeable.placeSpiralling(index: Int, count: Int, radius: Float) {
-                val (dx, dy) = folderSlotOffset(index, count, (1.0 - out) * SPIRAL)
+            fun Placeable.placeSpiralling(index: Int, count: Int, radius: Float, turn: Double) {
+                val (dx, dy) = folderSlotOffset(index, count, (1.0 - out) * SPIRAL + turn)
                 placeAt(planetAt + Offset(dx, dy) * (radius * out)) {
                     scaleX = lerp(FOLDED_SCALE, 1f, out)
                     scaleY = scaleX
@@ -426,14 +431,14 @@ fun HomeRing(
                         scaleY = scaleX
                     }
                     is Part.Slot -> when {
-                        openFolder != null -> placeable.placeSpiralling(part.index, slots, radius)
+                        openFolder != null -> placeable.placeSpiralling(part.index, slots, radius, turn)
                         folding != null -> placeable.placeDrifting(part.index)
                         // On a layer, so a spin moves it without drawing the ring again.
                         else -> placeable.placeAt(slotAt(part.index, slots, radius)) {}
                     }
                     Part.Held -> placeable.place(0, 0)
                     is Part.Leaving -> placeable.placeDrifting(part.index)
-                    is Part.Folding -> placeable.placeSpiralling(part.index, centred?.apps?.size ?: 1, folderRadius)
+                    is Part.Folding -> placeable.placeSpiralling(part.index, centred?.apps?.size ?: 1, folderRadius, foldTurn.toDouble())
                     Part.Shield -> placeable.place(0, 0)
                 }
             }
