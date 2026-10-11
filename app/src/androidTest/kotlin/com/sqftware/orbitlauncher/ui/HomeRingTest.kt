@@ -452,12 +452,8 @@ class HomeRingTest {
         showItems(listOf(RingItem.App(clock), work), onLaunch = launched::add)
         compose.mainClock.autoAdvance = false
         val rest = topNow()
-        val centre = compose.onRoot().getUnclippedBoundsInRoot().middle
-        val reach = (rest - centre).getDistance()
 
-        compose.onRoot().performTouchInput {
-            swipe(px(Offset(centre.x + reach, centre.y - reach / 2)), px(Offset(centre.x + reach, centre.y + reach / 2)), 80)
-        }
+        flingOpenFolder()
         compose.mainClock.advanceTimeBy(300)
         assertTrue("turned clockwise with the finger", topNow().x > rest.x + 20f)
 
@@ -466,6 +462,35 @@ class HomeRingTest {
         assertEquals("back where it was", rest.x, topNow().x, 0.5f)
         assertEquals(rest.y, topNow().y, 0.5f)
         compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    fun aSpinningFolderThatGoesLeavesTheRingInPlace() {
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), alphabet.take(4))
+        showItems(listOf(RingItem.App(clock), work))
+        val clockAt = compose.ringSlot(clock).getUnclippedBoundsInRoot().middle
+        openFolder = work
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+
+        flingOpenFolder()
+        compose.mainClock.advanceTimeBy(300)
+        openFolder = null
+        ring = listOf(RingItem.App(clock), work.copy(apps = alphabet.take(3)))
+        compose.mainClock.advanceTimeByFrame()
+
+        assertEquals("not turned by the folder's spin", clockAt.x, compose.ringSlot(clock).getUnclippedBoundsInRoot().middle.x, 0.5f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    /** Flings the open folder clockwise down its right side. */
+    private fun flingOpenFolder() {
+        val centre = compose.onRoot().getUnclippedBoundsInRoot().middle
+        val reach = (topNow() - centre).getDistance()
+        compose.onRoot().performTouchInput {
+            swipe(px(Offset(centre.x + reach, centre.y - reach / 2)), px(Offset(centre.x + reach, centre.y + reach / 2)), 80)
+        }
+        compose.mainClock.advanceTimeByFrame()
     }
 
     @Test

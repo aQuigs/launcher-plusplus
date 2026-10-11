@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
+import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.goesRound
 import com.sqftware.orbitlauncher.domain.restingTurn
 import com.sqftware.orbitlauncher.domain.turnBetween
@@ -62,14 +63,17 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
     var turn by mutableFloatStateOf(0f)
         private set
 
-    /** Whether the ring may spin: off, it is back in place at once, since its slots are hit where they are shown. */
-    internal var spins = true
+    /**
+     * What may spin, the ring or an open folder, or null for nothing. Whenever it changes, what spun is back in place at
+     * once, since slots are hit where they are shown, and a spin never carries over to what spins next.
+     */
+    internal var spinning: Any? = HomePlace.Ring
         set(value) {
-            field = value
-            if (!value) {
+            if (value != field) {
                 glide?.cancel()
                 turn = 0f
             }
+            field = value
         }
 
     private var glide: Job? = null
@@ -93,7 +97,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
 
     /** [position] in the area the spin is dragged in, as an offset from the ring's centre, if the ring can spin. */
     private fun fromCentre(position: Offset): Offset? {
-        val ring = ring?.takeIf { spins && it.isAttached } ?: return null
+        val ring = ring?.takeIf { spinning != null && it.isAttached } ?: return null
         val area = area?.takeIf { it.isAttached } ?: return null
         return area.localToRoot(position) - ring.localToRoot(ring.size.center.toOffset())
     }
