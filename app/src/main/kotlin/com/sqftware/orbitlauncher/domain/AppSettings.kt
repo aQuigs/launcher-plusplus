@@ -5,13 +5,13 @@ package com.sqftware.orbitlauncher.domain
  * and Most Used cards. By package, as badges and those cards are: every activity of an app goes with it.
  */
 data class AppSettings(val badgeOff: Set<String> = emptySet(), val offBuiltInCards: Set<String> = emptySet()) {
-    fun isBadgeOff(app: AppEntry): Boolean = app.packageName in badgeOff
+    fun isBadgeOff(app: AppEntry): Boolean = app.packageKey in badgeOff
 
-    fun isOffBuiltInCards(app: AppEntry): Boolean = app.packageName in offBuiltInCards
+    fun isOffBuiltInCards(app: AppEntry): Boolean = app.packageKey in offBuiltInCards
 
-    fun toggleBadge(app: AppEntry): AppSettings = copy(badgeOff = badgeOff.toggle(app.packageName))
+    fun toggleBadge(app: AppEntry): AppSettings = copy(badgeOff = badgeOff.toggle(app.packageKey))
 
-    fun toggleBuiltInCards(app: AppEntry): AppSettings = copy(offBuiltInCards = offBuiltInCards.toggle(app.packageName))
+    fun toggleBuiltInCards(app: AppEntry): AppSettings = copy(offBuiltInCards = offBuiltInCards.toggle(app.packageKey))
 
     /** [unread] without the counts of the apps whose badge is off. */
     fun badges(unread: UnreadCounts): UnreadCounts = unread - badgeOff

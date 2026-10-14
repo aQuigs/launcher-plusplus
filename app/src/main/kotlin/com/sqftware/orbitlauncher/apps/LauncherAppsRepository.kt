@@ -1,9 +1,11 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
 import android.content.pm.LauncherApps.PinItemRequest
@@ -14,14 +16,17 @@ import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.os.UserHandle
+import android.os.UserManager
 import android.util.Log
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -50,10 +55,18 @@ private const val SHOWN_SHORTCUTS = ShortcutQuery.FLAG_MATCH_MANIFEST or Shortcu
 // What a square leaves free on each side when its corners touch a circle as wide: (1 - 1/√2) / 2.
 private val SQUARE_IN_CIRCLE = ((1 - 1 / sqrt(2.0)) / 2).toFloat()
 
+private val PROFILE_CHANGES = IntentFilter().apply {
+    addAction(Intent.ACTION_MANAGED_PROFILE_ADDED)
+    addAction(Intent.ACTION_MANAGED_PROFILE_REMOVED)
+    addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+    addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+}
+
 class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
     private val activityManager = context.getSystemService(ActivityManager::class.java)
-    private val user = Process.myUserHandle()
+    private val userManager = context.getSystemService(UserManager::class.java)
+    private val ownUser = Process.myUserHandle()
 
     // An icon is asked for again each time its app comes back into view, and a collection card brings dozens back at a
     // tap; a drawn one is kept until the package list changes, as an update may bring a new icon.
@@ -82,13 +95,25 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
                 trySend(Unit)
             }
             launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
+            // The callback hears of a work profile's packages, but not of the profile coming, going or pausing, which
+            // changes the apps listed but no icon. Pins are the user's own only, so they never hear of it.
+            val profileChanges = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    trySend(Unit)
+                }
+            }.takeUnless { withShortcuts }
+            profileChanges?.let { ContextCompat.registerReceiver(context, it, PROFILE_CHANGES, ContextCompat.RECEIVER_NOT_EXPORTED) }
             send(Unit)
-            awaitClose { launcherApps.unregisterCallback(callback) }
+            awaitClose {
+                launcherApps.unregisterCallback(callback)
+                profileChanges?.let(context::unregisterReceiver)
+            }
         }.conflate()
 
     private fun loadApps(): List<AppEntry> =
-        launcherApps.getActivityList(null, user)
-            .map { info ->
+        profiles().flatMap { profile ->
+            val workProfile = userManager.workProfileOf(profile)
+            launcherApps.getActivityList(null, profile).map { info ->
                 AppEntry(
                     label = info.label.toString(),
                     packageName = info.componentName.packageName,
@@ -97,22 +122,38 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
                     canUninstall = info.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0,
                     installedAt = info.firstInstallTime,
                     category = categoryHint(info.applicationInfo.category),
+                    workProfile = workProfile,
                 )
             }
-            .sortedByLabel()
+        }.sortedByLabel()
+
+    // The user's own apps and those of their work profile. A private space is listed only to launchers allowed to see
+    // hidden profiles, which this one is not; a clone profile would pass for work, so from Android 15, which names a
+    // profile's kind, only a work profile does.
+    private fun profiles(): List<UserHandle> = launcherApps.profiles.filter { profile ->
+        profile == ownUser || Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM ||
+            launcherApps.getLauncherUserInfo(profile)?.userType == UserManager.USER_TYPE_PROFILE_MANAGED
+    }
+
+    // Null once the work profile has gone, so nothing of it starts in the user's own instead.
+    private fun userOf(workProfile: Long?): UserHandle? =
+        if (workProfile == null) ownUser else userManager.getUserForSerialNumber(workProfile)
+
+    private val AppEntry.user: UserHandle? get() = userOf(workProfile)
 
     // A pair has no icon of its own: the screen draws its apps' together.
     override suspend fun icon(app: AppEntry): ImageBitmap? = icons.get(app.key)
         ?: draw(app.key) { density ->
             when (val kind = app.kind) {
                 EntryKind.App -> activityIcon(app, density)
-                is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED), app, density)
+                is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
                 is EntryKind.AppPair -> null
             }
         }?.also { icons.put(app.key, it) }
 
-    private fun activityIcon(app: AppEntry, density: Int): Drawable? =
+    private fun activityIcon(app: AppEntry, density: Int): Drawable? = app.user?.let { user ->
         launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
+    }
 
     // The ring and the dialog that asks share it through the cache. A square icon, as a web page's is, would lose its
     // corners to the disc, so it shrinks to fit whole on the disc's tint; an adaptive one is made for the cut. A shortcut
@@ -124,38 +165,51 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     override fun launch(app: AppEntry) = startOrLog(TAG, app.key) {
         when (val kind = app.kind) {
-            EntryKind.App -> launcherApps.startMainActivity(app.component, user, null, null)
-            is EntryKind.Shortcut -> launcherApps.startShortcut(app.packageName, kind.id, null, null, user)
+            EntryKind.App -> app.user?.let { user ->
+                // A paused work profile starts nothing; asking to unpause it shows the system's own prompt, as a tap on a
+                // paused app does on other launchers.
+                if (userManager.isQuietModeEnabled(user)) {
+                    userManager.requestQuietModeEnabled(false, user)
+                } else {
+                    launcherApps.startMainActivity(app.component, user, null, null)
+                }
+            }
+            is EntryKind.Shortcut -> launcherApps.startShortcut(app.packageName, kind.id, null, null, ownUser)
             is EntryKind.AppPair -> context.startActivity(SplitScreenActivity.intent(context, kind.first.component, kind.second.component))
         }
     }
 
     override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
-        if (!app.isApp) return@withContext emptyList()
-        query(shortcutQuery(app.packageName).setActivity(app.component), app.key)
+        val user = app.user
+        if (!app.isApp || user == null) return@withContext emptyList()
+        query(shortcutQuery(app.packageName).setActivity(app.component), app.key, user)
             .filter { it.isEnabled }
             .sortedWith(compareBy({ !it.isDeclaredInManifest }, { it.rank }))
             .take(MAX_SHORTCUTS)
-            .map { AppShortcut(packageName = it.`package`, id = it.id, label = it.label) }
+            .map { AppShortcut(packageName = it.`package`, id = it.id, label = it.label, workProfile = app.workProfile) }
     }
 
     override suspend fun shortcutIcon(shortcut: AppShortcut): ImageBitmap? = draw(shortcut.logName) { density ->
-        shortcutInfo(shortcut.packageName, shortcut.id, SHOWN_SHORTCUTS)?.let { launcherApps.getShortcutIconDrawable(it, density) }
+        userOf(shortcut.workProfile)?.let { user ->
+            shortcutInfo(shortcut.packageName, shortcut.id, SHOWN_SHORTCUTS, user)?.let { launcherApps.getShortcutIconDrawable(it, density) }
+        }
     }
 
-    private fun shortcutInfo(packageName: String, id: String, flags: Int): ShortcutInfo? =
+    private fun shortcutInfo(packageName: String, id: String, flags: Int, user: UserHandle): ShortcutInfo? =
         launcherApps.getShortcuts(shortcutQuery(packageName, flags).setShortcutIds(listOf(id)), user)?.firstOrNull()
 
     override fun startShortcut(shortcut: AppShortcut) = startOrLog(TAG, shortcut.logName) {
-        launcherApps.startShortcut(shortcut.packageName, shortcut.id, null, null, user)
+        userOf(shortcut.workProfile)?.let { launcherApps.startShortcut(shortcut.packageName, shortcut.id, null, null, it) }
     }
 
     override fun openAppInfo(app: AppEntry) = startOrLog(TAG, "app info for ${app.key}") {
-        launcherApps.startAppDetailsActivity(app.component, user, null, null)
+        app.user?.let { launcherApps.startAppDetailsActivity(app.component, it, null, null) }
     }
 
-    // An app built into the system counts once the Play Store has updated it, as it then has a page there.
+    // An app built into the system counts once the Play Store has updated it, as it then has a page there. A work app's
+    // store is the one its organisation manages, which the user's own Play Store does not speak for.
     override suspend fun hasStorePage(app: AppEntry): Boolean = withContext(Dispatchers.IO) {
+        if (app.isWork) return@withContext false
         try {
             context.packageManager.getInstallSourceInfo(app.packageName).installingPackageName == PLAY_STORE
         } catch (_: PackageManager.NameNotFoundException) {
@@ -168,14 +222,15 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     override fun uninstall(app: AppEntry) = startOrLog(TAG, "uninstall for ${app.key}") {
         // In a task of its own, left out of recents: in the launcher's task, HOME would clear the confirmation and count as
         // a press inside the launcher.
-        val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null))
+        val user = app.user ?: return@startOrLog
+        val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null)).putExtra(Intent.EXTRA_USER, user)
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS))
     }
 
     override fun pinRequest(intent: Intent): PinItem? {
         val request = launcherApps.getPinItemRequest(intent) ?: return null
         val info = request.shortcutInfo
-        if (request.requestType != PinItemRequest.REQUEST_TYPE_SHORTCUT || info?.userHandle != user || !request.isValid) return null
+        if (request.requestType != PinItemRequest.REQUEST_TYPE_SHORTCUT || info?.userHandle != ownUser || !request.isValid) return null
         val shortcut = info.toEntry() ?: return null
         return object : PinItem {
             override val shortcut = shortcut
@@ -200,7 +255,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         val pinned = pinned(ShortcutQuery.FLAG_GET_KEY_FIELDS_ONLY).groupBy({ it.`package` }, { it.id })
         pages.keptPins(pinned).forEach { (packageName, ids) ->
             try {
-                launcherApps.pinShortcuts(packageName, ids, user)
+                launcherApps.pinShortcuts(packageName, ids, ownUser)
             } catch (e: RuntimeException) {
                 // The app went meanwhile, or the launcher stopped being the home app.
                 Log.w(TAG, "Cannot unpin the shortcuts of $packageName", e)
@@ -209,11 +264,11 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     }
 
     // The launcher's own pins, disabled ones too.
-    private fun pinned(extraFlags: Int = 0) = query(ShortcutQuery().setQueryFlags(ShortcutQuery.FLAG_MATCH_PINNED or extraFlags), "pins")
+    private fun pinned(extraFlags: Int = 0) = query(ShortcutQuery().setQueryFlags(ShortcutQuery.FLAG_MATCH_PINNED or extraFlags), "pins", ownUser)
 
     // Only the default home app may read other apps' shortcuts; until then there are none, and a menu offers the options
     // alone.
-    private fun query(query: ShortcutQuery, what: String): List<ShortcutInfo> = try {
+    private fun query(query: ShortcutQuery, what: String, user: UserHandle): List<ShortcutInfo> = try {
         if (launcherApps.hasShortcutHostPermission()) launcherApps.getShortcuts(query, user).orEmpty() else emptyList()
     } catch (e: RuntimeException) {
         // A locked user, or an app removed since the list loaded.

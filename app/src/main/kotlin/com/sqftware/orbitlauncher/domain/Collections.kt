@@ -258,17 +258,17 @@ const val BUILT_IN_CARD_APPS = 10
 
 /** The most recently installed apps, newest first, one per package. */
 fun newApps(apps: List<AppEntry>, limit: Int = BUILT_IN_CARD_APPS): List<AppEntry> =
-    apps.sortedByDescending { it.installedAt }.distinctBy { it.packageName }.take(limit)
+    apps.sortedByDescending { it.installedAt }.distinctBy { it.packageKey }.take(limit)
 
 /** How long each package has been in the foreground lately, in milliseconds. A package never in front is absent. */
 data class ForegroundTime(val byPackage: Map<String, Long> = emptyMap()) {
-    /** How long [app]'s package has been in front, none if never. */
-    fun of(app: AppEntry): Long = byPackage[app.packageName] ?: 0L
+    /** How long [app]'s package has been in front, none if never. Only the user's own profile's usage is counted, so a work app has none. */
+    fun of(app: AppEntry): Long = byPackage[app.packageKey] ?: 0L
 }
 
 /** The apps in front the longest by [time], the longest first, one per package; an app never in front is left out. */
 fun mostUsed(apps: List<AppEntry>, time: ForegroundTime, limit: Int = BUILT_IN_CARD_APPS): List<AppEntry> =
-    apps.distinctBy { it.packageName }
+    apps.distinctBy { it.packageKey }
         .filter { time.of(it) > 0L }
         .sortedByDescending(time::of)
         .take(limit)

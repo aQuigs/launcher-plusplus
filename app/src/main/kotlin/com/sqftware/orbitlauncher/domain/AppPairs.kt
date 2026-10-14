@@ -1,12 +1,18 @@
 package com.sqftware.orbitlauncher.domain
 
+/** Whether [first] and [second] make a pair, as [pairOf] says. */
+fun canPair(first: AppEntry, second: AppEntry): Boolean = first.isPairable && second.isPairable && first.packageName != second.packageName
+
+/** Whether it can be one of a pair: a plain app of the user's own, as the launcher opens a work app only through the system. */
+val AppEntry.isPairable: Boolean get() = isApp && !isWork
+
 /**
  * The pair of [first] and [second], opened in split screen with [first] on top and named after both, as Pixel names its
- * pairs; null unless they are plain apps of two packages. Two activities of one package share its task, so the second
- * would take the first one's place rather than open beside it.
+ * pairs; null unless they are [pairable][isPairable] apps of two packages. Two activities of one package share its
+ * task, so the second would take the first one's place rather than open beside it.
  */
 fun pairOf(first: AppEntry, second: AppEntry): AppEntry? {
-    if (!first.isApp || !second.isApp || first.packageName == second.packageName) return null
+    if (!canPair(first, second)) return null
     return AppEntry(
         label = "${first.label} | ${second.label}",
         packageName = "",

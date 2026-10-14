@@ -21,8 +21,8 @@ interface Badges {
     /** The unread counts now and as they change, empty while not [isEnabled]. Collect while the launcher is visible. */
     fun counts(): Flow<UnreadCounts>
 
-    /** Clears the counts kept for [packageName]'s dismissed notifications, now that the user has opened it or cleared them. */
-    fun opened(packageName: String)
+    /** Clears the counts kept for the [packageKey][AppEntry.packageKey] app's dismissed notifications, now that the user has opened it or cleared them. */
+    fun opened(packageKey: String)
 
     /** Opens the system screen where the user grants or revokes the launcher's notification access. */
     fun openSettings()
@@ -48,7 +48,7 @@ class NotificationBadges(private val context: Context) : Badges {
     override fun counts(): Flow<UnreadCounts> =
         combine(enabled(), UnreadListener.counts, kept.counts()) { on, live, dismissed -> if (on) live + dismissed else UnreadCounts() }
 
-    override fun opened(packageName: String) = kept.update { it.opened(packageName) }
+    override fun opened(packageKey: String) = kept.update { it.opened(packageKey) }
 
     override fun openSettings() = startOrLog(TAG, "the notification access settings") {
         val forThisListener = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)

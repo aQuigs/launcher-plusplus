@@ -22,7 +22,8 @@ private const val SUGGESTED_CARD_MIN_APPS = 2
 fun suggestSetup(home: HomeApps, collections: CollectionsPage, apps: List<AppEntry>, defaults: DefaultApps, time: ForegroundTime?): Setup? {
     if (!home.isEmpty) return null
 
-    val candidates = apps.filter { it.isApp && it.packageName !in defaults.skips }
+    // A work app is the organisation's to offer, and would share a card with the user's own copy.
+    val candidates = apps.filter { it.isApp && !it.isWork && it.packageName !in defaults.skips }
     return Setup(suggestHome(candidates, defaults, time), suggestCollections(collections, candidates))
 }
 

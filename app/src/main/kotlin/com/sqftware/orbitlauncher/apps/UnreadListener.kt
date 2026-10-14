@@ -1,12 +1,15 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.app.Notification
+import android.os.UserHandle
+import android.os.UserManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.sqftware.orbitlauncher.domain.PostedNotification
 import com.sqftware.orbitlauncher.domain.RemovalCause
 import com.sqftware.orbitlauncher.domain.Removals
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.inProfile
 import com.sqftware.orbitlauncher.domain.unreadCounts
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -18,6 +21,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class UnreadListener : NotificationListenerService() {
     private val kept by lazy { KeptUnread(this) }
     private val removals = Removals()
+    private val userManager by lazy { getSystemService(UserManager::class.java) }
+    // A profile keeps its serial number for life, and every event maps every notification on show.
+    private val workProfiles = HashMap<UserHandle, Long?>()
 
     override fun onListenerConnected() = publish()
 
@@ -60,7 +66,8 @@ class UnreadListener : NotificationListenerService() {
     }
 
     private fun StatusBarNotification.asPosted() = PostedNotification(
-        packageName = packageName,
+        // The work profile's notifications come here too, and badge its copy of the app, not the user's own.
+        packageKey = inProfile(packageName, workProfiles.getOrPut(user) { userManager.workProfileOf(user) }),
         isGroupSummary = notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
         isOngoing = isOngoing,
         // Only a media style adds a session, and System UI shows such a notification as the player, not in the list.

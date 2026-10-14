@@ -26,7 +26,7 @@ class KeptUnread(context: Context) {
         if (new == old) return
         prefs.edit {
             clear()
-            new.byKey.forEach { (key, kept) -> putString(key, "${kept.count} ${kept.packageName}") }
+            new.byKey.forEach { (key, kept) -> putString(key, "${kept.count} ${kept.packageKey}") }
         }
     }
 
@@ -40,6 +40,6 @@ class KeptUnread(context: Context) {
 
     private fun String.decode(): KeptNotification? {
         val count = substringBefore(' ').toIntOrNull() ?: return null
-        return KeptNotification(packageName = substringAfter(' '), count = count)
+        return KeptNotification(packageKey = substringAfter(' '), count = count)
     }
 }

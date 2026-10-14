@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
                 sizing = widgetHost::sizing,
             )
         }
-        val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageName) } }
+        val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageKey) } }
         val actions = AppActions(
             icon = repository::icon,
             launch = {
@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
             shortcuts = repository::shortcuts,
             shortcutIcon = repository::shortcutIcon,
             startShortcut = {
-                badges.opened(it.packageName)
+                badges.opened(it.packageKey)
                 repository.startShortcut(it)
             },
             openAppInfo = repository::openAppInfo,

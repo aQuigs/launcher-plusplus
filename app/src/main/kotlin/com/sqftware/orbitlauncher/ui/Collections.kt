@@ -1058,7 +1058,7 @@ internal val GridGlyph = materialGlyph(
     "M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4z" +
         "m0 6h4v-4h-4v4z",
 )
-private val WorkGlyph = materialGlyph(
+internal val WorkGlyph = materialGlyph(
     "Work",
     "M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8" +
         "c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z",

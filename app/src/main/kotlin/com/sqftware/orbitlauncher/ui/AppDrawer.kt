@@ -50,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -94,6 +95,8 @@ object AppDrawerTags {
     const val MOST_USED = "drawer_most_used"
     const val USAGE_ACCESS = "drawer_usage_access"
     const val SORT_MENU = "drawer_sort_menu"
+    const val PERSONAL = "drawer_personal"
+    const val WORK = "drawer_work"
 
     fun section(initial: Char) = "section_$initial"
 
@@ -163,7 +166,8 @@ data class DrawerControls(
  * becomes a [drag]. A change of style starts the list again at its top. A search field heads the
  * list: with a [query] the list holds only the matching apps, without sections or rail, and the keyboard's search key
  * acts on the first of them as a tap would; [searchFocus] puts the keyboard in the field. An app with [unread] notifications shows their number, in full at the end of
- * its row, since a row has the room a badge lacks, or as a badge on its icon in the grid.
+ * its row, since a row has the room a badge lacks, or as a badge on its icon in the grid. With apps of a work profile among
+ * [apps], tabs split the list into the user's own and the work ones, as on other launchers; a search finds both.
  */
 @Composable
 fun AppDrawer(
@@ -193,14 +197,18 @@ fun AppDrawer(
     // the sections' list because it was the first thing on screen when the search ended. Each new query starts at its top.
     val matchesState = rememberLazyGridState()
     LaunchedEffect(matches) { matchesState.scrollToItem(0) }
+    val hasWork = remember(apps) { apps.any { it.isWork } }
+    var workTab by rememberSaveable { mutableStateOf(false) }
+    val work = hasWork && workTab
+    val listed = remember(apps, work) { apps.filter { it.isWork == work } }
     val alphabetical = style.order == DrawerOrder.Alphabetical
     val usageForOrder = foregroundTime.takeIf { style.order == DrawerOrder.MostUsed }
-    val ordered = remember(apps, style.order, usageForOrder) { apps.inOrder(style.order, usageForOrder) }
+    val ordered = remember(listed, style.order, usageForOrder) { listed.inOrder(style.order, usageForOrder) }
     val sections = remember(ordered, alphabetical) { if (alphabetical) ordered.sectionsByInitial() else emptyList() }
     val askForUsage = picking == null && style.readsUsage && foregroundTime == null
     val showsMostUsed = picking == null && style.mostUsedRow
-    val mostUsedApps = remember(apps, showsMostUsed, foregroundTime) {
-        if (showsMostUsed && foregroundTime != null) mostUsed(apps, foregroundTime, GRID_COLUMNS) else emptyList()
+    val mostUsedApps = remember(listed, showsMostUsed, foregroundTime) {
+        if (showsMostUsed && foregroundTime != null) mostUsed(listed, foregroundTime, GRID_COLUMNS) else emptyList()
     }
     val sharingALabel = remember(apps) { apps.keysWithSharedLabels() }
     val detail = { app: AppEntry -> app.packageName.takeIf { app.key in sharingALabel } }
@@ -226,7 +234,7 @@ fun AppDrawer(
     }
     // The list keeps its place by the first item on screen, so a new order or a new row at the top would open it midway,
     // or the row out of sight above.
-    LaunchedEffect(style.order, style.layout, leading) { gridState.scrollToItem(0) }
+    LaunchedEffect(style.order, style.layout, leading, work) { gridState.scrollToItem(0) }
     val showsRail = !searching && alphabetical
     val entry = DrawerEntry(
         layout = style.layout,
@@ -254,6 +262,15 @@ fun AppDrawer(
                     .focusRequester(searchFocus),
             )
             controls?.let { StyleButtons(it) }
+        }
+        if (hasWork && !searching) {
+            ChoiceRow(
+                profileTabs,
+                selected = work,
+                onSelect = { workTab = it },
+                tag = { if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL },
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            )
         }
         Box(Modifier.weight(1f)) {
             LazyVerticalGrid(
@@ -302,6 +319,8 @@ fun AppDrawer(
         }
     }
 }
+
+private val profileTabs = listOf(false to "Personal", true to "Work")
 
 @Composable
 private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
@@ -480,7 +499,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
             .then(entry.action(app))
             .padding(horizontal = 24.dp, vertical = 8.dp),
     ) {
-        IconDisc(modifier = Modifier.size(ROW_ICON_SIZE)) { AppImage(app, entry.icon, Modifier.fillMaxSize()) }
+        AppFace(app, entry.icon, Modifier.size(ROW_ICON_SIZE))
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
             Text(text = app.label, style = MaterialTheme.typography.titleMedium)
             if (detail != null) {
@@ -529,7 +548,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
             .padding(horizontal = 4.dp, vertical = 8.dp),
     ) {
         Box(Modifier.size(GRID_ICON_SIZE)) {
-            IconDisc(modifier = Modifier.fillMaxSize()) { AppImage(app, entry.icon, Modifier.fillMaxSize()) }
+            AppFace(app, entry.icon, Modifier.fillMaxSize())
             UnreadBadge(unread, Modifier.align(Alignment.TopEnd).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {

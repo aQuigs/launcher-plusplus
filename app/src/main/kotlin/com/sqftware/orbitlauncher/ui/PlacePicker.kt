@@ -2,12 +2,8 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -29,17 +25,7 @@ private val switchablePlaces = listOf(HomePlace.Ring to "Ring", HomePlace.Dock t
 @Composable
 fun PlacePicker(place: HomePlace, onPlaceChange: (HomePlace) -> Unit, modifier: Modifier = Modifier) {
     PickingHeader(modifier) {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            switchablePlaces.forEachIndexed { index, (option, label) ->
-                SegmentedButton(
-                    selected = option == place,
-                    onClick = { onPlaceChange(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index, switchablePlaces.size),
-                    label = { Text(label) },
-                    modifier = Modifier.testTag(PlacePickerTags.place(option)),
-                )
-            }
-        }
+        ChoiceRow(switchablePlaces, selected = place, onSelect = onPlaceChange, tag = PlacePickerTags::place)
     }
 }
 
