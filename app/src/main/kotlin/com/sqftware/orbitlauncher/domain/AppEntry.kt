@@ -4,8 +4,9 @@ package com.sqftware.orbitlauncher.domain
  * Something the home screen can hold and start, as its [kind] says: a launchable activity, a shortcut an app pinned to the
  * home screen, which belongs to its app's [activityName], or a pair of apps. [canUninstall] is false for an app built into
  * the system. [installedAt] is when its package was first installed, in epoch milliseconds, and [category] the kind of app
- * its package says it is, if it says. A pair belongs to no one package, so its package and activity names are empty; make
- * one with [pairOf].
+ * its package says it is, if it says. [workProfile] is the serial number of the work profile an app belongs to, or null
+ * for one of the user's own. A pair belongs to no one package, so its package and activity names are empty; make one with
+ * [pairOf].
  */
 data class AppEntry(
     val label: String,
@@ -15,13 +16,25 @@ data class AppEntry(
     val installedAt: Long = 0L,
     val category: AppCategory? = null,
     val kind: EntryKind = EntryKind.App,
+    val workProfile: Long? = null,
 ) {
-    /** Identifies one activity, shortcut or pair whatever its label, so it survives relabelling and reloads of the app list. */
+    /**
+     * Identifies one activity, shortcut or pair whatever its label, so it survives relabelling and reloads of the app list.
+     * A work app's differs from the same app's in the user's own profile.
+     */
     val key: String = when (kind) {
         EntryKind.App -> activityKey(packageName, activityName)
         is EntryKind.Shortcut -> shortcutKey(packageName, kind.id)
         is EntryKind.AppPair -> pairKey(kind.first.key, kind.second.key)
-    }
+    }.let { inProfile(it, workProfile) }
+
+    val isWork: Boolean get() = workProfile != null
+
+    /**
+     * Its package, told apart from the same package in the other profile: what its notifications, usage and settings are
+     * counted and kept by.
+     */
+    val packageKey: String = inProfile(packageName, workProfile)
 
     /** Whether it is a plain app, one launchable activity, rather than a shortcut or a pair. */
     val isApp: Boolean get() = kind == EntryKind.App
@@ -34,9 +47,9 @@ data class AppEntry(
      * are not told apart from its app's. Made once, as every icon reads it.
      */
     val badgePackages: List<String> = when (kind) {
-        EntryKind.App -> listOf(packageName)
+        EntryKind.App -> listOf(packageKey)
         is EntryKind.Shortcut -> emptyList()
-        is EntryKind.AppPair -> listOf(kind.first.packageName, kind.second.packageName)
+        is EntryKind.AppPair -> listOf(kind.first.packageKey, kind.second.packageKey)
     }
 
     /** The label as a search sees it: lower case, without accents. Made once here rather than on every keystroke. */
@@ -80,6 +93,13 @@ fun pairKeys(key: String): Pair<String, String>? {
 
 private const val PAIR = "|"
 
+/**
+ * [key], a key or a package name of the user's own profile, as it is in the [workProfile] numbered so, if any. Keys are
+ * stored, so a work one must be no other kind of key: it starts with '@', which neither a package name nor a pair's key
+ * starts with.
+ */
+fun inProfile(key: String, workProfile: Long?) = if (workProfile == null) key else "@$workProfile:$key"
+
 /** [apps] by key, and a pair by its key while both its apps are among them, so a pair resolves wherever a key does. */
 class AppsByKey(apps: List<AppEntry>) {
     private val byKey = apps.associateBy { it.key }
@@ -100,4 +120,4 @@ fun List<AppEntry>.keysWithSharedLabels(): Set<String> =
         .mapTo(HashSet(), AppEntry::key)
 
 fun List<AppEntry>.sortedByLabel(): List<AppEntry> =
-    sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, AppEntry::label).thenBy(AppEntry::packageName))
+    sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, AppEntry::label).thenBy(AppEntry::packageName).thenBy(AppEntry::isWork))

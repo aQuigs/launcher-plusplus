@@ -79,6 +79,7 @@ import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppShortcut
+import com.sqftware.orbitlauncher.domain.canPair
 import com.sqftware.orbitlauncher.domain.AppsByKey
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -1262,14 +1263,14 @@ fun LauncherScreen(
                                         onToggle = { changeCollections { toggleApp(pick.kind, it) } },
                                     )
                                 }
-                                // Neither the app split nor another of its package can be its partner.
+                                // Only an app it makes a pair with can be its partner.
                                 is DrawerPick.Partner -> splitting?.let { first ->
                                     Picking(
                                         header = { PartnerPicker(first) },
                                         isPicked = { it.key == first.key },
                                         onToggle = { makePair(first, it, pick.spot) },
                                         mark = PickMark.Dot,
-                                        isPickable = { it.packageName != first.packageName },
+                                        isPickable = { canPair(first, it) },
                                     )
                                 }
                                 null -> null

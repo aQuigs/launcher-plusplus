@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -20,6 +21,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -219,6 +221,31 @@ class AppDrawerTest {
         compose.onNodeWithText(google.packageName).assertIsDisplayed()
         compose.onNodeWithText(microsoft.packageName).assertIsDisplayed()
         compose.onNodeWithText("Clock").assert(hasText(clock.packageName).not())
+    }
+
+    @Test
+    fun workAppsHaveATabOfTheirOwnAndASearchFindsBoth() {
+        val workMail = mail.copy(workProfile = 10)
+        show(listOf(clock, mail, workMail))
+
+        compose.onNodeWithTag(AppDrawerTags.PERSONAL).assertIsSelected()
+        compose.onNodeWithText("Clock").assertIsDisplayed()
+        compose.onAllNodesWithText("Mail").assertCountEquals(1)
+
+        compose.onNodeWithTag(AppDrawerTags.WORK).performClick()
+        compose.onNodeWithText("Clock").assertDoesNotExist()
+        compose.onAllNodesWithText("Mail").assertCountEquals(1)
+
+        compose.onNodeWithTag(AppDrawerTags.SEARCH).performTextInput("mail")
+        compose.onNodeWithTag(AppDrawerTags.WORK).assertDoesNotExist()
+        compose.onAllNodesWithText("Mail").assertCountEquals(2)
+    }
+
+    @Test
+    fun withoutWorkAppsThereAreNoTabs() {
+        show(listOf(clock, mail))
+
+        compose.onNodeWithTag(AppDrawerTags.PERSONAL).assertDoesNotExist()
     }
 
     @Test

@@ -1,8 +1,8 @@
 package com.sqftware.orbitlauncher.domain
 
-/** One notification as the badges see it. [number] is the count the app put on it, or 0. */
+/** One notification as the badges see it, from its app's [packageKey]. [number] is the count the app put on it, or 0. */
 data class PostedNotification(
-    val packageName: String,
+    val packageKey: String,
     val isGroupSummary: Boolean,
     val isOngoing: Boolean,
     val isMedia: Boolean,
@@ -51,7 +51,7 @@ private val PostedNotification.unread: Int get() = if (isGroupSummary || isOngoi
 fun unreadCounts(notifications: List<PostedNotification>): UnreadCounts = UnreadCounts(
     notifications
         .filter { it.unread > 0 }
-        .groupingBy { it.packageName }
+        .groupingBy { it.packageKey }
         .fold(0) { total, notification -> total + notification.unread },
 )
 
@@ -97,7 +97,7 @@ class Removals {
 }
 
 /** A notification the user dismissed unread: its app and how many unread it stood for. */
-data class KeptNotification(val packageName: String, val count: Int)
+data class KeptNotification(val packageKey: String, val count: Int)
 
 /**
  * The notifications the user dismissed unread, by the system's key for each, which stay on their app's badge until the
@@ -106,18 +106,18 @@ data class KeptNotification(val packageName: String, val count: Int)
  */
 data class Kept(val byKey: Map<String, KeptNotification> = emptyMap()) {
     val counts: UnreadCounts
-        get() = byKey.values.groupingBy { it.packageName }.fold(0) { total, kept -> total + kept.count }.let { UnreadCounts(it, it.keys) }
+        get() = byKey.values.groupingBy { it.packageKey }.fold(0) { total, kept -> total + kept.count }.let { UnreadCounts(it, it.keys) }
 
     fun afterRemoval(key: String, notification: PostedNotification, removal: Removal): Kept = when {
-        removal == Removal.Opened -> opened(notification.packageName)
+        removal == Removal.Opened -> opened(notification.packageKey)
         removal == Removal.Dismissed && notification.unread > 0 ->
-            Kept(byKey + (key to KeptNotification(notification.packageName, notification.unread)))
+            Kept(byKey + (key to KeptNotification(notification.packageKey, notification.unread)))
         else -> this
     }
 
     fun posted(key: String) = Kept(byKey - key)
 
-    fun opened(packageName: String) = Kept(byKey.filterValues { it.packageName != packageName })
+    fun opened(packageKey: String) = Kept(byKey.filterValues { it.packageKey != packageKey })
 }
 
 /** What a badge says for [count]: the number, until it would need three digits. */

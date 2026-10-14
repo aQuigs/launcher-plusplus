@@ -78,7 +78,7 @@ fun AppIcon(
             .itemDrag(app, drag)
             .semantics { contentDescription = app.label.withUnread(unread.count) },
     ) {
-        IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
+        AppFace(app, icon, Modifier.fillMaxSize(), presses)
         menu?.content?.invoke(app)
         UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
         nameRoom?.let { HangingName(app.label, it) }
@@ -158,6 +158,15 @@ fun IconDisc(
         contentAlignment = contentAlignment,
         content = content,
     )
+}
+
+/** An app's image on its [IconDisc], rippling for [presses], and over the disc's corner the [WorkMark] of a work app. */
+@Composable
+fun AppFace(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier = Modifier, presses: InteractionSource? = null) {
+    Box(modifier) {
+        IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
+        WorkMark(app, Modifier.align(Alignment.BottomEnd))
+    }
 }
 
 private val appLabelStyle @Composable get() = MaterialTheme.typography.labelMedium

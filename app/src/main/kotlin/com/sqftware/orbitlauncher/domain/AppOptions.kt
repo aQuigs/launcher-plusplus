@@ -2,8 +2,11 @@ package com.sqftware.orbitlauncher.domain
 
 import java.io.Serializable
 
-/** One of an app's shortcuts, declared in its manifest or published while it runs. */
-data class AppShortcut(val packageName: String, val id: String, val label: String)
+/** One of an app's shortcuts, declared in its manifest or published while it runs, in the app's [workProfile], if any. */
+data class AppShortcut(val packageName: String, val id: String, val label: String, val workProfile: Long? = null) {
+    /** Its app's [AppEntry.packageKey]. */
+    val packageKey: String get() = inProfile(packageName, workProfile)
+}
 
 /** Where an app was long-pressed. Serializable so the screen can save a pick that started there. */
 sealed interface AppSpot : Serializable {
@@ -50,7 +53,7 @@ sealed interface AppOption {
  * The options for [app] long-pressed at [spot], in menu order, given the [home] apps, the [settings] made for apps,
  * whether the badges are enabled and whether the app [hasStorePage]. A home place takes the app off it, and the ring and
  * the dock start a folder in its slot; a hand-picked card takes it off the card. Anywhere but home, the menu adds the app
- * to the ring or the dock where it has no slot of its own yet. A plain app can be split with another. A pinned shortcut
+ * to the ring or the dock where it has no slot of its own yet. A plain app of the user's own can be split with another. A pinned shortcut
  * wears no badge and is on no card, so offers neither setting. A pair belongs to no one app, so offers only where it is,
  * flipping its order there, and each of its apps' badge, which the pair's own adds up.
  */
@@ -69,7 +72,7 @@ fun appOptions(
     if (card is CollectionKind.HandPicked) add(AppOption.RemoveFromCard(card))
     if (place == null) listOf(HomePlace.Ring, HomePlace.Dock).filter { app !in home[it] }.forEach { add(AppOption.AddTo(it)) }
     if (app.isApp) {
-        add(AppOption.SplitWith)
+        if (app.isPairable) add(AppOption.SplitWith)
         if (badgesEnabled) add(AppOption.Badge(settings.isBadgeOff(app)))
         add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
     }
