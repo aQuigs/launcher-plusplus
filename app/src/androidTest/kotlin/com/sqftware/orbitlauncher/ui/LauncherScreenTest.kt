@@ -34,6 +34,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -65,6 +66,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppNames
 import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
+import com.sqftware.orbitlauncher.domain.CLOCK_ID
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.CardLook
@@ -84,6 +86,8 @@ import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.FolderLooks
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.ForegroundTime
+import com.sqftware.orbitlauncher.domain.GridPage
+import com.sqftware.orbitlauncher.domain.GridPages
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.HostedWidget
@@ -185,15 +189,16 @@ class LauncherScreenTest {
     private val widgets = { page: String ->
         WidgetActions(
             view = { context, _ -> View(context) },
-            add = { rows, _, _ ->
+            add = { rows, _, _, _ ->
                 widgetsAdded += rows
                 widgetPagesAddedTo += page
             },
             remove = {},
-            arrange = {},
+            arrange = { arranged -> widgetPages = widgetPages.change(page) { arranged } },
             sizing = { WidgetSizing() },
         )
     }
+    private var gridPages by mutableStateOf(GridPages())
     // Empty rather than the default page, so the built-in cards do not double the apps the other tests look for.
     private var collectionPages by mutableStateOf(CollectionPages(mapOf(LauncherPage.Collections.id to CollectionsPage(emptyList()))))
     private var collections: CollectionsPage
@@ -296,6 +301,8 @@ class LauncherScreenTest {
             onBecomeHomeApp = { homeRequests++ },
             widgetPages = widgetPages,
             widgets = widgets,
+            gridPages = gridPages,
+            onGridPagesChange = { gridPages = it },
             collectionPages = collectionPages,
             onCollectionPagesChange = { collectionPages = it },
             foregroundTime = foregroundTime,
@@ -3398,5 +3405,135 @@ class LauncherScreenTest {
         onPage(second, WidgetTags.ADD).performClick()
 
         compose.runOnIdle { assertEquals(listOf(second.id), widgetPagesAddedTo) }
+    }
+
+    private val grid = LauncherPage("grid-1", PageKind.Grid)
+
+    /** Shows the screen on a grid page right of home, its apps and folders [slots] by block, in the [cells] given. */
+    private fun showGrid(slots: Map<Int, RingSlot> = emptyMap(), cells: List<HostedWidget> = emptyList()) {
+        layout = PageLayout(listOf(LauncherPage.Home, grid))
+        gridPages = GridPages(mapOf(grid.id to GridPage(slots)))
+        widgetPages = WidgetPages(mapOf(grid.id to WidgetPage(cells)))
+        show()
+        compose.swipePager { swipeLeft() }
+        assertSettledOn(grid)
+    }
+
+    private fun cell(block: Int, row: Int, column: Int) = HostedWidget(block, row, column, 1, 1)
+
+    private fun gridApp(app: AppEntry) = compose.onNode(hasContentDescription(app.label) and hasAnyAncestor(hasTestTag(LauncherTags.page(grid))))
+
+    private fun gridBlock(block: Int) = onPage(grid, GridTags.block(block))
+
+    @Test
+    fun aTapOnAGridAppLaunchesIt() {
+        showGrid(mapOf(-2 to RingSlot.App(mail.key)), listOf(cell(-2, 0, 0)))
+
+        gridApp(mail).performClick()
+
+        compose.runOnIdle { assertEquals(listOf(mail), launched) }
+    }
+
+    @Test
+    fun aGridFolderOpensInADialogWhoseAppsLaunchAndCloseIt() {
+        showGrid(mapOf(-2 to folderOf(clock, mail)), listOf(cell(-2, 0, 0)))
+
+        compose.onNode(hasContentDescription("Folder, 2 apps") and hasAnyAncestor(hasTestTag(LauncherTags.page(grid)))).performClick()
+        compose.onNodeWithTag(GridTags.FOLDER_DIALOG).assertIsDisplayed()
+        compose.onNode(hasContentDescription(clock.label) and hasAnyAncestor(hasTestTag(GridTags.folderApp(clock)))).performClick()
+
+        compose.onNodeWithTag(GridTags.FOLDER_DIALOG).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(clock), launched) }
+    }
+
+    @Test
+    fun anAppsMenuOnAGridPageTakesItOff() {
+        showGrid(mapOf(-2 to RingSlot.App(mail.key), -3 to RingSlot.App(clock.key)), listOf(cell(-2, 0, 0), cell(-3, 0, 1)))
+
+        gridApp(mail).performTouchInput { longClick() }
+        compose.onNodeWithText("Remove").performClick()
+
+        compose.runOnIdle {
+            assertEquals(mapOf(-3 to RingSlot.App(clock.key)), gridPages[grid.id].slots)
+            assertEquals(listOf(cell(-3, 0, 1)), widgetPages[grid.id].widgets)
+        }
+    }
+
+    @Test
+    fun theLauncherMenuOnAGridPageAddsTheClockOnce() {
+        showGrid()
+
+        compose.onRoot().performTouchInput { longClick(centreOf(compose.page(grid))) }
+        compose.onNodeWithText("Add clock").performClick()
+
+        onPage(grid, WidgetTags.CLOCK).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(listOf(CLOCK_ID), widgetPages[grid.id].widgets.map { it.id }) }
+        compose.onRoot().performTouchInput { longClick(centreOf(compose.page(grid)) + Offset(0f, 300f)) }
+        compose.onNodeWithText("Add widget").assertIsDisplayed()
+        compose.onNodeWithText("Add clock").assertDoesNotExist()
+    }
+
+    @Test
+    fun anAppDraggedFromTheDrawerLandsInTheGridCellItIsLetGoOver() {
+        showGrid()
+        val corner = compose.page(grid).fetchSemanticsNode().boundsInRoot.topLeft
+
+        startDraggingFromDrawer(mail)
+        assertSettledOn(grid)
+        dragTo(corner + with(compose.density) { Offset(40.dp.toPx(), 40.dp.toPx()) })
+        letGo()
+
+        compose.runOnIdle {
+            val (block, slot) = gridPages[grid.id].slots.entries.single()
+            assertEquals(RingSlot.App(mail.key), slot)
+            assertEquals(listOf(cell(block, 0, 0)), widgetPages[grid.id].widgets)
+        }
+    }
+
+    @Test
+    fun aGridAppDraggedOntoAnotherMakesAFolderOfTheTwo() {
+        showGrid(mapOf(-2 to RingSlot.App(clock.key), -3 to RingSlot.App(mail.key)), listOf(cell(-2, 0, 0), cell(-3, 1, 2)))
+        val at = centreOf(gridApp(mail))
+
+        compose.onRoot().performTouchInput { liftOut(at) }
+        compose.dragGhost().assertIsDisplayed()
+        dragTo(centreOf(gridApp(clock)))
+        letGo()
+
+        compose.runOnIdle {
+            assertEquals(mapOf(-2 to folderOf(clock, mail)), gridPages[grid.id].slots)
+            assertEquals(listOf(cell(-2, 0, 0)), widgetPages[grid.id].widgets)
+        }
+    }
+
+    @Test
+    fun aGridAppTakenToTheRingByTheScreensEdgeMovesThere() {
+        showGrid(mapOf(-2 to RingSlot.App(mail.key)), listOf(cell(-2, 0, 0)))
+        val at = centreOf(gridApp(mail))
+
+        compose.onRoot().performTouchInput { liftOut(at) }
+        dragTo(Offset(2f, at.y))
+        rest(PAGE_TURN_MILLIS)
+        assertSettledOn(LauncherPage.Home)
+        dragTo(centreOf(onPage(LauncherPage.Home, HomeRingTags.EMBLEM)))
+        letGo()
+
+        compose.runOnIdle {
+            assertEquals(ringOf(mail), homeApps.ring)
+            assertEquals(emptyMap<Int, RingSlot>(), gridPages[grid.id].slots)
+            assertEquals(emptyList<HostedWidget>(), widgetPages[grid.id].widgets)
+        }
+    }
+
+    @Test
+    fun aLongPressOnTheGridClockEditsItWithoutOpeningTheClockAppAndItsBinRemovesIt() {
+        showGrid(cells = listOf(HostedWidget(CLOCK_ID, 0, 0, 2, 4)))
+
+        onPage(grid, HomeClockTags.TIME).performTouchInput { longClick() }
+
+        onPage(grid, WidgetTags.EDIT).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(emptyList<String>(), opened) }
+        onPage(grid, WidgetTags.REMOVE).performClick()
+        compose.runOnIdle { assertEquals(emptyList<HostedWidget>(), widgetPages[grid.id].widgets) }
     }
 }

@@ -39,9 +39,9 @@ interface WidgetHost {
     /**
      * Lets the user pick a widget for the page [page], where it takes the cells its provider asks for, up to [pageRows]
      * rows and the page's width, with columns [columnWidthDp] wide and rows [rowHeightDp] tall, and goes where
-     * [WidgetPage.add] finds room for it; with none, it is not added.
+     * [WidgetPage.add] finds room for it, past the last row only on a page that [lengthens]; with none, it is not added.
      */
-    fun add(page: String, pageRows: Int, columnWidthDp: Float, rowHeightDp: Float)
+    fun add(page: String, pageRows: Int, lengthens: Boolean, columnWidthDp: Float, rowHeightDp: Float)
 
     /** Takes the widget [id] off its page and gives its id back to the system. */
     fun remove(id: Int)
@@ -113,14 +113,14 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
 
     override fun updates(): Flow<WidgetPages> = pages.onStart { host.startListening() }.onCompletion { host.stopListening() }
 
-    override fun add(page: String, pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) {
+    override fun add(page: String, pageRows: Int, lengthens: Boolean, columnWidthDp: Float, rowHeightDp: Float) {
         val inProgress = pending
         if (inProgress != null) {
             // Only a pick from before the process started can still be waiting once the user is back to ask again.
             if (inProgress != restored) return
             discard(inProgress)
         }
-        val pick = WidgetPick(host.allocateAppWidgetId(), page, pageRows, columnWidthDp, rowHeightDp)
+        val pick = WidgetPick(host.allocateAppWidgetId(), page, pageRows, columnWidthDp, rowHeightDp, lengthens)
         pending = pick
         val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pick.id)
         if (!start("the widget picker") { picker.launch(intent) }) discard(pick)
@@ -184,6 +184,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
             rows = widgetCells(info.minHeight.toDp(), pick.rowHeightDp, pick.pageRows),
             columns = widgetCells(info.minWidth.toDp(), pick.columnWidthDp, WIDGET_COLUMNS),
             pick.pageRows,
+            pick.lengthens,
         )
         if (placed == page) {
             discard(pick)

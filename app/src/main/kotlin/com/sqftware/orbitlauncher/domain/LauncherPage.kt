@@ -3,8 +3,15 @@ package com.sqftware.orbitlauncher.domain
 import java.util.UUID
 import kotlin.math.abs
 
-/** What a page shows. */
-enum class PageKind { Ring, Collections, Widgets }
+/** What a page shows, and what such a page is called. */
+enum class PageKind(val title: String) {
+    Ring("Ring"),
+    Collections("Collections"),
+    Widgets("Widgets"),
+
+    /** A plain launcher's grid of apps, folders and widgets. */
+    Grid("Boring grid"),
+}
 
 /** A page of the launcher. Its [id] keys what the page holds, so two pages of one kind each keep their own. */
 data class LauncherPage(val id: String, val kind: PageKind) {
@@ -57,7 +64,7 @@ data class PageLayout(val pages: List<LauncherPage> = listOf(LauncherPage.Widget
         if (page == LauncherPage.Home) return "Home"
         val others = pages.filter { it.kind == page.kind && it != LauncherPage.Home }
         val number = others.indexOf(page) + if (page.kind == PageKind.Ring) 2 else 1
-        return if (number == 1) page.kind.name else "${page.kind.name} $number"
+        return if (number == 1) page.kind.title else "${page.kind.title} $number"
     }
 
     /** The ids of these pages, which what each holds is kept by. */

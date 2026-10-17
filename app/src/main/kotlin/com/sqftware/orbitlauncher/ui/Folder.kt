@@ -118,7 +118,7 @@ fun FolderIcon(
 ) {
     val count = folder.apps.size
     val presses = remember { MutableInteractionSource() }
-    val name = (if (folder.name.isEmpty()) "Folder" else "${folder.name} folder") + ", " + counted(count, "app")
+    val name = folderDescription(folder.name, count)
 
     Box(
         modifier
@@ -167,6 +167,13 @@ fun FolderNameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> 
     )
 }
 
+/** What a folder named [name] is called where a name must show: the name, or "Folder" for one with none. */
+fun folderTitle(name: String): String = name.ifEmpty { "Folder" }
+
+/** How a folder named [name] holding [count] apps is read out. */
+fun folderDescription(name: String, count: Int): String =
+    (if (name.isEmpty()) "Folder" else "$name folder") + ", " + counted(count, "app")
+
 /** [folder]'s disc of previews, filling the item: [presses] ripple it, and [inner] fades the previews. */
 @Composable
 fun FolderDisc(
@@ -178,19 +185,19 @@ fun FolderDisc(
 ) {
     IconDisc(presses, modifier, contentAlignment = Alignment.Center) {
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, contentAlignment = Alignment.Center) {
-            FolderPreviews(folder, icon)
+            FolderPreviews(folder.apps, icon)
         }
     }
 }
 
 /**
- * Up to four of [folder]'s icons, one alone in the middle, more where the open folder's ring puts them: two side by
+ * Up to four of a folder's [apps]' icons, one alone in the middle, more where the open folder's ring puts them: two side by
  * side, three as a triangle, four as a square. Sized by shares of the disc rather than fixed gaps, so a shrunken ring's
  * small discs fit them too.
  */
 @Composable
-fun FolderPreviews(folder: RingItem.Folder, icon: suspend (AppEntry) -> ImageBitmap?) {
-    val previews = folder.apps.take(PREVIEWS)
+fun FolderPreviews(apps: List<AppEntry>, icon: suspend (AppEntry) -> ImageBitmap?) {
+    val previews = apps.take(PREVIEWS)
     Layout(
         // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
         content = { previews.forEach { AppImage(it, icon, Modifier.clip(CircleShape)) } },

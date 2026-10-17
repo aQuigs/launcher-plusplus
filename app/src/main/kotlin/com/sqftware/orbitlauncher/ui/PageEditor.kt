@@ -179,7 +179,7 @@ fun PageEditor(
             title = "Add a page on the $side",
             choices = PageKind.entries,
             chosen = null,
-            label = { it.name },
+            label = { it.title },
             description = { it.blurb },
             onChoose = { kind ->
                 addingAtStart = null
@@ -206,6 +206,7 @@ private val PageKind.blurb: String
         PageKind.Ring -> "Its own ring of apps and folders"
         PageKind.Collections -> "Cards of apps: new, most used, by category"
         PageKind.Widgets -> "A grid of widgets"
+        PageKind.Grid -> "A plain grid of apps, folders and widgets"
     }
 
 @Composable
@@ -267,15 +268,18 @@ private fun PageCard(
 private fun PageContents.summary(): String? {
     if (isEmpty) return null
     return when (this) {
-        is PageContents.Ring -> listOfNotNull(
-            counted(apps, "app").takeIf { apps > 0 },
-            counted(folders, "folder").takeIf { folders > 0 },
-            counted(widgets, "widget").takeIf { widgets > 0 },
-        ).joinToString(" and ")
+        is PageContents.Ring -> itemsSummary(apps, folders, widgets)
         is PageContents.Cards -> counted(cards, "collection")
         is PageContents.Widgets -> counted(widgets.size, "widget")
+        is PageContents.Grid -> itemsSummary(apps, folders, widgets).ifEmpty { "the clock" }
     }
 }
+
+private fun itemsSummary(apps: Int, folders: Int, widgets: Int): String = listOfNotNull(
+    counted(apps, "app").takeIf { apps > 0 },
+    counted(folders, "folder").takeIf { folders > 0 },
+    counted(widgets, "widget").takeIf { widgets > 0 },
+).joinToString(" and ")
 
 /** A sketch of a page: the ring and its slots, with home's clock and dock, the cards, or the widgets where they sit. */
 @Composable
@@ -305,10 +309,11 @@ private fun PagePreview(contents: PageContents, isHome: Boolean, modifier: Modif
                 drawRoundRect(line, Offset(7.dp.toPx(), top), Size(size.width - 14.dp.toPx(), 20.dp.toPx()), CornerRadius(4.dp.toPx()), style = Stroke(1.dp.toPx()))
                 repeat(4) { drawCircle(mark, 3.dp.toPx(), Offset(16.dp.toPx() + it * 14.dp.toPx(), top + 10.dp.toPx())) }
             }
-            is PageContents.Widgets -> {
+            is PageContents.Widgets, is PageContents.Grid -> {
                 val inset = 6.dp.toPx()
                 val cell = (size.width - inset * 2) / WIDGET_COLUMNS
-                contents.widgets.forEach { widget ->
+                val blocks = if (contents is PageContents.Grid) contents.blocks else (contents as PageContents.Widgets).widgets
+                blocks.forEach { widget ->
                     drawRoundRect(
                         mark,
                         Offset(inset + widget.column * cell + 1.dp.toPx(), inset + widget.row * cell + 1.dp.toPx()),
@@ -364,6 +369,7 @@ private fun DeletePageDialog(label: String, contents: PageContents, onDelete: ()
                     is PageContents.Ring -> "This takes $what off the home screen. The apps stay installed and in the drawer."
                     is PageContents.Cards -> "This deletes $what. The apps stay installed."
                     is PageContents.Widgets -> "This removes $what."
+                    is PageContents.Grid -> "This takes $what off the home screen. The apps stay installed and in the drawer."
                 },
             )
         },

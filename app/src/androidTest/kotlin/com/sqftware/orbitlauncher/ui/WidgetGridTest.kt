@@ -81,7 +81,7 @@ class WidgetGridTest {
                         if (id != inert.id) setOnClickListener { tapped += id }
                     }
                 },
-                add = { rows, columnWidth, rowHeight -> added += Triple(rows, columnWidth, rowHeight) },
+                add = { rows, _, columnWidth, rowHeight -> added += Triple(rows, columnWidth, rowHeight) },
                 remove = removed::add,
                 arrange = {
                     arranged += it

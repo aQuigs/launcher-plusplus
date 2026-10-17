@@ -37,7 +37,7 @@ object ReorderTags {
 }
 
 /** How faint the item on the move shows where it would land, under the ghost that follows the finger. */
-private const val LANDING_ALPHA = 0.35f
+internal const val LANDING_ALPHA = 0.35f
 
 /** How long the finger rests over a position, off the middle of an item it could fold into, before the others make way. */
 const val MAKE_WAY_MILLIS = 300L

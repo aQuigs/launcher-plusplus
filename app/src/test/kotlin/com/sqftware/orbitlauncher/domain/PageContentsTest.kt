@@ -15,8 +15,8 @@ class PageContentsTest {
     fun `a ring page counts the apps in its folders, and home counts the dock too`() {
         val rings = RingPages(rings = mapOf(LauncherPage.Home.id to Ring(listOf(folder(clock, mail))), other.id to ringOf(maps)), dock = ringOf(notes))
 
-        assertEquals(PageContents.Ring(slots = 1, apps = 3, folders = 1, dock = 1), contentsOf(LauncherPage.Home, rings, CollectionPages(), WidgetPages()))
-        assertEquals(PageContents.Ring(slots = 1, apps = 1, folders = 0), contentsOf(other, rings, CollectionPages(), WidgetPages()))
+        assertEquals(PageContents.Ring(slots = 1, apps = 3, folders = 1, dock = 1), contentsOf(LauncherPage.Home, rings, CollectionPages(), GridPages(), WidgetPages()))
+        assertEquals(PageContents.Ring(slots = 1, apps = 1, folders = 0), contentsOf(other, rings, CollectionPages(), GridPages(), WidgetPages()))
     }
 
     @Test
@@ -24,7 +24,7 @@ class PageContentsTest {
         val ring = HostedWidget(RING_ID, row = 1, column = 0, rows = 5, columns = WIDGET_COLUMNS)
         val widgets = WidgetPages(mapOf(other.id to WidgetPage(listOf(HostedWidget(7, 0, 0, 1, 4), ring))))
 
-        val held = contentsOf(other, RingPages(), CollectionPages(), widgets)
+        val held = contentsOf(other, RingPages(), CollectionPages(), GridPages(), widgets)
 
         assertEquals(PageContents.Ring(slots = 0, apps = 0, folders = 0, widgets = 1), held)
         assertEquals(false, held.isEmpty)
@@ -35,8 +35,8 @@ class PageContentsTest {
         val fresh = LauncherPage("ring-3", PageKind.Ring)
         val widgets = LauncherPage("widgets-2", PageKind.Widgets)
 
-        assertTrue(contentsOf(fresh, RingPages(), CollectionPages(), WidgetPages()).isEmpty)
-        assertTrue(contentsOf(widgets, RingPages(), CollectionPages(), WidgetPages()).isEmpty)
-        assertEquals(PageContents.Cards(CollectionsPage().cards.size), contentsOf(LauncherPage.Collections, RingPages(), CollectionPages(), WidgetPages()))
+        assertTrue(contentsOf(fresh, RingPages(), CollectionPages(), GridPages(), WidgetPages()).isEmpty)
+        assertTrue(contentsOf(widgets, RingPages(), CollectionPages(), GridPages(), WidgetPages()).isEmpty)
+        assertEquals(PageContents.Cards(CollectionsPage().cards.size), contentsOf(LauncherPage.Collections, RingPages(), CollectionPages(), GridPages(), WidgetPages()))
     }
 }

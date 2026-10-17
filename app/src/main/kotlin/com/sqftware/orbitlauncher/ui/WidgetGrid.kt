@@ -69,7 +69,11 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -84,6 +88,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import com.sqftware.orbitlauncher.domain.CLOCK_ID
+import com.sqftware.orbitlauncher.domain.Cell
 import com.sqftware.orbitlauncher.domain.HostedWidget
 import com.sqftware.orbitlauncher.domain.RING_ID
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
@@ -94,6 +100,7 @@ import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.cellRange
 import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.heldDrag
+import com.sqftware.orbitlauncher.domain.isLauncherBlock
 import com.sqftware.orbitlauncher.domain.nearestCells
 import com.sqftware.orbitlauncher.domain.roomFor
 import com.sqftware.orbitlauncher.domain.widgetCells
@@ -110,18 +117,20 @@ object WidgetTags {
     const val RESIZE = "widget_resize"
     const val LANDING = "widget_landing"
     const val RING = "widget_ring"
+    const val CLOCK = "widget_clock"
 
     fun widget(id: Int) = "widget_$id"
 }
 
 /**
- * What a page of widgets asks of the system: a widget's view, a new one for a page of so many rows of cells so big, a
+ * What a page of widgets asks of the system: a widget's view, a new one for a page of so many rows of cells so big,
+ * which may or may not lengthen to take it, a
  * removal, every widget and the ring put where a page has them once one is moved or resized, and how a widget's
  * provider lets it be resized.
  */
 data class WidgetActions(
     val view: (Context, Int) -> View,
-    val add: (pageRows: Int, columnWidthDp: Float, rowHeightDp: Float) -> Unit,
+    val add: (pageRows: Int, lengthens: Boolean, columnWidthDp: Float, rowHeightDp: Float) -> Unit,
     val remove: (Int) -> Unit,
     val arrange: (WidgetPage) -> Unit,
     val sizing: (Int) -> WidgetSizing,
@@ -223,6 +232,34 @@ private class HeldWidget {
     }
 }
 
+/**
+ * Which cell of a grid page a point is over: the page tells it where its cells are as it is placed, so what is dragged
+ * over the page can be let go into one.
+ */
+class GridCells {
+    private var placed: LayoutCoordinates? = null
+    private var pitch = Offset.Zero
+
+    /** The rows the page shows. */
+    var pageRows = 0
+        private set
+
+    internal fun place(coordinates: LayoutCoordinates, pitch: Offset, rows: Int) {
+        placed = coordinates
+        this.pitch = pitch
+        pageRows = rows
+    }
+
+    /** The cell under [point], in root coordinates, if it is on the page's cells. */
+    fun at(point: Offset): Cell? {
+        val coordinates = placed?.takeIf { it.isAttached } ?: return null
+        if (pitch.x <= 0f || pitch.y <= 0f) return null
+        val local = coordinates.localPositionOf(coordinates.findRootCoordinates(), point)
+        if (local.x < 0f || local.y < 0f) return null
+        return Cell((local.y / pitch.y).toInt(), (local.x / pitch.x).toInt()).takeIf { it.row < pageRows && it.column < WIDGET_COLUMNS }
+    }
+}
+
 /** A drag the page scrolls under: how much of a scroll of so many pixels it can still follow, and following one. */
 private class Follower(val room: (px: Float) -> Float, val follow: (px: Float) -> Unit)
 
@@ -241,7 +278,10 @@ private class EdgeScroll {
  * moved, and around it the widgets in the rows the screen holds, which never scroll; it has no button, and leaves the
  * touches on its empty cells to what is behind it, so [addRequests] asks for a widget instead. Edited as [RING_ID], the
  * ring wears an outline and a finger drags it up or down the page.
- * Cells no widget takes stay empty. A long press on a widget puts it in edit mode, as in Arc: [editing] is its id, and
+ * With [fixed] and no ring, the page is a grid page's: its rows never scroll and it has no button, as a ring page's, and
+ * it shows the [clock], as [CLOCK_ID], and its apps and folders, the launcher's other blocks, through [item]; it tells
+ * [cells] where its cells are, and outlines the [landing] cell, where what is dragged over it would go.
+ * Cells no widget takes stay empty. A long press on a widget, or the clock, puts it in edit mode, as in Arc: [editing] is its id, and
  * it wears an outline, a bin on the top-right corner that removes it, and, if its provider lets it stretch, a handle on
  * the bottom-right corner that drags its size a whole cell at a time, within what the provider allows, the rows the
  * page shows and the columns right of it. While one is edited the widgets take no taps, and a tap anywhere but on that
@@ -259,8 +299,12 @@ fun WidgetGrid(
     modifier: Modifier = Modifier,
     ring: (@Composable (Modifier) -> Unit)? = null,
     addRequests: Flow<Unit> = emptyFlow(),
+    fixed: Boolean = ring != null,
+    clock: (@Composable (Modifier) -> Unit)? = null,
+    item: (@Composable (id: Int, Modifier) -> Unit)? = null,
+    cells: GridCells? = null,
+    landing: Cell? = null,
 ) {
-    val fixed = ring != null
     val density = LocalDensity.current
     val keyboard = WindowInsets.ime
     val bars = WindowInsets.systemBars.union(WindowInsets.displayCutout)
@@ -279,7 +323,8 @@ fun WidgetGrid(
     val ringRows = widgetCells(span(WIDGET_COLUMNS, cell.width).value.roundToInt(), cell.height.value, pageRows)
     // Placed only once the page is measured, and stored as placed, so the widgets the host moves are where they show.
     val measured = area != DpSize.Zero
-    val laid = remember(page, fixed, ringRows, pageRows, measured) { if (fixed && measured) page.withRing(ringRows, pageRows) else page }
+    val hasRing = ring != null
+    val laid = remember(page, hasRing, ringRows, pageRows, measured) { if (hasRing && measured) page.withRing(ringRows, pageRows) else page }
     val reach = fit.reach(laid)
     LaunchedEffect(laid) { if (laid != page) actions.arrange(laid) }
     val held = remember { HeldWidget() }
@@ -313,7 +358,7 @@ fun WidgetGrid(
     LaunchedEffect(editing == null) { if (editing == null) held.id?.let { release(it, false) } }
     val add = {
         onEditingChange(null)
-        actions.add(pageRows, cell.width.value, cell.height.value)
+        actions.add(pageRows, !fixed, cell.width.value, cell.height.value)
     }
     val latestAdd by rememberUpdatedState(add)
     LaunchedEffect(addRequests) { addRequests.collect { latestAdd() } }
@@ -390,6 +435,7 @@ fun WidgetGrid(
                     .fillMaxWidth()
                     // At least the page, so a widget can be dropped anywhere in sight.
                     .height(span(if (fixed) pageRows else maxOf(shown.rows, pageRows, edge.outlineBottom), cell.height))
+                    .then(if (cells == null) Modifier else Modifier.onPlaced { cells.place(it, pitch, pageRows) })
                     // A widget dragged past the last row passes over the button on its way down.
                     .zIndex(if (held.id != null) 1f else 0f),
             ) {
@@ -400,7 +446,7 @@ fun WidgetGrid(
                         modifier = Modifier.align(Alignment.Center).padding(8.dp),
                     )
                 }
-                places[held.id]?.let { landing ->
+                (places[held.id] ?: landing?.let { HostedWidget(0, it.row, it.column, 1, 1) })?.let { landing ->
                     Box(
                         Modifier
                             .offset { cellOffset(landing, cell) }
@@ -412,10 +458,26 @@ fun WidgetGrid(
                 laid.widgets.forEach { widget ->
                     key(widget.id) {
                         val at = if (held.id == widget.id) widget else places[widget.id] ?: widget
-                        if (widget.id == RING_ID) {
-                            ring?.let { RingBlock(widget, at, cell, pitch, reach, editing, onEditingChange, held, release, it) }
-                        } else {
-                            Widget(widget, at, cell, pitch, reach, actions, resize, pageRows, editing, onEditingChange, held, release, edge)
+                        when {
+                            widget.id == RING_ID -> ring?.let {
+                                LauncherBlock(widget, at, cell, pitch, reach, editing, onEditingChange, held, release, WidgetTags.RING) {
+                                    it(Modifier.fillMaxSize())
+                                }
+                            }
+                            widget.id == CLOCK_ID -> clock?.let {
+                                LauncherBlock(
+                                    widget, at, cell, pitch, reach, editing, onEditingChange, held, release, WidgetTags.CLOCK,
+                                    longPress = true,
+                                    remove = "Remove clock",
+                                    onRemove = { actions.arrange(laid.remove(CLOCK_ID)) },
+                                ) { it(Modifier) }
+                            }
+                            isLauncherBlock(widget.id) -> item?.let {
+                                Box(Modifier.inCells(widget, at, cell, pitch, reach, held, edited = false).size(cell.width, cell.height)) {
+                                    it(widget.id, Modifier.fillMaxSize())
+                                }
+                            }
+                            else -> Widget(widget, at, cell, pitch, reach, actions, resize, pageRows, editing, onEditingChange, held, release, edge)
                         }
                     }
                 }
@@ -438,12 +500,15 @@ fun WidgetGrid(
 }
 
 /**
- * The [ring] as stored, shown in the cells of [at], which [held] drags up and down the page's first [reach] rows while
- * it is edited, a cell and its gap being [pitch]; [release] lets it go. While a widget is edited, a tap on it ends that.
+ * One of the launcher's own [block]s, the ring or the clock, as stored, shown in the cells of [at], which [held] drags
+ * about the page's first [reach] rows while it is edited, a cell and its gap being [pitch]; [release] lets it go. Edited,
+ * it wears an outline, which a finger drags, and, given [onRemove], a bin read out as [remove]. With [longPress] a long
+ * press puts it in edit mode, as it does a widget, and goes on to drag it. While another widget is edited, a tap on it ends
+ * that, and what it shows takes no touches meanwhile.
  */
 @Composable
-private fun RingBlock(
-    ring: HostedWidget,
+private fun LauncherBlock(
+    block: HostedWidget,
     at: HostedWidget,
     cell: DpSize,
     pitch: Offset,
@@ -452,25 +517,45 @@ private fun RingBlock(
     onEditingChange: (Int?) -> Unit,
     held: HeldWidget,
     release: (id: Int, lifted: Boolean) -> Unit,
-    content: @Composable (Modifier) -> Unit,
+    tag: String,
+    longPress: Boolean = false,
+    remove: String = "",
+    onRemove: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
+    // Read through the latest, so the gesture is not started over when edit mode, which it turns on, changes the lambda.
+    val latestOnEditingChange by rememberUpdatedState(onEditingChange)
     Box(
         Modifier
-            .inCells(ring, at, cell, pitch, reach, held, edited = editing == RING_ID)
-            .size(span(ring.columns, cell.width), span(ring.rows, cell.height))
-            .testTag(WidgetTags.RING),
+            .inCells(block, at, cell, pitch, reach, held, edited = editing == block.id)
+            .size(span(block.columns, cell.width), span(block.rows, cell.height))
+            .then(if (longPress) Modifier.longPressToMove(block.id, held, haptics, { latestOnEditingChange(it) }, release) else Modifier)
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
     ) {
-        content(Modifier.fillMaxSize())
-        // Over the ring, so its apps take no touches meanwhile.
+        content()
         when (editing) {
             null -> Unit
-            RING_ID -> Box(
+            block.id -> Box(
                 Modifier
                     .fillMaxSize()
                     .border(2.dp, MaterialTheme.colorScheme.onBackground)
-                    .dragToMove(RING_ID, held, release)
+                    .dragToMove(block.id, held, release)
                     .testTag(WidgetTags.EDIT),
-            )
+            ) {
+                onRemove?.let {
+                    EditButton(
+                        Icons.Default.Delete,
+                        remove,
+                        Modifier.align(Alignment.TopEnd).offset(CONTROL_REACH, -CONTROL_REACH).testTag(WidgetTags.REMOVE),
+                        Modifier.clickable {
+                            onEditingChange(null)
+                            it()
+                        },
+                    )
+                }
+            }
             else -> Box(Modifier.fillMaxSize().takeTaps(onTap = { onEditingChange(null) }))
         }
     }
@@ -738,6 +823,47 @@ private suspend fun AwaitPointerEventScope.carry(id: Int, pointer: PointerId, he
         }
     } finally {
         release(id, lifted)
+    }
+}
+
+/**
+ * Puts [id] in edit mode through [onEditingChange] when a finger rests on it, and moves it through [held] with that
+ * finger until it lifts, then [release]s it. It times the press ahead of what is inside, whose taps consume the down, and
+ * takes nothing until the press fires, so a tap still reaches them; after that it takes the rest of the press ahead of
+ * them, the lift included, so nothing inside acts on it. It must stay attached through edit mode, which the press
+ * starts, or the finger would be let go as it fires.
+ */
+private fun Modifier.longPressToMove(
+    id: Int,
+    held: HeldWidget,
+    haptics: HapticFeedback,
+    onEditingChange: (Int?) -> Unit,
+    release: (id: Int, lifted: Boolean) -> Unit,
+) = pointerInput(id, held, haptics, release) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val ended = withTimeoutOrNull<Unit>(viewConfiguration.longPressTimeoutMillis) {
+            do {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+            } while (change != null && change.pressed && (change.position - down.position).getDistance() <= viewConfiguration.touchSlop)
+        }
+        if (ended != null || !held.pickUp(id)) return@awaitEachGesture
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onEditingChange(id)
+        var lifted = false
+        try {
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                change.consume()
+                if (change.changedToUpIgnoreConsumed()) {
+                    lifted = true
+                    break
+                }
+                held.offset += change.position - change.previousPosition
+            }
+        } finally {
+            release(id, lifted)
+        }
     }
 }
 

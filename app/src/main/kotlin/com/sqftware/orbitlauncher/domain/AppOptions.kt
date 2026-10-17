@@ -18,6 +18,9 @@ sealed interface AppSpot : Serializable {
     data class Home(val place: HomePlace) : AppSpot
 
     data class Card(val kind: CollectionKind) : AppSpot
+
+    /** The app or folder [block] of the grid page [page]; [inFolder] when the app is in that folder. */
+    data class Grid(val page: String, val block: Int, val inFolder: Boolean = false) : AppSpot
 }
 
 /** Something an app's long-press menu offers besides its shortcuts. */
@@ -27,6 +30,9 @@ sealed interface AppOption {
     data object NewFolder : AppOption
 
     data class RemoveFromCard(val kind: CollectionKind.HandPicked) : AppOption
+
+    /** Takes the app off its grid page, or out of the folder it is in there when [inFolder]. */
+    data class RemoveFromGrid(val inFolder: Boolean) : AppOption
 
     data class AddTo(val place: HomePlace.Slots) : AppOption
 
@@ -52,7 +58,7 @@ sealed interface AppOption {
 /**
  * The options for [app] long-pressed at [spot], in menu order, given the [home] apps, the [settings] made for apps,
  * whether the badges are enabled and whether the app [hasStorePage]. A home place takes the app off it, and the ring and
- * the dock start a folder in its slot; a hand-picked card takes it off the card. Anywhere but home, the menu adds the app
+ * the dock start a folder in its slot; a hand-picked card or a grid page takes it off. Anywhere but home, the menu adds the app
  * to the ring or the dock where it has no slot of its own yet. A plain app of the user's own can be split with another. A pinned shortcut
  * wears no badge and is on no card, so offers neither setting. A pair belongs to no one app, so offers only where it is,
  * flipping its order there, and each of its apps' badge, which the pair's own adds up.
@@ -70,9 +76,10 @@ fun appOptions(
     if (place != null) add(AppOption.Remove(place))
     if (place is HomePlace.Slots) add(AppOption.NewFolder)
     if (card is CollectionKind.HandPicked) add(AppOption.RemoveFromCard(card))
+    if (spot is AppSpot.Grid) add(AppOption.RemoveFromGrid(spot.inFolder))
     if (place == null) listOf(HomePlace.Ring, HomePlace.Dock).filter { app !in home[it] }.forEach { add(AppOption.AddTo(it)) }
     if (app.isApp) {
-        if (app.isPairable) add(AppOption.SplitWith)
+        if (app.isPairable && spot !is AppSpot.Grid) add(AppOption.SplitWith)
         if (badgesEnabled) add(AppOption.Badge(settings.isBadgeOff(app)))
         add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
     }

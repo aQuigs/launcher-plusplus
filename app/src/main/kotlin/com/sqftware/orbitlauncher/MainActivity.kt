@@ -28,6 +28,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesAppNamesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesCollectionsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesGridPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeOnReturnStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
@@ -53,6 +54,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
+import com.sqftware.orbitlauncher.domain.GridPages
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
@@ -114,6 +116,7 @@ class MainActivity : ComponentActivity() {
         val homeRole = RoleManagerHomeRole(this, activityResultRegistry)
         val badges = NotificationBadges(this)
         val collectionsStore = SharedPreferencesCollectionsStore(this)
+        val gridPagesStore = SharedPreferencesGridPagesStore(this)
         val appSettingsStore = SharedPreferencesAppSettingsStore(this)
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
@@ -124,7 +127,7 @@ class MainActivity : ComponentActivity() {
         val widgetActions = { page: String ->
             WidgetActions(
                 view = widgetHost::view,
-                add = { pageRows, columnWidthDp, rowHeightDp -> widgetHost.add(page, pageRows, columnWidthDp, rowHeightDp) },
+                add = { pageRows, lengthens, columnWidthDp, rowHeightDp -> widgetHost.add(page, pageRows, lengthens, columnWidthDp, rowHeightDp) },
                 remove = widgetHost::remove,
                 arrange = { widgetHost.arrange(page, it) },
                 sizing = widgetHost::sizing,
@@ -221,6 +224,7 @@ class MainActivity : ComponentActivity() {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
                 }
                 var collectionPages by remember { mutableStateOf(collectionsStore.load()) }
+                var gridPages by remember { mutableStateOf(gridPagesStore.load()) }
                 var appSettings by remember { mutableStateOf(appSettingsStore.load()) }
                 // Usage access is granted in Settings, so each return to the front reads the grant and the week's usage
                 // again. The grant is read before the first frame, so a granted card does not ask for it while the usage
@@ -236,10 +240,15 @@ class MainActivity : ComponentActivity() {
                     collectionPages = changed
                     collectionsStore.save(changed)
                 }
+                fun changeGridPages(changed: GridPages) {
+                    gridPages = changed
+                    gridPagesStore.save(changed)
+                }
                 // What a page no longer in the layout held goes, so no widget stays bound and no shortcut pinned for it.
                 fun keepPagesOf(layout: PageLayout) {
                     ringPages.keepingPages(layout.ids).let { if (it != ringPages) changeRingPages(it) }
                     collectionPages.keepingPages(layout.ids).let { if (it != collectionPages) changeCollectionPages(it) }
+                    gridPages.keepingPages(layout.ids).let { if (it != gridPages) changeGridPages(it) }
                     widgetHost.keepPages(layout.ids)
                 }
                 fun changeLayout(changed: PageLayout) {
@@ -366,6 +375,8 @@ class MainActivity : ComponentActivity() {
                     onBecomeHomeApp = homeRole::request,
                     widgetPages = widgetPages,
                     widgets = widgetActions,
+                    gridPages = gridPages,
+                    onGridPagesChange = ::changeGridPages,
                     collectionPages = collectionPages,
                     onCollectionPagesChange = ::changeCollectionPages,
                     foregroundTime = foregroundTime,

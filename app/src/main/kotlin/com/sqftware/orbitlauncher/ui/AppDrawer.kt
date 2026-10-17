@@ -412,7 +412,8 @@ private fun NoMatches() {
 
 private val RAIL_WIDTH = 28.dp
 private val ROW_ICON_SIZE = 40.dp
-private val GRID_ICON_SIZE = 52.dp
+/** How big an icon in the drawer's grid is, smaller than the ring's so four fit across with their names; a grid page's too. */
+internal val GRID_ICON_SIZE = 52.dp
 private const val GRID_COLUMNS = 4
 
 private fun LazyGridScope.fullWidth(key: Any? = null, contentType: Any? = null, content: @Composable () -> Unit) =

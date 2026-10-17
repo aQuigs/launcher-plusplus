@@ -204,5 +204,5 @@ fun SemanticsNodeInteractionsProvider.createCollectionName() = onNodeWithTag(Col
 fun SemanticsNodeInteractionsProvider.drawerRow(label: String) =
     onNode(hasText(label) and hasAnyAncestor(hasTestTag(AppDrawerTags.LIST)))
 
-// The kind's name is a page's label in the editor behind the dialog too.
-fun SemanticsNodeInteractionsProvider.addPageOf(kind: PageKind) = onNode(hasText(kind.name) and hasAnyAncestor(isDialog())).performClick()
+// The kind's title is a page's label in the editor behind the dialog too.
+fun SemanticsNodeInteractionsProvider.addPageOf(kind: PageKind) = onNode(hasText(kind.title) and hasAnyAncestor(isDialog())).performClick()

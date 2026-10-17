@@ -19,10 +19,17 @@ sealed interface PageContents {
     data class Widgets(val widgets: List<HostedWidget>) : PageContents {
         override val isEmpty: Boolean get() = widgets.isEmpty()
     }
+
+    /** A grid page's [apps], those in its [folders] included, and its [blocks] of every kind where they sit. */
+    data class Grid(val apps: Int, val folders: Int, val blocks: List<HostedWidget>) : PageContents {
+        override val isEmpty: Boolean get() = blocks.isEmpty()
+
+        val widgets: Int get() = blocks.count { !isLauncherBlock(it.id) }
+    }
 }
 
-/** What [page] holds of [rings], [collections] or [widgets], as its kind says; the dock is the home page's. */
-fun contentsOf(page: LauncherPage, rings: RingPages, collections: CollectionPages, widgets: WidgetPages): PageContents = when (page.kind) {
+/** What [page] holds of [rings], [collections], [grids] or [widgets], as its kind says; the dock is the home page's. */
+fun contentsOf(page: LauncherPage, rings: RingPages, collections: CollectionPages, grids: GridPages, widgets: WidgetPages): PageContents = when (page.kind) {
     PageKind.Ring -> {
         val held = rings.on(page.id).let { if (page == LauncherPage.Home) it else HomeApps(it.ring) }
         PageContents.Ring(
@@ -35,4 +42,13 @@ fun contentsOf(page: LauncherPage, rings: RingPages, collections: CollectionPage
     }
     PageKind.Collections -> PageContents.Cards(collections.on(page.id).cards.size)
     PageKind.Widgets -> PageContents.Widgets(widgets[page.id].widgets)
+    PageKind.Grid -> {
+        val grid = grids.grid(page.id, widgets)
+        val slots = grid.slots.values
+        PageContents.Grid(
+            apps = slots.sumOf { if (it is RingSlot.Folder) it.keys.size else 1 },
+            folders = slots.count { it is RingSlot.Folder },
+            blocks = grid.cells.widgets,
+        )
+    }
 }

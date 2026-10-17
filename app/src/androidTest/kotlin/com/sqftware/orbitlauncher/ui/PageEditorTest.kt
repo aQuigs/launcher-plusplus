@@ -37,6 +37,7 @@ class PageEditorTest {
                     PageKind.Ring -> if (page == LauncherPage.Home) PageContents.Ring(slots = 4, apps = 4, folders = 0) else PageContents.Ring(0, 0, 0)
                     PageKind.Collections -> PageContents.Cards(3)
                     PageKind.Widgets -> PageContents.Widgets(emptyList())
+                    PageKind.Grid -> PageContents.Grid(0, 0, emptyList())
                 }
             },
             onLayoutChange = { layout = it },
