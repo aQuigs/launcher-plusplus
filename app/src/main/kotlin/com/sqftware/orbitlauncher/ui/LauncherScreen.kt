@@ -239,9 +239,7 @@ data class HomePress(val launcherInFront: Boolean)
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
  * [LauncherPage.Home] whether to add its shortcut, which goes at the end of its ring once the system has pinned it. The
  * menu's Home page row chooses which page is home, where the launcher starts and HOME and Back return
- * ([onLayoutChange]). [apps] and
- * [pinnedShortcuts] are null until they have loaded. The drawer lays
- * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
+ * ([onLayoutChange]). [apps] and [pinnedShortcuts] are null until they have loaded. The drawer lays out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
  * drawer, the collection picker, the folder and a theme's try; one made while the launcher was in front also scrolls to the home page. With [homeOnReturn],
  * going out of sight does both, unless the launcher left on an errand of its own: adding a widget, app info, a store page, usage access. Back undoes what is on top:
@@ -321,8 +319,8 @@ fun LauncherScreen(
     // An app on its way out of the drawer, or an item on the move, and the page it was picked up on, if any.
     var dragged by remember { mutableStateOf<Drag?>(null) }
     var draggedFrom by remember { mutableStateOf<LauncherPage?>(null) }
-    // The ring page and the collections page the screen works on: the one settled in view, else the home page and the
-    // first collections page, which an app dragged from the drawer or a pinned shortcut goes to. The page an item was
+    // The ring page and the collections page the screen works on: the one settled in view, else the clock's ring page and
+    // the first collections page, which an app dragged from the drawer or a pinned shortcut goes to. The page an item was
     // picked up on stays the one of its kind while the item turns the pages, so the gesture holding it and the place it
     // left last until it is let go. Only they take part in menus, drags and open folders; the others are drawn as they
     // are, though any page in view takes a drop.
@@ -749,9 +747,11 @@ fun LauncherScreen(
     // Each animation gets its own job: a drag in progress cancels it, and that must not stop the collector.
     fun openDrawer() = scope.launch { drawerState.expand() }
     fun closeDrawer() = scope.launch { drawerState.partialExpand() }
-    // The latest layout, as both are called from callbacks remembered once.
-    fun goHome() = scope.launch { pagerState.animateScrollToPage(latestLayout.homeIndex) }
-    fun showRingPage() = scope.launch { pagerState.animateScrollToPage(latestLayout.pages.indexOf(latestRingPage)) }
+    // The latest layout, as these are called from callbacks remembered once.
+    fun show(page: LauncherPage) = scope.launch { pagerState.animateScrollToPage(latestLayout.pages.indexOf(page)) }
+    fun goHome() = show(latestLayout.home)
+    fun showClockRing() = show(LauncherPage.Home)
+    fun showRingPage() = show(latestRingPage)
     // Ends when the launcher is next in sight, not in front: the widget picker is drawn over the launcher and hands on to
     // the widget's own setup, which only then takes the launcher out of sight.
     var onErrand by remember { mutableStateOf(false) }
@@ -1167,7 +1167,11 @@ fun LauncherScreen(
                                 flips = true,
                                 onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
                             ),
-                            LauncherMenuRow("Theme", value = latestTheme.label) { latestOnPreviewThemeChange(latestTheme) },
+                            LauncherMenuRow("Theme", value = latestTheme.label) {
+                                // Its bar takes the clock's place, which may be on another page than the menu's.
+                                showClockRing()
+                                latestOnPreviewThemeChange(latestTheme)
+                            },
                             LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
                             LauncherMenuRow(
                                 "Names on the ring",
@@ -1252,14 +1256,15 @@ fun LauncherScreen(
     LaunchedEffect(pinRequests, pagerState, drawerState) {
         pinRequests.collect { request ->
             closeAll()
-            scope.launch { pagerState.animateScrollToPage(latestLayout.pages.indexOf(LauncherPage.Home)) }
+            showClockRing()
             confirmingPin = request
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
     // not a rung of its own: the keyboard takes the first Back, and closing the drawer ends the search.
     // The open folder closes only while its page is in view, as the drawer and the other pages hide it and a press should
-    // undo something in view; on another page, Back goes home first. With nothing left, the home app still takes Back:
+    // undo something in view; on another page, Back goes home first, and on a home that is not that ring, closes it from
+    // there. With nothing left, the home app still takes Back:
     // left to the system, it would finish the home activity, which the system then starts afresh, reloading everything on
     // screen. Opened as an app instead, Back leaves it.
     BackHandler(
@@ -1274,8 +1279,10 @@ fun LauncherScreen(
             pickingCollection -> pickingCollection = false
             editedWidget != null -> editingWidget = null
             open != null && settled == ringPage -> openFolder = null
-            pagerState.currentPage != layout.homeIndex -> goHome()
+            // Before going home, which may scroll away from the theme preview's bar on the clock's ring.
             previewing -> onPreviewThemeChange(null)
+            pagerState.currentPage != layout.homeIndex -> goHome()
+            open != null -> openFolder = null
         }
     }
 

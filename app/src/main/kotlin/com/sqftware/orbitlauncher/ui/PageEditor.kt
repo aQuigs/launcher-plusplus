@@ -81,8 +81,9 @@ private val EDGE_SPEED = 600.dp
 /**
  * The pages of [layout] as a strip of cards in swipe order, each drawn from what [contentsOf] says it holds. A tap on a
  * card hands its page to [onOpen]; a long press lifts it, to drag it along the strip to another place. A + at either end
- * adds a page of the kind picked in a dialog there, until the layout is full. Every page but home has an × that deletes
- * it, at once if it is empty, else once a dialog naming what it holds has asked. Each change is handed to [onLayoutChange].
+ * adds a page of the kind picked in a dialog there, until the layout is full. The home page wears a house. Every page but
+ * the clock's ring has an × that deletes it, at once if it is empty, else once a dialog naming what it holds has asked;
+ * deleting home makes the clock's ring home again. Each change is handed to [onLayoutChange].
  */
 @Composable
 fun PageEditor(
@@ -222,7 +223,7 @@ private fun PageCard(
     modifier: Modifier = Modifier,
 ) {
     val colours = MaterialTheme.colorScheme
-    val isHome = page == LauncherPage.Home
+    val isClockRing = page == LauncherPage.Home
     val marked = home || lifted
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.testTag(PageEditorTags.page(page))) {
@@ -240,7 +241,7 @@ private fun PageCard(
                 .border(if (marked) 2.dp else 1.dp, if (marked) colours.primary else colours.outlineVariant, CARD_SHAPE)
                 .clickable(onClick = onOpen),
         ) {
-            PagePreview(contents, isHome, Modifier.matchParentSize())
+            PagePreview(contents, isClockRing, Modifier.matchParentSize())
             if (home) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -249,7 +250,7 @@ private fun PageCard(
                     Icon(Icons.Default.Home, contentDescription = "Home page", tint = colours.onPrimary, modifier = Modifier.size(13.dp))
                 }
             }
-            if (!isHome) {
+            if (!isClockRing) {
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag(PageEditorTags.delete(page)),
@@ -286,15 +287,15 @@ private fun itemsSummary(apps: Int, folders: Int, widgets: Int): String = listOf
 
 /** A sketch of a page: the ring and its slots, with home's clock and dock, the cards, or the widgets where they sit. */
 @Composable
-private fun PagePreview(contents: PageContents, isHome: Boolean, modifier: Modifier = Modifier) {
+private fun PagePreview(contents: PageContents, isClockRing: Boolean, modifier: Modifier = Modifier) {
     val line = MaterialTheme.colorScheme.outline
     val mark = MaterialTheme.colorScheme.primary
 
     Canvas(modifier) {
         when (contents) {
             is PageContents.Ring -> {
-                if (isHome) drawRoundRect(line, Offset(size.width * 0.3f, size.height * 0.1f), Size(size.width * 0.4f, 6.dp.toPx()), CornerRadius(3.dp.toPx()))
-                val centre = Offset(size.width / 2, size.height * if (isHome) 0.48f else 0.45f)
+                if (isClockRing) drawRoundRect(line, Offset(size.width * 0.3f, size.height * 0.1f), Size(size.width * 0.4f, 6.dp.toPx()), CornerRadius(3.dp.toPx()))
+                val centre = Offset(size.width / 2, size.height * if (isClockRing) 0.48f else 0.45f)
                 val radius = size.width * 0.34f
                 drawCircle(line, radius, centre, style = Stroke(1.dp.toPx()))
                 drawCircle(line, radius * 0.4f, centre, style = Stroke(1.dp.toPx()))

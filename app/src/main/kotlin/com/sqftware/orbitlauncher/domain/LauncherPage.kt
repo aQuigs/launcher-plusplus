@@ -34,13 +34,14 @@ data class PageLayout(
     val pages: List<LauncherPage> = listOf(LauncherPage.Widgets, LauncherPage.Home, LauncherPage.Collections),
     private val homeId: String = LauncherPage.Home.id,
 ) {
-    val homeIndex: Int = pages.indexOfFirst { it.id == homeId }.takeIf { it >= 0 } ?: pages.indexOf(LauncherPage.Home)
+    val homeIndex: Int = pages.indexOfFirst { it.id == homeId }
 
     /** The page the launcher starts on and HOME returns to. */
     val home: LauncherPage get() = pages[homeIndex]
 
     init {
         require(LauncherPage.Home in pages) { "A page layout needs a Home page" }
+        require(homeIndex >= 0) { "Home must be one of the pages: $homeId" }
         require(pages.distinctBy { it.id }.size == pages.size) { "A page id may appear only once: $pages" }
     }
 
@@ -63,7 +64,8 @@ data class PageLayout(
     }
 
     /** The layout without [page]; [LauncherPage.Home] stays, and becomes home again if [page] was. */
-    fun remove(page: LauncherPage): PageLayout = if (page == LauncherPage.Home) this else PageLayout(pages - page, home.id)
+    fun remove(page: LauncherPage): PageLayout =
+        if (page == LauncherPage.Home) this else PageLayout(pages - page, home.id.takeIf { it != page.id } ?: LauncherPage.Home.id)
 
     /** The layout with the page at [from] moved to [to]; a position off the layout changes nothing. */
     fun move(from: Int, to: Int): PageLayout = PageLayout(pages.reordered(from, to, ReorderMode.Insert), home.id)
@@ -71,9 +73,12 @@ data class PageLayout(
     /** The layout with [page] as home; one it does not hold changes nothing. */
     fun withHome(page: LauncherPage): PageLayout = if (page in pages) PageLayout(pages, page.id) else this
 
-    /** What [page] is called: Home, or its kind, numbered from the second page of that kind on, home being the first ring. */
+    /**
+     * What [page] is called: Home, or its kind, numbered from the second page of that kind on, [LauncherPage.Home] being
+     * the first ring and called Home only while it is home.
+     */
     fun label(page: LauncherPage): String {
-        if (page == LauncherPage.Home) return "Home"
+        if (page == LauncherPage.Home) return if (home == page) "Home" else page.kind.title
         val others = pages.filter { it.kind == page.kind && it != LauncherPage.Home }
         val number = others.indexOf(page) + if (page.kind == PageKind.Ring) 2 else 1
         return if (number == 1) page.kind.title else "${page.kind.title} $number"

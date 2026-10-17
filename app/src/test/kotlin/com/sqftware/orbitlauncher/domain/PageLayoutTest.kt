@@ -111,8 +111,15 @@ class PageLayoutTest {
         assertEquals(LauncherPage.Collections, chosen.home)
         assertEquals(2, chosen.homeIndex)
         assertEquals(LauncherPage.Collections, chosen.move(from = 2, to = 0).add(PageKind.Grid, atStart = true).home)
-        assertEquals(LauncherPage.Home, chosen.remove(LauncherPage.Collections).home)
+        assertEquals(PageLayout(listOf(LauncherPage.Widgets, LauncherPage.Home)), chosen.remove(LauncherPage.Collections))
         assertEquals(chosen, chosen.withHome(LauncherPage("gone", PageKind.Ring)))
+    }
+
+    @Test
+    fun `the clock ring is called Home only while it is home`() {
+        val chosen = PageLayout().add(PageKind.Ring, atStart = false, id = "r2").withHome(LauncherPage.Collections)
+
+        assertEquals(listOf("Widgets", "Ring", "Collections", "Ring 2"), chosen.pages.map(chosen::label))
     }
 
     @Test
