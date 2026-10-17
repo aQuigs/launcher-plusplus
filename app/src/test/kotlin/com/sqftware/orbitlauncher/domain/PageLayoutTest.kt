@@ -103,4 +103,23 @@ class PageLayoutTest {
         assertEquals(PageLayout(), decodePageLayout("widgets\tWidgets"))
         assertEquals(PageLayout(listOf(LauncherPage.Home)), decodePageLayout("home\tRing\nx\tNope\nhome\tRing"))
     }
+
+    @Test
+    fun `another page made home keeps that through edits, and home falls back to the ring once it is deleted`() {
+        val chosen = PageLayout().withHome(LauncherPage.Collections)
+
+        assertEquals(LauncherPage.Collections, chosen.home)
+        assertEquals(2, chosen.homeIndex)
+        assertEquals(LauncherPage.Collections, chosen.move(from = 2, to = 0).add(PageKind.Grid, atStart = true).home)
+        assertEquals(LauncherPage.Home, chosen.remove(LauncherPage.Collections).home)
+        assertEquals(chosen, chosen.withHome(LauncherPage("gone", PageKind.Ring)))
+    }
+
+    @Test
+    fun `the page chosen as home comes back as it went`() {
+        val chosen = PageLayout().withHome(LauncherPage.Widgets)
+
+        assertEquals(chosen, decodePageLayout(chosen.encode()))
+        assertEquals(PageLayout(), decodePageLayout(PageLayout().encode()))
+    }
 }

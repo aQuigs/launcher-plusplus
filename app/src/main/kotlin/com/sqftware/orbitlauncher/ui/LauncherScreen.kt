@@ -237,7 +237,9 @@ data class HomePress(val launcherInFront: Boolean)
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
- * the home page whether to add its shortcut, which goes at the end of the ring once the system has pinned it. [apps] and
+ * [LauncherPage.Home] whether to add its shortcut, which goes at the end of its ring once the system has pinned it. The
+ * menu's Home page row chooses which page is home, where the launcher starts and HOME and Back return
+ * ([onLayoutChange]). [apps] and
  * [pinnedShortcuts] are null until they have loaded. The drawer lays
  * out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
@@ -727,6 +729,7 @@ fun LauncherScreen(
     var confirmingScene by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
+    var choosingHome by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     var renamingFolder by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     // By the card's stored name, which survives the activity being recreated.
@@ -1154,6 +1157,7 @@ fun LauncherScreen(
                             gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { LauncherMenuRow("Add clock") { addClock(it) } },
                             widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
                             LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
+                            LauncherMenuRow("Home page", value = latestLayout.label(latestLayout.home)) { choosingHome = true },
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
@@ -1221,6 +1225,7 @@ fun LauncherScreen(
         confirmingPin = null
         latestOnPreviewThemeChange(null)
         choosingLook = false
+        choosingHome = false
         choosingPlanet = null
         renamingFolder = null
         settingCard = null
@@ -1243,11 +1248,11 @@ fun LauncherScreen(
             if (press.launcherInFront) goHome()
         }
     }
-    // On the home page, so the shortcut is seen landing on the ring.
+    // On the page whose ring takes it, so the shortcut is seen landing there.
     LaunchedEffect(pinRequests, pagerState, drawerState) {
         pinRequests.collect { request ->
             closeAll()
-            goHome()
+            scope.launch { pagerState.animateScrollToPage(latestLayout.pages.indexOf(LauncherPage.Home)) }
             confirmingPin = request
         }
     }
@@ -1749,6 +1754,20 @@ fun LauncherScreen(
                         onDismiss = { creatingCollection = false },
                     )
                 }
+            }
+            if (choosingHome) {
+                ChoiceDialog(
+                    title = "Home page",
+                    choices = layout.pages,
+                    chosen = layout.home,
+                    label = layout::label,
+                    onChoose = {
+                        choosingHome = false
+                        onLayoutChange(layout.withHome(it))
+                    },
+                    onDismiss = { choosingHome = false },
+                    modifier = Modifier.testTag(LauncherMenuTags.HOME_DIALOG),
+                )
             }
             if (choosingLook) {
                 ChoiceDialog(

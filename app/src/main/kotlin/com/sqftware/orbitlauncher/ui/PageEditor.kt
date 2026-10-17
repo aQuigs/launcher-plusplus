@@ -143,6 +143,7 @@ fun PageEditor(
                         PageCard(
                             page = page,
                             label = layout.label(page),
+                            home = page == layout.home,
                             contents = held,
                             lifted = reorder.dragging == index,
                             // A long press let go without moving reaches the card's tap first, and opens nothing.
@@ -213,6 +214,7 @@ private val PageKind.blurb: String
 private fun PageCard(
     page: LauncherPage,
     label: String,
+    home: Boolean,
     contents: PageContents,
     lifted: Boolean,
     onOpen: () -> Unit,
@@ -221,7 +223,7 @@ private fun PageCard(
 ) {
     val colours = MaterialTheme.colorScheme
     val isHome = page == LauncherPage.Home
-    val marked = isHome || lifted
+    val marked = home || lifted
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.testTag(PageEditorTags.page(page))) {
         Box(
@@ -239,14 +241,15 @@ private fun PageCard(
                 .clickable(onClick = onOpen),
         ) {
             PagePreview(contents, isHome, Modifier.matchParentSize())
-            if (isHome) {
+            if (home) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.padding(6.dp).size(20.dp).background(colours.primary, CircleShape),
                 ) {
                     Icon(Icons.Default.Home, contentDescription = "Home page", tint = colours.onPrimary, modifier = Modifier.size(13.dp))
                 }
-            } else {
+            }
+            if (!isHome) {
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag(PageEditorTags.delete(page)),
