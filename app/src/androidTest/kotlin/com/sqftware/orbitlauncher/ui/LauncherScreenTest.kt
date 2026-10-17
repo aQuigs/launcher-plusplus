@@ -3411,7 +3411,7 @@ class LauncherScreenTest {
 
     /** Shows the screen on a grid page right of home, its apps and folders [slots] by block, in the [cells] given. */
     private fun showGrid(slots: Map<Int, RingSlot> = emptyMap(), cells: List<HostedWidget> = emptyList()) {
-        layout = PageLayout(listOf(LauncherPage.Widgets, LauncherPage.Home, grid))
+        layout = PageLayout(listOf(LauncherPage.Home, grid))
         gridPages = GridPages(mapOf(grid.id to GridPage(slots)))
         widgetPages = WidgetPages(mapOf(grid.id to WidgetPage(cells)))
         show()
