@@ -47,7 +47,6 @@ object LauncherMenuTags {
     const val MENU = "launcher_menu"
     const val RESET_DIALOG = "launcher_reset_dialog"
     const val LOOK_DIALOG = "launcher_folder_look_dialog"
-    const val HOME_DIALOG = "launcher_home_page_dialog"
 }
 
 /**

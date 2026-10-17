@@ -238,8 +238,8 @@ data class HomePress(val launcherInFront: Boolean)
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
  * [LauncherPage.Home] whether to add its shortcut, which goes at the end of its ring once the system has pinned it. The
- * menu's Home page row chooses which page is home, where the launcher starts and HOME and Back return
- * ([onLayoutChange]). [apps] and [pinnedShortcuts] are null until they have loaded. The drawer lays out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
+ * launcher starts, and HOME and Back return, on the layout's home, which the page editor chooses. [apps] and
+ * [pinnedShortcuts] are null until they have loaded. The drawer lays out and orders the apps as the [drawerStyle] says, which its own buttons and sort menu change
  * ([onDrawerStyleChange]). Every [HomePress] cancels a drag, ends widget editing and closes the menu, the dialogs, the
  * drawer, the collection picker, the folder and a theme's try; one made while the launcher was in front also scrolls to the home page. With [homeOnReturn],
  * going out of sight does both, unless the launcher left on an errand of its own: adding a widget, app info, a store page, usage access. Back undoes what is on top:
@@ -727,7 +727,6 @@ fun LauncherScreen(
     var confirmingScene by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
-    var choosingHome by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     var renamingFolder by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
     // By the card's stored name, which survives the activity being recreated.
@@ -1157,7 +1156,6 @@ fun LauncherScreen(
                             gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { LauncherMenuRow("Add clock") { addClock(it) } },
                             widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
                             LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
-                            LauncherMenuRow("Home page", value = latestLayout.label(latestLayout.home)) { choosingHome = true },
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
                             LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
@@ -1229,7 +1227,6 @@ fun LauncherScreen(
         confirmingPin = null
         latestOnPreviewThemeChange(null)
         choosingLook = false
-        choosingHome = false
         choosingPlanet = null
         renamingFolder = null
         settingCard = null
@@ -1761,20 +1758,6 @@ fun LauncherScreen(
                         onDismiss = { creatingCollection = false },
                     )
                 }
-            }
-            if (choosingHome) {
-                ChoiceDialog(
-                    title = "Home page",
-                    choices = layout.pages,
-                    chosen = layout.home,
-                    label = layout::label,
-                    onChoose = {
-                        choosingHome = false
-                        onLayoutChange(layout.withHome(it))
-                    },
-                    onDismiss = { choosingHome = false },
-                    modifier = Modifier.testTag(LauncherMenuTags.HOME_DIALOG),
-                )
             }
             if (choosingLook) {
                 ChoiceDialog(

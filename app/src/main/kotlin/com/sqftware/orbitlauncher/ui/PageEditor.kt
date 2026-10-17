@@ -65,6 +65,8 @@ object PageEditorTags {
 
     fun delete(page: LauncherPage) = "page_delete_${page.id}"
 
+    fun home(page: LauncherPage) = "page_home_${page.id}"
+
     fun add(atStart: Boolean) = if (atStart) "page_add_start" else "page_add_end"
 }
 
@@ -81,7 +83,8 @@ private val EDGE_SPEED = 600.dp
 /**
  * The pages of [layout] as a strip of cards in swipe order, each drawn from what [contentsOf] says it holds. A tap on a
  * card hands its page to [onOpen]; a long press lifts it, to drag it along the strip to another place. A + at either end
- * adds a page of the kind picked in a dialog there, until the layout is full. The home page wears a house. Every page but
+ * adds a page of the kind picked in a dialog there, until the layout is full. Each card's house makes its page home, the
+ * home page's filled in. Every page but
  * the clock's ring has an × that deletes it, at once if it is empty, else once a dialog naming what it holds has asked;
  * deleting home makes the clock's ring home again. Each change is handed to [onLayoutChange].
  */
@@ -118,7 +121,7 @@ fun PageEditor(
         Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Pages", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 20.dp))
             Text(
-                "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it.",
+                "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp),
@@ -150,6 +153,7 @@ fun PageEditor(
                             // A long press let go without moving reaches the card's tap first, and opens nothing.
                             onOpen = { if (reorder.dragging == null) onOpen(page) },
                             onDelete = { if (held.isEmpty) onLayoutChange(layout.remove(page)) else deleting = page },
+                            onMakeHome = { onLayoutChange(layout.withHome(page)) },
                             modifier = Modifier
                                 .reorderItem(reorder, index)
                                 .pointerInput(index) {
@@ -220,6 +224,7 @@ private fun PageCard(
     lifted: Boolean,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
+    onMakeHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colours = MaterialTheme.colorScheme
@@ -242,13 +247,20 @@ private fun PageCard(
                 .clickable(onClick = onOpen),
         ) {
             PagePreview(contents, isClockRing, Modifier.matchParentSize())
-            if (home) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.padding(6.dp).size(20.dp).background(colours.primary, CircleShape),
-                ) {
-                    Icon(Icons.Default.Home, contentDescription = "Home page", tint = colours.onPrimary, modifier = Modifier.size(13.dp))
-                }
+            IconButton(
+                onClick = onMakeHome,
+                enabled = !home,
+                modifier = Modifier.size(32.dp).testTag(PageEditorTags.home(page)),
+            ) {
+                Icon(
+                    Icons.Default.Home,
+                    contentDescription = if (home) "Home page" else "Make $label the home page",
+                    tint = if (home) colours.onPrimary else colours.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(if (home) colours.primary else colours.surfaceContainerHighest, CircleShape)
+                        .padding(3.dp),
+                )
             }
             if (!isClockRing) {
                 IconButton(

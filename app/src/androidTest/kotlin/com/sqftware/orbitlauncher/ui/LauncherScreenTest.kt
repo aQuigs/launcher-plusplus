@@ -2150,13 +2150,13 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theLauncherMenusHomePageRowMakesAnotherPageHomeWhichHomeAndBackThenGoTo() {
+    fun anotherPageMadeHomeIsWhereTheLauncherStartsAndHomeAndBackGo() {
+        layout = PageLayout().withHome(LauncherPage.Collections)
         show()
-        compose.longPressEmptyHomeSpace()
-        compose.onNodeWithText("Home page").performClick()
-        compose.onNode(hasText("Collections") and hasAnyAncestor(hasTestTag(LauncherMenuTags.HOME_DIALOG))).performClick()
+        assertSettledOn(LauncherPage.Collections)
 
-        compose.runOnIdle { assertEquals(LauncherPage.Collections, layout.home) }
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Home)
         pressHome(launcherInFront = true)
         assertSettledOn(LauncherPage.Collections)
         compose.swipePager { swipeRight() }
