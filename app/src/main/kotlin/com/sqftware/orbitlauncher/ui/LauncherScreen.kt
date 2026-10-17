@@ -874,9 +874,9 @@ fun LauncherScreen(
     // And for each app and folder of a grid page, by its block, built again as the grid pages change so none outlives its block.
     val gridMenus = remember(actions, gridPages) { mutableMapOf<AppSpot.Grid, AppMenu>() }
     fun gridMenu(spot: AppSpot.Grid) = gridMenus.getOrPut(spot) { appMenu(spot) }
-    val gridFolderMenus = remember(gridPages) { mutableMapOf<AppSpot.Grid, GridFolderMenu>() }
+    val gridFolderMenus = remember(gridPages) { mutableMapOf<AppSpot.Grid, FolderMenu>() }
     fun gridFolderMenu(spot: AppSpot.Grid) = gridFolderMenus.getOrPut(spot) {
-        GridFolderMenu(
+        FolderMenu(
             onOpen = { openMenuUnlessDragging { openMenu = OpenMenu.GridFolder(spot) } },
             content = {
                 (openMenu as? OpenMenu.GridFolder)?.takeIf { it.spot == spot }?.let { shown ->
@@ -1036,7 +1036,7 @@ fun LauncherScreen(
             onStart = { item, position ->
                 when (item) {
                     is AppEntry -> beginDrag(Drag.OnGrid(page, block, GridItem.App(item)), position)
-                    is GridItem.Folder -> beginDrag(Drag.OnGrid(page, block, item), position)
+                    is RingItem.Folder -> beginDrag(Drag.OnGrid(page, block, GridItem.Folder(item.apps, item.name)), position)
                     else -> false
                 }
             },

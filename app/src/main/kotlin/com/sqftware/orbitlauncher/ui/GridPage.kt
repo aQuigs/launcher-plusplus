@@ -3,7 +3,7 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -26,7 +26,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.GridItem
+import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+
+/** How wide an app in an open grid folder is, its name under it. */
+private val FOLDER_APP_WIDTH = 72.dp
 
 object GridTags {
     const val FOLDER_DIALOG = "grid_folder_dialog"
@@ -35,9 +40,6 @@ object GridTags {
 
     fun folderApp(app: AppEntry) = "grid_folder_app_${app.key}"
 }
-
-/** A folder's long-press menu on a grid page, opened and shown like an [AppMenu]. */
-typealias GridFolderMenu = LongPressMenu<GridItem.Folder>
 
 /**
  * An app or a folder in a cell of a grid page, its name under it: a tap launches the app or opens the folder ([onOpen]),
@@ -52,7 +54,7 @@ fun GridBlock(
     onLaunch: (AppEntry) -> Unit,
     onOpen: (GridItem.Folder) -> Unit,
     menu: AppMenu?,
-    folderMenu: GridFolderMenu?,
+    folderMenu: FolderMenu?,
     unread: UnreadCounts,
     onClearBadge: (AppEntry) -> Unit,
     drag: ItemDrag<Any?>?,
@@ -73,42 +75,13 @@ fun GridBlock(
                 AppLabel(item.app.label, Modifier.fillMaxWidth())
             }
             is GridItem.Folder -> {
-                GridFolderIcon(item, icon, onOpen, iconModifier, folderMenu, unread, drag)
+                // Placed by its block, an index no ring slot has, so a look that tells folders apart by place, as the
+                // solar system does, tells this one from the ring's.
+                val folder = remember(item, block) { RingItem.Folder(HomePlace.Folder(HomePlace.Ring, block), item.apps, name = item.name) }
+                FolderIcon(folder, icon, { onOpen(item) }, iconModifier, folderMenu, unread.badge(item.apps), drag)
                 AppLabel(folderTitle(item.name), Modifier.fillMaxWidth())
             }
         }
-    }
-}
-
-/** A folder as a disc of up to four of its icons, wearing its apps' unread sum. */
-@Composable
-private fun GridFolderIcon(
-    folder: GridItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
-    onOpen: (GridItem.Folder) -> Unit,
-    modifier: Modifier,
-    menu: GridFolderMenu?,
-    unread: UnreadCounts,
-    drag: ItemDrag<Any?>?,
-) {
-    val presses = remember { MutableInteractionSource() }
-    val badge = unread.badge(folder.apps)
-    val name = folderDescription(folder.name, folder.apps.size)
-    Box(
-        modifier
-            .combinedClickable(
-                interactionSource = presses,
-                indication = null,
-                onLongClickLabel = menu?.let { "Folder options" },
-                onLongClick = menu?.let { m -> { m.onOpen(folder) } } ?: {},
-                onClick = { onOpen(folder) },
-            )
-            .itemDrag(folder, drag)
-            .semantics { contentDescription = name.withUnread(badge.count) },
-    ) {
-        IconDisc(presses, Modifier.size(GRID_ICON_SIZE), contentAlignment = Alignment.Center) { FolderPreviews(folder.apps, icon) }
-        menu?.content?.invoke(folder)
-        UnreadBadge(badge, Modifier.align(Alignment.TopEnd))
     }
 }
 
@@ -132,26 +105,31 @@ fun GridFolderDialog(
         confirmButton = {},
         title = { Text(folderTitle(folder.name)) },
         text = {
-            FlowRow(
-                horizontalArrangement = Arrangement.Center,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-            ) {
-                folder.apps.forEach { app ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(72.dp).testTag(GridTags.folderApp(app))) {
-                        AppIcon(
-                            app,
-                            icon,
-                            onLaunch = {
-                                onDismiss()
-                                onLaunch(it)
-                            },
-                            modifier = Modifier.size(GRID_ICON_SIZE),
-                            menu = menu,
-                            unread = unread.badge(app),
-                            onClearBadge = onClearBadge,
-                        )
-                        AppLabel(app.label, Modifier.fillMaxWidth())
+            BoxWithConstraints {
+                // As many columns as fit, filled from the start of each row as a launcher's folder is.
+                val columns = (maxWidth / FOLDER_APP_WIDTH).toInt().coerceAtLeast(1)
+                val width = maxWidth / columns
+                FlowRow(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    maxItemsInEachRow = columns,
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                ) {
+                    folder.apps.forEach { app ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(width).testTag(GridTags.folderApp(app))) {
+                            AppIcon(
+                                app,
+                                icon,
+                                onLaunch = {
+                                    onDismiss()
+                                    onLaunch(it)
+                                },
+                                modifier = Modifier.size(GRID_ICON_SIZE),
+                                menu = menu,
+                                unread = unread.badge(app),
+                                onClearBadge = onClearBadge,
+                            )
+                            AppLabel(app.label, Modifier.fillMaxWidth())
+                        }
                     }
                 }
             }

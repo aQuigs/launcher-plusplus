@@ -61,6 +61,7 @@ The launcher's look is a theme, picked in the launcher's menu: Space (the ring's
 - Panel ground: the veil and the theme's marks under the drawer, every `Panel` such as Select Collection, and, made opaque, every dialog and menu
 - App drawer: search, the list and grid
 - Collections page: the cards, their header controls, the app picker
+- Grid page: its apps, its folders in each folder look, and an open folder's dialog
 - Widget page and the controls on every page (`TonalButton`, badges, the page dots)
 - Popups and panels: the launcher menu, an app's menu, the pin dialog, the place picker, the page editor and its dialogs, the dialog that sets a theme's scene as the wallpaper
 
