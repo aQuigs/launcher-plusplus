@@ -15,8 +15,17 @@ const val WIDGET_GAP_DP = 8
 /** The id the ring of a ring page goes by among the widgets it holds: one the system never gives a widget. */
 const val RING_ID = 0
 
+/** The id the clock of a grid page goes by among its widgets. */
+const val CLOCK_ID = -1
+
 /**
- * A widget on the page: the id the system knows it by, the row and column of its top-left cell, and the rows and
+ * Whether [id] is a block the launcher draws itself, the ring, the clock or an app of a grid page, rather than a widget
+ * the system hosts, whose ids are all above 0.
+ */
+fun isLauncherBlock(id: Int): Boolean = id <= RING_ID
+
+/**
+ * A widget on the page: the id the system knows it by, or a [launcher block][isLauncherBlock]'s, the row and column of its top-left cell, and the rows and
  * columns it spans.
  */
 data class HostedWidget(val id: Int, val row: Int, val column: Int, val rows: Int, val columns: Int) {
@@ -29,14 +38,14 @@ data class HostedWidget(val id: Int, val row: Int, val column: Int, val rows: In
 
 /**
  * The widgets on a page, each in cells of its own, top to bottom and then left to right. Cells no widget takes stay
- * empty, so a widget keeps its place when another leaves or moves. On a ring page the ring takes cells too, across the
- * page, as [RING_ID].
+ * empty, so a widget keeps its place when another leaves or moves. The launcher's own blocks take cells too: on a ring
+ * page the ring, across the page, as [RING_ID], and on a grid page its clock and its apps.
  */
 data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
-    val isEmpty: Boolean get() = widgets.all { it.id == RING_ID }
+    val isEmpty: Boolean get() = widgets.all { isLauncherBlock(it.id) }
 
-    /** The ids of the widgets the system hosts, the ring's left out. */
-    val ids: Set<Int> get() = widgets.mapNotNullTo(mutableSetOf()) { it.id.takeIf { id -> id != RING_ID } }
+    /** The ids of the widgets the system hosts, the launcher's blocks left out. */
+    val ids: Set<Int> get() = widgets.mapNotNullTo(mutableSetOf()) { it.id.takeUnless(::isLauncherBlock) }
 
     val ring: HostedWidget? get() = widgets.find { it.id == RING_ID }
 
@@ -45,13 +54,13 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
 
     /**
      * The page with the widget [id] in the first free cells, from the top and then the left, that hold [rows] by
-     * [columns]. A page with a ring never lengthens, so there they are within its first [pageRows] rows, and the page is
+     * [columns]. A page that never [lengthens], as one with a ring, has them within its first [pageRows] rows, and is
      * unchanged when there are none.
      */
-    fun add(id: Int, rows: Int, columns: Int, pageRows: Int): WidgetPage {
+    fun add(id: Int, rows: Int, columns: Int, pageRows: Int, lengthens: Boolean = true): WidgetPage {
         val width = columns.coerceIn(1, WIDGET_COLUMNS)
         val height = rows.coerceAtLeast(1)
-        val limit = if (ring == null) Int.MAX_VALUE else pageRows
+        val limit = if (lengthens && ring == null) Int.MAX_VALUE else pageRows
         val spot = generateSequence(0) { it + 1 }
             .takeWhile { it <= limit - height }
             .flatMap { row -> (0..WIDGET_COLUMNS - width).asSequence().map { HostedWidget(id, row, it, height, width) } }
@@ -61,8 +70,8 @@ data class WidgetPage(val widgets: List<HostedWidget> = emptyList()) {
 
     fun remove(id: Int): WidgetPage = WidgetPage(widgets.filter { it.id != id })
 
-    /** The page with only the widgets whose ids are in [held], and its ring. */
-    fun keeping(held: Set<Int>): WidgetPage = WidgetPage(widgets.filter { it.id in held || it.id == RING_ID })
+    /** The page with only the widgets whose ids are in [held], and the launcher's blocks. */
+    fun keeping(held: Set<Int>): WidgetPage = WidgetPage(widgets.filter { it.id in held || isLauncherBlock(it.id) })
 
     /**
      * The widget [id] made [rows] by [columns], no wider than the page leaves it from its column. The widgets it now
@@ -162,7 +171,7 @@ data class WidgetPages(val pages: Map<String, WidgetPage> = emptyMap()) {
     /** These pages with only the widgets of the pages in [ids]. */
     fun keepingPages(ids: Set<String>): WidgetPages = WidgetPages(pages.filterKeys { it in ids })
 
-    /** These pages with only the widgets whose ids are in [held], and their rings. */
+    /** These pages with only the widgets whose ids are in [held], and the launcher's blocks. */
     fun keeping(held: Set<Int>): WidgetPages = WidgetPages(pages.mapValues { (_, page) -> page.keeping(held) })
 }
 
@@ -246,7 +255,7 @@ fun nearestCells(cells: Int, dragDp: Float, pitchDp: Float): Int = cells + (drag
 fun WidgetPage.encode(): String = widgets.joinToString(LINE) { listOf(it.id, it.row, it.column, it.rows, it.columns).joinToString(FIELD) }
 
 /**
- * A line that is not a widget, or the ring, in the page's columns is skipped, and so is a second line for the same id, so a damaged
+ * A line that is not a widget, or a launcher block, in the page's columns is skipped, and so is a second line for the same id, so a damaged
  * file loses that widget and keeps the rest; widgets that overlap move down out of each other's way. A line of just an
  * id and rows is from before widgets had places: those take the page's width at the top, so they stack down it in the
  * order they come.
@@ -254,12 +263,12 @@ fun WidgetPage.encode(): String = widgets.joinToString(LINE) { listOf(it.id, it.
 fun decodeWidgetPage(text: String): WidgetPage {
     val widgets = text.nonEmptyLines()
         .mapNotNull { line ->
-            val fields = line.split(FIELD).map { it.toIntOrNull()?.takeIf { n -> n >= 0 } ?: return@mapNotNull null }
+            val fields = line.split(FIELD).map { it.toIntOrNull() ?: return@mapNotNull null }
             when (fields.size) {
-                2 -> HostedWidget(fields[0], 0, 0, fields[1], WIDGET_COLUMNS).takeIf { it.id != RING_ID }
+                2 -> HostedWidget(fields[0], 0, 0, fields[1], WIDGET_COLUMNS).takeUnless { isLauncherBlock(it.id) }
                 5 -> HostedWidget(fields[0], fields[1], fields[2], fields[3], fields[4])
                 else -> null
-            }?.takeIf { it.id >= 0 && it.rows > 0 && it.columns > 0 && it.end <= WIDGET_COLUMNS }
+            }?.takeIf { it.row >= 0 && it.column >= 0 && it.rows > 0 && it.columns > 0 && it.end <= WIDGET_COLUMNS }
         }
         .distinctBy { it.id }
     return WidgetPage(widgets.sortedWith(WidgetPage.PLACE)).settled()

@@ -70,6 +70,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -82,6 +83,7 @@ import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.canPair
 import com.sqftware.orbitlauncher.domain.AppsByKey
 import com.sqftware.orbitlauncher.domain.Bounds
+import com.sqftware.orbitlauncher.domain.Cell
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
@@ -91,10 +93,14 @@ import com.sqftware.orbitlauncher.domain.Colourways
 import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
+import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.FolderLooks
 import com.sqftware.orbitlauncher.domain.ForegroundTime
+import com.sqftware.orbitlauncher.domain.Grid
+import com.sqftware.orbitlauncher.domain.GridItem
+import com.sqftware.orbitlauncher.domain.GridPages
 import com.sqftware.orbitlauncher.domain.HomeApps
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Landing
@@ -106,6 +112,7 @@ import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingPages
@@ -194,7 +201,12 @@ data class HomePress(val launcherInFront: Boolean)
  * screen turns the pages that way, and an app from anywhere goes onto a hand-picked card too, leaving the ring, the dock,
  * the folder or the hand-picked card it came from. A widget page shows its widgets through the
  * [widgets] for its id; a long press puts a widget in edit mode, to move, resize or remove it, until a tap elsewhere or the page goes
- * out of view. A collections page shows its cards, the built-in ones filled from the app list and
+ * out of view. A grid page is a plain launcher's: its apps and folders, each in a cell of its own, among its widgets
+ * and the clock, which take cells of [widgetPages] as the widgets do while [gridPages] says what each app or folder is
+ * ([onGridPagesChange]). A tap launches an app or opens a folder in a dialog, a long press opens its menu, and one
+ * that goes on drags it to an empty cell, onto an app to make a folder of the two, into a folder, or to another page;
+ * an app from the drawer, a card or another page lands on a cell the same way. The launcher's menu there adds a widget
+ * or the clock. A collections page shows its cards, the built-in ones filled from the app list and
  * [foregroundTime] (null until usage access is granted, which [onOpenUsageSettings] asks for); a hand-picked card's
  * pencil opens the drawer to pick its apps, as a long press on the ring's emblem does, and the button under the cards opens the picker that
  * adds and removes cards, whose last tile opens a dialog naming a new custom collection. An app on a card opens its menu at
@@ -284,6 +296,8 @@ fun LauncherScreen(
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
     widgets: (page: String) -> WidgetActions,
+    gridPages: GridPages,
+    onGridPagesChange: (GridPages) -> Unit,
     collectionPages: CollectionPages,
     onCollectionPagesChange: (CollectionPages) -> Unit,
     foregroundTime: ForegroundTime?,
@@ -332,6 +346,7 @@ fun LauncherScreen(
         onHome?.let(::AppsByKey)?.let { lookup -> homeApps.keys.filterTo(HashSet()) { lookup[it] != null } }
     }
     val latestLayout by rememberUpdatedState(layout)
+    val latestOnHome by rememberUpdatedState(onHome)
     val latestRingPage by rememberUpdatedState(ringPage)
     val latestRingPages by rememberUpdatedState(ringPages)
     val latestHomeApps by rememberUpdatedState(homeApps)
@@ -407,6 +422,30 @@ fun LauncherScreen(
         if (changed == before) this else with(page.id, changed)
     }
 
+    val latestGridPages by rememberUpdatedState(gridPages)
+    val latestWidgetPages by rememberUpdatedState(widgetPages)
+    val latestWidgets by rememberUpdatedState(widgets)
+    val latestOnGridPagesChange by rememberUpdatedState(onGridPagesChange)
+
+    fun gridOf(page: String) = latestGridPages.grid(page, latestWidgetPages)
+
+    // What each app is and where it sits are kept apart, the places with the page's widgets, so both are saved at once.
+    fun saveGrids(changed: Map<String, Grid>) {
+        if (changed.isEmpty()) return
+        latestOnGridPagesChange(changed.entries.fold(latestGridPages) { pages, (page, grid) -> pages.with(page, grid) })
+        changed.forEach { (page, grid) -> latestWidgets(page).arrange(grid.cells) }
+    }
+
+    fun changeGrid(page: String, change: Grid.() -> Grid?) {
+        gridOf(page).change()?.let { saveGrids(mapOf(page to it)) }
+    }
+
+    // The folder of a grid page open in its dialog, and the one being renamed.
+    var openGridFolder by rememberSaveable { mutableStateOf<AppSpot.Grid?>(null) }
+    var renamingGridFolder by rememberSaveable { mutableStateOf<AppSpot.Grid?>(null) }
+    // Each grid page's cells, so what is dragged over one can be let go into a cell.
+    val gridCells = remember { mutableMapOf<String, GridCells>() }
+
     // The finger holding what is dragged and where it could land, in root coordinates. The finger moves every frame, so
     // only the ghost reads it; the targets under it are derived, so the ring, the dock, the cards and the bin recompose
     // when the finger changes zone or position, not whenever it moves. The targets are those of the page the pager is on
@@ -443,7 +482,7 @@ fun LauncherScreen(
     // The halves of the reorder switch, and the one the item on the move is over: a rest there flips the mode. The
     // switch overlaps what is under it, the first card's apps among them, so while the item is over it nothing moves.
     // Only an app from the drawer or a built-in card, which only adds, has no switch.
-    val switchShown by remember { derivedStateOf { dragged.let { it != null && it !is Drag.Copy } } }
+    val switchShown by remember { derivedStateOf { dragged.let { it != null && it !is Drag.Copy && it !is Drag.OnGrid } } }
     var switchHalves by remember { mutableStateOf(emptyMap<ReorderMode, Bounds>()) }
     val overSwitch by remember {
         derivedStateOf {
@@ -612,9 +651,34 @@ fun LauncherScreen(
         return Over.RingEnd.takeIf { drag.app != null && place == HomePlace.Ring }
     }
 
+    // The grid pages [target]'s cell is on, and the one a grid item came from, as they would be with what is dragged let go
+    // there; null where it does not land. A pinned shortcut stays where it is pinned, which only a ring page keeps.
+    fun gridLanding(drag: Drag, target: Over.GridCell): Map<String, Grid>? {
+        val grid = gridOf(target.page.id)
+        // A cell whose app is not installed shows nothing, so it takes what is let go there in its place.
+        val hidden = grid.slots.keys - grid.resolve(latestOnHome.orEmpty()).keys
+        if (drag is Drag.OnGrid) {
+            if (drag.page == target.page) return grid.move(drag.block, target.cell, hidden)?.let { mapOf(target.page.id to it) }
+            val from = gridOf(drag.page.id)
+            val slot = from.slots[drag.block] ?: return null
+            return grid.drop(slot, target.cell, hidden)?.let { mapOf(drag.page.id to from.remove(drag.block), target.page.id to it) }
+        }
+        val app = drag.app?.takeUnless { it.kind is EntryKind.Shortcut } ?: return null
+        return grid.drop(RingSlot.App(app.key), target.cell, hidden)?.let { mapOf(target.page.id to it) }
+    }
+
+    // Apart, so whether what is dragged lands is worked out as the finger crosses into a cell, not each time it moves.
+    val gridCell by remember { derivedStateOf { gridCells[inView.id]?.at(finger) } }
+
+    fun overGrid(drag: Drag, page: LauncherPage): Over? {
+        val cell = gridCell ?: return null
+        return Over.GridCell(page, cell).takeIf { gridLanding(drag, it) != null }
+    }
+
     fun overFor(drag: Drag): Over? = when {
         overBin || overSwitch != null -> null
         inView.kind == PageKind.Collections -> overCards(drag, inView)
+        inView.kind == PageKind.Grid -> overGrid(drag, inView)
         inView == latestRingPage -> overHome(drag)
         else -> null
     }
@@ -768,6 +832,9 @@ fun LauncherScreen(
                         when (option) {
                             is AppOption.Remove -> latestShown?.let { shown -> changeHomeApps { remove(option.place, app, shown) } }
                             is AppOption.RemoveFromCard -> changeCollections { removeApp(option.kind, app) }
+                            is AppOption.RemoveFromGrid -> (spot as? AppSpot.Grid)?.let { at ->
+                                changeGrid(at.page) { if (option.inFolder) removeFromFolder(at.block, app.key) else remove(at.block) }
+                            }
                             AppOption.NewFolder -> ((spot as? AppSpot.Home)?.place as? HomePlace.Slots)?.let { holder ->
                                 val slot = latestHomeApps.slots(holder).indexOf(app)
                                 if (slot >= 0) {
@@ -781,7 +848,7 @@ fun LauncherScreen(
                                 when (spot) {
                                     is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, app, flipped, shown) } }
                                     is AppSpot.Card -> changeCollections { replaceApp(spot.kind, app, flipped) }
-                                    AppSpot.Drawer, AppSpot.MostUsedRow -> Unit
+                                    AppSpot.Drawer, AppSpot.MostUsedRow, is AppSpot.Grid -> Unit
                                 }
                             }
                             is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(option.member ?: app))
@@ -804,6 +871,34 @@ fun LauncherScreen(
     val folderAppMenu = remember(actions, open?.at) { open?.let { appMenu(AppSpot.Home(it.at)) } }
     // Built once for each card, as the others are.
     val cardMenus = remember(actions) { mutableMapOf<CollectionKind, AppMenu>() }
+    // And for each app and folder of a grid page, by its block, built again as the grid pages change so none outlives its block.
+    val gridMenus = remember(actions, gridPages) { mutableMapOf<AppSpot.Grid, AppMenu>() }
+    fun gridMenu(spot: AppSpot.Grid) = gridMenus.getOrPut(spot) { appMenu(spot) }
+    val gridFolderMenus = remember(gridPages) { mutableMapOf<AppSpot.Grid, GridFolderMenu>() }
+    fun gridFolderMenu(spot: AppSpot.Grid) = gridFolderMenus.getOrPut(spot) {
+        GridFolderMenu(
+            onOpen = { openMenuUnlessDragging { openMenu = OpenMenu.GridFolder(spot) } },
+            content = {
+                (openMenu as? OpenMenu.GridFolder)?.takeIf { it.spot == spot }?.let { shown ->
+                    DisposableEffect(Unit) {
+                        onDispose { if ((openMenu as? OpenMenu.GridFolder)?.spot == spot) closeMenu() }
+                    }
+                    FolderOptionsMenu(
+                        expanded = shown.expanded,
+                        options = listOf(FolderOption.Rename, FolderOption.Remove),
+                        onOption = { option ->
+                            when (option) {
+                                FolderOption.Rename -> renamingGridFolder = spot
+                                FolderOption.Remove -> changeGrid(spot.page) { remove(spot.block) }
+                                FolderOption.AddApps, FolderOption.Planet -> Unit
+                            }
+                        },
+                        onDismiss = ::closeMenu,
+                    )
+                }
+            },
+        )
+    }
     val folderMenu = remember {
         FolderMenu(
             onOpen = { folder -> openMenuUnlessDragging { openMenu = OpenMenu.Folder(folder.at) } },
@@ -879,25 +974,36 @@ fun LauncherScreen(
         val place = dropPlace
         val home = drag.home
         val card = drag.card
-        // An app from a card leaves it for the ring or the dock, as one from there leaves for a card.
+        // An app from a card leaves it for the ring or the dock, as one from there leaves for a card, and one from a grid
+        // page leaves that.
         fun leaveCard() = card?.let { from -> app?.let { changeCollections(from.page) { removeApp(from.kind, it) } } }
+        fun leave() {
+            leaveCard()
+            (drag as? Drag.OnGrid)?.let { from -> changeGrid(from.page.id) { remove(from.block) } }
+        }
         when {
             drag is Drag.Within && overBin -> drag.remove?.invoke()
             placeChanged -> Unit
+            target is Over.GridCell -> gridLanding(drag, target)?.let { landed ->
+                saveGrids(landed)
+                if (app != null && home != null) shown?.let { changeHomeApps { remove(home, app, it) } }
+                leaveCard()
+            }
             app != null && target is Over.Card && card != null ->
                 changeCollectionPages { moveApp(app, card.page.id, card.kind, target.page.id, target.kind) }
             app != null && target is Over.Card -> {
                 changeCollections(target.page) { addApp(target.kind, app) }
                 if (home != null) shown?.let { changeHomeApps { remove(home, app, it) } }
+                leave()
             }
             app != null && foldInto != null -> shown?.let {
                 changeHomeApps { move(app, drag.home, foldInto, it) }
-                leaveCard()
+                leave()
             }
             drag is Drag.Within && target is Over.Slot && target.place === drag.place -> drag.move(target.index, latestReorderMode)
             app != null && drag.adds -> place?.let {
                 changeHomeApps(inView) { add(it, app) }
-                leaveCard()
+                leave()
             }
             app != null && home != null && place != null && shown != null ->
                 changeRingPages { move(app, latestRingPage.id, home, inView.id, place, shown) }
@@ -918,11 +1024,27 @@ fun LauncherScreen(
         copyDrag(fromPage = false) { app ->
             closeDrawer()
             focusManager.clearFocus()
-            val onCards = latestLayout.pageAt(pagerState.settledPage).kind == PageKind.Collections && latestCollections.takesAnywhere(app)
-            if (!onCards) showRingPage()
+            val over = latestLayout.pageAt(pagerState.settledPage).kind
+            val onCards = over == PageKind.Collections && latestCollections.takesAnywhere(app)
+            if (!onCards && over != PageKind.Grid) showRingPage()
         }
     }
     val dragFromBuiltInCard = remember { copyDrag(fromPage = true) }
+    val gridDrags = remember(gridPages) { mutableMapOf<AppSpot.Grid, ItemDrag<Any?>>() }
+    fun gridDrag(page: LauncherPage, block: Int) = gridDrags.getOrPut(AppSpot.Grid(page.id, block)) {
+        ItemDrag(
+            onStart = { item, position ->
+                when (item) {
+                    is AppEntry -> beginDrag(Drag.OnGrid(page, block, GridItem.App(item)), position)
+                    is GridItem.Folder -> beginDrag(Drag.OnGrid(page, block, item), position)
+                    else -> false
+                }
+            },
+            onMove = { finger = it },
+            onDrop = ::drop,
+            onCancel = { dragged = null },
+        )
+    }
 
     /**
      * Moving what [items] lists at the press among itself: [move] puts one where another is, as the mode says, and a place
@@ -1006,17 +1128,30 @@ fun LauncherScreen(
         rearrangeFor
     }
 
+    // A page's widgets, the picker for a new one being an errand.
+    fun errandWidgets(page: LauncherPage) = widgets(page.id).run { copy(add = { rows, lengthens, width, height -> errand { add(rows, lengthens, width, height) } }) }
+
+    // In the first free cells that hold it, which the page knows once it is laid out.
+    fun addClock(page: LauncherPage) {
+        val rows = gridCells[page.id]?.pageRows ?: return
+        val grid = gridOf(page.id)
+        val added = grid.addClock(rows)
+        if (added == grid) onToast("No room for the clock here") else saveGrids(mapOf(page.id to added))
+    }
+
     val launcherMenu = remember {
         LauncherMenu(
             onOpen = { at -> openMenuUnlessDragging { openMenu = OpenMenu.Launcher(at) } },
             content = { origin ->
                 (openMenu as? OpenMenu.Launcher)?.let { shown ->
                     val widgetsPage = latestRingPage.takeIf { it != LauncherPage.Home }
+                    val gridPage = latestLayout.pageAt(pagerState.settledPage).takeIf { it.kind == PageKind.Grid }
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
                         at = { shown.at - origin() },
                         rows = listOfNotNull(
-                            widgetsPage?.let { LauncherMenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
+                            (widgetsPage ?: gridPage)?.let { LauncherMenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
+                            gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { LauncherMenuRow("Add clock") { addClock(it) } },
                             widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
                             LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
                             LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
@@ -1075,6 +1210,8 @@ fun LauncherScreen(
         dragged = null
         closeMenu()
         openFolder = null
+        openGridFolder = null
+        renamingGridFolder = null
         editingWidget = null
         closeDrawer()
         pickingCollection = false
@@ -1329,7 +1466,8 @@ fun LauncherScreen(
                                             // First, so it lies behind the clock, the ring and the card and gets only the touches they
                                             // leave. A tap anywhere there closes an open folder, not only one on the ring's centre.
                                             EmptySpace(
-                                                menu = launcherMenu.takeIf { active },
+                                                // Only on the page in view, which the menu was opened on: home is active behind another kind of page too.
+                                                menu = launcherMenu.takeIf { active && page == settled },
                                                 onTap = {
                                                     if (active) openFolder = null
                                                     editingWidget = null
@@ -1478,12 +1616,63 @@ fun LauncherScreen(
                             PageKind.Widgets -> {
                                 WidgetGrid(
                                     page = widgetPages[page.id],
-                                    actions = remember(widgets, page) {
-                                        widgets(page.id).run { copy(add = { rows, width, height -> errand { add(rows, width, height) } }) }
-                                    },
+                                    actions = remember(widgets, page) { errandWidgets(page) },
                                     editing = editedWidget,
                                     onEditingChange = { editingWidget = it },
                                 )
+                            }
+                            PageKind.Grid -> {
+                                // The page an item was picked up on stays active while the item turns the pages, so its
+                                // gesture lasts until it is let go.
+                                val active = page == working(PageKind.Grid)
+                                val grid = remember(gridPages, widgetPages, page) { gridPages.grid(page.id, widgetPages) }
+                                val items = remember(grid, onHome) { grid.resolve(onHome.orEmpty()) }
+                                val target = (over as? Over.GridCell)?.takeIf { it.page == page }
+                                val targetBlock = target?.let { grid.at(it.cell)?.id }?.takeIf { it in items }
+                                Box(Modifier.fillMaxSize().verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() })) {
+                                    EmptySpace(menu = launcherMenu.takeIf { active }, onTap = { editingWidget = null })
+                                    if (grid.cells.widgets.isEmpty()) {
+                                        Text(
+                                            "Drag apps here from the drawer.\nLong-press for widgets and the clock.",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                                        )
+                                    }
+                                    WidgetGrid(
+                                        page = grid.cells,
+                                        actions = remember(widgets, page) { errandWidgets(page) },
+                                        editing = editedWidget,
+                                        onEditingChange = { editingWidget = it },
+                                        addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
+                                        fixed = true,
+                                        clock = { clockModifier ->
+                                            HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier)
+                                        },
+                                        item = { block, itemModifier ->
+                                            items[block]?.let { item ->
+                                                val spot = AppSpot.Grid(page.id, block)
+                                                GridBlock(
+                                                    block = block,
+                                                    item = item,
+                                                    icon = actions.icon,
+                                                    onLaunch = actions.launch,
+                                                    onOpen = { openGridFolder = spot },
+                                                    menu = gridMenu(spot).takeIf { active },
+                                                    folderMenu = gridFolderMenu(spot).takeIf { active },
+                                                    unread = unread,
+                                                    onClearBadge = actions.clearBadge,
+                                                    drag = gridDrag(page, block).takeIf { active },
+                                                    lifted = (dragged as? Drag.OnGrid)?.let { it.page == page && it.block == block } == true,
+                                                    foldTarget = targetBlock == block,
+                                                    modifier = itemModifier,
+                                                )
+                                            }
+                                        },
+                                        cells = remember(page) { gridCells.getOrPut(page.id) { GridCells() } },
+                                        landing = target?.cell?.takeIf { targetBlock == null },
+                                    )
+                                }
                             }
                             PageKind.Collections -> {
                                 val active = page == cardsPage
@@ -1520,7 +1709,7 @@ fun LauncherScreen(
             if (editingPages) {
                 PageEditor(
                     layout = layout,
-                    contentsOf = { contentsOf(it, ringPages, collectionPages, widgetPages) },
+                    contentsOf = { contentsOf(it, ringPages, collectionPages, gridPages, widgetPages) },
                     onLayoutChange = onLayoutChange,
                     onOpen = { page ->
                         editingPages = false
@@ -1599,6 +1788,35 @@ fun LauncherScreen(
                     onDismiss = { renamingFolder = null },
                 )
             }
+            openGridFolder?.let { spot ->
+                val folder = remember(gridPages, widgetPages, onHome, spot) {
+                    gridPages.grid(spot.page, widgetPages).resolve(onHome.orEmpty())[spot.block] as? GridItem.Folder
+                }
+                // One that went, as its last app left, closes; one whose apps are all uninstalled stays, as on the ring.
+                if (folder == null) {
+                    LaunchedEffect(Unit) { openGridFolder = null }
+                } else {
+                    GridFolderDialog(
+                        folder = folder,
+                        icon = actions.icon,
+                        onLaunch = actions.launch,
+                        menu = gridMenu(spot.copy(inFolder = true)),
+                        unread = unread,
+                        onClearBadge = actions.clearBadge,
+                        onDismiss = { openGridFolder = null },
+                    )
+                }
+            }
+            renamingGridFolder?.let { spot ->
+                FolderNameDialog(
+                    name = (gridPages[spot.page].slots[spot.block] as? RingSlot.Folder)?.name.orEmpty(),
+                    onRename = { name ->
+                        renamingGridFolder = null
+                        changeGrid(spot.page) { rename(spot.block, name) }
+                    },
+                    onDismiss = { renamingGridFolder = null },
+                )
+            }
             settingCard?.let(CollectionKind::named)?.let { kind ->
                 CollectionSettingsDialog(
                     page = collections,
@@ -1656,10 +1874,8 @@ fun LauncherScreen(
             }
             dragged?.let { drag ->
                 DragGhost(position = { finger - origin }, label = drag.label) {
-                    when (val item = drag.item) {
-                        is RingItem.App -> AppImage(item.app, actions.icon, Modifier.fillMaxSize())
-                        is RingItem.Folder -> FolderPreviews(item, actions.icon)
-                    }
+                    val app = drag.app
+                    if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
                 }
             }
         }
@@ -1668,7 +1884,6 @@ fun LauncherScreen(
 
 /** What is being dragged, and where from: how it shows under the finger, with its [label] if it has one. */
 private sealed interface Drag {
-    val item: RingItem
     val label: String? get() = null
 
     /** The home place it leaves if it lands in another or on a card; none for one from the drawer or a card. */
@@ -1678,7 +1893,10 @@ private sealed interface Drag {
     val card: Over.Card? get() = null
 
     /** The app dragged, unless it is a folder. */
-    val app: AppEntry? get() = (item as? RingItem.App)?.app
+    val app: AppEntry?
+
+    /** The apps of the folder dragged, which show under the finger, unless it is an app. */
+    val folderApps: List<AppEntry>? get() = null
 
     /** Whether it is an app with no home place to leave, which the ring and the dock add: from the drawer or a card. */
     val adds: Boolean get() = app != null && home == null
@@ -1687,9 +1905,7 @@ private sealed interface Drag {
     val current: (() -> Boolean)? get() = null
 
     /** Out of a list the system fills, the drawer or a built-in card, to a ring, the dock or a hand-picked card. */
-    data class Copy(override val app: AppEntry) : Drag {
-        override val item = RingItem.App(app)
-    }
+    data class Copy(override val app: AppEntry) : Drag
 
     /**
      * The item at [from] in [place], one of the [home] places or a [card]: to another of its positions, which [move] takes
@@ -1698,18 +1914,30 @@ private sealed interface Drag {
     class Within(
         val place: Rearrange,
         val from: Int,
-        override val item: RingItem,
+        val item: RingItem,
         override val label: String?,
         override val home: HomePlace?,
         override val card: Over.Card?,
         val move: (to: Int, ReorderMode) -> Unit,
         val remove: (() -> Unit)?,
         override val current: () -> Boolean,
-    ) : Drag
+    ) : Drag {
+        override val app: AppEntry? get() = (item as? RingItem.App)?.app
+
+        override val folderApps: List<AppEntry>? get() = (item as? RingItem.Folder)?.apps
+    }
 
     /** An app dragged out of the open folder at [home] over its middle, which closed it, to the ring or the dock. */
-    class OutOfFolder(override val app: AppEntry, override val home: HomePlace.Folder, override val current: () -> Boolean) : Drag {
-        override val item = RingItem.App(app)
+    class OutOfFolder(override val app: AppEntry, override val home: HomePlace.Folder, override val current: () -> Boolean) : Drag
+
+    /**
+     * The app or folder [block] of the grid page [page], to another cell there or on another grid page, or an app to a
+     * ring page or a hand-picked card, which it then leaves the grid for.
+     */
+    class OnGrid(val page: LauncherPage, val block: Int, val item: GridItem) : Drag {
+        override val app: AppEntry? get() = (item as? GridItem.App)?.app
+
+        override val folderApps: List<AppEntry>? get() = (item as? GridItem.Folder)?.apps
     }
 }
 
@@ -1744,6 +1972,9 @@ private sealed interface Over {
 
     /** A hand-picked card on [page] the app dragged is not on, which it is added to. */
     data class Card(val page: LauncherPage, val kind: CollectionKind.HandPicked) : Over
+
+    /** A [cell] of the grid page [page] where what is dragged lands. */
+    data class GridCell(val page: LauncherPage, val cell: Cell) : Over
 }
 
 /** The long-press menu that is showing. It keeps what it shows while [expanded] turns false, so it animates away whole. */
@@ -1771,6 +2002,11 @@ private sealed interface OpenMenu {
 
     /** The menu of the folder [at] its place and slot. */
     data class Folder(val at: HomePlace.Folder, override val expanded: Boolean = true) : OpenMenu {
+        override fun closed() = copy(expanded = false)
+    }
+
+    /** The menu of the folder at [spot] on a grid page. */
+    data class GridFolder(val spot: AppSpot.Grid, override val expanded: Boolean = true) : OpenMenu {
         override fun closed() = copy(expanded = false)
     }
 

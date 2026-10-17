@@ -9,9 +9,16 @@ import com.sqftware.orbitlauncher.domain.encode
 
 /**
  * A widget pick the system has not answered yet: the id allocated for it, the [page] it goes on, the rows that page had
- * room for, and how wide a column and how tall a row of it were, in dp.
+ * room for, how wide a column and how tall a row of it were, in dp, and whether it [lengthens] past those rows.
  */
-data class WidgetPick(val id: Int, val page: String, val pageRows: Int, val columnWidthDp: Float, val rowHeightDp: Float)
+data class WidgetPick(
+    val id: Int,
+    val page: String,
+    val pageRows: Int,
+    val columnWidthDp: Float,
+    val rowHeightDp: Float,
+    val lengthens: Boolean = true,
+)
 
 interface WidgetPageStore {
     fun load(): WidgetPages
@@ -37,13 +44,16 @@ class SharedPreferencesWidgetPageStore(context: Context) : WidgetPageStore {
     }
 
     override fun loadPick(): WidgetPick? {
-        val (id, page, pageRows, columnWidthDp, rowHeightDp) = prefs.getString(PICK_KEY, null)?.split(FIELD)?.takeIf { it.size == 5 } ?: return null
+        // A pick stored before grid pages has no sixth field: its page lengthens unless it has a ring.
+        val fields = prefs.getString(PICK_KEY, null)?.split(FIELD)?.takeIf { it.size in 5..6 } ?: return null
+        val (id, page, pageRows, columnWidthDp, rowHeightDp) = fields
         return WidgetPick(
             id.toIntOrNull() ?: return null,
             page,
             pageRows.toIntOrNull() ?: return null,
             columnWidthDp.toFloatOrNull() ?: return null,
             rowHeightDp.toFloatOrNull() ?: return null,
+            fields.getOrNull(5)?.toBooleanStrictOrNull() ?: true,
         )
     }
 
@@ -51,7 +61,7 @@ class SharedPreferencesWidgetPageStore(context: Context) : WidgetPageStore {
         if (pick == null) {
             remove(PICK_KEY)
         } else {
-            putString(PICK_KEY, listOf(pick.id, pick.page, pick.pageRows, pick.columnWidthDp, pick.rowHeightDp).joinToString(FIELD))
+            putString(PICK_KEY, listOf(pick.id, pick.page, pick.pageRows, pick.columnWidthDp, pick.rowHeightDp, pick.lengthens).joinToString(FIELD))
         }
     }
 

@@ -153,6 +153,7 @@ private val AppOption.label
         }
         AppOption.NewFolder -> "New folder"
         is AppOption.RemoveFromCard -> "Remove from ${kind.title}"
+        is AppOption.RemoveFromGrid -> if (inFolder) "Remove from folder" else "Remove"
         is AppOption.AddTo -> when (place) {
             HomePlace.Ring -> "Add to the ring"
             HomePlace.Dock -> "Add to the dock"
@@ -170,7 +171,7 @@ private val AppOption.icon
     get() = when (this) {
         is AppOption.Remove -> Icons.Default.Close
         AppOption.NewFolder -> FolderGlyph
-        is AppOption.RemoveFromCard -> Icons.Default.Close
+        is AppOption.RemoveFromCard, is AppOption.RemoveFromGrid -> Icons.Default.Close
         is AppOption.AddTo -> Icons.Default.Add
         AppOption.SplitWith -> SplitGlyph
         AppOption.Flip -> SwapGlyph

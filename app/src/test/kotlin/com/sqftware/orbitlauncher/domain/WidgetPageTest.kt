@@ -81,7 +81,7 @@ class WidgetPageTest {
     fun `a malformed line or a second line for the same widget is skipped`() {
         assertEquals(
             page,
-            decodeWidgetPage("7\t0\t0\t1\t2\nseven\t0\t0\t1\t1\n8\n9\t0\t0\t0\t1\n10\t0\t3\t1\t2\n-3\t0\t0\t1\t1\n12\t2\t1\t3\t3\n7\t4\t0\t1\t1"),
+            decodeWidgetPage("7\t0\t0\t1\t2\nseven\t0\t0\t1\t1\n8\n9\t0\t0\t0\t1\n10\t0\t3\t1\t2\n11\t-1\t0\t1\t1\n12\t2\t1\t3\t3\n7\t4\t0\t1\t1"),
         )
     }
 
