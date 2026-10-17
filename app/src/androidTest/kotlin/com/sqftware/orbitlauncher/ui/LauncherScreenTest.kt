@@ -2150,6 +2150,22 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun anotherPageMadeHomeIsWhereTheLauncherStartsAndHomeAndBackGo() {
+        layout = PageLayout().withHome(LauncherPage.Collections)
+        show()
+        assertSettledOn(LauncherPage.Collections)
+
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Home)
+        pressHome(launcherInFront = true)
+        assertSettledOn(LauncherPage.Collections)
+        compose.swipePager { swipeRight() }
+        assertSettledOn(LauncherPage.Home)
+        Espresso.pressBack()
+        assertSettledOn(LauncherPage.Collections)
+    }
+
+    @Test
     fun theLauncherComesBackOnThePageLeftUnlessSetToOpenOnTheHomePage() {
         show()
         goToCollections()

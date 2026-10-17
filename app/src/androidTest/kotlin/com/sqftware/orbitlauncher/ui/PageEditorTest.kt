@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -79,6 +80,17 @@ class PageEditorTest {
         compose.onNodeWithTag(PageEditorTags.delete(LauncherPage.Collections)).performScrollTo().performClick()
         compose.onNodeWithText("Delete").performClick()
         compose.runOnIdle { assertEquals(listOf(LauncherPage.Widgets, LauncherPage.Home), layout.pages) }
+    }
+
+    @Test
+    fun aPagesHouseMakesItHome() {
+        show()
+        compose.onNodeWithTag(PageEditorTags.home(LauncherPage.Home)).assertIsNotEnabled()
+
+        compose.onNodeWithTag(PageEditorTags.home(LauncherPage.Collections)).performScrollTo().performClick()
+
+        compose.runOnIdle { assertEquals(LauncherPage.Collections, layout.home) }
+        compose.onNodeWithTag(PageEditorTags.home(LauncherPage.Collections)).assertIsNotEnabled()
     }
 
     @Test
