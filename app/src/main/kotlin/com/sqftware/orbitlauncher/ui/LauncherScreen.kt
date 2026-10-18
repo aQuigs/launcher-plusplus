@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
@@ -489,6 +489,8 @@ fun LauncherScreen(
     // Only an app from the drawer or a built-in card, which only adds, has no switch.
     val switchShown by remember { derivedStateOf { dragged.let { it != null && it !is Drag.Copy && it !is Drag.OnGrid } } }
     var switchHalves by remember { mutableStateOf(emptyMap<ReorderMode, Bounds>()) }
+    // The switch takes the clock's place at the top while it shows, rather than covering half its digits.
+    val clockShade by animateFloatAsState(if (switchShown) 0f else 1f, label = "clock")
     val overSwitch by remember {
         derivedStateOf {
             if (switchShown) switchHalves.entries.find { it.value.contains(finger.x, finger.y) }?.key else null
@@ -1314,8 +1316,9 @@ fun LauncherScreen(
     // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it, and fills in under the
     // drawer's bottom edge whenever that rises above the box's.
     val navigationBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
-    // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back.
-    val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
+    // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back. The
+    // keyboard is left to the drawer, the one place here that types: a dialog's keyboard must not reflow the pages behind it.
+    val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -1569,9 +1572,9 @@ fun LauncherScreen(
                                                                 face = clock,
                                                                 onTimeClick = onOpenClock,
                                                                 onDateClick = onOpenCalendar,
-                                                                modifier = Modifier.padding(top = 24.dp),
+                                                                modifier = Modifier.padding(top = 24.dp).alpha(clockShade),
                                                             )
-                                                            Row {
+                                                            Row(Modifier.alpha(clockShade)) {
                                                                 RingerSwitch(mode = ringerMode, onClick = onRingerTap)
                                                                 if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
                                                             }
@@ -1664,7 +1667,7 @@ fun LauncherScreen(
                                         addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
                                         fixed = true,
                                         clock = { clockModifier ->
-                                            HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier)
+                                            HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier.alpha(clockShade))
                                         },
                                         item = { block, itemModifier ->
                                             items[block]?.let { item ->

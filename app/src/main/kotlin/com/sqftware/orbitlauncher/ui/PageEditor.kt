@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
+import com.sqftware.orbitlauncher.ui.theme.sidewaysScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,8 +137,7 @@ fun PageEditor(
                             while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
                         }
                     }
-                    .horizontalScroll(scroll)
-                    .padding(horizontal = 20.dp),
+                    .sidewaysScroll(scroll, inset = 20.dp),
             ) {
                 if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
                 layout.pages.forEachIndexed { index, page ->

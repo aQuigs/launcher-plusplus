@@ -22,17 +22,12 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -307,8 +302,6 @@ fun WidgetGrid(
     landing: Cell? = null,
 ) {
     val density = LocalDensity.current
-    val keyboard = WindowInsets.ime
-    val bars = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     var area by remember { mutableStateOf(DpSize.Zero) }
     var buttonHeight by remember { mutableStateOf(0.dp) }
     // The rows the page shows fill the screen but for the button below them and a gap, so a page no taller than the
@@ -417,14 +410,7 @@ fun WidgetGrid(
         Column(
             Modifier
                 .fillMaxSize()
-                .onSizeChanged { size ->
-                    with(density) {
-                        // The keyboard, raised for the drawer's search, squeezes this page too. Measured as if it were
-                        // down, the rows keep their height, so no widget is resized and redrawn by its provider meanwhile.
-                        val squeeze = (keyboard.getBottom(this) - bars.getBottom(this)).coerceAtLeast(0)
-                        area = DpSize(size.width.toDp(), (size.height + squeeze).toDp())
-                    }
-                }
+                .onSizeChanged { size -> with(density) { area = DpSize(size.width.toDp(), size.height.toDp()) } }
                 .then(if (fixed) Modifier else Modifier.verticalPageScroll(scroll))
                 .padding(PAGE_PADDING),
             verticalArrangement = Arrangement.spacedBy(GAP),
