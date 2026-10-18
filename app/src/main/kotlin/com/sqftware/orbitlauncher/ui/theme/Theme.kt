@@ -212,7 +212,7 @@ private fun Palette.nightLook() = LauncherLook(
     panelMark = pale.copy(alpha = 0.5f),
     tonalEdge = deep.copy(alpha = 0.5f),
     boxes = {
-        BoxColors(surfaceVariant, surfaceContainer, surfaceContainerHigh, floating = surfaceContainerHigh, lit = primaryContainer, onLit = onPrimaryContainer)
+        BoxColors(surfaceVariant, surfaceContainer, floating = surfaceContainerHigh, lit = primaryContainer, onLit = onPrimaryContainer)
     },
     cardAlpha = 0.7f,
 )
@@ -268,7 +268,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
         // The day's grounds are near the frost its tiers climb to, so a box on one is inked a step towards the deep instead.
         boxes = {
             val inked = lerp(surfaceContainerHighest, onSurface, 0.1f)
-            BoxColors(surfaceVariant, inked, inked, floating = inked, lit = primaryContainer, onLit = onPrimaryContainer)
+            BoxColors(surfaceVariant, inked, floating = inked, lit = primaryContainer, onLit = onPrimaryContainer)
         },
         cardAlpha = 0.75f,
     )
