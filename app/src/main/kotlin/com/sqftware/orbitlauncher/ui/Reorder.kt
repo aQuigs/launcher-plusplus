@@ -1,9 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -187,6 +185,8 @@ data class Arriving(val app: AppEntry, val to: Int, val mode: ReorderMode) {
     fun sourceOf(items: List<RingItem>, position: Int): Int? = items.arrivedFrom(position, to, mode)
 }
 
+private val reorderModes = ReorderMode.entries.map { it to it.name }
+
 /** How long the item on the move rests on the switch's other half before it flips, so passing over it does not. */
 const val SWITCH_HOVER_MILLIS = 400L
 
@@ -203,16 +203,9 @@ fun ReorderModeSwitch(
     hovered: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colours = MaterialTheme.colorScheme
-
-    Pane(
-        floating = true,
-        shape = CircleShape,
-        border = if (hovered) BorderStroke(2.dp, colours.primary) else null,
-        modifier = modifier.testTag(ReorderTags.SWITCH),
-    ) {
+    FloatingPane(modifier.testTag(ReorderTags.SWITCH), shape = CircleShape, marked = hovered) {
         ChoiceRow(
-            ReorderMode.entries.map { it to it.name },
+            reorderModes,
             selected = mode,
             onSelect = onModeChange,
             modifier = Modifier.padding(6.dp),

@@ -91,7 +91,7 @@ class LauncherColorsTest {
                         if (floats < 1.15f) failures += "a floating mark on $ground, $way, light $light: $floats"
                     }
                 }
-                val lit = contrast(onPrimaryContainer, primaryContainer)
+                val lit = contrast(look.boxes.onLit, look.boxes.lit)
                 if (lit < 3f) failures += "a selected box, $way, light $light: $lit"
                 assertEquals(1f, look.boxes.floating.alpha)
             }

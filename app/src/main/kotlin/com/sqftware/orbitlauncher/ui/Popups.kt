@@ -1,11 +1,9 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import kotlinx.coroutines.flow.first
 
@@ -57,7 +54,7 @@ fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifi
             onDismissRequest = onDismissRequest,
             modifier = modifier.solidGround(panelGround(), MenuDefaults.shape),
             containerColor = Color.Transparent,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = popupRim(),
             content = content,
         )
     }

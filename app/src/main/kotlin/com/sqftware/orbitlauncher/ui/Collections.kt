@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -338,7 +337,7 @@ private fun CollectionCardView(
     Pane(
         // Solid while dragged, so the card it passes over does not show through it.
         fill = if (dragged) tint.compositeOver(LocalBoxColors.current.floating) else tint,
-        border = if (dropTarget) BorderStroke(2.dp, colours.primary) else null,
+        marked = dropTarget,
         modifier = modifier
             .fillMaxWidth()
             .reorderItem(reorder, index)

@@ -46,7 +46,7 @@ repos:
       - id: launcher-surfaces
         name: Boxes are a Pane, choices a ChoiceRow, fills from BoxColors and corners from the theme's shapes
         language: pygrep
-        entry: '\.surface\w*\b|(RoundedCorner|CutCorner)Shape\s*\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard|SegmentedButton)\s*\('
+        entry: '\.surface\w*\b|(RoundedCorner|CutCorner)Shape\s*\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard|SegmentedButton|FilterChip|InputChip)\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|ChoiceRow\.kt$|Panel\.kt$|\w+Art\.kt$)
       - id: check-markdown

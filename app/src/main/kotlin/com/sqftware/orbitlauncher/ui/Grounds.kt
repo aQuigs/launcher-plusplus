@@ -19,41 +19,59 @@ import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import com.sqftware.orbitlauncher.ui.theme.LocalGround
 import com.sqftware.orbitlauncher.ui.theme.LocalTonalEdge
 
-// Every box and text button of the launcher is one of these, so each takes its look from the ground it is on (held by the
-// launcher-surfaces and launcher-buttons hooks) and a ground's look changes for all of them at once.
-
 /** [content] composed on [ground], for the boxes and buttons in it to take their look from. */
 @Composable
 fun OnGround(ground: Ground, content: @Composable () -> Unit) = CompositionLocalProvider(LocalGround provides ground, content = content)
 
 /**
- * A box on the ground it is composed on: a card, a tile, a setting's group, a strip. Its fill is that ground's box fill,
- * or a [selected] one lit in the primary container, or a card's own [fill] in the user's colour. A [floating] one, over
- * other content, is a small pop-up instead: on the pop-ups' solid ground, with its content on that ground. A tap anywhere
- * calls [onClick].
+ * A box on the ground it is composed on: a card, a tile, a setting's group, a strip. Its fill is that ground's, the lit one
+ * when [selected], or a card's own [fill] in the user's colour; a [marked] one, such as a drop target, is outlined. A tap
+ * anywhere calls [onClick].
  */
 @Composable
 fun Pane(
     modifier: Modifier = Modifier,
-    floating: Boolean = false,
     selected: Boolean = false,
-    fill: Color = if (selected) MaterialTheme.colorScheme.primaryContainer else LocalBoxColors.current.on(LocalGround.current),
+    marked: Boolean = false,
+    fill: Color = LocalBoxColors.current.let { if (selected) it.lit else it.on(LocalGround.current) },
     shape: Shape = MaterialTheme.shapes.large,
-    border: BorderStroke? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-    val ground = if (floating) modifier.solidGround(panelGround(), shape) else modifier
-    val colour = if (floating) Color.Transparent else fill
-    val inside: @Composable () -> Unit = if (floating) ({ OnGround(Ground.Popup, content) }) else content
+    val boxes = LocalBoxColors.current
+    val contentColor = if (selected) boxes.onLit else MaterialTheme.colorScheme.onSurface
+    val border = if (marked) markedEdge() else null
 
     if (onClick != null) {
-        Surface(onClick, ground, shape = shape, color = colour, contentColor = contentColor, border = border, content = inside)
+        Surface(onClick, modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = content)
     } else {
-        Surface(ground, shape = shape, color = colour, contentColor = contentColor, border = border, content = inside)
+        Surface(modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = content)
     }
 }
+
+/**
+ * A box that floats over other content, such as a bar over the clock, as a small pop-up: on the pop-ups' solid ground and
+ * rim, with its content on that ground; a [marked] one is outlined as a marked [Pane] is.
+ */
+@Composable
+fun FloatingPane(modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.large, marked: Boolean = false, content: @Composable () -> Unit) {
+    Surface(
+        modifier.solidGround(panelGround(), shape),
+        shape = shape,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = if (marked) markedEdge() else popupRim(),
+    ) {
+        OnGround(Ground.Popup, content)
+    }
+}
+
+/** The rim of whatever floats on the pop-ups' ground, which holds its edge over the launcher's own. */
+@Composable
+fun popupRim() = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+
+@Composable
+private fun markedEdge() = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
 
 /** How much a [LauncherButton] stands out: as its ground's buttons do, as a main action, or in the error colour. */
 enum class Emphasis { Normal, Strong, Destructive }

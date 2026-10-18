@@ -50,6 +50,7 @@ import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.NameWidths
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
+import com.sqftware.orbitlauncher.ui.theme.LocalGround
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -155,7 +156,7 @@ fun IconDisc(
     Box(
         modifier
             .clip(CircleShape)
-            .background(LocalBoxColors.current.glass)
+            .background(LocalBoxColors.current.on(LocalGround.current))
             .then(if (presses != null) Modifier.indication(presses, ripple()) else Modifier),
         contentAlignment = contentAlignment,
         content = content,

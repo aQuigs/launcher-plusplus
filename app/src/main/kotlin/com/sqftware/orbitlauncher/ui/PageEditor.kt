@@ -1,9 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
@@ -244,7 +242,7 @@ private fun PageCard(
                     }
                 },
             shape = MaterialTheme.shapes.medium,
-            border = BorderStroke(if (marked) 2.dp else 1.dp, if (marked) colours.primary else colours.outlineVariant),
+            marked = marked,
             onClick = onOpen,
         ) {
             Box(Modifier.fillMaxSize()) {
