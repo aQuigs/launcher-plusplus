@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -36,7 +37,8 @@ fun <T> ChoiceRow(
                 colors = colors,
                 // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
                 icon = {},
-                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                // One size for every choice, small enough that a word fits a narrow segment in a box.
+                label = { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 modifier = item(option),
             )
         }
