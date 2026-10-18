@@ -13,11 +13,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -101,32 +96,17 @@ fun AppOptionsMenu(
     onOption: (AppOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    fun choose(choice: () -> Unit) = chooseFrom(expanded, onDismiss, choice)
-
-    GroundMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(AppOptionsTags.MENU)) {
-        shortcuts.forEach { shortcut ->
-            DropdownMenuItem(
-                text = { Text(shortcut.label) },
-                leadingIcon = { ShortcutIcon(shortcut, shortcutIcon) },
-                onClick = { choose { onShortcut(shortcut) } },
-            )
-        }
-        if (shortcuts.isNotEmpty()) HorizontalDivider()
-        options.forEach { option ->
-            DropdownMenuItem(
-                text = { Text(option.label) },
-                leadingIcon = { Icon(option.icon, contentDescription = null) },
-                onClick = { choose { onOption(option) } },
-            )
-        }
-    }
-}
-
-/** Dismisses a menu, then acts. Items stay tappable while the menu animates away, and a second tap must not start the same thing twice. */
-internal fun chooseFrom(expanded: Boolean, onDismiss: () -> Unit, choice: () -> Unit) {
-    if (!expanded) return
-    onDismiss()
-    choice()
+    GroundMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        groups = listOf(
+            shortcuts.map { shortcut -> MenuRow(shortcut.label, icon = { ShortcutIcon(shortcut, shortcutIcon) }) { onShortcut(shortcut) } },
+            options.map { option ->
+                MenuRow(option.label, icon = glyph(option.icon), destructive = option == AppOption.Uninstall) { onOption(option) }
+            },
+        ),
+        modifier = Modifier.testTag(AppOptionsTags.MENU),
+    )
 }
 
 @Composable
@@ -176,7 +156,7 @@ private val AppOption.icon
         AppOption.SplitWith -> SplitGlyph
         AppOption.Flip -> SwapGlyph
         is AppOption.Badge -> Icons.Default.Notifications
-        is AppOption.BuiltInCards -> Icons.Default.Star
+        is AppOption.BuiltInCards -> if (isOff) ShownGlyph else HiddenGlyph
         AppOption.PlayStore -> Icons.Default.ShoppingCart
         AppOption.AppInfo -> Icons.Default.Info
         AppOption.Uninstall -> Icons.Default.Delete

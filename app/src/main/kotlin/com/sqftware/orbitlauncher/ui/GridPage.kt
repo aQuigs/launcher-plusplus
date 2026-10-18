@@ -1,7 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -13,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -21,8 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.GridItem
@@ -100,40 +95,34 @@ fun GridFolderDialog(
     onClearBadge: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {},
-        title = { Text(folderTitle(folder.name)) },
-        text = {
-            BoxWithConstraints {
-                // As many columns as fit, filled from the start of each row as a launcher's folder is.
-                val columns = (maxWidth / FOLDER_APP_WIDTH).toInt().coerceAtLeast(1)
-                val width = maxWidth / columns
-                FlowRow(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    maxItemsInEachRow = columns,
-                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                ) {
-                    folder.apps.forEach { app ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(width).testTag(GridTags.folderApp(app))) {
-                            AppIcon(
-                                app,
-                                icon,
-                                onLaunch = {
-                                    onDismiss()
-                                    onLaunch(it)
-                                },
-                                modifier = Modifier.size(GRID_ICON_SIZE),
-                                menu = menu,
-                                unread = unread.badge(app),
-                                onClearBadge = onClearBadge,
-                            )
-                            AppLabel(app.label, Modifier.fillMaxWidth())
-                        }
+    InfoDialog(title = folderTitle(folder.name), onDone = onDismiss, modifier = Modifier.testTag(GridTags.FOLDER_DIALOG)) {
+        BoxWithConstraints {
+            // As many columns as fit, filled from the start of each row as a launcher's folder is.
+            val columns = (maxWidth / FOLDER_APP_WIDTH).toInt().coerceAtLeast(1)
+            val width = maxWidth / columns
+            FlowRow(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                maxItemsInEachRow = columns,
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+            ) {
+                folder.apps.forEach { app ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(width).testTag(GridTags.folderApp(app))) {
+                        AppIcon(
+                            app,
+                            icon,
+                            onLaunch = {
+                                onDismiss()
+                                onLaunch(it)
+                            },
+                            modifier = Modifier.size(GRID_ICON_SIZE),
+                            menu = menu,
+                            unread = unread.badge(app),
+                            onClearBadge = onClearBadge,
+                        )
+                        AppLabel(app.label, Modifier.fillMaxWidth())
                     }
                 }
             }
-        },
-        modifier = Modifier.testTag(GridTags.FOLDER_DIALOG),
-    )
+        }
+    }
 }

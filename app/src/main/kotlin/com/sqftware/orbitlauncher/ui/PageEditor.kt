@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import com.sqftware.orbitlauncher.ui.theme.sidewaysScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +57,8 @@ import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
+import com.sqftware.orbitlauncher.ui.theme.Spacing
+import com.sqftware.orbitlauncher.ui.theme.sidewaysScroll
 
 object PageEditorTags {
     const val EDITOR = "page_editor"
@@ -74,7 +75,6 @@ object PageEditorTags {
 
 private val CARD_WIDTH = 88.dp
 private val CARD_HEIGHT = 176.dp
-private val CARD_GAP = 12.dp
 private val LIFT_ROOM = 8.dp
 
 // A finger dragging a page this near either end of the strip scrolls it, and at the edge itself this fast, a second.
@@ -95,6 +95,7 @@ fun PageEditor(
     contentsOf: (LauncherPage) -> PageContents,
     onLayoutChange: (PageLayout) -> Unit,
     onOpen: (LauncherPage) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var addingAtStart by remember { mutableStateOf<Boolean?>(null) }
@@ -104,7 +105,7 @@ fun PageEditor(
     val latestOnLayoutChange by rememberUpdatedState(onLayoutChange)
     val density = LocalDensity.current
     val rightToLeft = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val reorder = remember(density, rightToLeft) { ListReorder(with(density) { CARD_GAP.toPx() }, horizontal = true, mirrored = rightToLeft) }
+    val reorder = remember(density, rightToLeft) { ListReorder(with(density) { Spacing.Gap.toPx() }, horizontal = true, mirrored = rightToLeft) }
     SideEffect { reorder.count = layout.pages.size }
     val scroll = rememberScrollState()
     var finger by remember { mutableFloatStateOf(Float.NaN) }
@@ -119,16 +120,14 @@ fun PageEditor(
     }
 
     Panel(modifier.testTag(PageEditorTags.EDITOR)) {
-        Column(Modifier.padding(top = 24.dp, bottom = 24.dp - LIFT_ROOM), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Pages", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 20.dp))
-            Text(
-                "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
+        Column(Modifier.padding(bottom = Spacing.Top - LIFT_ROOM)) {
+            PanelHeader(
+                "Pages",
+                onClose,
+                subtitle = "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(CARD_GAP),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
                 modifier = Modifier
                     // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
                     // the strip's own place on screen.
@@ -137,9 +136,9 @@ fun PageEditor(
                             while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
                         }
                     }
-                    .sidewaysScroll(scroll, inset = 20.dp)
+                    .sidewaysScroll(scroll, inset = Spacing.Edge)
                     // Inside the scroll's fade, which clips, so a lifted card has room to rise and tilt.
-                    .padding(top = 24.dp, bottom = LIFT_ROOM),
+                    .padding(top = Spacing.Top, bottom = LIFT_ROOM),
             ) {
                 if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
                 layout.pages.forEachIndexed { index, page ->
@@ -378,21 +377,18 @@ private fun AddTile(atStart: Boolean, onClick: () -> Unit) {
 private fun DeletePageDialog(label: String, contents: PageContents, onDelete: () -> Unit, onDismiss: () -> Unit) {
     val what = contents.summary().orEmpty()
 
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { LauncherButton(onClick = onDelete, emphasis = Emphasis.Destructive) { Text("Delete") } },
-        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
-        title = { Text("Delete $label?") },
-        text = {
-            Text(
-                when (contents) {
-                    is PageContents.Ring -> "This takes $what off the home screen. The apps stay installed and in the drawer."
-                    is PageContents.Cards -> "This deletes $what. The apps stay installed."
-                    is PageContents.Widgets -> "This removes $what."
-                    is PageContents.Grid -> "This takes $what off the home screen. The apps stay installed and in the drawer."
-                },
-            )
+    ConfirmDialog(
+        title = "Delete $label?",
+        text = when (contents) {
+            is PageContents.Ring -> "This takes $what off the home screen. The apps stay installed and in the drawer."
+            is PageContents.Cards -> "This deletes $what. The apps stay installed."
+            is PageContents.Widgets -> "This removes $what."
+            is PageContents.Grid -> "This takes $what off the home screen. The apps stay installed and in the drawer."
         },
+        verb = "Delete",
+        onConfirm = onDelete,
+        onDismiss = onDismiss,
+        destructive = true,
         modifier = Modifier.testTag(PageEditorTags.DELETE_DIALOG),
     )
 }

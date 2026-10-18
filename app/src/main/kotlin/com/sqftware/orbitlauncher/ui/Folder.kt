@@ -6,30 +6,20 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -40,8 +30,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -68,7 +56,7 @@ typealias FolderMenu = LongPressMenu<RingItem.Folder>
 enum class FolderOption(val label: String, val icon: ImageVector) {
     AddApps("Add apps", Icons.Default.Add),
     Rename("Rename", Icons.Default.Edit),
-    Planet("Change planet", Icons.Default.Star),
+    Planet("Change planet", PlanetGlyph),
     Remove("Remove folder", Icons.Default.Close),
 }
 
@@ -145,25 +133,16 @@ fun FolderIcon(
  */
 @Composable
 fun FolderNameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
-    var typed by rememberSaveable { mutableStateOf(name) }
-
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { LauncherButton(onClick = { onRename(typed) }) { Text("Save") } },
-        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
-        title = { Text("Folder name") },
-        text = {
-            OutlinedTextField(
-                value = typed,
-                onValueChange = { typed = it.take(MAX_FOLDER_NAME) },
-                label = { Text("Name") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { onRename(typed) }),
-                modifier = Modifier.focusRequester(rememberShownFocus()).testTag(FolderTags.NAME),
-            )
-        },
+    NameDialog(
+        title = "Folder name",
+        verb = "Save",
+        maxLength = MAX_FOLDER_NAME,
+        onName = onRename,
+        onDismiss = onDismiss,
+        initial = name,
+        blankAllowed = true,
         modifier = Modifier.testTag(FolderTags.NAME_DIALOG),
+        fieldModifier = Modifier.testTag(FolderTags.NAME),
     )
 }
 
@@ -269,13 +248,10 @@ fun FolderOptionsMenu(
     onDismiss: () -> Unit,
     options: List<FolderOption> = FolderOption.entries,
 ) {
-    GroundMenu(expanded = expanded, onDismissRequest = onDismiss, modifier = Modifier.testTag(FolderTags.MENU)) {
-        options.forEach { option ->
-            DropdownMenuItem(
-                text = { Text(option.label) },
-                leadingIcon = { Icon(option.icon, contentDescription = null) },
-                onClick = { chooseFrom(expanded, onDismiss) { onOption(option) } },
-            )
-        }
-    }
+    GroundMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        groups = listOf(options.map { option -> MenuRow(option.label, icon = glyph(option.icon)) { onOption(option) } }),
+        modifier = Modifier.testTag(FolderTags.MENU),
+    )
 }

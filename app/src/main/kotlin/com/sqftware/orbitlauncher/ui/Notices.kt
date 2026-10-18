@@ -1,0 +1,66 @@
+package com.sqftware.orbitlauncher.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+
+object NoticeTags {
+    const val NOTICE = "notice"
+}
+
+const val NOTICE_MILLIS = 2_000L
+
+/**
+ * The launcher's one way of saying that something happened or could not: a short note at the foot of the screen for a
+ * moment, in its own colours, never the system's toast.
+ */
+@Stable
+class Notices {
+    private class Shown(val text: String)
+
+    private var shown by mutableStateOf<Shown?>(null)
+
+    /** Puts up [text]; again while it shows starts its moment over. */
+    fun show(text: String) {
+        shown = Shown(text)
+    }
+
+    /** Draws the note showing, if any, until its moment is up. */
+    @Composable
+    fun Host(modifier: Modifier = Modifier) {
+        val note = shown ?: return
+        LaunchedEffect(note) {
+            delay(NOTICE_MILLIS)
+            if (shown === note) shown = null
+        }
+        NoticeLabel(note.text, modifier)
+    }
+}
+
+// A plain box rather than a surface: it must not take the taps meant for what is under it.
+@Composable
+private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.inverseSurface)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .testTag(NoticeTags.NOTICE),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.inverseOnSurface)
+    }
+}

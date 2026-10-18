@@ -28,7 +28,7 @@ class CollectionPickerTest {
     private fun show(fontScale: Float, displayScale: Float) = compose.setContent {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(density.density * displayScale, fontScale)) {
-            CollectionPicker(page = CollectionsPage(), customs = emptyList(), onToggle = {}, onCreate = {})
+            CollectionPicker(page = CollectionsPage(), customs = emptyList(), onToggle = {}, onCreate = {}, onClose = {}, onNotice = {})
         }
     }
 

@@ -50,7 +50,7 @@ sealed interface CollectionKind : Serializable {
 private const val CUSTOM_PREFIX = "Custom:"
 
 /** What the picker's tile for making a custom collection says; no collection may take it as a name. */
-const val CREATE_YOUR_OWN = "Create Your Own"
+const val CREATE_YOUR_OWN = "Create your own"
 
 /** The longest name a custom collection keeps. */
 const val MAX_COLLECTION_NAME = 30

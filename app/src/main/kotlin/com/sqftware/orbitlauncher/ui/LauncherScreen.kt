@@ -70,7 +70,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -128,6 +127,7 @@ import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -156,14 +156,8 @@ const val PICK_TIP = "Long-press the centre to choose the ring's apps"
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
 @Composable
 private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        Text(
-            text = "$AUTO_SET_UP fills your home with the apps you use most",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        LauncherButton(onClick = onPickApps, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.PICK_APPS)) {
-            Text("Pick apps myself")
-        }
+    EmptyNote("$AUTO_SET_UP fills your home with the apps you use most", modifier) {
+        LauncherButton(onClick = onPickApps, modifier = Modifier.testTag(LauncherTags.PICK_APPS)) { Text("Pick apps myself") }
     }
 }
 
@@ -186,7 +180,7 @@ data class HomePress(val launcherInFront: Boolean)
  * what [ringPages], [collectionPages] or [widgetPages] hold for its id. The home page shows the [clock] over its ring,
  * with the dock at its foot; another ring page shows its ring alone: the time and the date open the clock app
  * and the calendar, and a tap on the emblem opens the drawer to search, a long press to pick the apps on the ring or in the dock; while
- * [pickTip], the tap also toasts ([onToast]) that a long press picks, until a long press does ([onPickTipLearned]). Under the date, a tap on
+ * [pickTip], the tap also notes that a long press picks, until a long press does ([onPickTipLearned]). Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
  * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, the emblem offers to
  * fill them with a guess ([onSetUpHome]), and a link under the ring to pick them by hand. Until [isHomeApp],
@@ -254,6 +248,7 @@ fun LauncherScreen(
     onLayoutChange: (PageLayout) -> Unit,
     homePresses: Flow<HomePress>,
     pinRequests: Flow<PinRequest>,
+    notices: Flow<String>,
     apps: List<AppEntry>?,
     pinnedShortcuts: List<AppEntry>?,
     ringPages: RingPages,
@@ -284,7 +279,6 @@ fun LauncherScreen(
     onHomeOnReturnChange: (Boolean) -> Unit,
     pickTip: Boolean,
     onPickTipLearned: () -> Unit,
-    onToast: (String) -> Unit,
     drawerStyle: DrawerStyle,
     onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
@@ -561,6 +555,7 @@ fun LauncherScreen(
     // through, as it does through the drawer; the pages and the drawer's chevron must not, so they go while it is up. Not
     // animated: it comes and goes in a frame, and pages fading back in would be tappable before they could be seen.
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
+    val shownNotices = remember { Notices() }
     // The page editor covers the whole screen the same way, until Back, HOME or a tap on a page.
     var editingPages by rememberSaveable { mutableStateOf(false) }
     // The system bars go with the launcher while the wallpaper shows alone.
@@ -1145,7 +1140,7 @@ fun LauncherScreen(
         val rows = gridCells[page.id]?.pageRows ?: return
         val grid = gridOf(page.id)
         val added = grid.addClock(rows)
-        if (added == grid) onToast("No room for the clock here") else saveGrids(mapOf(page.id to added))
+        if (added == grid) shownNotices.show("No room for the clock here") else saveGrids(mapOf(page.id to added))
     }
 
     val launcherMenu = remember {
@@ -1158,59 +1153,40 @@ fun LauncherScreen(
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
                         at = { shown.at - origin() },
-                        rows = listOfNotNull(
-                            (widgetsPage ?: gridPage)?.let { LauncherMenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
-                            gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { LauncherMenuRow("Add clock") { addClock(it) } },
-                            widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
-                            LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
-                            LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
-                            LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
-                            LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
-                            LauncherMenuRow(
-                                "24-hour clock",
-                                on = latestTwentyFourHour,
-                                flips = true,
-                                onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
+                        // What this page holds, how the launcher looks, the ring, the rest, then the launcher itself.
+                        groups = listOf(
+                            listOfNotNull(
+                                (widgetsPage ?: gridPage)?.let { MenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
+                                gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { MenuRow("Add clock") { addClock(it) } },
+                                widgetsPage?.let { MenuRow("Move ring") { editingWidget = RING_ID } },
                             ),
-                            LauncherMenuRow("Theme", value = latestTheme.label) {
-                                // Its bar takes the clock's place, which may be on another page than the menu's.
-                                showClockRing()
-                                latestOnPreviewThemeChange(latestTheme)
-                            },
-                            LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
-                            LauncherMenuRow(
-                                "Names on the ring",
-                                on = latestAppNames,
-                                flips = true,
-                                onClick = { latestOnAppNamesChange(!latestAppNames) },
+                            listOfNotNull(
+                                MenuRow("Edit pages", end = RowEnd.Value(counted(latestLayout.pages.size, "page"))) { editingPages = true },
+                                MenuRow("Theme", end = RowEnd.Value(latestTheme.label)) {
+                                    // Its bar takes the clock's place, which may be on another page than the menu's.
+                                    showClockRing()
+                                    latestOnPreviewThemeChange(latestTheme)
+                                },
+                                MenuRow("Folder look", end = RowEnd.Value(latestFolderLook.label)) { choosingLook = true },
+                                MenuRow("Showcase wallpaper") { showingWallpaper = true },
+                                LocalThemeArt.current.scene?.let { MenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             ),
-                            LauncherMenuRow(
-                                "Spin the ring",
-                                on = latestRingSpin,
-                                flips = true,
-                                onClick = { latestOnRingSpinChange(!latestRingSpin) },
+                            listOf(
+                                toggleRow("Names on the ring", latestAppNames) { latestOnAppNamesChange(it) },
+                                toggleRow("Spin the ring", latestRingSpin) { latestOnRingSpinChange(it) },
+                                MenuRow("Spin stats", end = RowEnd.Value(counted(latestSpinStats.spins, "spin"))) { showingSpinStats = true },
                             ),
-                            LauncherMenuRow("Spin stats", value = counted(latestSpinStats.spins, "spin")) { showingSpinStats = true },
-                            LauncherMenuRow(
-                                "Open on home page",
-                                on = latestHomeOnReturn,
-                                flips = true,
-                                onClick = { latestOnHomeOnReturnChange(!latestHomeOnReturn) },
+                            listOf(
+                                toggleRow("24-hour clock", latestTwentyFourHour) { latestOnTwentyFourHourChange(it) },
+                                MenuRow("Unread badges", end = RowEnd.Toggle(latestBadgesEnabled, flips = false)) { latestOnOpenBadgeSettings() },
+                                toggleRow("Open on home page", latestHomeOnReturn) { latestOnHomeOnReturnChange(it) },
+                                toggleRow("Ambient motion", latestAmbientMotion) { latestOnAmbientMotionChange(it) },
+                                toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
-                            LauncherMenuRow(
-                                "Ambient motion",
-                                on = latestAmbientMotion,
-                                flips = true,
-                                onClick = { latestOnAmbientMotionChange(!latestAmbientMotion) },
+                            listOf(
+                                MenuRow("Restart launcher") { latestOnRestart() },
+                                MenuRow("Reset launcher", destructive = true) { confirmingReset = true },
                             ),
-                            LauncherMenuRow(
-                                "Check for updates",
-                                on = latestCheckForUpdates,
-                                flips = true,
-                                onClick = { latestOnCheckForUpdatesChange(!latestCheckForUpdates) },
-                            ),
-                            LauncherMenuRow("Restart launcher") { latestOnRestart() },
-                            LauncherMenuRow("Reset launcher") { confirmingReset = true },
                         ),
                         onDismiss = ::closeMenu,
                     )
@@ -1251,6 +1227,7 @@ fun LauncherScreen(
         }
     }
 
+    LaunchedEffect(notices) { notices.collect(shownNotices::show) }
     LaunchedEffect(homePresses, pagerState, drawerState) {
         homePresses.collect { press ->
             closeAll()
@@ -1522,7 +1499,7 @@ fun LauncherScreen(
                                                     onSearch = {
                                                         if (active) {
                                                             search()
-                                                            if (pickTip) onToast(PICK_TIP)
+                                                            if (pickTip) shownNotices.show(PICK_TIP)
                                                         }
                                                     },
                                                     modifier = ringModifier.dropZone(page) { copy(ring = it) },
@@ -1651,12 +1628,7 @@ fun LauncherScreen(
                                 Box(Modifier.fillMaxSize().verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() })) {
                                     EmptySpace(menu = launcherMenu.takeIf { active }, onTap = { editingWidget = null })
                                     if (grid.cells.widgets.isEmpty()) {
-                                        Text(
-                                            "Drag apps here from the drawer.\nLong-press for widgets and the clock.",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                                        )
+                                        EmptyNote("Drag apps here from the drawer.\nLong-press for widgets and the clock.", Modifier.align(Alignment.Center))
                                     }
                                     WidgetGrid(
                                         page = grid.cells,
@@ -1734,6 +1706,7 @@ fun LauncherScreen(
                         editingPages = false
                         scope.launch { pagerState.scrollToPage(layout.pages.indexOf(page)) }
                     },
+                    onClose = { editingPages = false },
                 )
             }
             // Over the hidden scaffold, drawer strip included: a screen of its own until Back or HOME.
@@ -1757,6 +1730,8 @@ fun LauncherScreen(
                         }
                     },
                     onCreate = { creatingCollection = true },
+                    onClose = { pickingCollection = false },
+                    onNotice = shownNotices::show,
                 )
                 if (creatingCollection) {
                     CreateCollectionDialog(
@@ -1900,6 +1875,8 @@ fun LauncherScreen(
                     if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
                 }
             }
+            // Over everything, panels and the open drawer included, clear of the drawer's strip.
+            shownNotices.Host(Modifier.align(Alignment.BottomCenter).padding(bottom = DRAWER_PEEK + Spacing.Edge))
         }
     }
 }
@@ -2052,3 +2029,6 @@ private fun LayoutCoordinates.boundsIn(ancestor: LayoutCoordinates): Bounds {
 }
 
 private const val FOLDER_SKY_TURN_MILLIS = 3_600_000
+
+/** A menu row that flips a setting [on] in place, handing the new value to [onChange]. */
+private fun toggleRow(label: String, on: Boolean, onChange: (Boolean) -> Unit) = MenuRow(label, end = RowEnd.Toggle(on, flips = true)) { onChange(!on) }

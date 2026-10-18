@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Bundle
 import android.util.SizeF
 import android.view.View
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
@@ -71,10 +70,14 @@ private const val CONFIGURE_REQUEST = 0x5749
  * after a restart. The system picker binds the picked provider to the id the launcher allocated. A provider that wants
  * configuring is started through the host, which answers through the activity itself rather than the result registry,
  * so the activity forwards that answer to [onActivityResult]. An id whose pick or configuration is cancelled goes back.
- * The pick in progress is stored, since a recreated activity gets the answer, and an old one still there when the user
+ * A widget too big for any room left on its page is not added, and [onNoRoom] says so. The pick in progress is stored, since a recreated activity gets the answer, and an old one still there when the user
  * asks again was lost with its process.
  */
-class SystemWidgetHost(private val activity: ComponentActivity, private val store: WidgetPageStore) : WidgetHost {
+class SystemWidgetHost(
+    private val activity: ComponentActivity,
+    private val store: WidgetPageStore,
+    private val onNoRoom: () -> Unit,
+) : WidgetHost {
     private val manager = AppWidgetManager.getInstance(activity)
     private val host = object : AppWidgetHost(activity, HOST_ID) {
         override fun onCreateView(context: Context, appWidgetId: Int, appWidget: AppWidgetProviderInfo?) = SizedWidgetView(context)
@@ -188,7 +191,7 @@ class SystemWidgetHost(private val activity: ComponentActivity, private val stor
         )
         if (placed == page) {
             discard(pick)
-            Toast.makeText(activity, "No room for that widget here", Toast.LENGTH_SHORT).show()
+            onNoRoom()
             return
         }
         pending = null

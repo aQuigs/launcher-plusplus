@@ -36,11 +36,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -90,6 +87,7 @@ import com.sqftware.orbitlauncher.domain.matching
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.sectionsByInitial
 import com.sqftware.orbitlauncher.ui.theme.Ground
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
@@ -264,7 +262,7 @@ fun AppDrawer(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp)
+                        .padding(start = Spacing.Edge, top = 8.dp, end = if (controls == null) Spacing.Edge else 4.dp, bottom = 8.dp)
                         .focusRequester(searchFocus),
                 )
                 controls?.let { StyleButtons(it) }
@@ -274,7 +272,7 @@ fun AppDrawer(
                     profileTabs,
                     selected = work,
                     onSelect = { workTab = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.Edge, vertical = 4.dp),
                     item = { Modifier.testTag(if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL) },
                 )
             }
@@ -291,7 +289,7 @@ fun AppDrawer(
                         else -> {
                             if (askForUsage) {
                                 fullWidth(key = "usage", contentType = "usage") {
-                                    PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = 24.dp).testTag(AppDrawerTags.USAGE_ACCESS))
+                                    PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = Spacing.Edge).testTag(AppDrawerTags.USAGE_ACCESS))
                                 }
                             }
                             if (mostUsedApps.isNotEmpty()) {
@@ -369,7 +367,7 @@ private fun StyleButtons(controls: DrawerControls) {
     }
     Box(Modifier.padding(end = 8.dp)) {
         IconButton(onClick = { controls.onSortingChange(true) }) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Sort apps")
+            Icon(SortGlyph, contentDescription = "Sort apps")
         }
         SortMenu(controls)
     }
@@ -380,41 +378,26 @@ private fun StyleButtons(controls: DrawerControls) {
 private fun SortMenu(controls: DrawerControls) {
     val style = controls.style
     val close = { controls.onSortingChange(false) }
-    fun choose(changed: DrawerStyle) = chooseFrom(controls.sorting, close) { controls.onStyleChange(changed) }
-
-    GroundMenu(expanded = controls.sorting, onDismissRequest = close, modifier = Modifier.testTag(AppDrawerTags.SORT_MENU)) {
-        DrawerOrder.entries.forEach { order ->
-            val chosen = order == style.order
-            DropdownMenuItem(
-                text = { Text(order.label) },
-                trailingIcon = if (chosen) {
-                    { Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-                } else {
-                    null
-                },
-                onClick = { choose(style.copy(order = order)) },
-                modifier = Modifier.semantics { selected = chosen },
-            )
-        }
-        HorizontalDivider()
-        LauncherMenuItem(
-            LauncherMenuRow("Most used row", on = style.mostUsedRow, flips = true) {
-                controls.onStyleChange(style.copy(mostUsedRow = !style.mostUsedRow))
+    GroundMenu(
+        expanded = controls.sorting,
+        onDismissRequest = close,
+        groups = listOf(
+            DrawerOrder.entries.map { order ->
+                MenuRow(order.label, end = RowEnd.Choice(order == style.order)) { controls.onStyleChange(style.copy(order = order)) }
             },
-            controls.sorting,
-            close,
-        )
-    }
+            listOf(
+                MenuRow("Most used row", end = RowEnd.Toggle(style.mostUsedRow, flips = true)) {
+                    controls.onStyleChange(style.copy(mostUsedRow = !style.mostUsedRow))
+                },
+            ),
+        ),
+        modifier = Modifier.testTag(AppDrawerTags.SORT_MENU),
+    )
 }
 
 @Composable
 private fun NoMatches() {
-    Text(
-        text = "No apps match",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
-    )
+    EmptyNote("No apps match")
 }
 
 private val RAIL_WIDTH = 28.dp
@@ -484,14 +467,7 @@ private fun SectionHeader(initial: Char) = Heading(initial.toString(), Modifier.
 
 @Composable
 private fun Heading(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp),
-    )
+    SectionLabel(text, modifier.fillMaxWidth().padding(horizontal = Spacing.Edge, vertical = 6.dp))
 }
 
 @Composable
@@ -505,7 +481,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
         modifier = Modifier
             .fillMaxWidth()
             .then(entry.action(app))
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = Spacing.Edge, vertical = 8.dp),
     ) {
         AppFace(app, entry.icon, Modifier.size(ROW_ICON_SIZE))
         Column(Modifier.weight(1f).padding(start = 16.dp)) {

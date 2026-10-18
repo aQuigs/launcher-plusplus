@@ -2,8 +2,6 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -39,8 +36,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -56,17 +51,14 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.materialIcon
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -79,15 +71,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
@@ -95,7 +84,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -104,15 +92,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
@@ -132,17 +117,15 @@ import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
-import com.sqftware.orbitlauncher.ui.theme.GlyphFill
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
-import kotlinx.coroutines.delay
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
 object CollectionTags {
     const val ADD = "collection_add"
     const val BIN = "collection_bin"
     const val PICKER = "collection_picker"
-    const val NOTICE = "collection_notice"
     const val CREATE = "collection_create"
     const val CREATE_DIALOG = "collection_create_dialog"
     const val CREATE_NAME = "collection_create_name"
@@ -201,8 +184,6 @@ private val CollectionKind.emptyText: String
         is CollectionKind.HandPicked -> "Tap the pencil to add apps"
     }
 
-private val PAGE_PADDING = 16.dp
-private val CARD_GAP = 12.dp
 private val CARD_ICON_SIZE = 48.dp
 private val HEADER_BUTTON = 48.dp
 private val ROW_GAP = 12.dp
@@ -214,7 +195,6 @@ private const val PICKER_COLUMNS = 3
 private const val MIN_KEPT_LABEL_SCALE = 0.75f
 private const val MIN_LABEL_SCALE = 0.25f
 private val TILE_PADDING = 4.dp
-private const val NOTICE_MILLIS = 2_000L
 private const val EXPAND_MILLIS = 200
 
 /**
@@ -255,14 +235,14 @@ fun CollectionsColumn(
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
-    val gap = with(LocalDensity.current) { CARD_GAP.toPx() }
+    val gap = with(LocalDensity.current) { Spacing.Gap.toPx() }
     val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }
 
     Box(modifier.fillMaxSize()) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(CARD_GAP),
-            modifier = Modifier.fillMaxSize().verticalPageScroll().padding(PAGE_PADDING),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
+            modifier = Modifier.fillMaxSize().verticalPageScroll().padding(Spacing.Edge),
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
@@ -301,7 +281,7 @@ fun CollectionsColumn(
             }
             LauncherButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().testTag(CollectionTags.ADD)) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("Add Collection")
+                Text("Add collection")
             }
         }
         if (bin != null) Bin(bin, Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp))
@@ -495,12 +475,7 @@ private fun AppGrid(
     val modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE)
 
     if (shown.isEmpty()) {
-        Text(
-            text = kind.emptyText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = modifier.padding(vertical = 12.dp),
-        )
+        EmptyNote(kind.emptyText, modifier)
         return
     }
     Layout(
@@ -555,14 +530,8 @@ internal fun PermissionRequired(onClick: () -> Unit, modifier: Modifier = Modifi
             .clickable(onClickLabel = "Open the usage access settings", onClick = onClick)
             .padding(vertical = 12.dp),
     ) {
-        Text("Permission Required", style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = "Lets Orbit see which apps you use most.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
-        )
+        Text("Permission required", style = MaterialTheme.typography.titleMedium)
+        SupportingText("Lets Orbit see which apps you use most.", Modifier.padding(top = 4.dp, bottom = 12.dp), TextAlign.Center)
         LauncherButton(onClick = onClick) { Text("Allow usage access") }
     }
 }
@@ -601,61 +570,51 @@ fun CollectionPicker(
     customs: List<CollectionKind>,
     onToggle: (CollectionKind) -> Unit,
     onCreate: () -> Unit,
+    onClose: () -> Unit,
+    onNotice: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var notice by remember { mutableStateOf<Notice?>(null) }
-    LaunchedEffect(notice) {
-        if (notice != null) {
-            delay(NOTICE_MILLIS)
-            notice = null
-        }
-    }
-
     Panel(modifier.testTag(CollectionTags.PICKER)) {
-        BoxWithConstraints {
-            val grid = tileGrid(constraints.maxWidth)
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(grid.columns),
-                contentPadding = PaddingValues(PAGE_PADDING),
-                horizontalArrangement = Arrangement.spacedBy(CARD_GAP),
-                verticalArrangement = Arrangement.spacedBy(CARD_GAP),
-            ) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text("Select Collection", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
-                }
-                items(CollectionKind.all + customs, key = { it.name }) { kind ->
-                    val onPage = kind in page
-                    Tile(
-                        // As in Arc Pro: a person on a custom collection's tile, the grid on its card.
-                        glyph = if (kind is CollectionKind.Custom) Icons.Default.Person else kind.glyph,
-                        title = kind.title,
-                        labelStyle = grid.labelStyle,
-                        selected = onPage,
-                        onClick = {
-                            // Numbered so a second tap restarts the fade instead of sharing the first one's.
-                            notice = Notice(if (onPage) "Collection Removed" else "Collection Added", (notice?.serial ?: 0) + 1)
-                            onToggle(kind)
-                        },
-                        modifier = Modifier.testTag(CollectionTags.tile(kind)),
-                    )
-                }
-                item(key = CollectionTags.CREATE) {
-                    Tile(
-                        glyph = GridGlyph,
-                        title = CREATE_YOUR_OWN,
-                        labelStyle = grid.labelStyle,
-                        selected = false,
-                        onClick = onCreate,
-                        modifier = Modifier.testTag(CollectionTags.CREATE),
-                    )
+        Column {
+            PanelHeader("Select collection", onClose)
+            BoxWithConstraints {
+                val grid = tileGrid(constraints.maxWidth)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(grid.columns),
+                    contentPadding = PaddingValues(start = Spacing.Edge, end = Spacing.Edge, bottom = Spacing.Edge),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
+                ) {
+                    items(CollectionKind.all + customs, key = { it.name }) { kind ->
+                        val onPage = kind in page
+                        Tile(
+                            // As in Arc Pro: a person on a custom collection's tile, the grid on its card.
+                            glyph = if (kind is CollectionKind.Custom) Icons.Default.Person else kind.glyph,
+                            title = kind.title,
+                            labelStyle = grid.labelStyle,
+                            selected = onPage,
+                            onClick = {
+                                onNotice(if (onPage) "Collection removed" else "Collection added")
+                                onToggle(kind)
+                            },
+                            modifier = Modifier.testTag(CollectionTags.tile(kind)),
+                        )
+                    }
+                    item(key = CollectionTags.CREATE) {
+                        Tile(
+                            glyph = GridGlyph,
+                            title = CREATE_YOUR_OWN,
+                            labelStyle = grid.labelStyle,
+                            selected = false,
+                            onClick = onCreate,
+                            modifier = Modifier.testTag(CollectionTags.CREATE),
+                        )
+                    }
                 }
             }
-            notice?.let { NoticeLabel(it.text, Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp)) }
         }
     }
 }
-
-private data class Notice(val text: String, val serial: Int)
 
 private data class TileGrid(val columns: Int, val labelStyle: TextStyle)
 
@@ -683,39 +642,26 @@ private fun tileGrid(gridWidth: Int): TileGrid {
 
 // In whole px, rounded where the grid and the paddings round, so a name measured to fit is never a pixel too wide.
 private fun Density.labelWidth(gridWidth: Int, columns: Int): Int {
-    val content = gridWidth - PAGE_PADDING.roundToPx() * 2
-    val cell = (content - CARD_GAP.roundToPx() * (columns - 1)) / columns
+    val content = gridWidth - Spacing.Edge.roundToPx() * 2
+    val cell = (content - Spacing.Gap.roundToPx() * (columns - 1)) / columns
     return cell - TILE_PADDING.roundToPx() * 2
 }
 
 /**
- * Create Your Own: names a custom collection. Ok waits for a name [page] would take (see [CollectionsPage.custom]) and
- * calls [onCreate] with it; Back and a tap outside call [onDismiss]. Like Arc's, it has no Cancel.
+ * Create your own: names a custom collection. Create waits for a name [page] would take (see [CollectionsPage.custom])
+ * and calls [onCreate] with it; Cancel, Back and a tap outside call [onDismiss].
  */
 @Composable
 fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Custom) -> Unit, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    val kind = page.custom(name)
-    val taken = kind == null && name.isNotBlank()
-
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { LauncherButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
-        title = { Text(CREATE_YOUR_OWN) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it.take(MAX_COLLECTION_NAME) },
-                label = { Text("Collection Name") },
-                singleLine = true,
-                isError = taken,
-                supportingText = if (taken) ({ Text("That name is taken") }) else null,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { kind?.let(onCreate) }),
-                modifier = Modifier.focusRequester(rememberShownFocus()).testTag(CollectionTags.CREATE_NAME),
-            )
-        },
+    NameDialog(
+        title = CREATE_YOUR_OWN,
+        verb = "Create",
+        maxLength = MAX_COLLECTION_NAME,
+        onName = { name -> page.custom(name)?.let(onCreate) },
+        onDismiss = onDismiss,
+        refusal = { name -> "That name is taken".takeIf { name.isNotBlank() && page.custom(name) == null } },
         modifier = Modifier.testTag(CollectionTags.CREATE_DIALOG),
+        fieldModifier = Modifier.testTag(CollectionTags.CREATE_NAME),
     )
 }
 
@@ -750,11 +696,7 @@ fun CollectionSettingsDialog(
             modifier = Modifier.verticalScroll(rememberScrollState()),
         ) {
             if (index == 1) {
-                Text(
-                    text = "Every collection that uses the default follows these.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                SupportingText("Every collection that uses the default follows these.")
                 CARD_SETTINGS.forEach { DefaultChoices(it, page.defaults, onChange) }
             } else {
                 val look = page.look(card)
@@ -763,58 +705,54 @@ fun CollectionSettingsDialog(
         }
     }
 
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { LauncherButton(onClick = onDismiss) { Text("Done") } },
-        dismissButton = {
+    InfoDialog(
+        title = "${kind.title} settings",
+        onDone = onDismiss,
+        // Removing is about this collection, so it is offered on its tab only, not on the defaults every card shares.
+        aside = if (pager.targetPage == 0) ({
             LauncherButton(onClick = { removing = true }, emphasis = Emphasis.Destructive, modifier = Modifier.testTag(CollectionTags.REMOVE)) {
                 Text("Remove")
             }
-        },
-        title = { Text("${kind.title} settings") },
-        text = {
-            Column {
-                SecondaryTabRow(selectedTabIndex = pager.targetPage, containerColor = Color.Transparent) {
-                    SETTINGS_TABS.forEachIndexed { index, title ->
-                        Tab(
-                            selected = pager.targetPage == index,
-                            onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                            text = { Text(title) },
-                        )
-                    }
-                }
-                // As tall as the taller tab throughout, or the centred dialog would grow and shrink under a swipe.
-                Box(Modifier.padding(top = 16.dp)) {
-                    SizeOfLargest { SETTINGS_TABS.indices.forEach { settings(it) } }
-                    HorizontalPager(
-                        state = pager,
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.matchParentSize().testTag(CollectionTags.SETTINGS_PAGES),
-                    ) { settings(it) }
+        }) else null,
+        modifier = Modifier.testTag(CollectionTags.SETTINGS_DIALOG),
+    ) {
+        Column {
+            SecondaryTabRow(selectedTabIndex = pager.targetPage, containerColor = Color.Transparent) {
+                SETTINGS_TABS.forEachIndexed { index, title ->
+                    Tab(
+                        selected = pager.targetPage == index,
+                        onClick = { scope.launch { pager.animateScrollToPage(index) } },
+                        text = { Text(title) },
+                    )
                 }
             }
-        },
-        modifier = Modifier.testTag(CollectionTags.SETTINGS_DIALOG),
-    )
+            // As tall as the taller tab throughout, or the centred dialog would grow and shrink under a swipe.
+            Box(Modifier.padding(top = 16.dp)) {
+                SizeOfLargest { SETTINGS_TABS.indices.forEach { settings(it) } }
+                HorizontalPager(
+                    state = pager,
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.matchParentSize().testTag(CollectionTags.SETTINGS_PAGES),
+                ) { settings(it) }
+            }
+        }
+    }
 }
 
 /** Asks before taking the card of [kind] off the page, saying what goes with it. Back and a tap outside call [onDismiss]. */
 @Composable
 private fun RemoveCollectionDialog(kind: CollectionKind, onRemove: () -> Unit, onDismiss: () -> Unit) {
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { LauncherButton(onClick = onRemove, emphasis = Emphasis.Destructive) { Text("Remove") } },
-        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
-        title = { Text("Remove ${kind.title}?") },
-        text = {
-            Text(
-                when (kind) {
-                    is CollectionKind.Custom -> "This deletes the collection, its apps and its settings. The apps stay installed."
-                    is CollectionKind.HandPicked -> "This takes the card, its apps and its settings off the page. The apps stay installed."
-                    else -> "This takes the card and its settings off the page."
-                },
-            )
+    ConfirmDialog(
+        title = "Remove ${kind.title}?",
+        text = when (kind) {
+            is CollectionKind.Custom -> "This deletes the collection, its apps and its settings. The apps stay installed."
+            is CollectionKind.HandPicked -> "This takes the card, its apps and its settings off the page. The apps stay installed."
+            else -> "This takes the card and its settings off the page."
         },
+        verb = "Remove",
+        onConfirm = onRemove,
+        onDismiss = onDismiss,
+        destructive = true,
         modifier = Modifier.testTag(CollectionTags.REMOVE_DIALOG),
     )
 }
@@ -970,20 +908,6 @@ private fun Modifier.atLeastSquare() = layout { measurable, constraints ->
     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
-// A plain box rather than a surface: it must not take the taps meant for the tiles under it.
-@Composable
-private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.inverseSurface)
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .testTag(CollectionTags.NOTICE),
-    ) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.inverseOnSurface)
-    }
-}
-
 val CollectionKind.glyph: ImageVector
     get() = when (this) {
         CollectionKind.NewApps -> SparkleGlyph
@@ -1013,8 +937,6 @@ private val AppCategory.glyph: ImageVector
     }
 
 // Material glyphs the core icon set leaves out, from their published path data.
-internal fun materialGlyph(name: String, pathData: String): ImageVector =
-    materialIcon(name) { addPath(addPathNodes(pathData), fill = SolidColor(GlyphFill)) }
 
 private val DragHandleGlyph = materialGlyph("DragHandle", "M20 9H4v2h16V9zM4 15h16v-2H4v2z")
 private val BarChartGlyph = materialGlyph("BarChart", "M4 9h4v11H4zM10 4h4v16h-4zM16 13h4v7h-4z")
