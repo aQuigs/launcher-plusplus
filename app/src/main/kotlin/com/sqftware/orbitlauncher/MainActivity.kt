@@ -35,6 +35,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesSpinStatsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
@@ -108,6 +109,7 @@ class MainActivity : ComponentActivity() {
         val ambientMotionStore = SharedPreferencesAmbientMotionStore(this)
         val appNamesStore = SharedPreferencesAppNamesStore(this)
         val ringSpinStore = SharedPreferencesRingSpinStore(this)
+        val spinStatsStore = SharedPreferencesSpinStatsStore(this)
         val homeOnReturnStore = SharedPreferencesHomeOnReturnStore(this)
         val pickTipStore = SharedPreferencesPickTipStore(this)
         val ringer = SystemRinger(this)
@@ -181,6 +183,7 @@ class MainActivity : ComponentActivity() {
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
+                var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
                 var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
                 var pickTip by remember { mutableStateOf(pickTipStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
@@ -343,6 +346,11 @@ class MainActivity : ComponentActivity() {
                     onRingSpinChange = {
                         ringSpin = it
                         ringSpinStore.save(it)
+                    },
+                    spinStats = spinStats,
+                    onSpin = {
+                        spinStats += it
+                        spinStatsStore.save(spinStats)
                     },
                     homeOnReturn = homeOnReturn,
                     onHomeOnReturnChange = {

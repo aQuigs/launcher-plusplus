@@ -101,6 +101,7 @@ import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.domain.SpinStats
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetPages
@@ -156,6 +157,7 @@ class LauncherScreenTest {
     private var ambientMotion by mutableStateOf(true)
     private var appNames by mutableStateOf(false)
     private var ringSpin by mutableStateOf(true)
+    private var spinStats by mutableStateOf(SpinStats())
     private var homeOnReturn by mutableStateOf(false)
     private var pickTip by mutableStateOf(false)
     private val toasts = mutableListOf<String>()
@@ -282,6 +284,8 @@ class LauncherScreenTest {
             onAppNamesChange = { appNames = it },
             ringSpin = ringSpin,
             onRingSpinChange = { ringSpin = it },
+            spinStats = spinStats,
+            onSpin = { spinStats += it },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
@@ -2104,6 +2108,29 @@ class LauncherScreenTest {
         nameOn(mail).assertExists()
         compose.onNodeWithTag(HomeRingTags.folder(1)).performClick()
         nameOn(clock).assertExists()
+    }
+
+    @Test
+    fun aSpinOfTheRingCountsInTheSpinStatsTheMenuShows() {
+        homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
+        show()
+        val top = centreOf(compose.ringSlot(clock))
+        val bottom = centreOf(compose.ringSlot(mail))
+        val side = (top + bottom) / 2f + Offset((bottom.y - top.y) / 2, 0f)
+        compose.onRoot().performTouchInput {
+            val along = Offset(0f, 60.dp.toPx())
+            swipe(side - along, side + along, 80)
+        }
+
+        compose.runOnIdle {
+            assertEquals(1, spinStats.spins)
+            assertTrue("turned clockwise down the right side", spinStats.clockwise > 0)
+            assertTrue("let go moving", spinStats.topRpm > 0)
+        }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Spin stats").performClick()
+        compose.onNodeWithTag(LauncherMenuTags.SPIN_STATS_DIALOG).assertIsDisplayed()
+        compose.onNodeWithText("Top speed", substring = true).assertIsDisplayed()
     }
 
     @Test
