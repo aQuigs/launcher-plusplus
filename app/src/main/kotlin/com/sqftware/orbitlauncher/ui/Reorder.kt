@@ -4,10 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -215,19 +211,12 @@ fun ReorderModeSwitch(
         border = if (hovered) BorderStroke(2.dp, colours.primary) else null,
         modifier = modifier.testTag(ReorderTags.SWITCH),
     ) {
-        SingleChoiceSegmentedButtonRow(Modifier.padding(6.dp)) {
-            ReorderMode.entries.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = option == mode,
-                    onClick = { onModeChange(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index, ReorderMode.entries.size),
-                    modifier = Modifier
-                        .onGloballyPositioned { onPlaced(option, it.rootBounds()) }
-                        .testTag(ReorderTags.mode(option)),
-                ) {
-                    Text(option.name)
-                }
-            }
-        }
+        ChoiceRow(
+            ReorderMode.entries.map { it to it.name },
+            selected = mode,
+            onSelect = onModeChange,
+            modifier = Modifier.padding(6.dp),
+            item = { option -> Modifier.onGloballyPositioned { onPlaced(option, it.rootBounds()) }.testTag(ReorderTags.mode(option)) },
+        )
     }
 }

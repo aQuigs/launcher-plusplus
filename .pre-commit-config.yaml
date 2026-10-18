@@ -44,11 +44,11 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/Grounds\.kt$
       - id: launcher-surfaces
-        name: Boxes are a Pane and fills come from BoxColors, corners from the theme's shapes
+        name: Boxes are a Pane, choices a ChoiceRow, fills from BoxColors and corners from the theme's shapes
         language: pygrep
-        entry: '\.surface\w*\b|RoundedCornerShape\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard)\('
+        entry: '\.surface\w*\b|(RoundedCorner|CutCorner)Shape\s*\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard|SegmentedButton)\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
-        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|Panel\.kt$|\w+Art\.kt$)
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|ChoiceRow\.kt$|Panel\.kt$|\w+Art\.kt$)
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

@@ -271,8 +271,8 @@ fun AppDrawer(
                     profileTabs,
                     selected = work,
                     onSelect = { workTab = it },
-                    tag = { if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL },
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
+                    item = { Modifier.testTag(if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL) },
                 )
             }
             Box(Modifier.weight(1f)) {

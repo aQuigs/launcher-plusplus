@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -27,41 +28,41 @@ fun OnGround(ground: Ground, content: @Composable () -> Unit) = CompositionLocal
 
 /**
  * A box on the ground it is composed on: a card, a tile, a setting's group, a strip. Its fill is that ground's box fill,
- * or a [selected] one lit in the primary container, unless it is [floating] over other content, when it is opaque and its
- * own content sits on it as on a pop-up. A card of the user's colour gives its own [fill]; a tap anywhere calls [onClick].
+ * or a [selected] one lit in the primary container, or a card's own [fill] in the user's colour. A [floating] one, over
+ * other content, is a small pop-up instead: on the pop-ups' solid ground, with its content on that ground. A tap anywhere
+ * calls [onClick].
  */
 @Composable
 fun Pane(
     modifier: Modifier = Modifier,
     floating: Boolean = false,
     selected: Boolean = false,
-    fill: Color = when {
-        selected -> MaterialTheme.colorScheme.primaryContainer
-        floating -> LocalBoxColors.current.floating
-        else -> LocalBoxColors.current.on(LocalGround.current)
-    },
+    fill: Color = if (selected) MaterialTheme.colorScheme.primaryContainer else LocalBoxColors.current.on(LocalGround.current),
     shape: Shape = MaterialTheme.shapes.large,
     border: BorderStroke? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val ground = if (floating) modifier.solidGround(panelGround(), shape) else modifier
+    val colour = if (floating) Color.Transparent else fill
     val inside: @Composable () -> Unit = if (floating) ({ OnGround(Ground.Popup, content) }) else content
 
     if (onClick != null) {
-        Surface(onClick, modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = inside)
+        Surface(onClick, ground, shape = shape, color = colour, contentColor = contentColor, border = border, content = inside)
     } else {
-        Surface(modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = inside)
+        Surface(ground, shape = shape, color = colour, contentColor = contentColor, border = border, content = inside)
     }
 }
 
-/** How much a [LauncherButton] stands out: as its ground's buttons do, filled wherever it is, or in the error colour. */
+/** How much a [LauncherButton] stands out: as its ground's buttons do, as a main action, or in the error colour. */
 enum class Emphasis { Normal, Strong, Destructive }
 
 /**
  * A text button as its ground has them. On the wallpaper and on a panel over it, it is tonal and rimmed so it shows on any
- * patch of wallpaper; on a pop-up's solid ground it is bare text, as a dialog's are, unless [Emphasis.Strong]. A
- * [Emphasis.Destructive] one, which erases what the user keeps, is in the error colour.
+ * patch of wallpaper; on a pop-up's solid ground it is bare text, as a dialog's are, or filled in the primary colour for an
+ * [Emphasis.Strong] main action, since a tonal tint would not show there. An [Emphasis.Destructive] one, which erases what
+ * the user keeps, is in the error colour.
  */
 @Composable
 fun LauncherButton(
@@ -72,13 +73,20 @@ fun LauncherButton(
     content: @Composable RowScope.() -> Unit,
 ) {
     val error = MaterialTheme.colorScheme.error
-    val bare = LocalGround.current == Ground.Popup && emphasis != Emphasis.Strong
 
-    if (bare) {
-        val colors = if (emphasis == Emphasis.Destructive) ButtonDefaults.textButtonColors(contentColor = error) else ButtonDefaults.textButtonColors()
-        TextButton(onClick, modifier, enabled, colors = colors, content = content)
-    } else {
-        val colors = if (emphasis == Emphasis.Destructive) ButtonDefaults.filledTonalButtonColors(contentColor = error) else ButtonDefaults.filledTonalButtonColors()
-        FilledTonalButton(onClick, modifier, enabled, colors = colors, border = BorderStroke(1.dp, LocalTonalEdge.current), content = content)
+    when {
+        LocalGround.current != Ground.Popup -> {
+            val colors = if (emphasis == Emphasis.Destructive) {
+                ButtonDefaults.filledTonalButtonColors(contentColor = error)
+            } else {
+                ButtonDefaults.filledTonalButtonColors()
+            }
+            FilledTonalButton(onClick, modifier, enabled, colors = colors, border = BorderStroke(1.dp, LocalTonalEdge.current), content = content)
+        }
+        emphasis == Emphasis.Strong -> Button(onClick, modifier, enabled, content = content)
+        else -> {
+            val colors = if (emphasis == Emphasis.Destructive) ButtonDefaults.textButtonColors(contentColor = error) else ButtonDefaults.textButtonColors()
+            TextButton(onClick, modifier, enabled, colors = colors, content = content)
+        }
     }
 }

@@ -266,7 +266,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
         // The day's grounds are near the frost its tiers climb to, so a box on one is inked a step towards the deep instead.
         boxes = {
             val inked = lerp(surfaceContainerHighest, onSurface, 0.1f)
-            BoxColors(glass = surfaceVariant, panel = inked, popup = inked, floating = surfaceContainerHigh)
+            BoxColors(glass = surfaceVariant, panel = inked, popup = inked, floating = inked)
         },
         cardAlpha = 0.75f,
     )
@@ -275,7 +275,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
 @Composable
 fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
     val look = remember(colourway, lightWallpaper) { lookOf(colourway, lightWallpaper) }
-    MaterialTheme(colorScheme = look.colors, shapes = LauncherShapes) {
+    MaterialTheme(colorScheme = look.colors) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides look.colors.onBackground,

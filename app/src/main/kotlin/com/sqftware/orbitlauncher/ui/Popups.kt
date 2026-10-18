@@ -33,31 +33,33 @@ fun GroundDialog(
     title: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
 ) {
-    fun (@Composable () -> Unit).onPopup(): @Composable () -> Unit = { OnGround(Ground.Popup, this) }
-
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        confirmButton = confirmButton.onPopup(),
-        modifier = modifier.solidGround(panelGround(), AlertDialogDefaults.shape),
-        dismissButton = dismissButton?.onPopup(),
-        icon = icon?.onPopup(),
-        title = title?.onPopup(),
-        text = text?.onPopup(),
-        containerColor = Color.Transparent,
-    )
+    // The dialog is a window of its own, which takes its locals from here.
+    OnGround(Ground.Popup) {
+        AlertDialog(
+            onDismissRequest = onDismissRequest,
+            confirmButton = confirmButton,
+            modifier = modifier.solidGround(panelGround(), AlertDialogDefaults.shape),
+            dismissButton = dismissButton,
+            icon = icon,
+            title = title,
+            text = text,
+            containerColor = Color.Transparent,
+        )
+    }
 }
 
 /** Material's dropdown menu on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground. */
 @Composable
 fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = modifier.solidGround(panelGround(), MenuDefaults.shape),
-        containerColor = Color.Transparent,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        OnGround(Ground.Popup) { content() }
+    OnGround(Ground.Popup) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = onDismissRequest,
+            modifier = modifier.solidGround(panelGround(), MenuDefaults.shape),
+            containerColor = Color.Transparent,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            content = content,
+        )
     }
 }
 

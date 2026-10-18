@@ -64,9 +64,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -873,24 +870,13 @@ private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T
 
 @Composable
 private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        setting.choices.forEachIndexed { index, choice ->
-            SegmentedButton(
-                selected = choice == value,
-                onClick = { onChoose(choice) },
-                shape = SegmentedButtonDefaults.itemShape(index, setting.choices.size),
-                // Lit as the picker's tiles are: the default fill barely shows against the dialog.
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-                // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
-                icon = {},
-                label = { Text(choice.toString(), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.testTag(CollectionTags.choice(setting, choice)),
-            )
-        }
-    }
+    ChoiceRow(
+        setting.choices.map { it to it.toString() },
+        selected = value,
+        onSelect = onChoose,
+        modifier = Modifier.fillMaxWidth(),
+        item = { Modifier.testTag(CollectionTags.choice(setting, it)) },
+    )
 }
 
 /**

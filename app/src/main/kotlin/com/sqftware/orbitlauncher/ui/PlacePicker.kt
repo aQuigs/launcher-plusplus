@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,7 +26,7 @@ private val switchablePlaces = listOf(HomePlace.Ring to "Ring", HomePlace.Dock t
 @Composable
 fun PlacePicker(place: HomePlace, onPlaceChange: (HomePlace) -> Unit, modifier: Modifier = Modifier) {
     PickingHeader(modifier) {
-        ChoiceRow(switchablePlaces, selected = place, onSelect = onPlaceChange, tag = PlacePickerTags::place)
+        ChoiceRow(switchablePlaces, selected = place, onSelect = onPlaceChange, Modifier.fillMaxWidth(), item = { Modifier.testTag(PlacePickerTags.place(it)) })
     }
 }
 

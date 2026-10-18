@@ -59,15 +59,17 @@ class LauncherColorsTest {
         }
     }
 
-    // Text on a panel's box over the worst patch of wallpaper, as above, and every box against the wallpaper its scheme is
-    // for. A box on the wallpaper is the card glass; whether it shows hangs on the wallpaper, so only the grounds the
-    // launcher draws are held to show one.
+    // Every colour a box's text comes in, on a panel's box over the worst patch of wallpaper as above, and every box and
+    // floating mark against the wallpaper its scheme is for. A box on the wallpaper is the card glass; whether it shows hangs
+    // on the wallpaper, so only the grounds the launcher draws are held to show one. A floating Pane is on the pop-up ground.
+    // Body text is held to WCAG's 4.5:1; the accents, which mark large figures and glyphs, and the lit choice to its 3:1.
     @Test
-    fun `a box shows on the panel and pop-up grounds, and text reads on a box on every ground`() {
+    fun `boxes and floating marks show on the grounds the launcher draws, and their text reads on every ground`() {
         val failures = mutableListOf<String>()
         listOf(false, true).flatMap { light -> Colourway.entries.map { Triple(it, light, lookOf(it, light)) } }.forEach { (way, light, look) ->
             val wallpapers = if (light) listOf(Color.White, Color.Black) else listOf(Color.Black, Color.White)
             with(look.colors) {
+                val texts = listOf(onSurface to 4.5f, onSurfaceVariant to 4.5f, primary to 3f, tertiary to 3f)
                 Ground.entries.forEach { ground ->
                     val (usual, worst) = wallpapers.map { wallpaper ->
                         when (ground) {
@@ -77,11 +79,20 @@ class LauncherColorsTest {
                         }
                     }
                     val box = look.boxes.on(ground)
-                    val text = contrast(onSurface, box.compositeOver(if (ground == Ground.Wallpaper) usual else worst))
-                    val shows = contrast(box.compositeOver(usual), usual)
-                    if (text < 4.5f) failures += "text on a box on $ground, $way, light $light: $text"
-                    if (ground != Ground.Wallpaper && shows < 1.15f) failures += "a box on $ground, $way, light $light: $shows"
+                    val under = box.compositeOver(if (ground == Ground.Wallpaper) usual else worst)
+                    texts.forEach { (text, least) ->
+                        val reads = contrast(text, under)
+                        if (reads < least) failures += "$text on a box on $ground, $way, light $light: $reads"
+                    }
+                    if (ground != Ground.Wallpaper) {
+                        val shows = contrast(box.compositeOver(usual), usual)
+                        val floats = contrast(look.boxes.floating, usual)
+                        if (shows < 1.15f) failures += "a box on $ground, $way, light $light: $shows"
+                        if (floats < 1.15f) failures += "a floating mark on $ground, $way, light $light: $floats"
+                    }
                 }
+                val lit = contrast(onPrimaryContainer, primaryContainer)
+                if (lit < 3f) failures += "a selected box, $way, light $light: $lit"
                 assertEquals(1f, look.boxes.floating.alpha)
             }
         }

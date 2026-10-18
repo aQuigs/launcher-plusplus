@@ -1,10 +1,8 @@
 package com.sqftware.orbitlauncher.ui.theme
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.Colourway
 
 /**
@@ -32,15 +30,3 @@ class BoxColors internal constructor(val glass: Color, private val panel: Color,
 }
 
 val LocalBoxColors = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).boxes }
-
-/**
- * The launcher's corners, from a small target's to a strip's; a box takes one of these by size rather than a radius of its
- * own, so boxes of a kind round alike.
- */
-internal val LauncherShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(24.dp),
-)
