@@ -69,7 +69,7 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
                         DirectionTile(
                             MaterialTheme.colorScheme.tertiary,
                             decimal(stats.anticlockwise, 1),
-                            "turns anticlockwise",
+                            "turns counterclockwise",
                             Modifier.weight(1f),
                             mirrored = true,
                         )
