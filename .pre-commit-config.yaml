@@ -38,11 +38,17 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Panel\.kt$|Popups\.kt$|\w+Art\.kt$)
       - id: launcher-buttons
-        name: Text buttons are a TonalButton on the wallpaper and a PopupButton on a pop-up
+        name: Text buttons are a LauncherButton, which takes its look from the ground it is on
         language: pygrep
-        entry: '(?<!\w)(Text|FilledTonal|Outlined|Elevated)?Button\s*\('
+        entry: '(?<!\w)(Text|FilledTonal|Filled|Outlined|Elevated)?Button\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
-        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(TonalButton|Popups)\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/Grounds\.kt$
+      - id: launcher-surfaces
+        name: Boxes are a Pane and fills come from BoxColors, corners from the theme's shapes
+        language: pygrep
+        entry: '\.surface\w*\b|RoundedCornerShape\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard)\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|Panel\.kt$|\w+Art\.kt$)
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

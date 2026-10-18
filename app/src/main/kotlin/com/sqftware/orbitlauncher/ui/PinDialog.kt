@@ -28,8 +28,8 @@ class PinRequest(val shortcut: AppEntry, val appLabel: String, val icon: suspend
 fun PinDialog(request: PinRequest, onAdd: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onAdd) { Text("Add") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { LauncherButton(onClick = onAdd) { Text("Add") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         icon = { IconDisc(modifier = Modifier.size(48.dp)) { AppImage(request.shortcut, { request.icon() }, Modifier.fillMaxSize()) } },
         title = { Text(request.shortcut.label) },
         text = { Text("Shortcut from ${request.appLabel}") },

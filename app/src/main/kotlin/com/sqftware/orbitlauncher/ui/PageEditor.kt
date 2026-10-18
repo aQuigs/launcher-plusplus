@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,11 +11,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -41,7 +42,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,6 +59,7 @@ import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.edgePull
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 
 object PageEditorTags {
     const val EDITOR = "page_editor"
@@ -73,8 +77,6 @@ object PageEditorTags {
 private val CARD_WIDTH = 88.dp
 private val CARD_HEIGHT = 176.dp
 private val CARD_GAP = 12.dp
-private val CARD_RADIUS = 10.dp
-private val CARD_SHAPE = RoundedCornerShape(CARD_RADIUS)
 
 // A finger dragging a page this near either end of the strip scrolls it, and at the edge itself this fast, a second.
 private val EDGE_ZONE = 48.dp
@@ -232,7 +234,7 @@ private fun PageCard(
     val marked = home || lifted
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.testTag(PageEditorTags.page(page))) {
-        Box(
+        Pane(
             Modifier
                 .size(CARD_WIDTH, CARD_HEIGHT)
                 .graphicsLayer {
@@ -240,38 +242,39 @@ private fun PageCard(
                         translationY = -8.dp.toPx()
                         rotationZ = -3f
                     }
-                }
-                .clip(CARD_SHAPE)
-                .background(colours.surfaceContainer)
-                .border(if (marked) 2.dp else 1.dp, if (marked) colours.primary else colours.outlineVariant, CARD_SHAPE)
-                .clickable(onClick = onOpen),
+                },
+            shape = MaterialTheme.shapes.medium,
+            border = BorderStroke(if (marked) 2.dp else 1.dp, if (marked) colours.primary else colours.outlineVariant),
+            onClick = onOpen,
         ) {
-            PagePreview(contents, isClockRing, Modifier.matchParentSize())
-            IconButton(
-                onClick = onMakeHome,
-                enabled = !home,
-                modifier = Modifier.size(32.dp).testTag(PageEditorTags.home(page)),
-            ) {
-                Icon(
-                    Icons.Default.Home,
-                    contentDescription = if (home) "Home page" else "Make $label the home page",
-                    tint = if (home) colours.onPrimary else colours.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(if (home) colours.primary else colours.surfaceContainerHighest, CircleShape)
-                        .padding(3.dp),
-                )
-            }
-            if (!isClockRing) {
+            Box(Modifier.fillMaxSize()) {
+                PagePreview(contents, isClockRing, Modifier.matchParentSize())
                 IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag(PageEditorTags.delete(page)),
+                    onClick = onMakeHome,
+                    enabled = !home,
+                    modifier = Modifier.size(32.dp).testTag(PageEditorTags.home(page)),
                 ) {
                     Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Delete $label",
-                        modifier = Modifier.size(20.dp).background(colours.surfaceContainerHighest, CircleShape).padding(3.dp),
+                        Icons.Default.Home,
+                        contentDescription = if (home) "Home page" else "Make $label the home page",
+                        tint = if (home) colours.onPrimary else colours.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(if (home) colours.primary else LocalBoxColors.current.floating, CircleShape)
+                            .padding(3.dp),
                     )
+                }
+                if (!isClockRing) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag(PageEditorTags.delete(page)),
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Delete $label",
+                            modifier = Modifier.size(20.dp).background(LocalBoxColors.current.floating, CircleShape).padding(3.dp),
+                        )
+                    }
                 }
             }
         }
@@ -346,6 +349,8 @@ private fun PagePreview(contents: PageContents, isClockRing: Boolean, modifier: 
 @Composable
 private fun AddTile(atStart: Boolean, onClick: () -> Unit) {
     val edge = MaterialTheme.colorScheme.outline
+    // The page cards' corners, so it reads as a page yet to be.
+    val shape = MaterialTheme.shapes.medium
 
     Box(
         contentAlignment = Alignment.Center,
@@ -353,15 +358,15 @@ private fun AddTile(atStart: Boolean, onClick: () -> Unit) {
             .size(44.dp, CARD_HEIGHT)
             .drawBehind {
                 val stroke = 1.dp.toPx()
-                drawRoundRect(
-                    edge,
-                    Offset(stroke / 2, stroke / 2),
-                    Size(size.width - stroke, size.height - stroke),
-                    CornerRadius(CARD_RADIUS.toPx()),
-                    style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),
-                )
+                inset(stroke / 2) {
+                    drawOutline(
+                        shape.createOutline(size, layoutDirection, this),
+                        edge,
+                        style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),
+                    )
+                }
             }
-            .clip(CARD_SHAPE)
+            .clip(shape)
             .clickable(onClick = onClick)
             .testTag(PageEditorTags.add(atStart)),
     ) {
@@ -376,8 +381,8 @@ private fun DeletePageDialog(label: String, contents: PageContents, onDelete: ()
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onDelete, destructive = true) { Text("Delete") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { LauncherButton(onClick = onDelete, emphasis = Emphasis.Destructive) { Text("Delete") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Delete $label?") },
         text = {
             Text(

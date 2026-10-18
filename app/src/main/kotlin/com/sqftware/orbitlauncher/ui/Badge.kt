@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 
 object BadgeTags {
     const val BUBBLE = "badge"
@@ -49,7 +50,7 @@ fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
         textAlign = TextAlign.Center,
         modifier = modifier
             // Over the corner rather than inside it: a round icon has no room there.
-            .cornerBubble(top = true, fill = if (unread.dismissed) colors.error else colors.surfaceContainerHigh, edge = colors.error)
+            .cornerBubble(top = true, fill = if (unread.dismissed) colors.error else LocalBoxColors.current.floating, edge = colors.error)
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
             .padding(horizontal = 5.dp)
             .wrapContentHeight()
@@ -71,7 +72,7 @@ fun WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
         contentDescription = "Work",
         tint = colors.primary,
         modifier = modifier
-            .cornerBubble(top = false, fill = colors.surfaceContainerHigh, edge = colors.primary)
+            .cornerBubble(top = false, fill = LocalBoxColors.current.floating, edge = colors.primary)
             .size(18.dp)
             .padding(4.dp),
     )

@@ -149,8 +149,8 @@ fun FolderNameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> 
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = { onRename(typed) }) { Text("Save") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { LauncherButton(onClick = { onRename(typed) }) { Text("Save") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Folder name") },
         text = {
             OutlinedTextField(

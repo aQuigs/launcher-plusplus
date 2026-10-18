@@ -88,8 +88,11 @@ internal class LauncherLook(
     val ring: RingColors,
     val panelMark: Color,
     val tonalEdge: Color,
+    // Picked from the finished scheme's roles, so a box follows a role's tweak.
+    boxes: ColorScheme.() -> BoxColors,
     cardAlpha: Float,
 ) {
+    val boxes = colors.boxes()
     val cardTints = CardTints(colors.surfaceVariant, colors.scrim, cardAlpha)
 }
 
@@ -147,9 +150,9 @@ val GlyphFill = Color.Black
  * deep. What lies behind a page's content lets the wallpaper through: pages are clear, `surface` (every default
  * container) and cards are faint glass, and full-screen panels (the drawer, and every `Panel`) take the veil of
  * `surfaceDim` from their one `PanelGround`, so a container on one never stacks a second veil. Menus and dialogs float
- * on the same ground made opaque, so they read as the drawer does. Anything else that floats over other content (sheets,
- * a bin, edit handles, a box within a dialog) takes `surfaceContainerLow` and up, which are opaque lit deep, or the icons
- * beneath would show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night
+ * on the same ground made opaque, so they read as the drawer does. A box on each of those grounds, and anything that
+ * floats over other content (a bin, edit handles), takes its fill from the look's `BoxColors`, which picks it from the
+ * opaque `surfaceContainer` tiers so the icons beneath do not show through. A tonal button's `secondaryContainer` is a faint tint, of the deep by night
  * and frost by day, rimmed by the tonal edge, so it shows on a light wallpaper without drawing the eye. Content colours
  * are all opaque, so their contrast does not hang on the wallpaper.
  */
@@ -208,6 +211,7 @@ private fun Palette.nightLook() = LauncherLook(
     ring = RingColors(mark = ringMark, starLine = accent.copy(alpha = 0.7f), lit = spark),
     panelMark = pale.copy(alpha = 0.5f),
     tonalEdge = deep.copy(alpha = 0.5f),
+    boxes = { BoxColors(glass = surfaceVariant, panel = surfaceContainer, popup = surfaceContainerHigh, floating = surfaceContainerHigh) },
     cardAlpha = 0.7f,
 )
 
@@ -259,6 +263,11 @@ private fun Palette.dayLook() = nightLook().let { night ->
         ring = RingColors(mark = deep, starLine = dayAccent.copy(alpha = 0.7f), lit = dayWarm),
         panelMark = dayAccent.copy(alpha = 0.4f),
         tonalEdge = night.tonalEdge,
+        // The day's grounds are near the frost its tiers climb to, so a box on one is inked a step towards the deep instead.
+        boxes = {
+            val inked = lerp(surfaceContainerHighest, onSurface, 0.1f)
+            BoxColors(glass = surfaceVariant, panel = inked, popup = inked, floating = surfaceContainerHigh)
+        },
         cardAlpha = 0.75f,
     )
 }
@@ -266,7 +275,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
 @Composable
 fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
     val look = remember(colourway, lightWallpaper) { lookOf(colourway, lightWallpaper) }
-    MaterialTheme(colorScheme = look.colors) {
+    MaterialTheme(colorScheme = look.colors, shapes = LauncherShapes) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides look.colors.onBackground,
@@ -274,6 +283,7 @@ fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Compo
             LocalPanelMark provides look.panelMark,
             LocalTonalEdge provides look.tonalEdge,
             LocalCardTints provides look.cardTints,
+            LocalBoxColors provides look.boxes,
             // Elevation would tint a pane on top of the container ladder, which already sets how lit each tier is.
             LocalTonalElevationEnabled provides false,
             content = content,

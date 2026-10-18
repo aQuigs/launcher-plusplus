@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.LocalPanelMark
 
 /**
@@ -75,6 +76,7 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
             },
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        content = content,
-    )
+    ) {
+        OnGround(Ground.Panel, content)
+    }
 }

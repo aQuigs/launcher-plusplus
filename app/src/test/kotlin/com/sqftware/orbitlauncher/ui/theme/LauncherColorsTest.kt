@@ -59,6 +59,35 @@ class LauncherColorsTest {
         }
     }
 
+    // Text on a panel's box over the worst patch of wallpaper, as above, and every box against the wallpaper its scheme is
+    // for. A box on the wallpaper is the card glass; whether it shows hangs on the wallpaper, so only the grounds the
+    // launcher draws are held to show one.
+    @Test
+    fun `a box shows on the panel and pop-up grounds, and text reads on a box on every ground`() {
+        val failures = mutableListOf<String>()
+        listOf(false, true).flatMap { light -> Colourway.entries.map { Triple(it, light, lookOf(it, light)) } }.forEach { (way, light, look) ->
+            val wallpapers = if (light) listOf(Color.White, Color.Black) else listOf(Color.Black, Color.White)
+            with(look.colors) {
+                Ground.entries.forEach { ground ->
+                    val (usual, worst) = wallpapers.map { wallpaper ->
+                        when (ground) {
+                            Ground.Wallpaper -> wallpaper
+                            Ground.Panel -> surfaceDim.compositeOver(wallpaper)
+                            Ground.Popup -> surfaceDim.copy(alpha = 1f)
+                        }
+                    }
+                    val box = look.boxes.on(ground)
+                    val text = contrast(onSurface, box.compositeOver(if (ground == Ground.Wallpaper) usual else worst))
+                    val shows = contrast(box.compositeOver(usual), usual)
+                    if (text < 4.5f) failures += "text on a box on $ground, $way, light $light: $text"
+                    if (ground != Ground.Wallpaper && shows < 1.15f) failures += "a box on $ground, $way, light $light: $shows"
+                }
+                assertEquals(1f, look.boxes.floating.alpha)
+            }
+        }
+        assertEquals(emptyList<String>(), failures)
+    }
+
     @Test
     fun `what floats over the wallpaper is opaque`() {
         (nights + days).forEach { scheme ->

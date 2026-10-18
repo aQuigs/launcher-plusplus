@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -50,8 +50,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +86,7 @@ import com.sqftware.orbitlauncher.domain.keysWithSharedLabels
 import com.sqftware.orbitlauncher.domain.matching
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.sectionsByInitial
+import com.sqftware.orbitlauncher.ui.theme.Ground
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
@@ -247,74 +248,77 @@ fun AppDrawer(
         onClearBadge = onClearBadge,
     )
 
-    Column(modifier.fillMaxSize()) {
-        picking?.header?.invoke()
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SearchField(
-                query = query,
-                onQueryChange = onQueryChange,
-                onSearch = {
-                    if (picking == null) matches.firstOrNull()?.let(onLaunch) else matches.firstOrNull(picking.isPickable)?.let(picking.onToggle)
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp)
-                    .focusRequester(searchFocus),
-            )
-            controls?.let { StyleButtons(it) }
-        }
-        if (hasWork && !searching) {
-            ChoiceRow(
-                profileTabs,
-                selected = work,
-                onSelect = { workTab = it },
-                tag = { if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL },
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-            )
-        }
-        Box(Modifier.weight(1f)) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(if (style.layout == DrawerLayout.Grid) GRID_COLUMNS else 1),
-                state = if (searching) matchesState else gridState,
-                contentPadding = PaddingValues(end = if (showsRail) RAIL_WIDTH else 0.dp),
-                modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
-            ) {
-                when {
-                    searching && matches.isEmpty() -> fullWidth(contentType = "empty") { NoMatches() }
-                    searching -> apps(matches, entry, detail)
-                    else -> {
-                        if (askForUsage) {
-                            fullWidth(key = "usage", contentType = "usage") {
-                                PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = 24.dp).testTag(AppDrawerTags.USAGE_ACCESS))
+    // The drawer is a panel over the launcher, as each Panel is.
+    OnGround(Ground.Panel) {
+        Column(modifier.fillMaxSize()) {
+            picking?.header?.invoke()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SearchField(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    onSearch = {
+                        if (picking == null) matches.firstOrNull()?.let(onLaunch) else matches.firstOrNull(picking.isPickable)?.let(picking.onToggle)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp)
+                        .focusRequester(searchFocus),
+                )
+                controls?.let { StyleButtons(it) }
+            }
+            if (hasWork && !searching) {
+                ChoiceRow(
+                    profileTabs,
+                    selected = work,
+                    onSelect = { workTab = it },
+                    tag = { if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL },
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+            }
+            Box(Modifier.weight(1f)) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (style.layout == DrawerLayout.Grid) GRID_COLUMNS else 1),
+                    state = if (searching) matchesState else gridState,
+                    contentPadding = PaddingValues(end = if (showsRail) RAIL_WIDTH else 0.dp),
+                    modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
+                ) {
+                    when {
+                        searching && matches.isEmpty() -> fullWidth(contentType = "empty") { NoMatches() }
+                        searching -> apps(matches, entry, detail)
+                        else -> {
+                            if (askForUsage) {
+                                fullWidth(key = "usage", contentType = "usage") {
+                                    PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = 24.dp).testTag(AppDrawerTags.USAGE_ACCESS))
+                                }
                             }
-                        }
-                        if (mostUsedApps.isNotEmpty()) {
-                            fullWidth(key = "most_used", contentType = "most_used") {
-                                // A letter's header follows it in the A to Z list; elsewhere the rest needs a heading of its own.
-                                MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail, headsTheRest = !(alphabetical && headed))
+                            if (mostUsedApps.isNotEmpty()) {
+                                fullWidth(key = "most_used", contentType = "most_used") {
+                                    // A letter's header follows it in the A to Z list; elsewhere the rest needs a heading of its own.
+                                    MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail, headsTheRest = !(alphabetical && headed))
+                                }
                             }
-                        }
-                        if (alphabetical) {
-                            sections.forEach { section ->
-                                if (headed) fullWidth(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
-                                apps(section.apps, entry, detail)
+                            if (alphabetical) {
+                                sections.forEach { section ->
+                                    if (headed) fullWidth(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                                    apps(section.apps, entry, detail)
+                                }
+                            } else {
+                                apps(ordered, entry, detail)
                             }
-                        } else {
-                            apps(ordered, entry, detail)
                         }
                     }
                 }
-            }
-            if (showsRail) {
-                LetterRail(
-                    initials = initials,
-                    highlighted = highlighted,
-                    onSelect = { section ->
-                        lastSelected = section
-                        scope.launch { gridState.scrollToItem(headerIndices[section]) }
-                    },
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                )
+                if (showsRail) {
+                    LetterRail(
+                        initials = initials,
+                        highlighted = highlighted,
+                        onSelect = { section ->
+                            lastSelected = section
+                            scope.launch { gridState.scrollToItem(headerIndices[section]) }
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    )
+                }
             }
         }
     }

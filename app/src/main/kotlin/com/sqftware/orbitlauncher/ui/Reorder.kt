@@ -7,7 +7,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -210,10 +209,9 @@ fun ReorderModeSwitch(
 ) {
     val colours = MaterialTheme.colorScheme
 
-    // Solid, as what floats over other content is.
-    Surface(
+    Pane(
+        floating = true,
         shape = CircleShape,
-        color = colours.surfaceContainerHigh,
         border = if (hovered) BorderStroke(2.dp, colours.primary) else null,
         modifier = modifier.testTag(ReorderTags.SWITCH),
     ) {

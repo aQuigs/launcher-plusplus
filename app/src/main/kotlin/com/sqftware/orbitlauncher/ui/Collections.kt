@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,8 +25,8 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -34,13 +36,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -59,8 +58,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.materialIcon
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,14 +67,13 @@ import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -89,8 +85,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
@@ -106,9 +102,9 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -125,10 +121,10 @@ import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.CARD_ROW_APPS
+import com.sqftware.orbitlauncher.domain.CARD_SETTINGS
 import com.sqftware.orbitlauncher.domain.CREATE_YOUR_OWN
 import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.CardLook
-import com.sqftware.orbitlauncher.domain.CARD_SETTINGS
 import com.sqftware.orbitlauncher.domain.CardSetting
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
@@ -141,6 +137,7 @@ import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
 import com.sqftware.orbitlauncher.ui.theme.GlyphFill
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -306,7 +303,7 @@ fun CollectionsColumn(
                     )
                 }
             }
-            TonalButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().testTag(CollectionTags.ADD)) {
+            LauncherButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().testTag(CollectionTags.ADD)) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                 Text("Add Collection")
             }
@@ -341,13 +338,9 @@ private fun CollectionCardView(
     val colours = MaterialTheme.colorScheme
     val tint = LocalCardTints.current.of(look.colour)
 
-    Card(
-        shape = RoundedCornerShape(20.dp),
+    Pane(
         // Solid while dragged, so the card it passes over does not show through it.
-        colors = CardDefaults.cardColors(
-            containerColor = if (dragged) tint.compositeOver(colours.surfaceContainerHigh) else tint,
-            contentColor = colours.onSurface,
-        ),
+        fill = if (dragged) tint.compositeOver(LocalBoxColors.current.floating) else tint,
         border = if (dropTarget) BorderStroke(2.dp, colours.primary) else null,
         modifier = modifier
             .fillMaxWidth()
@@ -562,7 +555,7 @@ internal fun PermissionRequired(onClick: () -> Unit, modifier: Modifier = Modifi
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClickLabel = "Open the usage access settings", onClick = onClick)
             .padding(vertical = 12.dp),
     ) {
@@ -574,7 +567,7 @@ internal fun PermissionRequired(onClick: () -> Unit, modifier: Modifier = Modifi
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
-        TonalButton(onClick = onClick) { Text("Allow usage access") }
+        LauncherButton(onClick = onClick) { Text("Allow usage access") }
     }
 }
 
@@ -593,7 +586,7 @@ private fun Bin(bin: BinTarget, modifier: Modifier = Modifier) {
                 scaleY = scale
             }
             .clip(CircleShape)
-            .background(if (bin.highlighted) colours.error else colours.surfaceContainerHigh)
+            .background(if (bin.highlighted) colours.error else LocalBoxColors.current.floating)
             .semantics { contentDescription = "Remove from the collection" }
             .testTag(CollectionTags.BIN),
     ) {
@@ -711,7 +704,7 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
+        confirmButton = { LauncherButton(onClick = { kind?.let(onCreate) }, enabled = kind != null) { Text("Ok") } },
         title = { Text(CREATE_YOUR_OWN) },
         text = {
             OutlinedTextField(
@@ -776,9 +769,9 @@ fun CollectionSettingsDialog(
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { LauncherButton(onClick = onDismiss) { Text("Done") } },
         dismissButton = {
-            PopupButton(onClick = { removing = true }, destructive = true, modifier = Modifier.testTag(CollectionTags.REMOVE)) {
+            LauncherButton(onClick = { removing = true }, emphasis = Emphasis.Destructive, modifier = Modifier.testTag(CollectionTags.REMOVE)) {
                 Text("Remove")
             }
         },
@@ -814,8 +807,8 @@ fun CollectionSettingsDialog(
 private fun RemoveCollectionDialog(kind: CollectionKind, onRemove: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onRemove, destructive = true) { Text("Remove") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { LauncherButton(onClick = onRemove, emphasis = Emphasis.Destructive) { Text("Remove") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Remove ${kind.title}?") },
         text = {
             Text(
@@ -865,21 +858,16 @@ private fun <T : Any> DefaultChoices(setting: CardSetting<T>, defaults: CardLook
 /** A box of its own for [setting], so its title, choices and [footer] read as one, apart from the next setting's. */
 @Composable
 private fun <T : Any> SettingBox(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit, footer: @Composable () -> Unit = {}) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .padding(12.dp),
-    ) {
-        Text(setting.title, style = MaterialTheme.typography.titleSmall)
-        // Every setting named, so a new one does not compile until it is given a way to be chosen.
-        when (setting) {
-            CardSetting.Colour -> Swatches(setting, value, onChoose)
-            CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More -> Segments(setting, value, onChoose)
+    Pane(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(12.dp)) {
+            Text(setting.title, style = MaterialTheme.typography.titleSmall)
+            // Every setting named, so a new one does not compile until it is given a way to be chosen.
+            when (setting) {
+                CardSetting.Colour -> Swatches(setting, value, onChoose)
+                CardSetting.Rows, CardSetting.Limit, CardSetting.Names, CardSetting.More -> Segments(setting, value, onChoose)
+            }
+            footer()
         }
-        footer()
     }
 }
 
@@ -963,12 +951,9 @@ private fun Tile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colours = MaterialTheme.colorScheme
-
-    Surface(
+    Pane(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) colours.primaryContainer else colours.surfaceVariant,
+        selected = selected,
         modifier = modifier
             .atLeastSquare()
             .semantics { this.selected = selected },

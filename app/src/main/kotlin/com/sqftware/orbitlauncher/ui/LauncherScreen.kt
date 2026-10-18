@@ -3,8 +3,8 @@ package com.sqftware.orbitlauncher.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -44,19 +44,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -68,8 +66,10 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -78,9 +78,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
-import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppShortcut
-import com.sqftware.orbitlauncher.domain.canPair
+import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppsByKey
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.Cell
@@ -106,40 +105,41 @@ import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Landing
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
-import com.sqftware.orbitlauncher.domain.RING_ID
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
+import com.sqftware.orbitlauncher.domain.RING_ID
+import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingItem
-import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.RingSlot
+import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.Spin
 import com.sqftware.orbitlauncher.domain.SpinStats
 import com.sqftware.orbitlauncher.domain.Theme
-import com.sqftware.orbitlauncher.domain.ReorderMode
-import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPages
-import com.sqftware.orbitlauncher.domain.edgePull
-import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.appOptions
+import com.sqftware.orbitlauncher.domain.canPair
 import com.sqftware.orbitlauncher.domain.contentsOf
+import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.flipped
+import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
 import java.io.Serializable
+import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
@@ -162,7 +162,7 @@ private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
             text = "$AUTO_SET_UP fills your home with the apps you use most",
             style = MaterialTheme.typography.bodySmall,
         )
-        TonalButton(onClick = onPickApps, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.PICK_APPS)) {
+        LauncherButton(onClick = onPickApps, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.PICK_APPS)) {
             Text("Pick apps myself")
         }
     }

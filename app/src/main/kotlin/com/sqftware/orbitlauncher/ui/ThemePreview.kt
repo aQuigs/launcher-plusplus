@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -75,10 +74,9 @@ fun ThemePreviewBar(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
+    Pane(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().testTag(ThemePreviewTags.BAR),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        floating = true,
         border = BorderStroke(1.dp, LocalTonalEdge.current),
     ) {
         Column(Modifier.padding(vertical = 8.dp)) {
@@ -90,8 +88,8 @@ fun ThemePreviewBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                PopupButton(onClose, Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
-                TonalButton(onUse, Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
+                LauncherButton(onClose, modifier = Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
+                LauncherButton(onUse, emphasis = Emphasis.Strong, modifier = Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
             }
             ChipRow { Chips(Theme.entries, shown, Theme::label, onShow) }
             // One row for both, so the bar is no taller than the clock whose room it takes.
