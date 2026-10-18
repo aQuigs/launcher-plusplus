@@ -1,7 +1,8 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateTo
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -11,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.Spin
 import com.sqftware.orbitlauncher.domain.goesRound
 import com.sqftware.orbitlauncher.domain.restingTurn
 import com.sqftware.orbitlauncher.domain.turnBetween
@@ -56,9 +59,10 @@ private val CATCH_SPEED = 30.dp
 /**
  * The ring's fidget spin: a drag up or down round the ring's sides turns it, and let go it coasts on and settles on the
  * nearest whole turn, so it always ends as it shows otherwise. Only how the ring looks turns, never the order of its items.
+ * Each spin is handed to [onSpin] once it rests or is caught.
  */
 @Stable
-class RingSpin internal constructor(private val scope: CoroutineScope) {
+class RingSpin internal constructor(private val scope: CoroutineScope, private val onSpin: (Spin) -> Unit) {
     /** How far the ring is turned, in radians clockwise. */
     var turn by mutableFloatStateOf(0f)
         private set
@@ -81,6 +85,11 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
     /** How fast [glide] turns the ring, in radians a second. */
     private var speed = 0f
 
+    /** [CATCH_SPEED] in radians a second, at the ring's rim as the last gesture found it. */
+    private var catchSpeed = 0f
+
+    private fun catchable() = abs(speed) >= catchSpeed
+
     // Read only by the gesture, so not state: the ring as its layout last placed it, the band round its centre a drag
     // starts a spin from, and the area the drag is made in.
     private var ring: LayoutCoordinates? = null
@@ -102,21 +111,35 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
         return area.localToRoot(position) - ring.localToRoot(ring.size.center.toOffset())
     }
 
-    /** Lets the ring go at [velocity], in radians a second, to coast as far as a spinner would and settle on a whole turn. */
-    private fun letGo(velocity: Float) = glide(restingTurn(turn + velocity / COAST_RATE), velocity, COAST_RATE * COAST_RATE)
+    /**
+     * Lets the ring go at [velocity], in radians a second, to coast as far as a spinner would and settle on a whole turn,
+     * which ends the spin [tally] counts.
+     */
+    private fun letGo(velocity: Float, tally: Tally) =
+        glide(restingTurn(turn + velocity / COAST_RATE), velocity, COAST_RATE * COAST_RATE, tally)
 
     /** Swings a caught ring back to the nearest whole turn. */
-    private fun settle() = glide(restingTurn(turn), 0f, SETTLE_STIFFNESS)
+    private fun settle() = glide(restingTurn(turn), 0f, SETTLE_STIFFNESS, tally = null)
 
-    private fun glide(rest: Float, velocity: Float, stiffness: Float) {
-        val from = turn
+    private fun glide(rest: Float, velocity: Float, stiffness: Float, tally: Tally?) {
+        val motion = AnimationState(turn, velocity)
         glide = scope.launch {
-            // Critically damped, a spring slows as an exponential coast does, but lands on the rest.
-            animate(from, rest, velocity, spring(Spring.DampingRatioNoBouncy, stiffness, REST_THRESHOLD)) { value, now ->
-                turn = value
-                speed = now
+            // Timed by the animation's frames, and only while it could be caught, so neither the spring's invisible last creep to
+            // rest nor the time the launcher spends out of sight mid-coast counts.
+            var coastNanos = 0L
+            try {
+                // Critically damped, a spring slows as an exponential coast does, but lands on the rest.
+                motion.animateTo(rest, spring(Spring.DampingRatioNoBouncy, stiffness, REST_THRESHOLD)) {
+                    tally?.add(value - turn)
+                    turn = value
+                    speed = this.velocity
+                    if (catchable()) coastNanos = lastFrameTimeNanos - startTimeNanos
+                }
+                turn = 0f
+            } finally {
+                // However the coast ends: at rest, caught, or cut short as what spins changes.
+                tally?.let { onSpin(it.spin(velocity, coast = coastNanos / 1e9)) }
             }
-            turn = 0f
         }
     }
 
@@ -127,7 +150,8 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             val start = fromCentre(down.position)?.takeIf { it.getDistance() in inner..outer } ?: return@awaitEachGesture
             // Caught, it stops under the finger as a spinner does, before what the finger lands on sees the touch, so the
             // catch launches nothing.
-            val caught = glide?.isActive == true && abs(speed) * outer >= CATCH_SPEED.toPx()
+            catchSpeed = CATCH_SPEED.toPx() / outer
+            val caught = glide?.isActive == true && catchable()
             if (caught) {
                 glide?.cancel()
                 down.consume()
@@ -149,6 +173,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
             glide?.cancel()
 
             val velocity = VelocityTracker()
+            val tally = Tally()
             var at = start
             velocity.addPosition(down.uptimeMillis, down.position)
             while (crossing != null && crossing.pressed) {
@@ -156,22 +181,38 @@ class RingSpin internal constructor(private val scope: CoroutineScope) {
                 val now = fromCentre(crossing.position) ?: break
                 // Over the emblem the finger's angle swings wildly, and at the very centre it has none.
                 if (now.getDistance() >= inner) {
-                    turn += turnBetween(at.x, at.y, now.x, now.y)
+                    val by = turnBetween(at.x, at.y, now.x, now.y)
+                    turn += by
+                    tally.add(by)
                     at = now
                 }
                 velocity.addPosition(crossing.uptimeMillis, crossing.position)
                 crossing = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
             }
             crossing?.consume()
-            letGo(velocity.calculateVelocity().let { turnRate(at.x, at.y, it.x, it.y) })
+            letGo(velocity.calculateVelocity().let { turnRate(at.x, at.y, it.x, it.y) }, tally)
         }
+    }
+
+    /** How far a spin under way has turned each way, in radians. */
+    private class Tally {
+        private var clockwise = 0.0
+        private var anticlockwise = 0.0
+
+        fun add(by: Float) {
+            if (by > 0) clockwise += by else anticlockwise -= by
+        }
+
+        fun spin(letGo: Float, coast: Double) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast)
     }
 }
 
+/** The fidget spin of a ring or folder, handing each spin to [onSpin] once it is over. */
 @Composable
-fun rememberRingSpin(): RingSpin {
+fun rememberRingSpin(onSpin: (Spin) -> Unit = {}): RingSpin {
     val scope = rememberCoroutineScope()
-    return remember(scope) { RingSpin(scope) }
+    val latestOnSpin by rememberUpdatedState(onSpin)
+    return remember(scope) { RingSpin(scope) { latestOnSpin(it) } }
 }
 
 fun Modifier.spinsRing(spin: RingSpin): Modifier = then(spin.modifier)
