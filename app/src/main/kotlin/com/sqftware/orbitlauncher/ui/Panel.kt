@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -21,7 +20,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.LocalPanelMark
-import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 /**
  * The ground of every full-screen view over the launcher, the drawer's and each [Panel]'s alike, and of every pop-up:
@@ -89,7 +87,7 @@ fun Panel(
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         OnGround(Ground.Panel) {
-            Column(Modifier.padding(bottom = Spacing.Edge)) {
+            Column {
                 PanelHeader(title, onClose, subtitle = subtitle)
                 content()
             }

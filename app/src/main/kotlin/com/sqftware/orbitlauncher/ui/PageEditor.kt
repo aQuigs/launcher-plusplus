@@ -129,7 +129,7 @@ fun PageEditor(
         Row(
             horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
             modifier = Modifier
-                .padding(top = Spacing.Top)
+                .padding(vertical = Spacing.Top)
                 // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
                 // the strip's own place on screen.
                 .pointerInput(Unit) {

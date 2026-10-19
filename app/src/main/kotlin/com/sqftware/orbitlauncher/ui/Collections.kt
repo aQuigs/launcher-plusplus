@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -120,6 +121,7 @@ import com.sqftware.orbitlauncher.domain.title
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import com.sqftware.orbitlauncher.ui.theme.Spacing
+import com.sqftware.orbitlauncher.ui.theme.fadingEdges
 import kotlinx.coroutines.launch
 
 object CollectionTags {
@@ -577,9 +579,12 @@ fun CollectionPicker(
     Panel("Select collection", onClose, modifier.testTag(CollectionTags.PICKER)) {
         BoxWithConstraints {
             val grid = tileGrid(constraints.maxWidth)
+            val scroll = rememberLazyGridState()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(grid.columns),
-                contentPadding = PaddingValues(horizontal = Spacing.Edge),
+                state = scroll,
+                modifier = Modifier.fadingEdges(scroll),
+                contentPadding = PaddingValues(start = Spacing.Edge, end = Spacing.Edge, bottom = Spacing.Edge),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
             ) {

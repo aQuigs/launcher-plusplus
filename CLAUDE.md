@@ -54,7 +54,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
   - A menu is a `GroundMenu` of groups of `MenuRow`s: a menu of things to do gives every row an icon, a menu of settings none, and a destructive row is red.
   - A full-screen view is a `Panel`, which carries its title and a close button. Other text outside boxes and buttons is a `SectionLabel`, `SupportingText` or an `EmptyNote`; spaces come from `Spacing`.
   - A note that something happened, or could not, is a notice through `LocalNotices`, never a system toast.
-  - A row that scrolls sideways is a `sidewaysScroll`, which fades where there is more; what rises out of the row is its `bleed`.
+  - What scrolls fades at an edge with more beyond it (`fadingEdges`); a row that scrolls sideways is a `sidewaysScroll`, whose `bleed` is what rises out of it.
   - A glyph means one thing everywhere: the cross, the bin and the chevron as `Glyphs.kt` says, and a choice made is a `PickedMark`.
   - UI words are in sentence case; names (of apps, collections, themes) keep their own.
 - Colours live in `ui/theme`: components take a `colorScheme` role or a theme token, never a literal or a surface alpha copy, and a look changes by changing its role there (held by the `theme-colours-only` hook and `LauncherColorsTest`).
