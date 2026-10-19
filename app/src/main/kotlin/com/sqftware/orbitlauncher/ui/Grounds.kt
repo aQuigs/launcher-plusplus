@@ -50,7 +50,7 @@ fun Pane(
     val shown: @Composable () -> Unit = {
         Box(propagateMinConstraints = true) {
             content()
-            if (selected) PickedMark(Modifier.wrapContentSize(Alignment.TopEnd).padding(8.dp))
+            if (selected) PickedMark(Modifier.align(Alignment.TopEnd).wrapContentSize(Alignment.TopEnd).padding(8.dp))
         }
     }
     if (onClick != null) {

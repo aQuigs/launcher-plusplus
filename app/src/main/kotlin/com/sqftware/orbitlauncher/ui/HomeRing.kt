@@ -47,8 +47,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
@@ -71,14 +71,14 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.HangingNames
-import com.sqftware.orbitlauncher.domain.NameRoom
-import com.sqftware.orbitlauncher.domain.rooms
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.folderSlotOffset
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
+import com.sqftware.orbitlauncher.domain.rooms
 import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
 import kotlin.math.cos
 import kotlin.math.min
@@ -335,20 +335,24 @@ fun HomeRing(
                     val line = nameLine.toPx()
                     val air = NAME_HOLE_AIR.toPx()
                     val holes = items.mapIndexedNotNull { index, item ->
-                        val room = rooms[item.tag] ?: return@mapIndexedNotNull null
+                        val room = rooms[item.tag]?.takeIf { it.width > 0 } ?: return@mapIndexedNotNull null
                         val name = item.hangingName?.let(nameWidths) ?: return@mapIndexedNotNull null
                         val width = minOf(if (room.lines > 1) name.twoLines else name.oneLine, room.width)
                         val (dx, dy) = ringSlotOffset(index, items.size)
                         Triple(Offset(dx, dy) * radius, width, room.lines * line)
                     }
+                    // One path, redrawn each frame of a spin rather than made anew.
+                    val path = Path()
                     return { turn ->
                         val cos = cos(turn)
                         val sin = sin(turn)
-                        Path().apply {
+                        path.apply {
+                            rewind()
                             holes.forEach { (offset, width, height) ->
                                 val slot = size.center + Offset(offset.x * cos - offset.y * sin, offset.x * sin + offset.y * cos)
-                                val top = slot.y + iconSize / 2 + gap
-                                addRoundRect(RoundRect(slot.x - width / 2 - air, top - air, slot.x + width / 2 + air, top + height + air, CornerRadius(air)))
+                                // From the icon's middle, which covers the marks anyway, so none show in the gap above the name.
+                                val bottom = slot.y + iconSize / 2 + gap + height + air
+                                addRoundRect(RoundRect(slot.x - width / 2 - air, slot.y, slot.x + width / 2 + air, bottom, CornerRadius(air)))
                             }
                         }
                     }
@@ -357,15 +361,15 @@ fun HomeRing(
                 // An app on its way in from another place makes way for itself among the ring's.
                 val ringMarks = marksFor(making ?: ring) { index, count -> ringSlotOffset(index, count) }
                 val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> folderSlotOffset(index, count) } }
-                val nameHoles = if (names && centred == null) nameHoles(making ?: ring) else null
+                // In the order shown, which a drag rearranges, as the names are.
+                val nameHoles = if (names && centred == null) nameHoles(making ?: moving.shown(ring)) else null
                 onDrawBehind {
                     val out = spread.value
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     if (centred == null) {
                         val turn = spin.turn
-                        clipPath(nameHoles?.invoke(turn) ?: Path(), ClipOp.Difference) {
-                            rotate(Math.toDegrees(turn.toDouble()).toFloat()) { ringMarks(glow, 1f) }
-                        }
+                        val drawMarks: DrawScope.() -> Unit = { rotate(Math.toDegrees(turn.toDouble()).toFloat()) { ringMarks(glow, 1f) } }
+                        if (nameHoles == null) drawMarks() else clipPath(nameHoles(turn), ClipOp.Difference, block = drawMarks)
                     } else {
                         val drift = 1f + DRIFT * out
                         scale(drift, drift) { ringMarks(glow, 1f - out) }

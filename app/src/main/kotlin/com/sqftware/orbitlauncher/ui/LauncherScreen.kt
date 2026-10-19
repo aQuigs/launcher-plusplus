@@ -93,7 +93,6 @@ import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.EntryKind
-import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.FolderLooks
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -129,9 +128,6 @@ import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
-import java.io.Serializable
-import kotlin.math.roundToInt
-import kotlin.math.sign
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -140,6 +136,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.io.Serializable
+import kotlin.math.roundToInt
+import kotlin.math.sign
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
@@ -1572,9 +1571,9 @@ fun LauncherScreen(
                                                                 face = clock,
                                                                 onTimeClick = onOpenClock,
                                                                 onDateClick = onOpenCalendar,
-                                                                modifier = Modifier.padding(top = 24.dp).alpha(clockShade),
+                                                                modifier = Modifier.padding(top = 24.dp).graphicsLayer { alpha = clockShade },
                                                             )
-                                                            Row(Modifier.alpha(clockShade)) {
+                                                            Row(Modifier.graphicsLayer { alpha = clockShade }) {
                                                                 RingerSwitch(mode = ringerMode, onClick = onRingerTap)
                                                                 if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
                                                             }
@@ -1667,7 +1666,7 @@ fun LauncherScreen(
                                         addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
                                         fixed = true,
                                         clock = { clockModifier ->
-                                            HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier.alpha(clockShade))
+                                            HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier.graphicsLayer { alpha = clockShade })
                                         },
                                         item = { block, itemModifier ->
                                             items[block]?.let { item ->
