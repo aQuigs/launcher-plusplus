@@ -242,7 +242,7 @@ private fun OwnImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, mo
     // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one; asked
     // again for the same app, it keeps showing the icon it has until the new one is drawn.
     val bitmap by key(app.key) {
-        produceState<ImageBitmap?>(null, icon) { value = icon(app) }
+        produceState<ImageBitmap?>(null, icon) { value = icon(app) ?: value }
     }
 
     Box(modifier) {

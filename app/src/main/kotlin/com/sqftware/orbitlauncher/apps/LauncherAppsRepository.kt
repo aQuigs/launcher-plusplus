@@ -23,7 +23,6 @@ import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.Log
-import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
@@ -69,16 +68,14 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val ownUser = Process.myUserHandle()
 
     // An icon is asked for again each time its app comes back into view, and a collection card brings dozens back at a
-    // tap; a drawn one is kept until the package list changes, as an update may bring a new icon.
-    private val icons = object : LruCache<String, ImageBitmap>(ICON_CACHE_BYTES) {
-        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
-    }
+    // tap; every icon shown asks again after a package change, which redraws only that package's.
+    private val icons = IconCache(ICON_CACHE_BYTES)
 
     // One at a time and in order, so unpinning for an older home screen never lands after a newer one's.
     private val pinWork = Dispatchers.IO.limitedParallelism(1)
 
     override fun installedApps(): Flow<List<AppEntry>> =
-        changes(withShortcuts = false) { icons.evictAll() }
+        changes(withShortcuts = false, icons::forget)
             .map { loadApps() }
             .flowOn(Dispatchers.IO)
 
@@ -88,10 +85,10 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             .flowOn(Dispatchers.IO)
 
     // Once at first, then again after each change the callback reports; changes while a load runs make one more load.
-    private fun changes(withShortcuts: Boolean, onChange: () -> Unit = {}): Flow<Unit> =
+    private fun changes(withShortcuts: Boolean, onChange: (packageNames: Collection<String>) -> Unit = {}): Flow<Unit> =
         callbackFlow {
             val callback = PackageChanges(withShortcuts) {
-                onChange()
+                onChange(it)
                 trySend(Unit)
             }
             launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
@@ -142,14 +139,16 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val AppEntry.user: UserHandle? get() = userOf(workProfile)
 
     // A pair has no icon of its own: the screen draws its apps' together.
-    override suspend fun icon(app: AppEntry): ImageBitmap? = icons.get(app.key)
-        ?: draw(app.key) { density ->
-            when (val kind = app.kind) {
-                EntryKind.App -> activityIcon(app, density)
-                is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
-                is EntryKind.AppPair -> null
+    override suspend fun icon(app: AppEntry): ImageBitmap? = icons[app.key]
+        ?: icons.keep(app.key, app.packageName) {
+            draw(app.key) { density ->
+                when (val kind = app.kind) {
+                    EntryKind.App -> activityIcon(app, density)
+                    is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
+                    is EntryKind.AppPair -> null
+                }
             }
-        }?.also { icons.put(app.key, it) }
+        }
 
     private fun activityIcon(app: AppEntry, density: Int): Drawable? = app.user?.let { user ->
         launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
@@ -238,8 +237,9 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
             // Until it is pinned, a lookup by id finds nothing, since the app may only have made it for the request. Kept,
             // so the ring shows it at once if the user adds it.
-            override suspend fun icon() = draw(shortcut.key) { density -> pinnedIcon(info, shortcut, density) }
-                ?.also { icons.put(shortcut.key, it) }
+            override suspend fun icon() = icons.keep(shortcut.key, shortcut.packageName) {
+                draw(shortcut.key) { density -> pinnedIcon(info, shortcut, density) }
+            }
 
             override fun accept() = try {
                 request.accept()
@@ -327,19 +327,22 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     // Any of these can add, remove or relabel launchable activities, so each reloads the whole list. Apps change their
     // shortcuts often, so only a list of shortcuts hears of that too.
-    private class PackageChanges(private val withShortcuts: Boolean, private val onChange: () -> Unit) : LauncherApps.Callback() {
+    private class PackageChanges(
+        private val withShortcuts: Boolean,
+        private val onChange: (packageNames: Collection<String>) -> Unit,
+    ) : LauncherApps.Callback() {
         override fun onShortcutsChanged(packageName: String, shortcuts: List<ShortcutInfo>, user: UserHandle) {
-            if (withShortcuts) onChange()
+            if (withShortcuts) onChange(listOf(packageName))
         }
 
-        override fun onPackageAdded(packageName: String, user: UserHandle) = onChange()
+        override fun onPackageAdded(packageName: String, user: UserHandle) = onChange(listOf(packageName))
 
-        override fun onPackageRemoved(packageName: String, user: UserHandle) = onChange()
+        override fun onPackageRemoved(packageName: String, user: UserHandle) = onChange(listOf(packageName))
 
-        override fun onPackageChanged(packageName: String, user: UserHandle) = onChange()
+        override fun onPackageChanged(packageName: String, user: UserHandle) = onChange(listOf(packageName))
 
-        override fun onPackagesAvailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = onChange()
+        override fun onPackagesAvailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = onChange(packageNames.asList())
 
-        override fun onPackagesUnavailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = onChange()
+        override fun onPackagesUnavailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = onChange(packageNames.asList())
     }
 }
