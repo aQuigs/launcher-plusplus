@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -170,7 +171,16 @@ class MainActivity : ComponentActivity() {
             val shownTheme = previewTheme ?: theme
             var colourways by remember { mutableStateOf(colourwayStore.load()) }
             Themed(shownTheme, colourways.of(shownTheme), lightWallpaper) {
-                val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
+                // Each app list follows a package change, which may bring an app a new icon, so every icon shown is handed a
+                // new way to ask and asks again. Counted, not compared: an update leaves the app's entry as it was.
+                var appLists by remember { mutableIntStateOf(0) }
+                val apps by produceState<List<AppEntry>?>(null) {
+                    repository.installedApps().collect {
+                        value = it
+                        appLists++
+                    }
+                }
+                val appActions = remember(appLists) { actions.copy(icon = { repository.icon(it) }) }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
                 // as folders come and go.
@@ -304,7 +314,7 @@ class MainActivity : ComponentActivity() {
                             appUsage.openUsageSettings()
                         }
                     },
-                    actions = actions,
+                    actions = appActions,
                     reorderMode = reorderMode,
                     onReorderModeChange = {
                         reorderMode = it
