@@ -74,6 +74,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -136,24 +137,6 @@ class MainActivity : ComponentActivity() {
             )
         }
         val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageKey) } }
-        val actions = AppActions(
-            icon = repository::icon,
-            launch = {
-                clearBadge(it)
-                repository.launch(it)
-            },
-            clearBadge = clearBadge,
-            shortcuts = repository::shortcuts,
-            shortcutIcon = repository::shortcutIcon,
-            startShortcut = {
-                badges.opened(it.packageKey)
-                repository.startShortcut(it)
-            },
-            openAppInfo = repository::openAppInfo,
-            hasStorePage = repository::hasStorePage,
-            openStorePage = repository::openStorePage,
-            uninstall = repository::uninstall,
-        )
 
         // A rotation must not ask again.
         if (savedInstanceState == null) askToPin(intent)
@@ -170,7 +153,33 @@ class MainActivity : ComponentActivity() {
             val shownTheme = previewTheme ?: theme
             var colourways by remember { mutableStateOf(colourwayStore.load()) }
             Themed(shownTheme, colourways.of(shownTheme), lightWallpaper) {
-                val apps by produceState<List<AppEntry>?>(null) { repository.installedApps().collect { value = it } }
+                val appLists by produceState<IndexedValue<List<AppEntry>>?>(null) {
+                    repository.installedApps().withIndex().collect { value = it }
+                }
+                val apps = appLists?.value
+                // Each app list after the first follows a package change, which may bring an app a new icon, so every icon
+                // shown is handed a new way to ask, a new lambda rather than a reference equal to the last, and asks again.
+                // Counted, not compared: an update leaves the app's entry as it was.
+                val actions = remember(appLists?.index ?: 0) {
+                    AppActions(
+                        icon = { repository.icon(it) },
+                        launch = {
+                            clearBadge(it)
+                            repository.launch(it)
+                        },
+                        clearBadge = clearBadge,
+                        shortcuts = repository::shortcuts,
+                        shortcutIcon = repository::shortcutIcon,
+                        startShortcut = {
+                            badges.opened(it.packageKey)
+                            repository.startShortcut(it)
+                        },
+                        openAppInfo = repository::openAppInfo,
+                        hasStorePage = repository::hasStorePage,
+                        openStorePage = repository::openStorePage,
+                        uninstall = repository::uninstall,
+                    )
+                }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
                 // file holds a few keys. Each folder keeps the planet it shows, loaded or changed, so none takes another's
                 // as folders come and go.

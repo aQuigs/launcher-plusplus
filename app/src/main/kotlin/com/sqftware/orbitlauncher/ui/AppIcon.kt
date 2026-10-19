@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -238,10 +239,10 @@ private fun Modifier.cutAroundSecond() = drawWithCache {
 
 @Composable
 private fun OwnImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier) {
-    val bitmap by produceState<ImageBitmap?>(null, app.key) {
-        // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one.
-        value = null
-        value = icon(app)
+    // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one; asked
+    // again for the same app, it keeps showing the icon it has until the new one is drawn.
+    val bitmap by key(app.key) {
+        produceState<ImageBitmap?>(null, icon) { value = icon(app) ?: value }
     }
 
     Box(modifier) {

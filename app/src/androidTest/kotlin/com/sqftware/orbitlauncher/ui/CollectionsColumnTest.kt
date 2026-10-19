@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -41,6 +42,7 @@ class CollectionsColumnTest {
     private val apps = recent + clock + mail
     private var page by mutableStateOf(CollectionsPage())
     private var foregroundTime by mutableStateOf<ForegroundTime?>(null)
+    private var icon by mutableStateOf<suspend (AppEntry) -> ImageBitmap?>({ null })
     private val launched = mutableListOf<AppEntry>()
     private val edited = mutableListOf<CollectionKind>()
     private var adds = 0
@@ -54,7 +56,7 @@ class CollectionsColumnTest {
             apps = apps,
             builtInApps = apps,
             foregroundTime = foregroundTime,
-            icon = { null },
+            icon = icon,
             onLaunch = launched::add,
             onToggleExpanded = { page = page.toggleExpanded(it) },
             onSettings = settingsOpened::add,
@@ -82,6 +84,17 @@ class CollectionsColumnTest {
         compose.onNodeWithText("R12").assertDoesNotExist()
         compose.collectionEditButton(NewApps).assertDoesNotExist()
         compose.onNodeWithText("Permission Required").assertIsDisplayed()
+    }
+
+    @Test
+    fun aNewIconSourceRedrawsTheIconsAlreadyShown() {
+        show()
+        val asked = mutableListOf<AppEntry>()
+
+        compose.runOnIdle { icon = { asked += it; null } }
+        compose.waitForIdle()
+
+        assertTrue(asked.toString(), asked.containsAll(recent.takeLast(5)))
     }
 
     @Test
