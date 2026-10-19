@@ -140,7 +140,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     // A pair has no icon of its own: the screen draws its apps' together.
     override suspend fun icon(app: AppEntry): ImageBitmap? = icons[app.key]
-        ?: icons.keep(app.key, app.packageName) {
+        ?: icons.keep(app) {
             draw(app.key) { density ->
                 when (val kind = app.kind) {
                     EntryKind.App -> activityIcon(app, density)
@@ -237,7 +237,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
             // Until it is pinned, a lookup by id finds nothing, since the app may only have made it for the request. Kept,
             // so the ring shows it at once if the user adds it.
-            override suspend fun icon() = icons.keep(shortcut.key, shortcut.packageName) {
+            override suspend fun icon() = icons.keep(shortcut) {
                 draw(shortcut.key) { density -> pinnedIcon(info, shortcut, density) }
             }
 
@@ -332,17 +332,19 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         private val onChange: (packageNames: Collection<String>) -> Unit,
     ) : LauncherApps.Callback() {
         override fun onShortcutsChanged(packageName: String, shortcuts: List<ShortcutInfo>, user: UserHandle) {
-            if (withShortcuts) onChange(listOf(packageName))
+            if (withShortcuts) changed(packageName)
         }
 
-        override fun onPackageAdded(packageName: String, user: UserHandle) = onChange(listOf(packageName))
+        override fun onPackageAdded(packageName: String, user: UserHandle) = changed(packageName)
 
-        override fun onPackageRemoved(packageName: String, user: UserHandle) = onChange(listOf(packageName))
+        override fun onPackageRemoved(packageName: String, user: UserHandle) = changed(packageName)
 
-        override fun onPackageChanged(packageName: String, user: UserHandle) = onChange(listOf(packageName))
+        override fun onPackageChanged(packageName: String, user: UserHandle) = changed(packageName)
 
-        override fun onPackagesAvailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = onChange(packageNames.asList())
+        override fun onPackagesAvailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = changed(*packageNames)
 
-        override fun onPackagesUnavailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = onChange(packageNames.asList())
+        override fun onPackagesUnavailable(packageNames: Array<String>, user: UserHandle, replacing: Boolean) = changed(*packageNames)
+
+        private fun changed(vararg packageNames: String) = onChange(packageNames.asList())
     }
 }

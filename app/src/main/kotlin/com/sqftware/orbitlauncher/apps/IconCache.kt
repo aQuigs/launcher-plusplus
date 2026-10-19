@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.apps
 
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
+import com.sqftware.orbitlauncher.domain.AppEntry
 
 /**
  * Drawn icons by key, each forgotten when its package changes, as an update may bring a new icon. One drawn while a
@@ -13,20 +14,20 @@ internal class IconCache(maxBytes: Int) {
     private val drawn = object : LruCache<String, Drawn>(maxBytes) {
         override fun sizeOf(key: String, value: Drawn) = value.bitmap.width * value.bitmap.height * 4
     }
-    private var changes = 0
+    private var generation = 0
 
     operator fun get(key: String): ImageBitmap? = drawn.get(key)?.bitmap
 
-    /** Draws the icon of [packageName] kept under [key], and keeps it unless a package changed meanwhile. */
-    suspend fun keep(key: String, packageName: String, draw: suspend () -> ImageBitmap?): ImageBitmap? {
-        val before = synchronized(this) { changes }
+    /** Draws [app]'s icon, and keeps it unless a package changed meanwhile. */
+    suspend fun keep(app: AppEntry, draw: suspend () -> ImageBitmap?): ImageBitmap? {
+        val before = synchronized(this) { generation }
         return draw()?.also { bitmap ->
-            synchronized(this) { if (changes == before) drawn.put(key, Drawn(packageName, bitmap)) }
+            synchronized(this) { if (generation == before) drawn.put(app.key, Drawn(app.packageName, bitmap)) }
         }
     }
 
     fun forget(packageNames: Collection<String>) = synchronized(this) {
-        changes++
+        generation++
         drawn.snapshot().forEach { (key, icon) -> if (icon.packageName in packageNames) drawn.remove(key) }
     }
 }
