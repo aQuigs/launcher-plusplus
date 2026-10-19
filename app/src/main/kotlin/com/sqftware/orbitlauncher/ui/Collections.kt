@@ -475,7 +475,7 @@ private fun AppGrid(
     val modifier = Modifier.fillMaxWidth().padding(end = 8.dp).defaultMinSize(minHeight = CARD_ICON_SIZE)
 
     if (shown.isEmpty()) {
-        EmptyNote(kind.emptyText, modifier)
+        SupportingText(kind.emptyText, modifier.padding(vertical = Spacing.Gap))
         return
     }
     Layout(

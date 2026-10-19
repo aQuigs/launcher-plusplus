@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
@@ -1875,8 +1876,14 @@ fun LauncherScreen(
                     if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
                 }
             }
-            // Over everything, panels and the open drawer included, clear of the drawer's strip.
-            shownNotices.Host(Modifier.align(Alignment.BottomCenter).padding(bottom = DRAWER_PEEK + Spacing.Edge))
+            // Over everything, panels and the open drawer included, clear of the drawer's strip and of the keyboard,
+            // which the root leaves to the drawer.
+            shownNotices.Host(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = DRAWER_PEEK + Spacing.Edge),
+            )
         }
     }
 }

@@ -83,7 +83,9 @@ private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
-    private val notices = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    // Buffered like the pin requests: a widget's answer can arrive in a recreated activity before the screen collects.
+    private val noticeChannel = Channel<String>(Channel.BUFFERED)
+    private val notices = noticeChannel.receiveAsFlow()
 
     // A channel, unlike the presses, keeps a request that starts the activity until the screen is there to collect it.
     private val pinRequestChannel = Channel<PinRequest>(Channel.CONFLATED)
@@ -126,7 +128,7 @@ class MainActivity : ComponentActivity() {
         val shade = StatusBarNotificationShade(this)
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
-        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { notices.tryEmit("No room for that widget here") })
+        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
                 view = widgetHost::view,
