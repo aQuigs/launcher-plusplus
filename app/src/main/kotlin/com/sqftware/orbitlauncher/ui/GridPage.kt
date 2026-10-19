@@ -24,6 +24,7 @@ import com.sqftware.orbitlauncher.domain.GridItem
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 /** How wide an app in an open grid folder is, its name under it. */
 private val FOLDER_APP_WIDTH = 72.dp
@@ -101,7 +102,7 @@ fun GridFolderDialog(
             val columns = (maxWidth / FOLDER_APP_WIDTH).toInt().coerceAtLeast(1)
             val width = maxWidth / columns
             FlowRow(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
                 maxItemsInEachRow = columns,
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
             ) {

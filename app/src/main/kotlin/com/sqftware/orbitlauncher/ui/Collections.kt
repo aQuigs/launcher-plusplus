@@ -571,45 +571,42 @@ fun CollectionPicker(
     onToggle: (CollectionKind) -> Unit,
     onCreate: () -> Unit,
     onClose: () -> Unit,
-    onNotice: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Panel(modifier.testTag(CollectionTags.PICKER)) {
-        Column {
-            PanelHeader("Select collection", onClose)
-            BoxWithConstraints {
-                val grid = tileGrid(constraints.maxWidth)
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(grid.columns),
-                    contentPadding = PaddingValues(start = Spacing.Edge, end = Spacing.Edge, bottom = Spacing.Edge),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
-                ) {
-                    items(CollectionKind.all + customs, key = { it.name }) { kind ->
-                        val onPage = kind in page
-                        Tile(
-                            // As in Arc Pro: a person on a custom collection's tile, the grid on its card.
-                            glyph = if (kind is CollectionKind.Custom) Icons.Default.Person else kind.glyph,
-                            title = kind.title,
-                            labelStyle = grid.labelStyle,
-                            selected = onPage,
-                            onClick = {
-                                onNotice(if (onPage) "Collection removed" else "Collection added")
-                                onToggle(kind)
-                            },
-                            modifier = Modifier.testTag(CollectionTags.tile(kind)),
-                        )
-                    }
-                    item(key = CollectionTags.CREATE) {
-                        Tile(
-                            glyph = GridGlyph,
-                            title = CREATE_YOUR_OWN,
-                            labelStyle = grid.labelStyle,
-                            selected = false,
-                            onClick = onCreate,
-                            modifier = Modifier.testTag(CollectionTags.CREATE),
-                        )
-                    }
+    val notices = LocalNotices.current
+    Panel("Select collection", onClose, modifier.testTag(CollectionTags.PICKER)) {
+        BoxWithConstraints {
+            val grid = tileGrid(constraints.maxWidth)
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(grid.columns),
+                contentPadding = PaddingValues(horizontal = Spacing.Edge),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
+                verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
+            ) {
+                items(CollectionKind.all + customs, key = { it.name }) { kind ->
+                    val onPage = kind in page
+                    Tile(
+                        // As in Arc Pro: a person on a custom collection's tile, the grid on its card.
+                        glyph = if (kind is CollectionKind.Custom) Icons.Default.Person else kind.glyph,
+                        title = kind.title,
+                        labelStyle = grid.labelStyle,
+                        selected = onPage,
+                        onClick = {
+                            notices.show(if (onPage) "Collection removed" else "Collection added")
+                            onToggle(kind)
+                        },
+                        modifier = Modifier.testTag(CollectionTags.tile(kind)),
+                    )
+                }
+                item(key = CollectionTags.CREATE) {
+                    Tile(
+                        glyph = GridGlyph,
+                        title = CREATE_YOUR_OWN,
+                        labelStyle = grid.labelStyle,
+                        selected = false,
+                        onClick = onCreate,
+                        modifier = Modifier.testTag(CollectionTags.CREATE),
+                    )
                 }
             }
         }
@@ -659,9 +656,9 @@ fun CreateCollectionDialog(page: CollectionsPage, onCreate: (CollectionKind.Cust
         maxLength = MAX_COLLECTION_NAME,
         onName = { name -> page.custom(name)?.let(onCreate) },
         onDismiss = onDismiss,
-        refusal = { name -> "That name is taken".takeIf { name.isNotBlank() && page.custom(name) == null } },
+        refusal = { name -> "That name is taken".takeIf { page.custom(name) == null } },
         modifier = Modifier.testTag(CollectionTags.CREATE_DIALOG),
-        fieldModifier = Modifier.testTag(CollectionTags.CREATE_NAME),
+        fieldTag = CollectionTags.CREATE_NAME,
     )
 }
 
@@ -692,7 +689,7 @@ fun CollectionSettingsDialog(
     val scope = rememberCoroutineScope()
     val settings: @Composable (Int) -> Unit = { index ->
         Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
             modifier = Modifier.verticalScroll(rememberScrollState()),
         ) {
             if (index == 1) {
@@ -708,12 +705,7 @@ fun CollectionSettingsDialog(
     InfoDialog(
         title = "${kind.title} settings",
         onDone = onDismiss,
-        // Removing is about this collection, so it is offered on its tab only, not on the defaults every card shares.
-        aside = if (pager.targetPage == 0) ({
-            LauncherButton(onClick = { removing = true }, emphasis = Emphasis.Destructive, modifier = Modifier.testTag(CollectionTags.REMOVE)) {
-                Text("Remove")
-            }
-        }) else null,
+        aside = DialogAction("Remove", destructive = true, Modifier.testTag(CollectionTags.REMOVE)) { removing = true },
         modifier = Modifier.testTag(CollectionTags.SETTINGS_DIALOG),
     ) {
         Column {
@@ -727,7 +719,7 @@ fun CollectionSettingsDialog(
                 }
             }
             // As tall as the taller tab throughout, or the centred dialog would grow and shrink under a swipe.
-            Box(Modifier.padding(top = 16.dp)) {
+            Box(Modifier.padding(top = Spacing.Edge)) {
                 SizeOfLargest { SETTINGS_TABS.indices.forEach { settings(it) } }
                 HorizontalPager(
                     state = pager,
@@ -936,7 +928,6 @@ private val AppCategory.glyph: ImageVector
         AppCategory.Video -> Icons.Default.PlayArrow
     }
 
-// Material glyphs the core icon set leaves out, from their published path data.
 
 private val DragHandleGlyph = materialGlyph("DragHandle", "M20 9H4v2h16V9zM4 15h16v-2H4v2z")
 private val BarChartGlyph = materialGlyph("BarChart", "M4 9h4v11H4zM10 4h4v16h-4zM16 13h4v7h-4z")

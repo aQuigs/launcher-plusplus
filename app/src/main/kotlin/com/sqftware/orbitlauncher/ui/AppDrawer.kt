@@ -262,7 +262,7 @@ fun AppDrawer(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = Spacing.Edge, top = 8.dp, end = if (controls == null) Spacing.Edge else 4.dp, bottom = 8.dp)
+                        .padding(start = Spacing.Edge, top = Spacing.Tight, end = if (controls == null) Spacing.Edge else 4.dp, bottom = Spacing.Tight)
                         .focusRequester(searchFocus),
                 )
                 controls?.let { StyleButtons(it) }
@@ -284,7 +284,7 @@ fun AppDrawer(
                     modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
                 ) {
                     when {
-                        searching && matches.isEmpty() -> fullWidth(contentType = "empty") { NoMatches() }
+                        searching && matches.isEmpty() -> fullWidth(contentType = "empty") { EmptyNote("No apps match") }
                         searching -> apps(matches, entry, detail)
                         else -> {
                             if (askForUsage) {
@@ -386,18 +386,11 @@ private fun SortMenu(controls: DrawerControls) {
                 MenuRow(order.label, end = RowEnd.Choice(order == style.order)) { controls.onStyleChange(style.copy(order = order)) }
             },
             listOf(
-                MenuRow("Most used row", end = RowEnd.Toggle(style.mostUsedRow, flips = true)) {
-                    controls.onStyleChange(style.copy(mostUsedRow = !style.mostUsedRow))
-                },
+                toggleRow("Most used row", style.mostUsedRow) { controls.onStyleChange(style.copy(mostUsedRow = it)) },
             ),
         ),
         modifier = Modifier.testTag(AppDrawerTags.SORT_MENU),
     )
-}
-
-@Composable
-private fun NoMatches() {
-    EmptyNote("No apps match")
 }
 
 private val RAIL_WIDTH = 28.dp
@@ -481,7 +474,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
         modifier = Modifier
             .fillMaxWidth()
             .then(entry.action(app))
-            .padding(horizontal = Spacing.Edge, vertical = 8.dp),
+            .padding(horizontal = Spacing.Edge, vertical = Spacing.Tight),
     ) {
         AppFace(app, entry.icon, Modifier.size(ROW_ICON_SIZE))
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
@@ -509,7 +502,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
         if (picked) {
             when (picking?.mark) {
                 PickMark.Dot -> Dot(Modifier.padding(start = 12.dp))
-                else -> Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                else -> PickedMark()
             }
         }
         entry.menu?.content?.invoke(app)

@@ -83,7 +83,7 @@ private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
-    // Buffered like the pin requests: a widget's answer can arrive in a recreated activity before the screen collects.
+    // A channel, so a widget's answer that reaches a recreated activity before the screen collects is kept until it does.
     private val noticeChannel = Channel<String>(Channel.BUFFERED)
     private val notices = noticeChannel.receiveAsFlow()
 

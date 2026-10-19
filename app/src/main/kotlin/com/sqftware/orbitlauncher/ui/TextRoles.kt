@@ -29,7 +29,7 @@ import com.sqftware.orbitlauncher.ui.theme.Spacing
  * [onClose], so leaving it does not hang on knowing Back.
  */
 @Composable
-fun PanelHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modifier, subtitle: String? = null) {
+internal fun PanelHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modifier, subtitle: String? = null) {
     Column(modifier.fillMaxWidth().padding(start = Spacing.Edge, top = Spacing.Top, end = Spacing.Tight, bottom = Spacing.Tight)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))

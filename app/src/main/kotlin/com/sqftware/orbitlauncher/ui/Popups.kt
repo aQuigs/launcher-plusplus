@@ -11,8 +11,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.DropdownMenu
@@ -40,6 +38,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.ui.theme.Ground
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.flow.first
 
 // Every dialog and menu of the launcher is one of these, so each sits on the drawer's ground (held by the
@@ -108,6 +108,9 @@ class MenuRow(
     val onClick: () -> Unit,
 )
 
+/** A row that flips the setting it shows [on], handing the new value to [onChange]. */
+fun toggleRow(label: String, on: Boolean, onChange: (Boolean) -> Unit) = MenuRow(label, end = RowEnd.Toggle(on, flips = true)) { onChange(!on) }
+
 /** A menu row's icon drawn from [glyph]. */
 fun glyph(glyph: ImageVector): @Composable () -> Unit = { Icon(glyph, contentDescription = null) }
 
@@ -145,7 +148,7 @@ private fun MenuItem(row: MenuRow, expanded: Boolean, onDismiss: () -> Unit) {
             is RowEnd.Value -> ({ Text(end.text, color = colors.onSurfaceVariant) })
             // The switch only shows the state: the row is the control.
             is RowEnd.Toggle -> ({ Switch(checked = end.on, onCheckedChange = null) })
-            is RowEnd.Choice -> if (end.chosen) ({ Icon(Icons.Default.Check, contentDescription = null, tint = colors.primary) }) else null
+            is RowEnd.Choice -> if (end.chosen) ({ PickedMark() }) else null
         },
         colors = if (row.destructive) MenuDefaults.itemColors(textColor = colors.error, leadingIconColor = colors.error) else MenuDefaults.itemColors(),
         onClick = { chooseFrom(expanded, onDismiss, row.onClick) },
@@ -168,11 +171,14 @@ private fun MenuItem(row: MenuRow, expanded: Boolean, onDismiss: () -> Unit) {
 }
 
 /** Dismisses a menu, then acts. Items stay tappable while the menu animates away, and a second tap must not start the same thing twice. */
-internal fun chooseFrom(expanded: Boolean, onDismiss: () -> Unit, choice: () -> Unit) {
+private fun chooseFrom(expanded: Boolean, onDismiss: () -> Unit, choice: () -> Unit) {
     if (!expanded) return
     onDismiss()
     choice()
 }
+
+/** A dialog's one further action besides its own: its [label], in the error colour if [destructive], calling [onClick]. */
+class DialogAction(val label: String, val destructive: Boolean = false, val modifier: Modifier = Modifier, val onClick: () -> Unit)
 
 /**
  * A dialog that shows [content], or sets things in it as they change, so nothing waits for a confirm: Done, Back and a
@@ -183,13 +189,21 @@ fun InfoDialog(
     title: String,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    aside: (@Composable () -> Unit)? = null,
+    aside: DialogAction? = null,
     content: @Composable () -> Unit,
 ) {
     GroundDialog(
         onDismissRequest = onDone,
         confirmButton = { LauncherButton(onClick = onDone) { Text("Done") } },
-        dismissButton = aside,
+        dismissButton = aside?.let { action ->
+            {
+                LauncherButton(
+                    onClick = action.onClick,
+                    emphasis = if (action.destructive) Emphasis.Destructive else Emphasis.Normal,
+                    modifier = action.modifier,
+                ) { Text(action.label) }
+            }
+        },
         title = { Text(title) },
         text = content,
         modifier = modifier,
@@ -225,9 +239,9 @@ fun ConfirmDialog(
 }
 
 /**
- * Asks for a name, starting from [initial], up to [maxLength] long: [verb] and the keyboard's Done hand what was typed to
- * [onName], while [refusal] has nothing against it (it says why a name will not do, or null), and while it is not blank
- * unless [blankAllowed]; Cancel, Back and a tap outside call [onDismiss].
+ * Asks for a name, starting from [initial], up to [maxLength] long, in a field tagged [fieldTag]: [verb] and the
+ * keyboard's Done hand what was typed to [onName], unless it is blank (and not [blankAllowed]) or [refusal] says why a
+ * name that is not blank will not do; Cancel, Back and a tap outside call [onDismiss].
  */
 @Composable
 fun NameDialog(
@@ -237,13 +251,13 @@ fun NameDialog(
     onName: (String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    fieldModifier: Modifier = Modifier,
+    fieldTag: String = "",
     initial: String = "",
     blankAllowed: Boolean = false,
     refusal: (String) -> String? = { null },
 ) {
     var typed by rememberSaveable { mutableStateOf(initial) }
-    val refused = refusal(typed)
+    val refused = if (typed.isBlank()) null else refusal(typed)
     val accepted = refused == null && (blankAllowed || typed.isNotBlank())
     val name = { if (accepted) onName(typed) }
 
@@ -262,7 +276,7 @@ fun NameDialog(
                 supportingText = refused?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { name() }),
-                modifier = fieldModifier.focusRequester(rememberShownFocus()),
+                modifier = Modifier.testTag(fieldTag).focusRequester(rememberShownFocus()),
             )
         },
         modifier = modifier,
@@ -299,12 +313,10 @@ fun <T> ChoiceDialog(
                             .selectable(selected = choice == chosen, role = Role.RadioButton) { onChoose(choice) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (chosen != null) RadioButton(selected = choice == chosen, onClick = null, Modifier.padding(end = 16.dp))
-                        Column(Modifier.padding(vertical = 8.dp)) {
+                        if (chosen != null) RadioButton(selected = choice == chosen, onClick = null, Modifier.padding(end = Spacing.Edge))
+                        Column(Modifier.padding(vertical = Spacing.Tight)) {
                             Text(label(choice))
-                            description(choice)?.let {
-                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            description(choice)?.let { SupportingText(it) }
                         }
                     }
                 }

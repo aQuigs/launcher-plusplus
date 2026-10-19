@@ -70,7 +70,9 @@ private const val CONFIGURE_REQUEST = 0x5749
  * after a restart. The system picker binds the picked provider to the id the launcher allocated. A provider that wants
  * configuring is started through the host, which answers through the activity itself rather than the result registry,
  * so the activity forwards that answer to [onActivityResult]. An id whose pick or configuration is cancelled goes back.
- * A widget too big for any room left on its page is not added, and [onNoRoom] says so. The pick in progress is stored, since a recreated activity gets the answer, and an old one still there when the user
+ * A widget too big for any room left on its page is not added, and [onNoRoom] says so.
+ *
+ * The pick in progress is stored, since a recreated activity gets the answer, and an old one still there when the user
  * asks again was lost with its process.
  */
 class SystemWidgetHost(

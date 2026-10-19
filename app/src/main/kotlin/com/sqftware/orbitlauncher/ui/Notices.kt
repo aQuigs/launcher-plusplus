@@ -11,19 +11,15 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-
-object NoticeTags {
-    const val NOTICE = "notice"
-}
 
 const val NOTICE_MILLIS = 2_000L
 
@@ -54,6 +50,9 @@ class Notices {
     }
 }
 
+/** The launcher's notices, for any view to [Notices.show] one; one put up outside the launcher shows nowhere. */
+val LocalNotices = staticCompositionLocalOf { Notices() }
+
 // A plain box rather than a surface: it must not take the taps meant for what is under it.
 @Composable
 private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
@@ -64,7 +63,6 @@ private fun NoticeLabel(text: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 20.dp, vertical = 12.dp)
             // Said aloud, as the system's toast was.
             .semantics { liveRegion = LiveRegionMode.Polite }
-            .testTag(NoticeTags.NOTICE),
     ) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.inverseOnSurface, textAlign = TextAlign.Center)
     }

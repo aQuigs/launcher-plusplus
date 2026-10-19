@@ -142,7 +142,7 @@ fun FolderNameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> 
         initial = name,
         blankAllowed = true,
         modifier = Modifier.testTag(FolderTags.NAME_DIALOG),
-        fieldModifier = Modifier.testTag(FolderTags.NAME),
+        fieldTag = FolderTags.NAME,
     )
 }
 

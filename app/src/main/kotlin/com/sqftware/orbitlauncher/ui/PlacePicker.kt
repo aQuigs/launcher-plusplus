@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -59,7 +58,7 @@ private fun PickingHeader(
     content: @Composable () -> Unit,
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Tight),
         modifier = modifier.padding(horizontal = Spacing.Edge, vertical = Spacing.Tight).testTag(PlacePickerTags.PICKER),
     ) {
         content()

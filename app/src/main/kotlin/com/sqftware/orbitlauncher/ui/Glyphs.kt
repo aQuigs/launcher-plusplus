@@ -6,10 +6,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import com.sqftware.orbitlauncher.ui.theme.GlyphFill
 
-// A glyph means one thing wherever it shows: a cross takes something off where it is (an app off the ring, a widget
-// off its page, a page out of the layout), a bin uninstalls or is where a lifted app is dropped to take it off its card,
-// and a chevron opens or closes what it sits on, never a menu. Material's core set lacks those below, drawn here from
-// Material's own paths.
+// A glyph means one thing wherever it shows: a cross closes a view or takes something off where it is (an app off the
+// ring, a widget off its page, a page out of the layout), a bin uninstalls or is where a lifted app is dropped to take
+// it off its card, and a chevron opens or closes what it sits on, never a menu. Material's core set lacks those below,
+// drawn here from Material's own paths.
 
 /** A glyph from Material's [pathData], filled as the core set's are so it takes its tint. */
 internal fun materialGlyph(name: String, pathData: String): ImageVector =

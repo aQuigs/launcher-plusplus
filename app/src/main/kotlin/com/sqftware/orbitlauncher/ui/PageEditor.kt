@@ -75,6 +75,7 @@ object PageEditorTags {
 
 private val CARD_WIDTH = 88.dp
 private val CARD_HEIGHT = 176.dp
+// As far as a lifted card rises and tilts out of the strip.
 private val LIFT_ROOM = 8.dp
 
 // A finger dragging a page this near either end of the strip scrolls it, and at the edge itself this fast, a second.
@@ -119,63 +120,60 @@ fun PageEditor(
         scroll.scrollAtEdges(speed, pull = { towardsEnd * edgePull(finger, scroll.viewportSize.toFloat(), zone) }) { reorder.offset += it }
     }
 
-    Panel(modifier.testTag(PageEditorTags.EDITOR)) {
-        Column(Modifier.padding(bottom = Spacing.Top - LIFT_ROOM)) {
-            PanelHeader(
-                "Pages",
-                onClose,
-                subtitle = "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
-                modifier = Modifier
-                    // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
-                    // the strip's own place on screen.
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
-                        }
-                    }
-                    .sidewaysScroll(scroll, inset = Spacing.Edge)
-                    // Inside the scroll's fade, which clips, so a lifted card has room to rise and tilt.
-                    .padding(top = Spacing.Top, bottom = LIFT_ROOM),
-            ) {
-                if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
-                layout.pages.forEachIndexed { index, page ->
-                    key(page.id) {
-                        val held = contents.getValue(page)
-                        PageCard(
-                            page = page,
-                            label = layout.label(page),
-                            home = page == layout.home,
-                            contents = held,
-                            lifted = reorder.dragging == index,
-                            // A long press let go without moving reaches the card's tap first, and opens nothing.
-                            onOpen = { if (reorder.dragging == null) onOpen(page) },
-                            onDelete = { if (held.isEmpty) onLayoutChange(layout.remove(page)) else deleting = page },
-                            onMakeHome = { onLayoutChange(layout.withHome(page)) },
-                            modifier = Modifier
-                                .reorderItem(reorder, index)
-                                .pointerInput(index) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = { reorder.dragging = index },
-                                        onDrag = { change, amount ->
-                                            change.consume()
-                                            reorder.moveBy(amount.x)
-                                        },
-                                        onDragEnd = {
-                                            reorder.end()?.let { (from, to) ->
-                                                if (from != to) latestOnLayoutChange(latestLayout.move(from, to))
-                                            }
-                                        },
-                                        onDragCancel = { reorder.end() },
-                                    )
-                                },
-                        )
+    Panel(
+        "Pages",
+        onClose,
+        modifier.testTag(PageEditorTags.EDITOR),
+        subtitle = "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
+            modifier = Modifier
+                .padding(top = Spacing.Top)
+                // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
+                // the strip's own place on screen.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
                     }
                 }
-                if (!layout.isFull) AddTile(atStart = false, onClick = { addingAtStart = false })
+                .sidewaysScroll(scroll, bleed = LIFT_ROOM),
+        ) {
+            if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
+            layout.pages.forEachIndexed { index, page ->
+                key(page.id) {
+                    val held = contents.getValue(page)
+                    PageCard(
+                        page = page,
+                        label = layout.label(page),
+                        home = page == layout.home,
+                        contents = held,
+                        lifted = reorder.dragging == index,
+                        // A long press let go without moving reaches the card's tap first, and opens nothing.
+                        onOpen = { if (reorder.dragging == null) onOpen(page) },
+                        onDelete = { if (held.isEmpty) onLayoutChange(layout.remove(page)) else deleting = page },
+                        onMakeHome = { onLayoutChange(layout.withHome(page)) },
+                        modifier = Modifier
+                            .reorderItem(reorder, index)
+                            .pointerInput(index) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { reorder.dragging = index },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        reorder.moveBy(amount.x)
+                                    },
+                                    onDragEnd = {
+                                        reorder.end()?.let { (from, to) ->
+                                            if (from != to) latestOnLayoutChange(latestLayout.move(from, to))
+                                        }
+                                    },
+                                    onDragCancel = { reorder.end() },
+                                )
+                            },
+                    )
+                }
             }
+            if (!layout.isFull) AddTile(atStart = false, onClick = { addingAtStart = false })
         }
     }
 

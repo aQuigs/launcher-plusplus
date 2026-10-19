@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.SpinStats
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 /** Where the two directions meet on the dial, in degrees, so each reads as its own arc. */
 private const val DIAL_GAP = 8f
@@ -49,7 +50,7 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
                 SupportingText("Drag up or down round the ring's side and let go to start counting.", textAlign = TextAlign.Center)
             } else {
                 // As tall as each other, though one label wraps.
-                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.Gap)) {
                     DirectionTile(
                         MaterialTheme.colorScheme.primary,
                         decimal(stats.clockwise, 1),

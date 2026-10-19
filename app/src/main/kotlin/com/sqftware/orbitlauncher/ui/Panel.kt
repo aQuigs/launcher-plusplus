@@ -1,9 +1,12 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -18,6 +21,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.LocalPanelMark
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 /**
  * The ground of every full-screen view over the launcher, the drawer's and each [Panel]'s alike, and of every pop-up:
@@ -55,12 +59,19 @@ fun panelGround(): PanelGround {
 }
 
 /**
- * A full-screen view over the launcher on the [PanelGround]. The launcher is laid out clear of the system bars, so the
- * veil carries on through the navigation bar, as the open drawer's does.
+ * A full-screen view over the launcher on the [PanelGround], headed by its [title] and [subtitle] with a close button that
+ * calls [onClose], over its [content]. The launcher is laid out clear of the system bars, so the veil carries on through
+ * the navigation bar, as the open drawer's does.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun Panel(
+    title: String,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val ground = panelGround()
     // As the launcher's, held whether or not the bars show.
     val navigationBar = WindowInsets.navigationBarsIgnoringVisibility
@@ -77,6 +88,11 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        OnGround(Ground.Panel, content)
+        OnGround(Ground.Panel) {
+            Column(Modifier.padding(bottom = Spacing.Edge)) {
+                PanelHeader(title, onClose, subtitle = subtitle)
+                content()
+            }
+        }
     }
 }
