@@ -69,6 +69,8 @@ class OpenFreeMapTiles(context: Context) : MapTiles {
             val (code, body) = get(url)
             when {
                 code == HttpURLConnection.HTTP_OK -> return body
+                // The server answers a tile with nothing in it, open sea say, with no content: an empty tile, not a fault.
+                code == HttpURLConnection.HTTP_NO_CONTENT -> return ByteArray(0)
                 // A build is retired some weeks on, so its URLs go; the TileJSON names the current one.
                 code == HttpURLConnection.HTTP_NOT_FOUND -> template = null
                 else -> throw IOException("HTTP $code for tile $id")

@@ -1,5 +1,18 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+private val FIRST_RETRY = 5.seconds
+private val LAST_RETRY = 2.minutes
+
+/**
+ * How long to wait before the [retry]th try again (from 0) at a disc whose tiles could not be had: 5 s, doubling up to
+ * 2 min, so a map left blank by a dropped connection fills in soon after it returns without asking the server often.
+ */
+fun paintRetryDelay(retry: Int): Duration = (FIRST_RETRY * (1 shl retry.coerceAtMost(5))).coerceAtMost(LAST_RETRY)
+
 /** Where the minimap gets its OpenMapTiles vector tiles. */
 interface MapTiles {
     /** The tile [id]'s bytes, or null when it cannot be had now (offline, say). */
