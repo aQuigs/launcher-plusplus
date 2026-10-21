@@ -9,15 +9,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.TouchInjectionScope
-import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
@@ -38,6 +37,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -63,19 +63,18 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
-import com.sqftware.orbitlauncher.domain.AppNames
 import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.CLOCK_ID
-import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.domain.CardLook
 import com.sqftware.orbitlauncher.domain.CardSetting
+import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
-import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionKind.MostUsed
 import com.sqftware.orbitlauncher.domain.CollectionKind.NewApps
+import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.Colourways
@@ -84,7 +83,6 @@ import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.FolderLooks
-import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.GridPage
 import com.sqftware.orbitlauncher.domain.GridPages
@@ -96,26 +94,28 @@ import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
-import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.ReorderMode
+import com.sqftware.orbitlauncher.domain.Ring
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.SpinStats
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.pairOf
-import kotlin.math.abs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.abs
 
 private const val FOLD_TARGET = "Drop to put in a folder"
 
@@ -160,7 +160,6 @@ class LauncherScreenTest {
     private var spinStats by mutableStateOf(SpinStats())
     private var homeOnReturn by mutableStateOf(false)
     private var pickTip by mutableStateOf(false)
-    private val toasts = mutableListOf<String>()
     private var drawerStyle by mutableStateOf(DrawerStyle())
     private var reorderMode by mutableStateOf(ReorderMode.Insert)
     private var ringerMode by mutableStateOf(RingerMode.Normal)
@@ -254,6 +253,7 @@ class LauncherScreenTest {
             onLayoutChange = { layout = it },
             homePresses = homePresses,
             pinRequests = pinRequests,
+            notices = emptyFlow(),
             apps = apps,
             pinnedShortcuts = pinnedShortcuts,
             ringPages = ringPages,
@@ -290,7 +290,6 @@ class LauncherScreenTest {
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
             onPickTipLearned = { pickTip = false },
-            onToast = { toasts += it },
             drawerStyle = drawerStyle,
             onDrawerStyleChange = { drawerStyle = it },
             onOpenClock = { opened += "clock" },
@@ -2054,7 +2053,9 @@ class LauncherScreenTest {
         show()
 
         compose.emblem().performClick()
-        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
+        compose.onNodeWithText(PICK_TIP).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(NOTICE_MILLIS)
+        compose.onNodeWithText(PICK_TIP).assertDoesNotExist()
         compose.drawerHandle().performClick()
         assertDrawerOpen(false)
 
@@ -2066,7 +2067,7 @@ class LauncherScreenTest {
 
         compose.emblem().performClick()
         assertDrawerOpen(true)
-        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
+        compose.onNodeWithText(PICK_TIP).assertDoesNotExist()
     }
 
     // Flipped twice, so a row that kept the style it first showed would ask for the same one again.
@@ -2220,7 +2221,7 @@ class LauncherScreenTest {
         show()
         goToCollections()
 
-        compose.onNodeWithText("Permission Required").performClick()
+        compose.onNodeWithText("Permission required").performClick()
         leaveAndReturn()
         assertSettledOn(LauncherPage.Collections)
 
@@ -2592,7 +2593,7 @@ class LauncherScreenTest {
 
         compose.collectionTile(tools).performClick()
 
-        compose.onNodeWithText("Collection Added").assertIsDisplayed()
+        compose.onNodeWithText("Collection added").assertIsDisplayed()
         compose.collectionTile(tools).assertIsSelected()
         // Seeded by the words in the package names: "clock" belongs in Tools, "mail" is nobody's word.
         compose.runOnIdle {
@@ -2602,7 +2603,7 @@ class LauncherScreenTest {
 
         compose.collectionTile(tools).performClick()
 
-        compose.onNodeWithText("Collection Removed").assertIsDisplayed()
+        compose.onNodeWithText("Collection removed").assertIsDisplayed()
         compose.collectionTile(tools).assertIsNotSelected()
         compose.runOnIdle { assertEquals(CollectionsPage(), collections) }
 
@@ -2694,9 +2695,9 @@ class LauncherScreenTest {
 
         compose.createCollectionTile().performClick()
         compose.createCollectionName().performTextInput("tools")
-        compose.onNodeWithText("Ok").assertIsNotEnabled()
+        compose.onNodeWithText("Create").assertIsNotEnabled()
         compose.createCollectionName().performTextReplacement(" Finance ")
-        compose.onNodeWithText("Ok").performClick()
+        compose.onNodeWithText("Create").performClick()
 
         compose.createCollectionDialog().assertDoesNotExist()
         compose.pickerTile(finance).assertIsSelected()
@@ -2971,12 +2972,12 @@ class LauncherScreenTest {
         show()
         goToCollections()
 
-        compose.onNodeWithText("Permission Required").performClick()
+        compose.onNodeWithText("Permission required").performClick()
         compose.runOnIdle { assertEquals(1, usageSettingsOpened) }
 
         foregroundTime = ForegroundTime(mapOf(mail.packageName to 1_000L))
 
-        compose.onNodeWithText("Permission Required").assertDoesNotExist()
+        compose.onNodeWithText("Permission required").assertDoesNotExist()
         compose.collectionApp(MostUsed, mail).assertIsDisplayed()
     }
 

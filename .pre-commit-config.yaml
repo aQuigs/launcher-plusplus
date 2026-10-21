@@ -49,6 +49,18 @@ repos:
         entry: '\.surface\w*\b|(RoundedCorner|CutCorner)Shape\s*\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard|SegmentedButton|FilterChip|InputChip)\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|ChoiceRow\.kt$|Panel\.kt$|\w+Art\.kt$)
+      - id: launcher-pop-up-kinds
+        name: Dialogs are an InfoDialog, ConfirmDialog, NameDialog or ChoiceDialog, menus a GroundMenu of MenuRows, notes a Notice
+        language: pygrep
+        entry: '(?<![\w.])(DropdownMenuItem|BasicAlertDialog|Dialog|Popup|ModalBottomSheet|Snackbar)\s*\(|\bToast\b'
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/Popups\.kt$
+      - id: sideways-scroll
+        name: A row that scrolls sideways is a sidewaysScroll, which shows there is more
+        language: pygrep
+        entry: '\.horizontalScroll\(|\bLazyRow\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/Fades\.kt$
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

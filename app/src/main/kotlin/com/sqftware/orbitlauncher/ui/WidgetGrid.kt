@@ -35,7 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -101,10 +101,11 @@ import com.sqftware.orbitlauncher.domain.roomFor
 import com.sqftware.orbitlauncher.domain.widgetCells
 import com.sqftware.orbitlauncher.domain.widgetRowsWithin
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
-import kotlin.math.abs
-import kotlin.math.roundToInt
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 object WidgetTags {
     const val ADD = "widget_add"
@@ -166,12 +167,11 @@ private data class Fixed(override val count: Int) : PageRows {
 }
 
 private val GAP = WIDGET_GAP_DP.dp
-private val PAGE_PADDING = 16.dp
 private val CONTROL_SIZE = 40.dp
 
 // How far the edit controls reach past the outline's corners. Any reach keeps the bin and the handle apart on a widget
 // one row tall, since each is half a row; half the page's padding keeps them clear of the screen's edge.
-private val CONTROL_REACH = PAGE_PADDING / 2
+private val CONTROL_REACH = Spacing.Edge / 2
 
 // A finger this near the page's top or bottom edge, dragging a widget or its handle, scrolls the page, and at the edge
 // itself this fast, a second.
@@ -308,11 +308,11 @@ fun WidgetGrid(
     // screen does not scroll.
     val rows = remember(area.height, buttonHeight, fixed) {
         val button = if (fixed) 0.dp else buttonHeight + GAP
-        widgetRowsWithin((area.height - PAGE_PADDING * 2 - button).value)
+        widgetRowsWithin((area.height - Spacing.Edge * 2 - button).value)
     }
     val pageRows = rows.count
     val fit = remember(pageRows, fixed) { if (fixed) Fixed(pageRows) else Lengthening(pageRows) }
-    val cell = DpSize(maxOf((area.width - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS, 0.dp), rows.heightDp.dp)
+    val cell = DpSize(maxOf((area.width - Spacing.Edge * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS, 0.dp), rows.heightDp.dp)
     // As tall as the page is wide, so the ring is the size it has on a page of its own.
     val ringRows = widgetCells(span(WIDGET_COLUMNS, cell.width).value.roundToInt(), cell.height.value, pageRows)
     // Placed only once the page is measured, and stored as placed, so the widgets the host moves are where they show.
@@ -412,7 +412,7 @@ fun WidgetGrid(
                 .fillMaxSize()
                 .onSizeChanged { size -> with(density) { area = DpSize(size.width.toDp(), size.height.toDp()) } }
                 .then(if (fixed) Modifier else Modifier.verticalPageScroll(scroll))
-                .padding(PAGE_PADDING),
+                .padding(Spacing.Edge),
             verticalArrangement = Arrangement.spacedBy(GAP),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -427,11 +427,7 @@ fun WidgetGrid(
                     .zIndex(if (held.id != null) 1f else 0f),
             ) {
                 if (!fixed && laid.isEmpty) {
-                    Text(
-                        "No widgets yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.align(Alignment.Center).padding(8.dp),
-                    )
+                    EmptyNote("No widgets yet", Modifier.align(Alignment.Center))
                 }
                 (places[held.id] ?: landing?.let { HostedWidget(0, it.row, it.column, 1, 1) })?.let { landing ->
                     Box(
@@ -533,7 +529,7 @@ private fun LauncherBlock(
             ) {
                 onRemove?.let {
                     EditButton(
-                        Icons.Default.Delete,
+                        Icons.Default.Close,
                         remove,
                         Modifier.align(Alignment.TopEnd).offset(CONTROL_REACH, -CONTROL_REACH).testTag(WidgetTags.REMOVE),
                         Modifier.clickable {
@@ -646,7 +642,7 @@ private fun Widget(
                     .testTag(WidgetTags.EDIT),
             ) {
                 EditButton(
-                    Icons.Default.Delete,
+                    Icons.Default.Close,
                     "Remove widget",
                     Modifier.align(Alignment.TopEnd).offset(CONTROL_REACH, -CONTROL_REACH).testTag(WidgetTags.REMOVE),
                     Modifier.clickable {
