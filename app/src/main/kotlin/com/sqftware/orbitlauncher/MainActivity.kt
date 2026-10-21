@@ -1,5 +1,8 @@
 package com.sqftware.orbitlauncher
 
+import com.sqftware.orbitlauncher.ui.LocalHeading
+import com.sqftware.orbitlauncher.domain.easeHeading
+import com.sqftware.orbitlauncher.apps.SensorHeadingSource
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -92,6 +95,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
+// The share of the way a heading moves to each reading of the compass, so the map settles rather than shivers.
+private const val HEADING_EASE = 0.25f
+
 // Drawables by name, so a build without the art still draws the ground, walls and doors of the map.
 private val MINIMAP_SPRITES = MinimapSpriteNames(
     trees = listOf("osrs_map_tree_0", "osrs_map_tree_1"),
@@ -145,6 +151,7 @@ class MainActivity : ComponentActivity() {
         val relauncher = SystemRelauncher(this)
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
+        val headingSource = SensorHeadingSource(this)
         val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this, MINIMAP_SPRITES))
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = { page: String ->
@@ -283,6 +290,19 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                // The map turns with the phone only while it shows, as the map follows the user.
+                val heading = remember { mutableStateOf<Float?>(null) }
+                val readHeading = remember { { heading.value } }
+                LaunchedEffect(mapping) {
+                    heading.value = null
+                    if (mapping) {
+                        repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            headingSource.headings().collect { reading ->
+                                heading.value = heading.value?.let { easeHeading(it, reading, HEADING_EASE) } ?: reading
+                            }
+                        }
+                    }
+                }
                 var collectionPages by remember { mutableStateOf(collectionsStore.load()) }
                 var gridPages by remember { mutableStateOf(gridPagesStore.load()) }
                 var appSettings by remember { mutableStateOf(appSettingsStore.load()) }
@@ -344,7 +364,7 @@ class MainActivity : ComponentActivity() {
                     setUpHome()
                 }
 
-                CompositionLocalProvider(LocalMinimap provides minimap) {
+                CompositionLocalProvider(LocalMinimap provides minimap, LocalHeading provides readHeading) {
                     LauncherScreen(
                         layout = layout,
                         onLayoutChange = ::changeLayout,

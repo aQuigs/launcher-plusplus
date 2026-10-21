@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 
@@ -9,3 +10,9 @@ import androidx.compose.ui.graphics.ImageBitmap
  * is denied, or no map has been drawn yet. It changes as the user moves, so it is read where it is drawn.
  */
 val LocalMinimap = compositionLocalOf<ImageBitmap?> { null }
+
+/**
+ * Which way the phone faces, in degrees clockwise from north, or null without a compass or while the map is off. Read
+ * where it is drawn, so its many small changes redraw only what turns with it.
+ */
+val LocalHeading = staticCompositionLocalOf<() -> Float?> { { null } }

@@ -1,5 +1,18 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.center
+import com.sqftware.orbitlauncher.ui.theme.StackCountDismissed
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.material3.ripple
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.shape.GenericShape
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
@@ -104,15 +117,37 @@ private const val GAME_WIDTH = 270
 internal val gamePixel: Int
     @Composable get() = max(2, LocalWindowInfo.current.containerSize.width / GAME_WIDTH)
 
-/** The minimap's frame and its compass, as the game draws them: where the frame's map hole is centred, and its radius. */
+/**
+ * The minimap's frame and its compass, as the game draws them: where the frame's map hole is centred, the radius of
+ * the map and of the frame's outer edge; where the compass socket is centred in the frame, the radius of the compass's
+ * face and of its socket's outer edge; and the way from the map's centre to the socket.
+ */
 private val FRAME_HOLE_CENTRE = IntOffset(100, 84)
 private const val MAP_RADIUS = 76
-
-/** The map data's credit, which its licence asks to show with the map, along the bottom of the disc, in game pixels below its centre. */
-private const val MAP_CREDIT = "© OpenStreetMap"
-private const val CREDIT_DROP = 66
-private const val COMPASS_RADIUS = 17
+private const val FRAME_RADIUS = 82
 private val COMPASS_CENTRE = IntOffset(22, 22)
+private const val COMPASS_RADIUS = 17
+private const val SOCKET_RADIUS = 23
+private val COMPASS_WAY = (COMPASS_CENTRE - FRAME_HOLE_CENTRE).toOffset().let { it / it.getDistance() }
+
+/**
+ * How far past its cell the emblem may reach, as a share of the cell: the frame fills the room inside the ring's apps
+ * rather than leaving a wide gap to them.
+ */
+private const val EMBLEM_REACH = 1.15f
+
+/**
+ * The credit the map data's licences ask to show with the map, along the bottom of the disc: how wide it may run and
+ * how far below the centre its foot is, in game pixels.
+ */
+private const val MAP_CREDIT = "© OpenMapTiles © OpenStreetMap"
+private const val CREDIT_WIDTH = 104
+private const val CREDIT_DROP = 70
+
+/** The whole game pixels the minimap is drawn at in an emblem of [size]: as large as reaches its room, and no larger than the rest of the game. */
+private fun mapScale(size: Size, px: Int) = max(1, min(px, floor(size.minDimension * EMBLEM_REACH / (2f * FRAME_RADIUS)).toInt()))
+
+private fun circle(centre: Offset, radius: Int) = Path().apply { addOval(Rect(centre, radius.toFloat())) }
 
 /** The game's round orb, clipped from its frame: where its circle is centred in the sprite, and its radius. */
 private val ORB_CENTRE = IntOffset(40, 17)
@@ -160,35 +195,56 @@ object OldSchoolArt : ThemeArt {
     override val hintShade: Color
         @Composable get() = GameShadow
 
+    /**
+     * The minimap in its frame: the map of where the user is, or the game's grass until there is one, turned with the
+     * phone as the game turns it with the camera, and the compass, turned with it, on the frame's edge.
+     */
     @Composable
     override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) {
         val frame = sprite(R.drawable.osrs_1177_0)
         val compass = sprite(R.drawable.osrs_169_0)
         val px = gamePixel
         val map = LocalMinimap.current
-        val credit = rememberTextMeasurer().measure(MAP_CREDIT, MaterialTheme.typography.labelSmall.copy(color = MinimapSelf))
+        val heading = LocalHeading.current
+        val measurer = rememberTextMeasurer()
+        val creditStyle = MaterialTheme.typography.labelSmall.copy(color = MinimapSelf, textAlign = TextAlign.Center)
         Spacer(
             modifier.drawWithCache {
-                // As large as fits the emblem, and never larger than the rest of the game's pixels.
-                val scale = max(1, min(px, floor(size.minDimension / (2f * (MAP_RADIUS + 6))).toInt()))
-                val centre = Offset(size.width / 2, size.height / 2)
+                val scale = mapScale(size, px)
+                val centre = size.center
                 val origin = centre - (FRAME_HOLE_CENTRE * scale).toOffset()
-                val compassAt = origin + (COMPASS_CENTRE * scale).toOffset()
-                val compassHole = Path().apply { addOval(Rect(compassAt, COMPASS_RADIUS * scale.toFloat())) }
+                val ring = circle(centre, FRAME_RADIUS * scale)
+                val compassAt = centre + COMPASS_WAY * ((FRAME_RADIUS - SOCKET_RADIUS) * scale.toFloat())
+                val socketOrigin = compassAt - (COMPASS_CENTRE * scale).toOffset()
+                val socket = Path.combine(PathOperation.Difference, circle(compassAt, SOCKET_RADIUS * scale), circle(compassAt, COMPASS_RADIUS * scale))
+                val face = circle(compassAt, COMPASS_RADIUS * scale)
+                val credit = measurer.measure(MAP_CREDIT, creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
                 onDrawBehind {
+                    val turn = -(heading() ?: 0f)
                     // The painted map has the self marker at its centre already; the grass stands in until there is one.
                     if (map != null) {
-                        drawSprite(map, centre - Offset(map.width.toFloat(), map.height.toFloat()) * (scale / 2f), scale)
+                        rotate(turn, centre) { drawSprite(map, centre - Offset(map.width.toFloat(), map.height.toFloat()) * (scale / 2f), scale) }
                         drawText(credit, topLeft = Offset(centre.x - credit.size.width / 2f, centre.y + CREDIT_DROP * scale - credit.size.height))
                     } else {
                         drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat(), centre)
                         if (marked) selfMarker(centre, scale)
                     }
-                    clipPath(compassHole) { drawSprite(compass, compassAt - Offset(compass.width.toFloat(), compass.height.toFloat()) * (scale / 2f), scale) }
-                    drawSprite(frame, origin, scale)
+                    // The frame's own ring alone: its compass socket would reach out among the ring's apps, so the
+                    // compass sits just inside the frame's edge, over the map, as in the game's fixed-size view.
+                    clipPath(ring) { drawSprite(frame, origin, scale) }
+                    clipPath(face) { rotate(turn, compassAt) { drawSprite(compass, compassAt - Offset(compass.width.toFloat(), compass.height.toFloat()) * (scale / 2f), scale) } }
+                    clipPath(socket) { drawSprite(frame, socketOrigin, scale) }
                 }
             },
         )
+    }
+
+    /** The emblem clips to the frame's outer edge, which reaches past its cell, so the map and its compass show whole. */
+    @Composable
+    override fun emblemBox(edge: Color): Modifier {
+        val px = gamePixel
+        val shape = remember(px) { GenericShape { size, _ -> addOval(Rect(Offset(size.width / 2, size.height / 2), FRAME_RADIUS * mapScale(size, px).toFloat())) } }
+        return Modifier.clip(shape)
     }
 
     /** The minimap is the whole of the game's ring; nothing more is drawn round the slots. */
@@ -330,12 +386,12 @@ object OldSchoolArt : ThemeArt {
                     val orb = Path().apply { addOval(Rect(centre, ORB_RADIUS * px.toFloat())) }
                     clipPath(orb) { drawSprite(frame, centre - (ORB_CENTRE * px).toOffset(), px) }
                     drawSprite(fill, centre - Offset(fill.width.toFloat(), fill.height.toFloat()) * (px / 2f), px)
-                },
+                }.pressed(presses),
                 contentAlignment = contentAlignment,
                 content = content,
             )
         } else {
-            Box(modifier, contentAlignment = contentAlignment, content = content)
+            Box(modifier.pressed(presses), contentAlignment = contentAlignment, content = content)
         }
     }
 
@@ -345,8 +401,12 @@ object OldSchoolArt : ThemeArt {
         val px = gamePixel
         Spacer(
             modifier.drawBehind {
-                val scale = max(1, min(px, floor(size.minDimension / ITEM_FIT).toInt()))
-                drawSprite(bitmap, Offset(size.width, size.height) / 2f - Offset(bitmap.width.toFloat(), bitmap.height.toFloat()) * (scale / 2f), scale)
+                if (bitmap.width > ITEM_FIT || bitmap.height > ITEM_FIT) {
+                    drawImage(bitmap, dstSize = IntSize(size.width.toInt(), size.height.toInt()), filterQuality = FilterQuality.None)
+                } else {
+                    val scale = max(1, min(px, floor(size.minDimension / ITEM_FIT).toInt()))
+                    drawSprite(bitmap, Offset(size.width, size.height) / 2f - Offset(bitmap.width.toFloat(), bitmap.height.toFloat()) * (scale / 2f), scale)
+                }
             },
         )
     }
@@ -354,10 +414,19 @@ object OldSchoolArt : ThemeArt {
     override val badgeCorner: Alignment
         get() = Alignment.TopStart
 
-    /** An item's stack count: yellow, in the game's small font, at the item's top left. */
+    /**
+     * An item's stack count, in the game's small font at the item's top left: yellow while it has notifications in the
+     * shade, white once they are all dismissed, as the game's white counts mark a different stack.
+     */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
-        Text(badgeText(unread.count), modifier, color = StackCount, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(
+            badgeText(unread.count),
+            modifier.testTag(BadgeTags.BUBBLE),
+            color = if (unread.dismissed) StackCountDismissed else StackCount,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
     }
 
     /** The time in the quill digits the game draws its largest headings in, anything else in its bold type. */
@@ -367,7 +436,7 @@ object OldSchoolArt : ThemeArt {
         val px = gamePixel * CLOCK_SCALE
         val quill = time.takeWhile { it in '0'..':' }
         val rest = time.drop(quill.length).trim()
-        Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier.clearAndSetSemantics { text = AnnotatedString(time) }, verticalAlignment = Alignment.CenterVertically) {
             QuillLine(quill, digits, px)
             if (rest.isNotEmpty()) Text(" $rest", color = StackCount, style = MaterialTheme.typography.titleLarge)
         }
@@ -411,7 +480,27 @@ object OldSchoolArt : ThemeArt {
         @Composable get() = RectangleShape
 
     override val drawerPeek: Dp
-        @Composable get() = with(LocalDensity.current) { (STONE_HEIGHT * gamePixel).toDp() }
+        @Composable get() = 0.dp
+
+    override val drawerTabInDock: Boolean
+        get() = true
+
+    /** The inventory tab's backpack, on the dock's last stone, which opens the drawer as the game's tab opens its inventory. */
+    @Composable
+    override fun DockDrawerTab(onClick: () -> Unit, modifier: Modifier) {
+        val bag = sprite(R.drawable.osrs_777_0)
+        val px = gamePixel
+        Spacer(
+            modifier
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = "Open the app drawer" }
+                .testTag(AppDrawerTags.HANDLE)
+                .drawBehind {
+                    val scale = max(1, min(px, floor(size.minDimension / STONE_FACE).toInt()))
+                    drawSprite(bag, Offset(size.width, size.height) / 2f - Offset(bag.width.toFloat(), bag.height.toFloat()) * (scale / 2f), scale)
+                },
+        )
+    }
 
     /** The inventory tab: a stone with the game's backpack, lit red while the drawer is open as a selected tab is. */
     @Composable
@@ -546,6 +635,9 @@ private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLe
 }
 
 /** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
+/** The ripple of a press on an icon, unbounded, so it never clips the item's pixels. */
+private fun Modifier.pressed(presses: InteractionSource?) = if (presses == null) this else indication(presses, ripple(bounded = false))
+
 internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
     drawSpritePart(image, 0, image.width, topLeft, scale, tint, alpha)
 

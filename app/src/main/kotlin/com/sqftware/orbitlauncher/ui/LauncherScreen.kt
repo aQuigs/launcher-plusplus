@@ -1621,7 +1621,7 @@ fun LauncherScreen(
                                         // moves rather than jumps.
                                         if (isHome) {
                                             val dockShown = dock.isNotEmpty() || (onHome == null && !pageApps.dock.isEmpty) ||
-                                                (active || page == inView) && dragged?.app != null
+                                                (active || page == inView) && dragged?.app != null || art.drawerTabInDock
                                             AnimatedVisibility(visible = dockShown) {
                                                 Dock(
                                                     items = dock,
@@ -1636,6 +1636,7 @@ fun LauncherScreen(
                                                     onClearBadge = actions.clearBadge,
                                                     rearrange = dockRearrange.takeIf { active },
                                                     foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Dock }?.index,
+                                                    tab = if (art.drawerTabInDock) { tab -> art.DockDrawerTab(::openDrawer, tab) } else null,
                                                 )
                                             }
                                         }
@@ -1733,7 +1734,7 @@ fun LauncherScreen(
                 }
             }
             if (layout.showsDots && !drawerOpen) {
-                PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = drawerPeek - 8.dp))
+                PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = (drawerPeek - 8.dp).coerceAtLeast(0.dp)))
             }
             if (editingPages) {
                 PageEditor(

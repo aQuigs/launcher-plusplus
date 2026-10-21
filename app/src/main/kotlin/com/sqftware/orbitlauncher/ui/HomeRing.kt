@@ -486,14 +486,13 @@ private fun Emblem(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(CircleShape)
+            .then(art.emblemBox(edgeMark))
             .combinedClickable(
                 onClickLabel = hint ?: "Search apps",
                 onLongClickLabel = "Choose the apps on the home screen".takeIf { hint == null },
                 onLongClick = onEdit.takeIf { hint == null },
                 onClick = if (hint == null) onSearch else onEdit,
             )
-            .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (hint == null) contentDescription = "Favourites" },
     ) {

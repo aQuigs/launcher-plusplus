@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.Image
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -239,6 +241,22 @@ interface ThemeArt {
     /** A menu's items, [content], as the theme sets them out: by default as they are. */
     @Composable
     fun MenuBody(content: @Composable () -> Unit) = content()
+
+    /**
+     * What the emblem's box clips its face and its touch to, and draws round the face: by default the circle of its
+     * cell, rimmed faintly in [edge].
+     */
+    @Composable
+    fun emblemBox(edge: Color): Modifier =
+        Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
+
+    /** Whether the tab that opens the drawer ends the dock's row, as [DockDrawerTab], rather than peeking below it. */
+    val drawerTabInDock: Boolean
+        get() = false
+
+    /** The tab that opens the drawer, in the last of the dock's slots, for a theme with its [drawerTabInDock]. */
+    @Composable
+    fun DockDrawerTab(onClick: () -> Unit, modifier: Modifier) = Unit
 
     /** The type every text is set in, or null for Material's own. */
     val typography: Typography?
