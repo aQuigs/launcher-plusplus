@@ -34,14 +34,11 @@ import com.sqftware.orbitlauncher.ui.theme.RingColors
  */
 interface ThemeArt {
     /**
-     * What the emblem's hint is written in, and the shadow that keeps it legible, over the emblem's own face: by default
-     * the content colour on its inverse, for a face drawn in the scheme's roles.
+     * What the emblem's hint is written in over the emblem's own face: by default the content colour, for a face drawn in
+     * the scheme's roles.
      */
     val hintInk: Color
         @Composable get() = MaterialTheme.colorScheme.onSurface
-
-    val hintShade: Color
-        @Composable get() = MaterialTheme.colorScheme.inverseOnSurface
 
     /**
      * The emblem's face, filling the item: its ground, and its mark unless [marked] is false because a hint is shown

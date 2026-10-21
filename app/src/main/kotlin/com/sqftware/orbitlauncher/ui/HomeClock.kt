@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.ui.theme.legible
 
 object HomeClockTags {
     const val TIME = "clock_time"
@@ -44,7 +45,7 @@ fun HomeClock(face: ClockFace, onTimeClick: () -> Unit, onDateClick: () -> Unit,
         val display = MaterialTheme.typography.displayLarge
         Text(
             text = face.time,
-            style = display,
+            style = display.legible(),
             fontWeight = FontWeight.Light,
             maxLines = 1,
             // A large font scale would otherwise wrap the time onto a second line and push the ring down.
@@ -53,7 +54,7 @@ fun HomeClock(face: ClockFace, onTimeClick: () -> Unit, onDateClick: () -> Unit,
         )
         Text(
             text = face.date,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.legible(),
             modifier = Modifier.target("Open the calendar", onDateClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.DATE),
         )
     }
@@ -93,7 +94,7 @@ private fun GlyphLabel(@DrawableRes glyph: Int, label: String, modifier: Modifie
     val size = with(LocalDensity.current) { style.lineHeight.toDp() }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
         Icon(painterResource(glyph), contentDescription = null, modifier = Modifier.padding(end = 6.dp).size(size))
-        Text(text = label, style = style)
+        Text(text = label, style = style.legible())
     }
 }
 
