@@ -14,12 +14,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.LocalGround
 import com.sqftware.orbitlauncher.ui.theme.Spacing
+import com.sqftware.orbitlauncher.ui.theme.legible
 
 // The kinds of text the launcher shows outside its boxes and buttons, each in one style wherever it is, so a screen does
 // not pick its own size or colour for a title, a heading, a line that explains, or a note that there is nothing here.
@@ -59,23 +59,23 @@ fun SupportingText(text: String, modifier: Modifier = Modifier, textAlign: TextA
 
 /**
  * Says there is nothing here yet, and what to do about it in [action], if anything, centred in its place. Straight on
- * the wallpaper it takes the theme's ink and shade, which read on any wallpaper.
+ * the wallpaper it takes the theme's hint ink.
  */
 @Composable
 fun EmptyNote(text: String, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
     val art = LocalThemeArt.current
     val onWallpaper = LocalGround.current == Ground.Wallpaper
-    val style = MaterialTheme.typography.bodyLarge.let { if (onWallpaper) it.copy(shadow = Shadow(art.hintShade, blurRadius = 6f)) else it }
 
     Column(
         modifier.fillMaxWidth().padding(Spacing.Edge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
     ) {
+        val ink = if (onWallpaper) art.hintInk else MaterialTheme.colorScheme.onSurfaceVariant
         Text(
             text,
-            style = style,
-            color = if (onWallpaper) art.hintInk else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge.legible(ink),
+            color = ink,
             textAlign = TextAlign.Center,
         )
         action?.invoke()

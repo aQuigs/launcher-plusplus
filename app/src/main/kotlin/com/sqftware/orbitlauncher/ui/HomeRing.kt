@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -80,6 +79,7 @@ import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
 import com.sqftware.orbitlauncher.domain.rooms
 import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
+import com.sqftware.orbitlauncher.ui.theme.legible
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -548,7 +548,7 @@ private fun Emblem(
             Text(
                 text = hint,
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
-                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(art.hintShade, blurRadius = 6f)),
+                style = MaterialTheme.typography.labelLarge.legible(art.hintInk),
                 color = art.hintInk,
                 textAlign = TextAlign.Center,
                 maxLines = 2,

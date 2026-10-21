@@ -51,6 +51,7 @@ import com.sqftware.orbitlauncher.domain.NameWidths
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import com.sqftware.orbitlauncher.ui.theme.LocalGround
+import com.sqftware.orbitlauncher.ui.theme.legible
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -179,7 +180,7 @@ private val appLabelStyle @Composable get() = MaterialTheme.typography.labelMedi
 fun AppLabel(label: String, modifier: Modifier = Modifier, maxLines: Int = 1) {
     Text(
         text = label,
-        style = appLabelStyle,
+        style = appLabelStyle.legible(),
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         textAlign = TextAlign.Center,

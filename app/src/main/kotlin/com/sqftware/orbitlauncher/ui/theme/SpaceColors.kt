@@ -56,7 +56,6 @@ internal val SpaceMars = Palette(
 // The emblem is a disc of the icon's own sky whatever the wallpaper, so what is drawn inside it keeps the night's colours.
 val RingSpark = Spark
 val RingInk = Frost.copy(alpha = 0.9f)
-val RingShade = Sky
 
 val FolderEdge = DiscEdge(outer = Sky.copy(alpha = 0.5f), inner = Frost.copy(alpha = 0.5f))
 

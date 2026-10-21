@@ -61,6 +61,12 @@ repos:
         entry: '\.horizontalScroll\(|\bLazyRow\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/Fades\.kt$
+      - id: legible-text
+        name: Text on the wallpaper takes its halo from legible(), never a shadow of its own
+        language: pygrep
+        entry: '(?<![\w.])Shadow\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude
