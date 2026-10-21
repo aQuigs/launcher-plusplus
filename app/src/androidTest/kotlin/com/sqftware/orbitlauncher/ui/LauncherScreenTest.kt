@@ -168,6 +168,7 @@ class LauncherScreenTest {
     private var updateAvailable by mutableStateOf(false)
     private var updatesOpened = 0
     private var checkForUpdates by mutableStateOf(true)
+    private var showWhereIAm by mutableStateOf(false)
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -301,6 +302,8 @@ class LauncherScreenTest {
             onOpenUpdate = { updatesOpened++ },
             checkForUpdates = checkForUpdates,
             onCheckForUpdatesChange = { checkForUpdates = it },
+            showWhereIAm = showWhereIAm,
+            onShowWhereIAmChange = { showWhereIAm = it },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPages = widgetPages,
@@ -2226,6 +2229,19 @@ class LauncherScreenTest {
 
         leaveAndReturn()
         assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
+    fun theLauncherMenusWhereIAmRowShowsWhetherTheMapFollowsTheUserAndATapFlipsIt() {
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Show where I am").assertIsOff()
+
+        compose.onNodeWithText("Show where I am").performClick()
+
+        compose.runOnIdle { assertTrue(showWhereIAm) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Show where I am").assertIsOn()
     }
 
     @Test

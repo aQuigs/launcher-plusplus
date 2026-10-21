@@ -234,7 +234,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]),
+ * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([showWhereIAm], [onShowWhereIAmChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -295,6 +295,8 @@ fun LauncherScreen(
     onOpenUpdate: () -> Unit,
     checkForUpdates: Boolean,
     onCheckForUpdatesChange: (Boolean) -> Unit,
+    showWhereIAm: Boolean,
+    onShowWhereIAmChange: (Boolean) -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
@@ -388,6 +390,8 @@ fun LauncherScreen(
     val latestOnRestart by rememberUpdatedState(onRestart)
     val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
     val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
+    val latestShowWhereIAm by rememberUpdatedState(showWhereIAm)
+    val latestOnShowWhereIAmChange by rememberUpdatedState(onShowWhereIAmChange)
 
     // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
     // through this screen's BackHandler.
@@ -1200,6 +1204,12 @@ fun LauncherScreen(
                                 on = latestAmbientMotion,
                                 flips = true,
                                 onClick = { latestOnAmbientMotionChange(!latestAmbientMotion) },
+                            ),
+                            LauncherMenuRow(
+                                "Show where I am",
+                                on = latestShowWhereIAm,
+                                flips = true,
+                                onClick = { latestOnShowWhereIAmChange(!latestShowWhereIAm) },
                             ),
                             LauncherMenuRow(
                                 "Check for updates",

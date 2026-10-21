@@ -196,17 +196,15 @@ private class Protobuf(private val bytes: ByteArray, start: Int, private val end
         }
     }
 
-    fun fixed32(): Int {
-        var v = 0
-        for (i in 0 until 4) v = v or ((bytes[at + i].toInt() and 0xFF) shl (8 * i))
-        at += 4
-        return v
-    }
+    fun fixed32() = fixed(4).toInt()
 
-    fun fixed64(): Long {
+    fun fixed64() = fixed(8)
+
+    private fun fixed(size: Int): Long {
+        if (at + size > end) throw IllegalArgumentException("Truncated fixed value")
         var v = 0L
-        for (i in 0 until 8) v = v or ((bytes[at + i].toLong() and 0xFF) shl (8 * i))
-        at += 8
+        for (i in 0 until size) v = v or ((bytes[at + i].toLong() and 0xFF) shl (8 * i))
+        at += size
         return v
     }
 
