@@ -11,12 +11,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -275,7 +278,7 @@ fun AppDrawer(
                     item = { Modifier.testTag(if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL) },
                 )
             }
-            Box(Modifier.weight(1f)) {
+            Box(Modifier.weight(1f).windowInsetsPadding(WindowInsets.ime)) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(if (style.layout == DrawerLayout.Grid) GRID_COLUMNS else 1),
                     state = if (searching) matchesState else gridState,
@@ -558,16 +561,8 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {
                     PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))
-                    PickMark.Check -> Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                            .size(18.dp)
-                            .padding(2.dp),
-                    )
+                    // Clear of the work mark, which takes the bottom-end corner.
+                    PickMark.Check -> PickedMark(Modifier.align(Alignment.BottomStart))
                 }
             }
             entry.menu?.content?.invoke(app)

@@ -67,7 +67,7 @@ object SpaceArt : ThemeArt {
                         val side = outer * EMBLEM_ART_PER_RADIUS
                         val art = Size(side, side)
                         val inset = (size.minDimension - side) / 2
-                        onDrawBehind { clipPath(disc) { translate(inset, inset) { with(sky) { draw(art, alpha = 0.5f) } } } }
+                        onDrawBehind { clipPath(disc) { translate(inset, inset) { with(sky) { draw(art) } } } }
                     },
             )
             if (marked) {

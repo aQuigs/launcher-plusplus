@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,6 +77,21 @@ fun WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
             .cornerBubble(top = false, fill = LocalBoxColors.current.floating, edge = colors.primary)
             .size(18.dp)
             .padding(4.dp),
+    )
+}
+
+/** The tick on whatever is chosen: a tile picked in a picker, an app picked in the drawer. */
+@Composable
+fun PickedMark(modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Icon(
+        Icons.Default.Check,
+        contentDescription = null,
+        tint = colors.onPrimary,
+        modifier = modifier
+            .background(colors.primary, CircleShape)
+            .size(18.dp)
+            .padding(2.dp),
     )
 }
 

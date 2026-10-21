@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
+import com.sqftware.orbitlauncher.ui.theme.sidewaysScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +75,7 @@ object PageEditorTags {
 private val CARD_WIDTH = 88.dp
 private val CARD_HEIGHT = 176.dp
 private val CARD_GAP = 12.dp
+private val LIFT_ROOM = 8.dp
 
 // A finger dragging a page this near either end of the strip scrolls it, and at the edge itself this fast, a second.
 private val EDGE_ZONE = 48.dp
@@ -118,7 +119,7 @@ fun PageEditor(
     }
 
     Panel(modifier.testTag(PageEditorTags.EDITOR)) {
-        Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(top = 24.dp, bottom = 24.dp - LIFT_ROOM), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Pages", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 20.dp))
             Text(
                 "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
@@ -129,7 +130,6 @@ fun PageEditor(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(CARD_GAP),
                 modifier = Modifier
-                    .padding(top = 24.dp)
                     // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
                     // the strip's own place on screen.
                     .pointerInput(Unit) {
@@ -137,8 +137,9 @@ fun PageEditor(
                             while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
                         }
                     }
-                    .horizontalScroll(scroll)
-                    .padding(horizontal = 20.dp),
+                    .sidewaysScroll(scroll, inset = 20.dp)
+                    // Inside the scroll's fade, which clips, so a lifted card has room to rise and tilt.
+                    .padding(top = 24.dp, bottom = LIFT_ROOM),
             ) {
                 if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
                 layout.pages.forEachIndexed { index, page ->

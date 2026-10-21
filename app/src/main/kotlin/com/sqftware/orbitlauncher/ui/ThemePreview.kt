@@ -1,6 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.horizontalScroll
+import com.sqftware.orbitlauncher.ui.theme.sidewaysScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,7 +100,7 @@ fun ThemePreviewBar(
 @Composable
 private fun ChipRow(content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier.nestedScroll(KeepsSideways).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        Modifier.nestedScroll(KeepsSideways).sidewaysScroll(rememberScrollState(), inset = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
     )

@@ -1,7 +1,10 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -10,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -42,10 +46,17 @@ fun Pane(
     val contentColor = if (selected) boxes.onLit else MaterialTheme.colorScheme.onSurface
     val border = if (marked) markedEdge() else null
 
+    // A chosen box is ticked as well as lit, as its fill alone may sit close to an unchosen one's.
+    val shown: @Composable () -> Unit = {
+        Box(propagateMinConstraints = true) {
+            content()
+            if (selected) PickedMark(Modifier.align(Alignment.TopEnd).wrapContentSize(Alignment.TopEnd).padding(8.dp))
+        }
+    }
     if (onClick != null) {
-        Surface(onClick, modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = content)
+        Surface(onClick, modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = shown)
     } else {
-        Surface(modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = content)
+        Surface(modifier, shape = shape, color = fill, contentColor = contentColor, border = border, content = shown)
     }
 }
 
