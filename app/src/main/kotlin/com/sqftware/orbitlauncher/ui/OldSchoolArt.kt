@@ -140,7 +140,7 @@ private const val EMBLEM_REACH = 1.15f
  * The credit the map data's licences ask to show with the map, along the bottom of the disc: how wide it may run and
  * how far below the centre its foot is, in game pixels.
  */
-private const val MAP_CREDIT = "© OpenMapTiles © OpenStreetMap"
+private const val MAP_CREDIT = "© OpenMapTiles\n© OpenStreetMap"
 private const val CREDIT_WIDTH = 104
 private const val CREDIT_DROP = 70
 
