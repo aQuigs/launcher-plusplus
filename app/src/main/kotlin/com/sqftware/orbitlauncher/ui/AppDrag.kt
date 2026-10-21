@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import kotlinx.coroutines.CancellationException
 
 object DragTags {
@@ -146,7 +147,7 @@ fun DragGhost(
             Modifier
                 .size(RING_ICON_SIZE)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .background(LocalBoxColors.current.floating)
                 .testTag(DragTags.GHOST),
             contentAlignment = Alignment.Center,
             content = content,

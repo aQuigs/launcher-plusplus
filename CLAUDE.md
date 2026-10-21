@@ -48,7 +48,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
 ## Conventions
 
 - The look follows the wallpaper: a light one gets the day scheme and day ring colours. Colours come from the scheme's roles or `LocalRingColors`, never from an assumption that the launcher is dark.
-- A text button on the wallpaper, or on glass over it, is a `TonalButton`, rimmed so it reads on any wallpaper; one on a pop-up's own solid ground (a dialog, the theme preview's bar) is a `PopupButton`, or a `TonalButton` for its main action, with `destructive` set where it erases what the user keeps. Material's text buttons appear only inside those two (held by the `launcher-buttons` hook).
+- What a thing sits on is its `Ground` (`LocalGround`): the wallpaper, a panel (the drawer, every `Panel`) or a pop-up (every dialog and menu, and a `FloatingPane`). Boxes, choices and buttons take their look from it and never pick one: every box is a `Pane`, filled from `BoxColors` for its ground, lit when selected and outlined when marked; a floating bar or switch is a `FloatingPane`; a mark over other content (a drag ghost, the bin, edit handles, a badge) takes `BoxColors.floating`; a choice is a `ChoiceRow` or `ChoiceChips`; a text button is a `LauncherButton`, with an `Emphasis` for a main or destructive action. Corners come from `MaterialTheme.shapes`. The `launcher-surfaces` and `launcher-buttons` hooks and `LauncherColorsTest` hold it.
 - Colours live in `ui/theme`: components take a `colorScheme` role or a theme token, never a literal or a surface alpha copy, and a look changes by changing its role there (held by the `theme-colours-only` hook and `LauncherColorsTest`).
 
 ## Themes
@@ -62,7 +62,7 @@ The launcher's look is a theme, picked in the launcher's menu: Space (the ring's
 - App drawer: search, the list and grid
 - Collections page: the cards, their header controls, the app picker
 - Grid page: its apps, its folders in each folder look, and an open folder's dialog
-- Widget page and the controls on every page (`TonalButton`, badges, the page dots)
+- Widget page and the controls on every page (`LauncherButton`, `Pane`, badges, the page dots)
 - Popups and panels: the launcher menu, an app's menu, the pin dialog, the place picker, the page editor and its dialogs, the dialog that sets a theme's scene as the wallpaper
 
 A feature that adds one of these surfaces, or changes how one looks, draws it from `ui/theme`, or from `LocalThemeArt` where its shape differs by theme, so each theme can give it its own look, and checks it under every theme. A new surface goes on this list.

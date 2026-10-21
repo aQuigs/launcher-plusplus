@@ -68,8 +68,8 @@ import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
@@ -105,10 +105,11 @@ import com.sqftware.orbitlauncher.domain.nearestCells
 import com.sqftware.orbitlauncher.domain.roomFor
 import com.sqftware.orbitlauncher.domain.widgetCells
 import com.sqftware.orbitlauncher.domain.widgetRowsWithin
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 object WidgetTags {
     const val ADD = "widget_add"
@@ -489,7 +490,7 @@ fun WidgetGrid(
                         .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
                         .testTag(WidgetTags.ADD),
                 ) {
-                    TonalButton(onClick = add) {
+                    LauncherButton(onClick = add) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                         Text("Add widget")
                     }
@@ -714,7 +715,7 @@ private fun EditButton(icon: ImageVector, description: String, modifier: Modifie
             .size(CONTROL_SIZE)
             .clip(CircleShape)
             .then(input)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            .background(LocalBoxColors.current.floating),
     ) {
         Icon(icon, contentDescription = description, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }

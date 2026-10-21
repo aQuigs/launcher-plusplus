@@ -145,8 +145,8 @@ fun LauncherMenuItem(row: LauncherMenuRow, expanded: Boolean, onDismiss: () -> U
 fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onReset, destructive = true) { Text("Reset") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { LauncherButton(onClick = onReset, emphasis = Emphasis.Destructive) { Text("Reset") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Reset Orbit?") },
         text = {
             Text("This clears the ring, the dock, folders, collections, widgets and your settings, then restarts. Permissions stay.")
@@ -160,8 +160,8 @@ fun ResetDialog(onReset: () -> Unit, onDismiss: () -> Unit) {
 fun SceneDialog(scene: ThemeScene, onSet: () -> Unit, onDismiss: () -> Unit) {
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onSet) { Text("Set") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { LauncherButton(onClick = onSet) { Text("Set") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Set the ${scene.name} as wallpaper?") },
         text = { Text("It replaces the home screen's wallpaper.") },
     )
@@ -185,7 +185,7 @@ fun <T> ChoiceDialog(
     GroundDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text(title) },
         text = {
             Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {

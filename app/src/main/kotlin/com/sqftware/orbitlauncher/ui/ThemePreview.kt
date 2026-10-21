@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,9 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -32,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.Theme
-import com.sqftware.orbitlauncher.ui.theme.LocalTonalEdge
 
 object ThemePreviewTags {
     const val BAR = "theme_preview_bar"
@@ -75,12 +71,7 @@ fun ThemePreviewBar(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().testTag(ThemePreviewTags.BAR),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, LocalTonalEdge.current),
-    ) {
+    FloatingPane(modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().testTag(ThemePreviewTags.BAR)) {
         Column(Modifier.padding(vertical = 8.dp)) {
             Row(Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -90,16 +81,16 @@ fun ThemePreviewBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                PopupButton(onClose, Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
-                TonalButton(onUse, Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
+                LauncherButton(onClose, modifier = Modifier.testTag(ThemePreviewTags.CLOSE)) { Text("Close") }
+                LauncherButton(onUse, emphasis = Emphasis.Strong, modifier = Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
             }
-            ChipRow { Chips(Theme.entries, shown, Theme::label, onShow) }
+            ChipRow { ChoiceChips(Theme.entries, shown, Theme::label, onShow) }
             // One row for both, so the bar is no taller than the clock whose room it takes.
             ChipRow {
-                Chips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)
+                ChoiceChips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)
                 if (shown.colourways.size > 1) {
                     VerticalDivider(Modifier.height(24.dp).align(Alignment.CenterVertically))
-                    Chips(shown.colourways, colourway, Colourway::label, onColourwayChange)
+                    ChoiceChips(shown.colourways, colourway, Colourway::label, onColourwayChange)
                 }
             }
         }
@@ -121,11 +112,4 @@ private object KeepsSideways : NestedScrollConnection {
     override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource) = available
 
     override suspend fun onPostFling(consumed: Velocity, available: Velocity) = available
-}
-
-@Composable
-private fun <T> Chips(choices: List<T>, chosen: T, label: (T) -> String, onChoose: (T) -> Unit) {
-    choices.forEach { choice ->
-        FilterChip(selected = choice == chosen, onClick = { onChoose(choice) }, label = { Text(label(choice)) })
-    }
 }

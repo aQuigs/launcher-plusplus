@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,7 +44,7 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
 
     GroundDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { LauncherButton(onClick = onDismiss) { Text("Done") } },
         title = { Text("Spin stats") },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -131,22 +129,18 @@ private fun SpinDial(stats: SpinStats, count: String) {
 
 @Composable
 private fun DirectionTile(tint: Color, value: String, label: String, modifier: Modifier, mirrored: Boolean = false) {
-    Column(
-        modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp))
-            .padding(12.dp)
-            .semantics(mergeDescendants = true) {},
-    ) {
-        Icon(
-            RotateRightGlyph,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(20.dp).graphicsLayer { if (mirrored) scaleX = -1f },
-        )
-        Spacer(Modifier.size(6.dp))
-        Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Pane(modifier.fillMaxHeight().semantics(mergeDescendants = true) {}) {
+        Column(Modifier.padding(12.dp)) {
+            Icon(
+                RotateRightGlyph,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(20.dp).graphicsLayer { if (mirrored) scaleX = -1f },
+            )
+            Spacer(Modifier.size(6.dp))
+            Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
