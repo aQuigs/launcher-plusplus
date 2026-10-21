@@ -29,7 +29,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
-import com.sqftware.orbitlauncher.apps.MinimapSpriteNames
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.PlatformLocationSource
@@ -67,7 +66,6 @@ import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.CollectionPages
-import com.sqftware.orbitlauncher.domain.minimap.MapIcon
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.GridPages
@@ -102,13 +100,6 @@ private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 // least turn worth redrawing for: under one of the map's pixels at its edge, so the sensor's jitter at rest draws nothing.
 private const val HEADING_EASE = 0.25f
 private const val HEADING_STEP = 0.5f
-
-// Drawables by name, so a build without the art still draws the ground, walls and doors of the map.
-private val MINIMAP_SPRITES = MinimapSpriteNames(
-    trees = listOf("osrs_map_tree_0", "osrs_map_tree_1"),
-    npc = "osrs_300_1",
-    icons = MapIcon.entries.associateWith { icon -> "osrs_map_" + icon.name.replace(Regex("(?<=.)(?=[A-Z])"), "_").lowercase() },
-)
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -157,7 +148,7 @@ class MainActivity : ComponentActivity() {
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this)
-        val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this, MINIMAP_SPRITES))
+        val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this))
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = { page: String ->
             WidgetActions(
