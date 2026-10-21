@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.AlertDialog
@@ -8,7 +7,6 @@ import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 
 // Every dialog and menu of the launcher is one of these, so each sits on the drawer's ground (held by the
@@ -47,17 +44,19 @@ fun GroundDialog(
     )
 }
 
-/** Material's dropdown menu on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground. */
+/** Material's dropdown menu in the theme's box on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground. */
 @Composable
 fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val art = LocalThemeArt.current
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier.solidGround(panelGround(), MenuDefaults.shape),
+        modifier = modifier.then(art.menuBox(panelGround())),
         containerColor = Color.Transparent,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        content = content,
-    )
+        border = art.menuRim,
+    ) {
+        art.MenuBody { content() }
+    }
 }
 
 /**

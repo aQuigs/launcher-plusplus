@@ -14,6 +14,20 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import com.sqftware.orbitlauncher.ui.theme.MenuTarget
+import com.sqftware.orbitlauncher.ui.theme.MenuVerb
+import com.sqftware.orbitlauncher.ui.theme.MenuRim
+import com.sqftware.orbitlauncher.ui.theme.MenuGround
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.drawBehind
@@ -76,6 +90,15 @@ private const val ORB_RADIUS = 17
 /** How far each of a pile's two items sits from the middle, in the game's pixels: the one behind up and over, the one in front down and back. */
 private val PILE_BEHIND = IntOffset(4, -3)
 private val PILE_FRONT = IntOffset(-3, 4)
+
+/**
+ * The game's row of tab stones: a stone's face, as wide as a dock icon, and the pitch they repeat at; how tall a stone
+ * is; and how wide each of the row's rounded end stones is.
+ */
+private const val STONE_FACE = 31
+private const val STONE_PITCH = 33
+private const val STONE_HEIGHT = 36
+private const val END_STONE = 38
 
 /** The game's own type: its plain, bold and small fonts, drawn whole game pixels high. */
 private val GameFont = FontFamily(Font(R.font.osrs_plain), Font(R.font.osrs_bold, FontWeight.Bold))
@@ -218,6 +241,80 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
+    /** A dock icon is as wide as a tab stone's face, so the stones meet as the game's row does. */
+    override val dockIconSize: Dp
+        @Composable get() = with(LocalDensity.current) { (STONE_FACE * gamePixel).toDp() }
+
+    override val dockIconFill: Float
+        get() = STONE_FACE.toFloat() / STONE_PITCH
+
+    /**
+     * The game's row of tab stones under the dock's slots, one stone to a slot: the row's rounded end stones at its ends
+     * and its middle stone between, all lit red, as a selected tab is, while the dock is a drop target.
+     */
+    @Composable
+    override fun dockGround(glowColour: Color): DrawScope.(DockSlots) -> Unit {
+        val row = sprite(R.drawable.osrs_1174_0)
+        val stone = sprite(R.drawable.osrs_1180_0)
+        val lit = sprite(R.drawable.osrs_1181_0)
+        val px = gamePixel
+        return { slots ->
+            val count = slots.starts.size
+            val scale = max(1, min(px, floor(slots.iconSize / STONE_FACE).toInt()))
+            val top = size.height / 2 - STONE_HEIGHT * scale / 2f
+            slots.starts.forEachIndexed { index, start ->
+                val centre = start + slots.iconSize / 2
+                val half = STONE_PITCH * scale / 2f
+                when {
+                    count == 1 || index in 1 until count - 1 -> drawSprite(stone, Offset(centre - stone.width * scale / 2f, top), scale)
+                    index == 0 -> drawSpritePart(row, 0, END_STONE, Offset(centre + half - END_STONE * scale, top), scale)
+                    else -> drawSpritePart(row, row.width - END_STONE, END_STONE, Offset(centre - half, top), scale)
+                }
+                if (slots.glow > 0f) drawSprite(lit, Offset(centre - lit.width * scale / 2f, top), scale, alpha = slots.glow * 0.7f)
+            }
+        }
+    }
+
+    /** The inventory tab: a stone with the game's backpack, lit red while the drawer is open as a selected tab is. */
+    @Composable
+    override fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) {
+        val stone = sprite(if (open) R.drawable.osrs_1181_0 else R.drawable.osrs_1180_0)
+        val bag = sprite(R.drawable.osrs_777_0)
+        val px = gamePixel
+        with(LocalDensity.current) {
+            Spacer(
+                modifier
+                    .clickable(onClickLabel = null, onClick = onClick)
+                    .semantics { contentDescription = if (open) "Close the app drawer" else "Open the app drawer" }
+                    .testTag(AppDrawerTags.HANDLE)
+                    .size((stone.width * px).toDp(), (stone.height * px).toDp())
+                    .drawBehind {
+                        drawSprite(stone, Offset.Zero, px)
+                        drawSprite(bag, Offset((stone.width - bag.width) * px / 2f, (stone.height - bag.height) * px / 2f), px)
+                    },
+            )
+        }
+    }
+
+    /** The game's right-click menu: a black box in a one pixel brown rim. */
+    @Composable
+    override fun menuBox(ground: PanelGround): Modifier = Modifier.background(MenuGround)
+
+    override val menuRim: BorderStroke
+        @Composable get() = BorderStroke(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim)
+
+    /** "Choose Option" in the rim's brown over the items, which are in white with any secondary text in the target's orange. */
+    @Composable
+    override fun MenuBody(content: @Composable () -> Unit) {
+        Text(
+            "Choose Option",
+            color = MenuRim,
+            style = MaterialTheme.typography.labelLarge.copy(shadow = null),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp).semantics { hideFromAccessibility() },
+        )
+        MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
+    }
+
     override val typography: Typography
         @Composable get() {
             val px = gamePixel
@@ -233,12 +330,25 @@ private const val ITEM_FIT = 28f
 private fun sprite(@DrawableRes id: Int): ImageBitmap = ImageBitmap.imageResource(id)
 
 /** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
-private fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null) = drawImage(
+private fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
+    drawSpritePart(image, 0, image.width, topLeft, scale, tint, alpha)
+
+/** The columns of [image] from [from], [width] of them, drawn as [drawSprite] draws the whole. */
+private fun DrawScope.drawSpritePart(
+    image: ImageBitmap,
+    from: Int,
+    width: Int,
+    topLeft: Offset,
+    scale: Int,
+    tint: Color? = null,
+    alpha: Float = 1f,
+) = drawImage(
     image,
-    srcOffset = IntOffset.Zero,
-    srcSize = IntSize(image.width, image.height),
+    srcOffset = IntOffset(from, 0),
+    srcSize = IntSize(width, image.height),
     dstOffset = IntOffset(topLeft.x.toInt(), topLeft.y.toInt()),
-    dstSize = IntSize(image.width * scale, image.height * scale),
+    dstSize = IntSize(width * scale, image.height * scale),
+    alpha = alpha,
     colorFilter = tint?.let { ColorFilter.tint(it) },
     filterQuality = FilterQuality.None,
 )

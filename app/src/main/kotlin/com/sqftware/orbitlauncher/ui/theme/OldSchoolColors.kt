@@ -25,6 +25,10 @@ internal val OldSchoolPalette = Palette(
 val GameShadow = Color.Black
 val StackCount = Yellow
 val MenuVerb = Color.White
+
+/** The game's right-click menu: its black box and the brown of its rim and its "Choose Option" header. */
+val MenuGround = Color.Black
+val MenuRim = Color(0xFF5D5447)
 val MenuTarget = Color(0xFFFF9040)
 
 /** The orange of the game's interface text, such as a window's title. */

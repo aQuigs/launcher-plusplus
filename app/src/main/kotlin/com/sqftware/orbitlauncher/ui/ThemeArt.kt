@@ -1,6 +1,8 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.CornerRadius
+import com.sqftware.orbitlauncher.domain.DOCK_ICON_FILL
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.toSize
@@ -121,10 +127,44 @@ interface ThemeArt {
     @Composable
     fun ClockTime(time: String, modifier: Modifier) = PlainClockTime(time, modifier)
 
+    /** How large a dock's icons are while they all fit, and what share of its slot each fills. */
+    val dockIconSize: Dp
+        @Composable get() = 56.dp
+
+    val dockIconFill: Float
+        get() = DOCK_ICON_FILL
+
+    /**
+     * Builds what draws under the dock's [slots][DockSlots], glowing by how much the dock is lit as a drop target: by
+     * default nothing but that glow, in [glowColour].
+     */
+    @Composable
+    fun dockGround(glowColour: Color): DrawScope.(DockSlots) -> Unit = { slots ->
+        if (slots.glow > 0f) drawRoundRect(glowColour.copy(alpha = 0.12f * slots.glow), cornerRadius = CornerRadius(size.height / 2))
+    }
+
+    /** What opens and closes the drawer above the pages, pointing the way it will move: by default a chevron. */
+    @Composable
+    fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) = ChevronHandle(open, onClick, modifier)
+
+    /** A menu's box on [ground]: by default the solid ground in Material's menu shape, rimmed so it holds its edge. */
+    @Composable
+    fun menuBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, MenuDefaults.shape)
+
+    val menuRim: BorderStroke?
+        @Composable get() = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+
+    /** A menu's items, [content], as the theme sets them out: by default as they are. */
+    @Composable
+    fun MenuBody(content: @Composable () -> Unit) = content()
+
     /** The type every text is set in, or null for Material's own. */
     val typography: Typography?
         @Composable get() = null
 }
+
+/** The dock's slots as laid out on its row: each icon [iconSize] across, the nth starting [starts] along, and how much it [glow]s. */
+class DockSlots(val iconSize: Float, val starts: List<Float>, val glow: Float)
 
 /** Where an icon is drawn, for a theme that frames the home ring's icons apart from the rest. */
 enum class IconPlace { Ring, Elsewhere }

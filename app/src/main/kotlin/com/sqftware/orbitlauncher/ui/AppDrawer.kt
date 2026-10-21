@@ -103,12 +103,17 @@ object AppDrawerTags {
     fun letter(initial: Char) = "rail_$initial"
 }
 
+/** What peeks above the pages to open the drawer and close it, in the theme. A tap calls [onClick]. */
+@Composable
+fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) =
+    LocalThemeArt.current.DrawerHandle(open, onClick, modifier)
+
 /**
- * The chevron that peeks above the pages, pointing the way the drawer will move, on a soft halo in the scrim so it reads on
- * any wallpaper. A tap calls [onClick].
+ * [DrawerHandle] as most themes draw it: a chevron pointing the way the drawer will move, on a soft halo in the scrim so
+ * it reads on any wallpaper.
  */
 @Composable
-fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ChevronHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
     val scrim = MaterialTheme.colorScheme.scrim
 
