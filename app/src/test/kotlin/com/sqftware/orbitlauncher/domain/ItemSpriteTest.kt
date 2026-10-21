@@ -74,6 +74,13 @@ class ItemSpriteTest {
     }
 
     @Test
+    fun anAdaptiveIconWithItsLogoOnALightGroundShowsTheGround() {
+        val ground = square(108) { x, y -> if (x in 44..63 && y in 44..63) red else white }
+        val mark = mark(IconLayers(square(108) { _, _ -> 0 }, ground))
+        assertTrue(red in mark.colours())
+    }
+
+    @Test
     fun anAdaptiveIconOnAColouredGroundKeepsItsGroundInADisc() {
         val logo = square(108) { x, y -> if (x in 44..63 && y in 44..63) white else 0 }
         val mark = mark(IconLayers(logo, square(108) { _, _ -> blue }))

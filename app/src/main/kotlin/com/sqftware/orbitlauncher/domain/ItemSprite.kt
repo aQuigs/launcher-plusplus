@@ -44,13 +44,14 @@ fun itemSprite(icon: IconLayers, size: Int, colours: Int = 14): Pixels {
 /**
  * What of [icon] the item shows. An adaptive icon on a plain light ground is its foreground alone, the way the brand
  * draws its logo; on a coloured ground the colour is part of the mark (a blue bubble, a green phone), so both layers
- * go into a disc. Either way only the middle of the canvas, where the system keeps the mark, is taken.
+ * go into a disc, as they do when the logo is drawn on the ground and the foreground is all but empty. Either way only
+ * the middle of the canvas, where the system keeps the mark, is taken.
  */
 internal fun mark(icon: IconLayers): Pixels {
     val background = icon.background ?: return icon.foreground
     val fore = safeZone(icon.foreground)
     val back = safeZone(background)
-    if (isPlainLight(back)) return fore
+    if (isPlainLight(back) && !isNearlyEmpty(fore)) return fore
     val out = Pixels(fore.width, fore.height)
     val r = fore.width / 2f
     for (y in 0 until fore.height) for (x in 0 until fore.width) {
@@ -67,6 +68,8 @@ private fun safeZone(layer: Pixels): Pixels {
     val from = (layer.width - side) / 2
     return Pixels(side, side, IntArray(side * side) { i -> layer[from + i % side, from + i / side] })
 }
+
+private fun isNearlyEmpty(layer: Pixels) = layer.argb.count { alpha(it) >= 128 } < layer.argb.size / 50
 
 private fun isPlainLight(layer: Pixels): Boolean {
     val opaque = layer.argb.filter { alpha(it) >= 128 }
