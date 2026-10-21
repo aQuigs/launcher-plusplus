@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The minimap of where the user is: their [location], drawn from map [tiles] with the theme's [art]. It lives as long as
@@ -20,20 +22,25 @@ import kotlinx.coroutines.flow.mapLatest
  */
 class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: MinimapArt) {
     private val maker = MinimapMaker(tiles, art::sprites)
+
+    // A paint runs on past its collection's end until it next suspends, so a collection restarted at once would share
+    // the maker with it.
+    private val painting = Mutex()
     private var shown: Pair<IntArray, ImageBitmap>? = null
 
     /**
      * A new [MINIMAP_SIZE] px disc each time the user moves far enough for a new fix, once the tiles it needs are to
-     * be had. Collect it only while the launcher is visible, and one collector at a time: it keeps location updates
-     * running while collected.
+     * be had. Collect it only while the launcher is visible: it keeps location updates running while collected.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun images(): Flow<ImageBitmap> = location.locations()
         .distinctUntilChanged()
         .mapLatest { centre ->
-            val disc = maker.paint(centre) ?: return@mapLatest null
-            shown?.takeIf { it.first === disc }?.second
-                ?: Bitmap.createBitmap(disc, MINIMAP_SIZE, MINIMAP_SIZE, Bitmap.Config.ARGB_8888).asImageBitmap().also { shown = disc to it }
+            painting.withLock {
+                val disc = maker.paint(centre) ?: return@withLock null
+                shown?.takeIf { it.first === disc }?.second
+                    ?: Bitmap.createBitmap(disc, MINIMAP_SIZE, MINIMAP_SIZE, Bitmap.Config.ARGB_8888).asImageBitmap().also { shown = disc to it }
+            }
         }
         .filterNotNull()
         .flowOn(Dispatchers.Default)
