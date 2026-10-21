@@ -1,7 +1,12 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.ui.Alignment
+import com.sqftware.orbitlauncher.domain.Unread
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -86,7 +91,45 @@ interface ThemeArt {
     /** The theme's world as a scene the launcher's menu offers to set as the wallpaper, if it has one. */
     val scene: ThemeScene?
         get() = null
+
+    /**
+     * What an app's icon sits on, filling the item, with [content] over it and rippling for [presses]: by default a
+     * disc. [place] says whether the icon is on the home ring or elsewhere, where a theme may frame it differently.
+     */
+    @Composable
+    fun IconGround(
+        place: IconPlace,
+        presses: InteractionSource?,
+        modifier: Modifier,
+        contentAlignment: Alignment,
+        content: @Composable BoxScope.() -> Unit,
+    ) = PlainIconGround(presses, modifier, contentAlignment, content)
+
+    /** An icon's [bitmap] filling its square: by default scaled smoothly. */
+    @Composable
+    fun IconImage(bitmap: ImageBitmap, modifier: Modifier) = Image(bitmap, contentDescription = null, modifier = modifier)
+
+    /** Which corner of an icon its badge sits on. */
+    val badgeCorner: Alignment
+        get() = Alignment.TopEnd
+
+    /** The badge for [unread] notifications, or nothing for none: by default a bubble over the corner. */
+    @Composable
+    fun BadgeFace(unread: Unread, modifier: Modifier) = BubbleBadge(unread, modifier)
+
+    /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
+    @Composable
+    fun ClockTime(time: String, modifier: Modifier) = PlainClockTime(time, modifier)
+
+    /** The type every text is set in, or null for Material's own. */
+    val typography: Typography?
+        @Composable get() = null
 }
+
+/** Where an icon is drawn, for a theme that frames the home ring's icons apart from the rest. */
+enum class IconPlace { Ring, Elsewhere }
+
+val LocalIconPlace = staticCompositionLocalOf { IconPlace.Elsewhere }
 
 /**
  * How many times something done [perTurn] times a turn has been done when an angle that turns has come [turn] degrees
@@ -113,6 +156,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.Paper -> PaperArt
     Theme.CrystalCity -> CrystalArt
     Theme.GreenCore -> GreenCoreArt
+    Theme.OldSchool -> OldSchoolArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
@@ -120,10 +164,13 @@ val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
 /** [content] in [theme]: its [colourway] for a light or a dark wallpaper, and its art, chosen together. */
 @Composable
 fun Themed(theme: Theme, colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
-    LauncherTheme(colourway, lightWallpaper) {
-        CompositionLocalProvider(LocalThemeArt provides artOf(theme), content = content)
+    val art = artOf(theme)
+    LauncherTheme(colourway, lightWallpaper, art.typography ?: MaterialTypography) {
+        CompositionLocalProvider(LocalThemeArt provides art, content = content)
     }
 }
+
+private val MaterialTypography = Typography()
 
 /**
  * How every folder on the screen draws itself: the [look] the user chose, the [planets] the folders are in the Solar

@@ -31,6 +31,8 @@ import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.EntryKind
+import com.sqftware.orbitlauncher.domain.IconStyle
+import com.sqftware.orbitlauncher.domain.itemSprite
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.isStorable
 import com.sqftware.orbitlauncher.domain.sortedByLabel
@@ -139,9 +141,10 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     private val AppEntry.user: UserHandle? get() = userOf(workProfile)
 
     // A pair has no icon of its own: the screen draws its apps' together.
-    override suspend fun icon(app: AppEntry): ImageBitmap? = icons[app.key]
-        ?: icons.keep(app) {
-            draw(app.key) { density ->
+    override suspend fun icon(app: AppEntry, style: IconStyle): ImageBitmap? {
+        val key = if (style == IconStyle.Plain) app.key else "${style.name}:${app.key}"
+        return icons[key] ?: icons.keep(app, key) {
+            draw(app.key, style) { density ->
                 when (val kind = app.kind) {
                     EntryKind.App -> activityIcon(app, density)
                     is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
@@ -149,6 +152,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
                 }
             }
         }
+    }
 
     private fun activityIcon(app: AppEntry, density: Int): Drawable? = app.user?.let { user ->
         launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
@@ -293,10 +297,12 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         packageName
     }
 
-    private suspend fun draw(what: String, drawable: (density: Int) -> Drawable?): ImageBitmap? = withContext(Dispatchers.IO) {
+    private suspend fun draw(what: String, style: IconStyle = IconStyle.Plain, drawable: (density: Int) -> Drawable?): ImageBitmap? = withContext(Dispatchers.IO) {
         try {
             val size = activityManager.launcherLargeIconSize
-            drawable(activityManager.launcherLargeIconDensity)?.toBitmap(size, size)?.asImageBitmap()
+            val icon = drawable(activityManager.launcherLargeIconDensity) ?: return@withContext null
+            val itemSize = style.itemSize
+            if (itemSize == null) icon.toBitmap(size, size).asImageBitmap() else itemSprite(icon.layers(size), itemSize).toImageBitmap()
         } catch (e: RuntimeException) {
             // An app on the home screen whose icon cannot be drawn would otherwise crash the launcher on every start.
             Log.w(TAG, "No icon for $what", e)

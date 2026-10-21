@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -38,7 +39,16 @@ private val BADGE_RING = 2.dp
  */
 @Composable
 fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
-    if (unread.count <= 0) return
+    if (unread.count > 0) LocalThemeArt.current.BadgeFace(unread, modifier)
+}
+
+/** The corner of an icon its badge sits on, in the theme. */
+internal val badgeCorner: Alignment
+    @Composable get() = LocalThemeArt.current.badgeCorner
+
+/** [UnreadBadge] as most themes draw it: a ringed bubble over the corner. */
+@Composable
+internal fun BubbleBadge(unread: Unread, modifier: Modifier) {
 
     val colors = MaterialTheme.colorScheme
     Text(

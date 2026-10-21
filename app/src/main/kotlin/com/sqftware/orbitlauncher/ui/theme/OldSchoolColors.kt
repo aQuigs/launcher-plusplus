@@ -1,0 +1,38 @@
+package com.sqftware.orbitlauncher.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// The game's interface: its chatbox parchment by day, and by night a shade under its bank brown, with cream text so the
+// scheme's dimmed text still reads on the glass, its yellow for what is lit and the orange of a menu's target. What is
+// drawn from the game's own sprites keeps their colours, and its orange text is a token of its own.
+private val Bank = Color(0xFF201B14)
+private val Parchment = Color(0xFFE6DABB)
+private val Cream = Color(0xFFF2E8CC)
+private val Yellow = Color(0xFFFFFF00)
+
+internal val OldSchoolPalette = Palette(
+    deep = Bank,
+    accent = Yellow,
+    pale = Cream,
+    spark = Yellow,
+    warm = Color(0xFFFF9040),
+    alarm = Color(0xFFFF8C8C),
+    frost = Parchment,
+    ringMark = Color(0xFFEEEEEE),
+)
+
+/** The game's text: the shadow every line casts, the yellow of a stack's count, white for a menu's verb, orange for its target. */
+val GameShadow = Color.Black
+val StackCount = Yellow
+val MenuVerb = Color.White
+val MenuTarget = Color(0xFFFF9040)
+
+/** The orange of the game's interface text, such as a window's title. */
+val GameOrange = Color(0xFFFF981F)
+
+/** What shows through the minimap's frame before the map has loaded: the game's grass. */
+val MinimapGrass = Color(0xFF698F24)
+
+/** The player's own square at the minimap's middle, outlined so it shows on a white wall. */
+val MinimapSelf = Color.White
+val MinimapSelfEdge = Color.Black

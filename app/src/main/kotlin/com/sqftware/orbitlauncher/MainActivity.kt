@@ -160,9 +160,11 @@ class MainActivity : ComponentActivity() {
                 // Each app list after the first follows a package change, which may bring an app a new icon, so every icon
                 // shown is handed a new way to ask, a new lambda rather than a reference equal to the last, and asks again.
                 // Counted, not compared: an update leaves the app's entry as it was.
-                val actions = remember(appLists?.index ?: 0) {
+                val iconStyle = shownTheme.iconStyle
+                val actions = remember(appLists?.index ?: 0, iconStyle) {
                     AppActions(
-                        icon = { repository.icon(it) },
+                        icon = { repository.icon(it, iconStyle) },
+                        ringIcon = { repository.icon(it, iconStyle.small) },
                         launch = {
                             clearBadge(it)
                             repository.launch(it)

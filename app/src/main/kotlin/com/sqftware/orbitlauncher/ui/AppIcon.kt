@@ -81,7 +81,7 @@ fun AppIcon(
     ) {
         AppFace(app, icon, Modifier.fillMaxSize(), presses)
         menu?.content?.invoke(app)
-        UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+        UnreadBadge(unread, Modifier.align(badgeCorner))
         nameRoom?.let { HangingName(app.label, it) }
     }
 }
@@ -149,6 +149,15 @@ fun IconDisc(
     presses: InteractionSource? = null,
     modifier: Modifier = Modifier,
     contentAlignment: Alignment = Alignment.TopStart,
+    content: @Composable BoxScope.() -> Unit,
+) = LocalThemeArt.current.IconGround(LocalIconPlace.current, presses, modifier, contentAlignment, content)
+
+/** [IconDisc] as most themes draw it: a disc of the scheme's variant surface, the icon clipped to it. */
+@Composable
+internal fun PlainIconGround(
+    presses: InteractionSource?,
+    modifier: Modifier,
+    contentAlignment: Alignment,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
@@ -246,6 +255,6 @@ private fun OwnImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, mo
     }
 
     Box(modifier) {
-        bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
+        bitmap?.let { LocalThemeArt.current.IconImage(it, Modifier.fillMaxSize()) }
     }
 }

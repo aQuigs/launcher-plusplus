@@ -18,11 +18,11 @@ internal class IconCache(maxBytes: Int) {
 
     operator fun get(key: String): ImageBitmap? = drawn.get(key)?.bitmap
 
-    /** Draws [app]'s icon, and keeps it unless a package changed meanwhile. */
-    suspend fun keep(app: AppEntry, draw: suspend () -> ImageBitmap?): ImageBitmap? {
+    /** Draws [app]'s icon, and keeps it under [key] unless a package changed meanwhile. */
+    suspend fun keep(app: AppEntry, key: String = app.key, draw: suspend () -> ImageBitmap?): ImageBitmap? {
         val before = synchronized(this) { generation }
         return draw()?.also { bitmap ->
-            synchronized(this) { if (generation == before) drawn.put(app.key, Drawn(app.packageName, bitmap)) }
+            synchronized(this) { if (generation == before) drawn.put(key, Drawn(app.packageName, bitmap)) }
         }
     }
 

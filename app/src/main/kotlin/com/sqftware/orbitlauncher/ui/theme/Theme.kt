@@ -4,6 +4,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTonalElevationEnabled
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -123,6 +124,7 @@ private fun paletteOf(colourway: Colourway): Palette = when (colourway) {
     Colourway.Coral -> PaperPalette
     Colourway.Ice -> CrystalPalette
     Colourway.Green -> GreenCorePalette
+    Colourway.Classic -> OldSchoolPalette
 }
 
 val LocalRingColors = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).ring }
@@ -264,9 +266,9 @@ private fun Palette.dayLook() = nightLook().let { night ->
 }
 
 @Composable
-fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
+fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, typography: Typography, content: @Composable () -> Unit) {
     val look = remember(colourway, lightWallpaper) { lookOf(colourway, lightWallpaper) }
-    MaterialTheme(colorScheme = look.colors) {
+    MaterialTheme(colorScheme = look.colors, typography = typography) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides look.colors.onBackground,

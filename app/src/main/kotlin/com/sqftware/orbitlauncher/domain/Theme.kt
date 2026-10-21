@@ -2,9 +2,15 @@ package com.sqftware.orbitlauncher.domain
 
 /**
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
- * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks.
+ * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, and apps' icons in
+ * its [iconStyle].
  */
-enum class Theme(val label: String, val folderLooks: List<FolderLook>, val colourways: List<Colourway>) {
+enum class Theme(
+    val label: String,
+    val folderLooks: List<FolderLook>,
+    val colourways: List<Colourway>,
+    val iconStyle: IconStyle = IconStyle.Plain,
+) {
     Space(
         "Space",
         listOf(FolderLook.Rim, FolderLook.Ringed, FolderLook.Orbit, FolderLook.Plain, FolderLook.SolarSystem),
@@ -30,6 +36,7 @@ enum class Theme(val label: String, val folderLooks: List<FolderLook>, val colou
     Paper("Paper", listOf(FolderLook.FoldedSquare, FolderLook.Envelope, FolderLook.Pinwheel), listOf(Colourway.Coral)),
     CrystalCity("Crystal city", listOf(FolderLook.Cube, FolderLook.Octahedron, FolderLook.Geode), listOf(Colourway.Ice)),
     GreenCore("Green core", listOf(FolderLook.WireSphere, FolderLook.Orb, FolderLook.HexCell), listOf(Colourway.Green)),
+    OldSchool("Old School", listOf(FolderLook.Pile), listOf(Colourway.Classic), IconStyle.Item),
 }
 
 /**

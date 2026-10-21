@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
+import com.sqftware.orbitlauncher.domain.IconStyle
 import com.sqftware.orbitlauncher.domain.RingPages
 import kotlinx.coroutines.flow.Flow
 
@@ -17,8 +18,11 @@ interface AppRepository {
      */
     fun pinnedShortcuts(): Flow<List<AppEntry>>
 
-    /** Reads the icon from the app's package, or the pinned shortcut's. Null when it is gone or cannot be drawn, and for a pair. */
-    suspend fun icon(app: AppEntry): ImageBitmap?
+    /**
+     * Reads the icon from the app's package, or the pinned shortcut's, drawn in [style]. Null when it is gone or cannot be
+     * drawn, and for a pair.
+     */
+    suspend fun icon(app: AppEntry, style: IconStyle = IconStyle.Plain): ImageBitmap?
 
     /**
      * Starts [app], the pinned shortcut, or the pair's two apps together in split screen. Does nothing if it has gone since

@@ -550,7 +550,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
     ) {
         Box(Modifier.size(GRID_ICON_SIZE)) {
             AppFace(app, entry.icon, Modifier.fillMaxSize())
-            UnreadBadge(unread, Modifier.align(Alignment.TopEnd).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
+            UnreadBadge(unread, Modifier.align(badgeCorner).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {
                     PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))

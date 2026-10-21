@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -259,7 +260,7 @@ fun HomeRing(
     val foldTurn = remember(folding?.at) { Snapshot.withoutReadObservation { spin.turn } }
 
     Layout(
-        content = {
+        content = { CompositionLocalProvider(LocalIconPlace provides IconPlace.Ring) {
             if (openFolder == null || spreadingOut) {
                 Emblem(hint, { slowTurn.value }, { fastTurn.value }, minuteOfDay, onSearch, onEdit, Modifier.layoutId(Part.Emblem))
             }
@@ -305,7 +306,7 @@ fun HomeRing(
                 }
             }
             if (spreadingOut) Spacer(Modifier.layoutId(Part.Shield).inert())
-        },
+        } },
         modifier = modifier
             .fillMaxSize()
             // Cached, so the glow and the planet moving do not lay the ring out again every frame.
