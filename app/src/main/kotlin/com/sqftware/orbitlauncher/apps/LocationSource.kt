@@ -80,12 +80,13 @@ class PlatformLocationSource(private val context: Context) : LocationSource {
     }.conflate()
 
     // The fused provider, on Android 12 and up, mixes in Wi-Fi and cell fixes and spends the least power for a rough
-    // place; the network provider does the same before it. GPS is the fallback where neither is on.
+    // place; the network provider does the same before it. GPS is the fallback where neither is on, from Android 12,
+    // which serves it to coarse access; Android 11 wants fine access for it.
     private fun provider(): String? {
-        val candidates = buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(LocationManager.FUSED_PROVIDER)
-            add(LocationManager.NETWORK_PROVIDER)
-            add(LocationManager.GPS_PROVIDER)
+        val candidates = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+        } else {
+            listOf(LocationManager.NETWORK_PROVIDER)
         }
         return candidates.firstOrNull { it in manager.allProviders && manager.isProviderEnabled(it) }
     }

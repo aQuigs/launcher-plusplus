@@ -69,7 +69,8 @@ object WebMercator {
     /** Every tile at zoom [z] that holds ground within [radiusM] metres of [centre]. */
     fun tilesAround(centre: LatLon, radiusM: Double, z: Int): List<TileId> {
         val c = toMercator(centre)
-        val reach = radiusM / groundScale(centre.lat)
+        // The map stops short of the poles, where the scale would reach across the whole world.
+        val reach = radiusM / groundScale(centre.lat.coerceIn(-MAX_LAT, MAX_LAT))
         val low = tileAt(Mercator(c.x - reach, c.y - reach), z)
         val high = tileAt(Mercator(c.x + reach, c.y + reach), z)
         return (high.y..low.y).flatMap { y -> (low.x..high.x).map { x -> TileId(z, x, y) } }

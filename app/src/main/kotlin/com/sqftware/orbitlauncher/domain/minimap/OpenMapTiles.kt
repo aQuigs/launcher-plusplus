@@ -187,6 +187,9 @@ object OpenMapTiles {
         "credit union" to "bank",
     )
 
+    // Stops and car parks are named after the streets they are on, so "Church St" says nothing of a church.
+    private val UNHINTED_CLASSES = setOf("bus", "railway", "entrance", "parking")
+
     private val NPC_SUBCLASSES = setOf(
         "restaurant", "cafe", "fast_food", "bar", "pub", "bank", "pharmacy", "ice_cream", "food_court", "post_office", "library",
         "marketplace", "theatre", "cinema", "ferry_terminal", "townhall", "parking", "subway_entrance", "station", "tram_stop",
@@ -195,7 +198,7 @@ object OpenMapTiles {
     private fun poiOf(feature: VectorFeature, at: Local): Poi? {
         val cls = feature.string("class") ?: return null
         val subclass = feature.string("subclass") ?: cls
-        val rule = ICON_RULES.firstOrNull { it.matches(cls, subclass) } ?: feature.string("name")?.lowercase()?.let { name ->
+        val rule = ICON_RULES.firstOrNull { it.matches(cls, subclass) } ?: feature.string("name")?.takeIf { cls !in UNHINTED_CLASSES }?.lowercase()?.let { name ->
             NAME_HINTS.firstOrNull { (needle, _) -> needle in name }?.let { (_, hinted) ->
                 ICON_RULES.firstOrNull { it.matches(if (hinted == "place_of_worship") hinted else cls, hinted) }
             }

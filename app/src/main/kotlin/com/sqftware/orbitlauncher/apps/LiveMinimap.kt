@@ -37,8 +37,10 @@ class LiveMinimap(private val location: LocationSource, private val tiles: MapTi
                     val bytes = tiles.tile(id) ?: continue
                     try {
                         decoded[id] = VectorTile.decode(bytes, OpenMapTiles.LAYERS)
-                    } catch (e: IllegalArgumentException) {
+                    } catch (e: RuntimeException) {
+                        // Whatever is wrong with the bytes, the home screen must not go down over them, nor keep them.
                         Log.w(TAG, "Unreadable tile $id", e)
+                        tiles.discard(id)
                     }
                 }
                 // A map with a tile missing would show made-up grass where it belongs, so the last map stays instead.

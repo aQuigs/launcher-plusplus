@@ -281,7 +281,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
     private fun paintDoors(walls: Set<Int>, comp: IntArray) {
         val doorsPer = mutableMapOf<Int, Int>()
         val doorPx = mutableSetOf<Int>()
-        for (poi in scene.pois.filter { it.door }) {
+        for (poi in scene.pois.filter { it.door }.sortedBy { hypot(it.at.east, it.at.north) }) {
             val p = px(poi.at)
             var best: Int? = null
             var bestD = Double.MAX_VALUE
@@ -417,7 +417,8 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
     private fun paintNpcs(icons: List<Placed>) {
         val sprite = sprites.npc ?: return
         val dots = mutableListOf<Pair<Int, Int>>()
-        for (poi in scene.pois.filter { it.npc }) {
+        // Nearest first, so which people make the cap does not depend on the order the tiles came in.
+        for (poi in scene.pois.filter { it.npc }.sortedBy { hypot(it.at.east, it.at.north) }) {
             val p = px(poi.at)
             val x = floor(p.x).toInt()
             val y = floor(p.y).toInt()

@@ -117,10 +117,11 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
                     else -> feature.skip(wire)
                 }
             }
-            return VectorFeature(id, type, tags, decodeGeometry(geometry, type))
+            return VectorFeature(id, type, tags, decodeGeometry(geometry))
         }
 
-        private fun decodeGeometry(commands: IntArray, type: GeometryType): List<List<TilePoint>> {
+        // Each MoveTo starts a part, so each point of a multipoint is a part of its own.
+        private fun decodeGeometry(commands: IntArray): List<List<TilePoint>> {
             val parts = mutableListOf<List<TilePoint>>()
             var current = mutableListOf<TilePoint>()
             var x = 0
@@ -150,8 +151,7 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
                 }
             }
             if (current.isNotEmpty()) parts += current
-            // A multipoint is one MoveTo with many points, which reads above as one part: each point is its own.
-            return if (type == GeometryType.Point) parts.flatten().map(::listOf) else parts
+            return parts
         }
 
         private fun zigzag(n: Int) = (n ushr 1) xor -(n and 1)
@@ -210,7 +210,8 @@ private class Protobuf(private val bytes: ByteArray, start: Int, private val end
 
     private fun length(): Int {
         val n = varint().toInt()
-        if (n < 0 || at + n > end) throw IllegalArgumentException("Length past the end")
+        // Compared without adding, so a corrupt length cannot overflow past the check.
+        if (n < 0 || n > end - at) throw IllegalArgumentException("Length past the end")
         return n
     }
 

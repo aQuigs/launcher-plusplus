@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.domain.minimap
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -68,6 +69,19 @@ class VectorTileTest {
         val tile = VectorTile.decode(bytes, only = setOf("water"))
         assertTrue("water" in tile.layers)
         assertNull(tile["housenumber"])
+    }
+
+    @Test
+    fun rejectsCorruptBytesAsIllegal() {
+        val corrupt = listOf(
+            byteArrayOf(0x1A, 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x07, 0x00),
+            byteArrayOf(0x1A, 0x05, 0x0A),
+            byteArrayOf(0x1A, 0x80.toByte()),
+            "<html>captive portal</html>".toByteArray(),
+        )
+        for (bytes in corrupt) {
+            assertThrows(IllegalArgumentException::class.java) { VectorTile.decode(bytes) }
+        }
     }
 
     @Test

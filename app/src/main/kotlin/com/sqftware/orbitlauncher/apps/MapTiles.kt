@@ -17,6 +17,9 @@ import java.net.URL
 interface MapTiles {
     /** The vector tile [id], an OpenMapTiles Mapbox Vector Tile, or null when it cannot be had now (offline, say). */
     suspend fun tile(id: TileId): ByteArray?
+
+    /** Forgets the tile [id], which turned out unreadable, so the next ask fetches it afresh. */
+    suspend fun discard(id: TileId)
 }
 
 private const val TAG = "OpenFreeMapTiles"
@@ -38,12 +41,14 @@ class OpenFreeMapTiles(context: Context) : MapTiles {
     // The tile URLs carry the planet build's date, which moves weekly, so they come from the TileJSON, once per run.
     private var template: String? = null
 
+    private fun fileOf(id: TileId) = File(dir, "${id.z}/${id.x}/${id.y}.mvt")
+
     override suspend fun tile(id: TileId): ByteArray? = withContext(Dispatchers.IO) {
-        val file = File(dir, "${id.z}/${id.x}/${id.y}.mvt")
+        val file = fileOf(id)
         // One fetch at a time: the map asks for a handful of tiles, and the server is a free one.
         fetching.withLock {
-            if (file.exists()) return@withLock file.readBytes().also { file.setLastModified(System.currentTimeMillis()) }
             try {
+                if (file.exists()) return@withLock file.readBytes().also { file.setLastModified(System.currentTimeMillis()) }
                 val bytes = fetch(id) ?: return@withLock null
                 file.parentFile?.mkdirs()
                 val partial = File(file.path + ".part")
@@ -52,13 +57,17 @@ class OpenFreeMapTiles(context: Context) : MapTiles {
                 prune()
                 bytes
             } catch (e: IOException) {
-                Log.i(TAG, "Could not fetch tile $id", e)
+                Log.i(TAG, "Could not get tile $id", e)
                 null
             } catch (e: JSONException) {
                 Log.w(TAG, "Unreadable TileJSON", e)
                 null
             }
         }
+    }
+
+    override suspend fun discard(id: TileId) {
+        withContext(Dispatchers.IO) { fetching.withLock { fileOf(id).delete() } }
     }
 
     private fun fetch(id: TileId): ByteArray? {

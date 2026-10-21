@@ -109,6 +109,7 @@ class OpenMapTilesTest {
                 point(mapOf("class" to "parking", "subclass" to "parking")),
                 point(mapOf("class" to "office", "subclass" to "government", "name" to "Livonia City Hall")),
                 point(mapOf("class" to "bench", "subclass" to "bench")),
+                point(mapOf("class" to "bus", "subclass" to "bus_stop", "name" to "Church St & 5th Ave")),
             ),
         ).pois
 

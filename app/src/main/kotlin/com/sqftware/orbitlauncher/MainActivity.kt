@@ -272,13 +272,14 @@ class MainActivity : ComponentActivity() {
                         if (granted) {
                             changeShowWhereIAm(true)
                         } else {
-                            Toast.makeText(this@MainActivity, "The map needs location access to show where you are", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "The map needs location access, which Settings can allow", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
                 // The map follows the user only while the launcher is visible, like the clock, and each return reads the
-                // grant again.
+                // grant again. The state outlives a change of key, so turning it off must drop the last map.
                 val minimap by produceState<ImageBitmap?>(null, showWhereIAm) {
+                    value = null
                     if (showWhereIAm) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             if (location.isGranted()) liveMinimap.images().collect { value = it } else changeShowWhereIAm(false)

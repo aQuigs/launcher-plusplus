@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebMercatorTest {
@@ -39,6 +40,7 @@ class WebMercatorTest {
         // Bryant Park lies 94% of the way across its tile, under the map's reach of the eastern edge.
         assertEquals(listOf(TileId(14, 4824, 6157), TileId(14, 4825, 6157)), OpenMapTiles.tilesFor(bryantPark))
         assertEquals(listOf(TileId(14, 4397, 6057)), OpenMapTiles.tilesFor(livonia))
+        assertTrue(OpenMapTiles.tilesFor(LatLon(-90.0, 0.0)).size <= 4)
     }
 
     @Test
