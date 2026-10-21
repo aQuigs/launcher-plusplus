@@ -1,8 +1,7 @@
 package com.sqftware.orbitlauncher.apps
 
-import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import com.sqftware.orbitlauncher.domain.Pixels
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.MapTiles
@@ -28,7 +27,7 @@ class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: Mi
     // A paint runs on past its collection's end until it next suspends, so a collection restarted at once would share
     // the maker with it.
     private val painting = Mutex()
-    private var shown: Pair<IntArray, ImageBitmap>? = null
+    private var shown: Pair<Pixels, ImageBitmap>? = null
 
     /**
      * A new [MINIMAP_SIZE] px disc each time the user moves far enough for a new fix, once the tiles it needs are to
@@ -53,6 +52,6 @@ class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: Mi
     private suspend fun paint(centre: LatLon): ImageBitmap? = painting.withLock {
         val disc = maker.paint(centre) ?: return@withLock null
         shown?.takeIf { it.first === disc }?.second
-            ?: Bitmap.createBitmap(disc, MINIMAP_SIZE, MINIMAP_SIZE, Bitmap.Config.ARGB_8888).asImageBitmap().also { shown = disc to it }
+            ?: disc.toImageBitmap().also { shown = disc to it }
     }
 }

@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
+import com.sqftware.orbitlauncher.domain.Pixels
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,12 +17,13 @@ class MinimapPainterTest {
     @Test
     fun paintsAnOpaqueDiscOnAClearSquare() {
         val disc = painter.paint(MapScene(centre))
-        assertEquals(MINIMAP_SIZE * MINIMAP_SIZE, disc.size)
-        assertEquals(0, disc.at(0, 0))
-        assertEquals(0, disc.at(MINIMAP_SIZE - 1, MINIMAP_SIZE - 1))
-        assertEquals(0, disc.at(10, 10))
+        assertEquals(MINIMAP_SIZE, disc.width)
+        assertEquals(MINIMAP_SIZE, disc.height)
+        assertEquals(0, disc[0, 0])
+        assertEquals(0, disc[MINIMAP_SIZE - 1, MINIMAP_SIZE - 1])
+        assertEquals(0, disc[10, 10])
         for ((x, y) in listOf(0 to 76, 76 to 0, 151 to 76, 76 to 151, 76 to 76, 30 to 30)) {
-            assertEquals("($x, $y)", 0xFF, disc.at(x, y) ushr 24)
+            assertEquals("($x, $y)", 0xFF, disc[x, y] ushr 24)
         }
     }
 
@@ -30,13 +32,13 @@ class MinimapPainterTest {
         val disc = painter.paint(MapScene(centre))
         for (y in 74..78) for (x in 74..78) {
             val inner = x in 75..77 && y in 75..77
-            assertEquals("($x, $y)", if (inner) WHITE else BLACK, disc.at(x, y))
+            assertEquals("($x, $y)", if (inner) WHITE else BLACK, disc[x, y])
         }
     }
 
     @Test
     fun paintsBareGroundAsGrassWithNoWalls() {
-        val disc = MinimapPainter(MinimapSprites()).paint(MapScene(centre))
+        val disc = MinimapPainter(MinimapSprites()).paint(MapScene(centre)).argb
         val ground = disc.indices.filter { disc[it] ushr 24 == 0xFF && it !in centreMarker }.map { disc[it] }.toSet()
         assertTrue(ground.all { it shr 8 and 0xFF == 0x8F && it and 0xFF == 0x24 })
         assertTrue(WALL !in ground)
@@ -48,24 +50,24 @@ class MinimapPainterTest {
         val disc = MinimapPainter(MinimapSprites()).paint(
             MapScene(centre, buildings = listOf(Building(rect(40, 40, 70, 60), seed = 1), Building(rect(70, 40, 100, 60), seed = 2))),
         )
-        assertEquals(WALL, disc.at(40, 50))
-        assertEquals(WALL, disc.at(99, 50))
-        assertEquals(WALL, disc.at(55, 40))
-        assertEquals(WALL, disc.at(85, 59))
+        assertEquals(WALL, disc[40, 50])
+        assertEquals(WALL, disc[99, 50])
+        assertEquals(WALL, disc[55, 40])
+        assertEquals(WALL, disc[85, 59])
         for (y in 41..58) {
-            assertTrue("seam at y $y", disc.at(69, y) != WALL && disc.at(70, y) != WALL)
+            assertTrue("seam at y $y", disc[69, y] != WALL && disc[70, y] != WALL)
         }
-        assertEquals(disc.at(60, 50), disc.at(80, 50))
+        assertEquals(disc[60, 50], disc[80, 50])
     }
 
     @Test
     fun givesAStructureAtMostTwoDoorsOfOneTileEach() {
         val building = Building(rect(40, 40, 110, 60), seed = 3)
         val entered = (45..105 step 10).map { Poi(local(it, 41), door = true) }
-        val disc = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = listOf(building), pois = entered))
+        val disc = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = listOf(building), pois = entered)).argb
         assertEquals(MAX_DOORS * DOOR_PX, disc.count { it == DOOR })
 
-        val one = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = listOf(building), pois = entered.take(1)))
+        val one = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = listOf(building), pois = entered.take(1))).argb
         assertEquals(DOOR_PX, one.count { it == DOOR })
     }
 
@@ -94,51 +96,49 @@ class MinimapPainterTest {
     @Test
     fun capsIconsSpacesThemAndLimitsEachKind() {
         val spread = MapIcon.entries.take(8).mapIndexed { i, icon -> Poi(local(30 + (i % 4) * 30, 40 + (i / 4) * 60), icon) }
-        val disc = painter.paint(MapScene(centre, pois = spread))
+        val disc = painter.paint(MapScene(centre, pois = spread)).argb
         val shown = MapIcon.entries.filter { icon -> disc.any { it == ICON or icon.ordinal } }
         assertEquals(MAX_ICONS, shown.size)
         assertEquals(MapIcon.entries.take(MAX_ICONS), shown)
 
         val banks = (0 until 4).map { Poi(local(30 + it * 30, 40), MapIcon.Bank) }
-        assertEquals(MAX_PER_ICON * 9, painter.paint(MapScene(centre, pois = banks)).count { it == ICON or MapIcon.Bank.ordinal })
+        assertEquals(MAX_PER_ICON * 9, painter.paint(MapScene(centre, pois = banks)).argb.count { it == ICON or MapIcon.Bank.ordinal })
 
         val crowded = listOf(Poi(local(40, 40), MapIcon.Bank), Poi(local(50, 40), MapIcon.Altar))
-        val close = painter.paint(MapScene(centre, pois = crowded))
+        val close = painter.paint(MapScene(centre, pois = crowded)).argb
         assertEquals(9, close.count { it == ICON or MapIcon.Bank.ordinal })
         assertEquals(0, close.count { it == ICON or MapIcon.Altar.ordinal })
     }
 
     @Test
     fun standsPeopleOnlyWhereSomeoneIsMapped() {
-        assertTrue(painter.paint(MapScene(centre)).none { it == NPC })
+        assertTrue(painter.paint(MapScene(centre)).argb.none { it == NPC })
         val people = listOf(Poi(local(40, 40), npc = true), Poi(local(110, 110), npc = true), Poi(local(40, 110)))
-        assertEquals(2 * 9, painter.paint(MapScene(centre, pois = people)).count { it == NPC })
+        assertEquals(2 * 9, painter.paint(MapScene(centre, pois = people)).argb.count { it == NPC })
         val many = (0 until 30).map { Poi(local(30 + (it % 6) * 15, 40 + (it / 6) * 15), npc = true) }
-        assertEquals(MAX_NPCS * 9, painter.paint(MapScene(centre, pois = many)).count { it == NPC })
+        assertEquals(MAX_NPCS * 9, painter.paint(MapScene(centre, pois = many)).argb.count { it == NPC })
     }
 
     @Test
     fun pavesBuiltUpPlaces() {
         val blocks = (0 until 4).flatMap { i -> (0 until 4).map { j -> Building(rect(20 + i * 30, 20 + j * 30, 40 + i * 30, 40 + j * 30), seed = (i * 4 + j).toLong()) } }
         val disc = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = blocks))
-        assertEquals(PLAZA, disc.at(17, 76))
+        assertEquals(PLAZA, disc[17, 76])
     }
 
     @Test
     fun paintsTheSameSceneTheSameWay() {
         val tiles = OpenMapTiles.tilesFor(centre).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
         val scene = OpenMapTiles.scene(centre, tiles)
-        val disc = painter.paint(scene)
-        assertArrayEquals(disc, painter.paint(scene))
+        val disc = painter.paint(scene).argb
+        assertArrayEquals(disc, painter.paint(scene).argb)
         assertTrue(disc.any { it == WALL })
         assertTrue(disc.any { it == ROAD })
     }
 
-    private fun IntArray.at(x: Int, y: Int) = this[y * MINIMAP_SIZE + x]
-
     private val centreMarker = (74..78).flatMap { y -> (74..78).map { x -> y * MINIMAP_SIZE + x } }.toSet()
 
-    private fun IntArray.spots(colour: Int) = indices.filter { this[it] == colour }.map { (it % MINIMAP_SIZE).toDouble() to (it / MINIMAP_SIZE).toDouble() }
+    private fun Pixels.spots(colour: Int) = argb.indices.filter { argb[it] == colour }.map { (it % MINIMAP_SIZE).toDouble() to (it / MINIMAP_SIZE).toDouble() }
 
     // Spots are whole pixels of positions that were not, so two may sit up to a pixel's diagonal closer than placed.
     private fun assertMinimumSpacing(spots: List<Pair<Double, Double>>, spacing: Double) {
@@ -156,7 +156,7 @@ class MinimapPainterTest {
         return listOf(listOf(corner(x0, y0), corner(x1, y0), corner(x1, y1), corner(x0, y1)))
     }
 
-    private fun solid(w: Int, h: Int, colour: Int) = Sprite(w, h, IntArray(w * h) { colour })
+    private fun solid(w: Int, h: Int, colour: Int) = Pixels(w, h, IntArray(w * h) { colour })
 
     private companion object {
         const val TREE = 0xFFFF00FF.toInt()

@@ -23,7 +23,7 @@ internal fun Drawable.layers(size: Int): IconLayers =
 
 private fun Drawable?.pixels(size: Int): Pixels? = this?.toBitmap(size, size)?.pixels()
 
-private fun Bitmap.pixels(): Pixels {
+internal fun Bitmap.pixels(): Pixels {
     val argb = IntArray(width * height)
     getPixels(argb, 0, width, 0, 0, width, height)
     return Pixels(width, height, argb)

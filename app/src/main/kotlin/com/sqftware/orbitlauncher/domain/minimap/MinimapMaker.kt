@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
+import com.sqftware.orbitlauncher.domain.Pixels
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -30,13 +31,13 @@ interface MapTiles {
 class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
     private val painter by lazy { MinimapPainter(sprites()) }
     private val decoded = mutableMapOf<TileId, VectorTile>()
-    private var last: Pair<LatLon, IntArray>? = null
+    private var last: Pair<LatLon, Pixels>? = null
 
     /**
-     * The disc around [centre], the very array of the last one if [centre] has not moved, or null while a tile it needs
+     * The disc around [centre], the very image of the last one if [centre] has not moved, or null while a tile it needs
      * cannot be had: a map with a tile missing would show made-up grass where that tile belongs.
      */
-    suspend fun paint(centre: LatLon): IntArray? {
+    suspend fun paint(centre: LatLon): Pixels? {
         last?.let { (at, disc) -> if (at == centre) return disc }
         val needed = OpenMapTiles.tilesFor(centre)
         decoded.keys.retainAll(needed.toSet())

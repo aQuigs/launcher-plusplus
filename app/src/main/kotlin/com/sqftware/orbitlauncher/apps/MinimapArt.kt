@@ -3,9 +3,9 @@ package com.sqftware.orbitlauncher.apps
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.BitmapFactory
+import com.sqftware.orbitlauncher.domain.Pixels
 import com.sqftware.orbitlauncher.domain.minimap.MapIcon
 import com.sqftware.orbitlauncher.domain.minimap.MinimapSprites
-import com.sqftware.orbitlauncher.domain.minimap.Sprite
 
 interface MinimapArt {
     /** The sprites the minimap draws with; any it lacks are left off the map. Call it off the main thread. */
@@ -29,11 +29,8 @@ class ResourceMinimapArt(private val context: Context, private val names: Minima
 
     // By name, since the art ships with the theme that draws it and a build without it must still draw a map.
     @SuppressLint("DiscouragedApi")
-    private fun sprite(name: String): Sprite? {
+    private fun sprite(name: String): Pixels? {
         val id = context.resources.getIdentifier(name, "drawable", context.packageName).takeIf { it != 0 } ?: return null
-        val bitmap = BitmapFactory.decodeResource(context.resources, id, BitmapFactory.Options().apply { inScaled = false }) ?: return null
-        val pixels = IntArray(bitmap.width * bitmap.height)
-        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        return Sprite(bitmap.width, bitmap.height, pixels)
+        return BitmapFactory.decodeResource(context.resources, id, BitmapFactory.Options().apply { inScaled = false })?.pixels()
     }
 }

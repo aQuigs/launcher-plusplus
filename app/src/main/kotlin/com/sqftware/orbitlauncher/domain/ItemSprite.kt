@@ -3,15 +3,6 @@ package com.sqftware.orbitlauncher.domain
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** An image as packed ARGB pixels, row by row: [width] across and [height] down. */
-class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(width * height)) {
-    init {
-        require(argb.size == width * height)
-    }
-
-    operator fun get(x: Int, y: Int) = argb[y * width + x]
-}
-
 /**
  * An app's icon as the system gives it: an adaptive icon's two layers, each the full 108-unit canvas, or a legacy
  * icon as its [foreground] alone with no [background].
@@ -40,7 +31,7 @@ fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
     val top = (ITEM_HEIGHT - small.height) / 2 - 1
     for (y in 0 until small.height) for (x in 0 until small.width) {
         val c = small[x, y]
-        item.argb[(top + y) * ITEM_WIDTH + left + x] = if (alpha(c) >= 128) c or OPAQUE else 0
+        item.argb[(top + y) * ITEM_WIDTH + left + x] = if (alpha(c) >= 128) opaque(c) else 0
     }
     dropBackingTile(item)
     posterize(item, colours)
@@ -141,8 +132,8 @@ private fun posterize(item: Pixels, colours: Int) {
         val at = boxes.indices.maxBy { boxes[it].size }
         val biggest = boxes[at]
         if (biggest.size < 2) break
-        val channel = (0..2).maxBy { ch -> biggest.maxOf { channel(item.argb[it], ch) } - biggest.minOf { channel(item.argb[it], ch) } }
-        val sorted = biggest.sortedBy { channel(item.argb[it], channel) }
+        val channel = CHANNELS.maxBy { ch -> biggest.maxOf { ch(item.argb[it]) } - biggest.minOf { ch(item.argb[it]) } }
+        val sorted = biggest.sortedBy { channel(item.argb[it]) }
         boxes.removeAt(at)
         boxes += sorted.subList(0, sorted.size / 2)
         boxes += sorted.subList(sorted.size / 2, sorted.size)
@@ -151,17 +142,18 @@ private fun posterize(item: Pixels, colours: Int) {
         val m = mean(box.map { item.argb[it] })
         val grey = (red(m) + green(m) + blue(m)) / 3f
         val muted = { v: Int -> ((v * 0.85f + grey * 0.15f) * 0.92f).roundToInt() }
-        val colour = argb(255, muted(red(m)), muted(green(m)), muted(blue(m)))
+        val colour = rgb(muted(red(m)), muted(green(m)), muted(blue(m)))
         box.forEach { item.argb[it] = colour }
     }
 }
 
-private const val OUTLINE = 0xFF000000.toInt()
+private val CHANNELS = listOf(::red, ::green, ::blue)
+
 private const val SHADOW = 0xFF302020.toInt()
 
 private fun outline(item: Pixels) {
     val solid = BooleanArray(item.argb.size) { item.argb[it] != 0 }
-    for (i in item.argb.indices) if (!solid[i] && neighbours(i).any { it != null && solid[it] }) item.argb[i] = OUTLINE
+    for (i in item.argb.indices) if (!solid[i] && neighbours(i).any { it != null && solid[it] }) item.argb[i] = BLACK
     for (y in ITEM_HEIGHT - 1 downTo 1) for (x in ITEM_WIDTH - 1 downTo 1) {
         val i = y * ITEM_WIDTH + x
         if (item.argb[i] == 0 && item.argb[i - ITEM_WIDTH - 1] != 0) item.argb[i] = SHADOW
@@ -176,20 +168,4 @@ private fun neighbours(i: Int): List<Int?> {
     }
 }
 
-private const val OPAQUE = 0xFF000000.toInt()
-
-private fun alpha(c: Int) = c ushr 24
-private fun red(c: Int) = c shr 16 and 0xFF
-private fun green(c: Int) = c shr 8 and 0xFF
-private fun blue(c: Int) = c and 0xFF
-private fun channel(c: Int, ch: Int) = c shr (16 - 8 * ch) and 0xFF
-private fun luma(c: Int) = (red(c) + green(c) + blue(c)) / 3
-private fun argb(a: Int, r: Int, g: Int, b: Int) = a shl 24 or (r shl 16) or (g shl 8) or b
 private fun distance(c: Int, d: Int) = abs(red(c) - red(d)) + abs(green(c) - green(d)) + abs(blue(c) - blue(d))
-private fun mean(cs: List<Int>) = argb(255, cs.sumOf { red(it) } / cs.size, cs.sumOf { green(it) } / cs.size, cs.sumOf { blue(it) } / cs.size)
-
-private fun over(top: Int, under: Int): Int {
-    val a = alpha(top) / 255f
-    val blend = { t: Int, u: Int -> (t * a + u * (1 - a)).roundToInt() }
-    return argb(maxOf(alpha(top), alpha(under)), blend(red(top), red(under)), blend(green(top), green(under)), blend(blue(top), blue(under)))
-}

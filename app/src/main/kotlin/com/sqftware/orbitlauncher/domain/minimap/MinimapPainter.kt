@@ -1,5 +1,14 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
+import com.sqftware.orbitlauncher.domain.BLACK
+import com.sqftware.orbitlauncher.domain.Pixels
+import com.sqftware.orbitlauncher.domain.alpha
+import com.sqftware.orbitlauncher.domain.blue
+import com.sqftware.orbitlauncher.domain.green
+import com.sqftware.orbitlauncher.domain.lerpRgb
+import com.sqftware.orbitlauncher.domain.opaque
+import com.sqftware.orbitlauncher.domain.red
+import com.sqftware.orbitlauncher.domain.rgb
 import java.util.EnumSet
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -23,7 +32,6 @@ private const val N = MINIMAP_SIZE
 private const val WALL = 0xFFEEEEEE.toInt()
 private const val DOOR = 0xFFEE0000.toInt()
 private const val RAIL = 0xFF3A3024.toInt()
-private const val BLACK = 0xFF000000.toInt()
 private const val WHITE = 0xFFFFFFFF.toInt()
 private const val GRASS_DARK = 0x698F24
 private const val GRASS_LIGHT = 0x718F24
@@ -35,7 +43,7 @@ private val GROUND_COLOUR = IntArray(Ground.entries.size).also { colours ->
         Ground.Road to 0x85755A, Ground.Walk to 0x8B867A, Ground.Path to 0x85755A, Ground.Plaza to 0x6F6A5E,
         Ground.Parking to 0x85755A, Ground.Sand to 0xB4A26C, Ground.Pier to 0x866A45, Ground.FloorStone to 0x7A7468,
         Ground.FloorWood to 0x866C4C, Ground.Pitch to 0x6F9E2C,
-    ).forEach { (ground, rgb) -> colours[ground.ordinal] = rgb or BLACK }
+    ).forEach { (ground, rgb) -> colours[ground.ordinal] = opaque(rgb) }
 }
 
 /** The ground grass blends into, so it shades toward a path over about a tile rather than meeting it at a hard edge. */
@@ -81,8 +89,8 @@ private val DISC_PIXELS = DISC.count { it }
  * keyed by places on Earth, so the map keeps its trees and grass as it moves.
  */
 class MinimapPainter(private val sprites: MinimapSprites) {
-    /** The disc as ARGB pixels, row by row: opaque inside the circle, clear outside it. */
-    fun paint(scene: MapScene): IntArray = Painting(scene, sprites).run()
+    /** The disc: opaque inside the circle, clear outside it. */
+    fun paint(scene: MapScene): Pixels = Painting(scene, sprites).run()
 }
 
 private class Px(val x: Double, val y: Double)
@@ -111,7 +119,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 
     private fun pxRings(polygon: Polygon) = polygon.map { ring -> ring.map(::px) }
 
-    fun run(): IntArray {
+    fun run(): Pixels {
         // 1. footprints, whose cover says whether the place is built up
         val bid = IntArray(N * N)
         scene.buildings.forEachIndexed { i, b -> scanPolygon(pxRings(b.polygon)) { bid[it] = i + 1 } }
@@ -180,7 +188,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         paintSelf()
 
         for (i in 0 until N * N) if (!DISC[i]) img[i] = 0
-        return img
+        return Pixels(N, N, img)
     }
 
     private fun groundOf(kind: WayKind) = when (kind) {
@@ -252,9 +260,9 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         val sums = Array(tw * tw) { IntArray(4) }
         for (i in 0 until N * N) if (cls[i] in BLEND_GROUND) {
             val acc = sums[tileOf(i % N, i / N)]
-            acc[0] += img[i] shr 16 and 0xFF
-            acc[1] += img[i] shr 8 and 0xFF
-            acc[2] += img[i] and 0xFF
+            acc[0] += red(img[i])
+            acc[1] += green(img[i])
+            acc[2] += blue(img[i])
             acc[3]++
         }
         val blended = IntArray(tw * tw)
@@ -382,7 +390,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 
     // --- icons and people ----------------------------------------------------------------------
 
-    private class Candidate(val distance: Double, val at: Px, val icon: MapIcon, val sprite: Sprite)
+    private class Candidate(val distance: Double, val at: Px, val icon: MapIcon, val sprite: Pixels)
 
     /** Map icons decluttered by priority, then by nearness to the centre. Returns where they went. */
     private fun paintIcons(): List<Px> {
@@ -429,13 +437,13 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         for (y in m - 2..m + 2) for (x in m - 2..m + 2) img[y * N + x] = if (abs(x - m) <= 1 && abs(y - m) <= 1) WHITE else BLACK
     }
 
-    private fun blit(sprite: Sprite, ox: Int, oy: Int) {
+    private fun blit(sprite: Pixels, ox: Int, oy: Int) {
         for (y in 0 until sprite.height) for (x in 0 until sprite.width) {
-            val argb = sprite.argb[y * sprite.width + x]
+            val argb = sprite[x, y]
             val tx = ox + x
             val ty = oy + y
-            if (argb ushr 24 < 128 || tx !in 0 until N || ty !in 0 until N) continue
-            img[ty * N + tx] = argb or BLACK
+            if (alpha(argb) < 128 || tx !in 0 until N || ty !in 0 until N) continue
+            img[ty * N + tx] = opaque(argb)
         }
     }
 
@@ -547,17 +555,6 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 }
 
 private fun sq(v: Double) = v * v
-
-private fun rgb(r: Int, g: Int, b: Int) = BLACK or (r shl 16) or (g shl 8) or b
-
-private fun lerpRgb(from: Int, to: Int, f: Double): Int {
-    fun channel(shift: Int): Int {
-        val a = from shr shift and 0xFF
-        val b = to shr shift and 0xFF
-        return (a + (b - a) * f).roundToInt()
-    }
-    return rgb(channel(16), channel(8), channel(0))
-}
 
 /** A number in [0, 1) that depends only on [key]: SplitMix64 over its parts. */
 private fun stableRandom(vararg key: Long): Double {
