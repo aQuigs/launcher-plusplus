@@ -7,7 +7,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.ImageBitmap
@@ -61,8 +63,8 @@ fun Dock(
     val art = LocalThemeArt.current
     val fullSize = art.dockIconSize
     val ground = art.dockGround(MaterialTheme.colorScheme.primary)
-    // Where the last layout put the slots, read only to draw what lies under them, so it need not be state.
-    val laidOut = remember { arrayOfNulls<DockRow>(1) }
+    // Written by measure and read by draw, so a new layout of the row redraws its ground.
+    var laidOut by remember { mutableStateOf<DockRow?>(null) }
 
     Layout(
         content = {
@@ -80,17 +82,19 @@ fun Dock(
         },
         modifier = modifier
             .fillMaxWidth()
+            .drawBehind { laidOut?.let { ground(DockSlots(it.iconSize, it.starts, glow)) } }
             .padding(vertical = 12.dp)
-            .drawBehind { laidOut[0]?.let { ground(DockSlots(it.iconSize, it.starts, glow)) } }
             .testTag(DockTags.DOCK),
     ) { measurables, constraints ->
         val width = constraints.maxWidth
         val height = fullSize.roundToPx()
-        laidOut[0] = null
-        if (measurables.isEmpty()) return@Layout layout(width, height) {}
+        if (measurables.isEmpty()) {
+            laidOut = DockRow(fullSize.toPx(), emptyList())
+            return@Layout layout(width, height) {}
+        }
 
         val row = dockRow(fullSize.toPx(), width.toFloat(), measurables.size, art.dockIconFill)
-        laidOut[0] = row
+        laidOut = row
         val size = row.iconSize.roundToInt()
         val icons = measurables.map { it.measure(Constraints.fixed(size, size)) }
 
