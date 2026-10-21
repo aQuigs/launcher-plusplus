@@ -27,6 +27,15 @@ class OpenMapTilesTest {
         VectorFeature(null, GeometryType.Point, tags, listOf(listOf(at)))
 
     @Test
+    fun scalesAPolarCentreAsTheEdgeOfTheMapItIsDrawnAt() {
+        val top = TileId(14, 8192, 0)
+        val tile = VectorTile(mapOf("landcover" to VectorLayer("landcover", EXTENT, listOf(square(mapOf("class" to "grass"))))))
+        fun polygons(lat: Double) = OpenMapTiles.scene(LatLon(lat, 0.0), mapOf(top to tile)).areas.single().polygons
+
+        assertEquals(polygons(85.05112878), polygons(90.0))
+    }
+
+    @Test
     fun mapsGroundLayersAndClasses() {
         val areas = scene(
             "landcover" to listOf(square(mapOf("class" to "wood")), square(mapOf("class" to "grass", "subclass" to "garden")), square(mapOf("class" to "sand")), square(mapOf("class" to "rock"))),

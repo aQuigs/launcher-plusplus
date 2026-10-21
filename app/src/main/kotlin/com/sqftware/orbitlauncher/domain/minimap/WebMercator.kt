@@ -37,8 +37,12 @@ object WebMercator {
         lon = Math.toDegrees(at.x / EARTH_RADIUS_M),
     )
 
-    /** Ground metres per mercator metre at [lat]: mercator stretches everything away from the equator by 1 / cos(lat). */
-    fun groundScale(lat: Double) = cos(Math.toRadians(lat))
+    /**
+     * Ground metres per mercator metre at [lat]: mercator stretches everything away from the equator by 1 / cos(lat).
+     * Taken at the latitude [toMercator] clamps to, since the map stops short of the poles, where the scale would reach
+     * across the whole world.
+     */
+    fun groundScale(lat: Double) = cos(Math.toRadians(lat.coerceIn(-MAX_LAT, MAX_LAT)))
 
     fun tileSize(z: Int) = 2 * HALF_WORLD_M / (1 shl z)
 
@@ -69,8 +73,7 @@ object WebMercator {
     /** Every tile at zoom [z] that holds ground within [radiusM] metres of [centre]. */
     fun tilesAround(centre: LatLon, radiusM: Double, z: Int): List<TileId> {
         val c = toMercator(centre)
-        // The map stops short of the poles, where the scale would reach across the whole world.
-        val reach = radiusM / groundScale(centre.lat.coerceIn(-MAX_LAT, MAX_LAT))
+        val reach = radiusM / groundScale(centre.lat)
         val low = tileAt(Mercator(c.x - reach, c.y - reach), z)
         val high = tileAt(Mercator(c.x + reach, c.y + reach), z)
         return (high.y..low.y).flatMap { y -> (low.x..high.x).map { x -> TileId(z, x, y) } }
