@@ -67,7 +67,7 @@ class CardTints internal constructor(glass: Color, wallpaper: Color, alpha: Floa
 }
 
 // Every colour named here, so a new one does not compile until it has its hue.
-private val CardColour.hue: Color?
+internal val CardColour.hue: Color?
     get() = when (this) {
         CardColour.Plain -> null
         CardColour.Red -> Color(0xFFE53935)

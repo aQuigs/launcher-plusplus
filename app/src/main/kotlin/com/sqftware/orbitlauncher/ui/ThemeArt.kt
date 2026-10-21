@@ -3,6 +3,13 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.foundation.Image
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.sqftware.orbitlauncher.domain.CardColour
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
@@ -177,12 +184,44 @@ interface ThemeArt {
     val menuRim: BorderStroke?
         @Composable get() = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
 
-    /** A collection card's shape and its rim, if any: by default a rounded card with none. */
-    val cardShape: Shape
-        get() = RoundedCornerShape(20.dp)
+    /**
+     * A collection card round its [header] and its [body], on the ground of the [colour] the user chose, solid while
+     * [dragged] and marked while it is the [dropTarget]: by default a rounded card of the colour's tint.
+     */
+    @Composable
+    fun CollectionCardBox(
+        colour: CardColour,
+        dragged: Boolean,
+        dropTarget: Boolean,
+        modifier: Modifier,
+        header: @Composable () -> Unit,
+        body: @Composable () -> Unit,
+    ) = PlainCardBox(colour, dragged, dropTarget, modifier, header, body)
 
-    val cardRim: BorderStroke?
-        @Composable get() = null
+    /** A collection's [glyph] and [title] at the start of its card's header: by default the glyph beside the title. */
+    @Composable
+    fun CardTitle(glyph: ImageVector, title: String, modifier: Modifier) = PlainCardTitle(glyph, title, modifier)
+
+    /** The face of a card header's button, its [glyph] in [tint] and turned by [glyphModifier]: by default the glyph alone. */
+    @Composable
+    fun CardButtonFace(glyph: ImageVector, contentDescription: String?, tint: Color, glyphModifier: Modifier) =
+        Icon(glyph, contentDescription, glyphModifier, tint)
+
+    /** The bin an app is dropped on to take it out of a collection, filling its target, lit while [highlighted]: by default a disc. */
+    @Composable
+    fun BinFace(highlighted: Boolean, modifier: Modifier) = PlainBinFace(highlighted, modifier)
+
+    /** What a card setting's title and choices are boxed in, in a collection's settings: by default a rounded raised box. */
+    @Composable
+    fun settingBox(): Modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)
+
+    /** The shape of the [index]th of [count] segments of a setting's choices: by default Material's rounded row. */
+    @Composable
+    fun segmentShape(index: Int, count: Int): Shape = SegmentedButtonDefaults.itemShape(index, count)
+
+    /** The shape of a colour swatch in a card's settings. */
+    val swatchShape: Shape
+        get() = CircleShape
 
     /** A dialog's box on [ground]: by default the solid ground in Material's dialog shape. */
     @Composable

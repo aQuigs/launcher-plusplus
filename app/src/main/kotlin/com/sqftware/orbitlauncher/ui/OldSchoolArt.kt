@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.sqftware.orbitlauncher.domain.CardColour
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -425,12 +427,37 @@ object OldSchoolArt : ThemeArt {
     override val menuRim: BorderStroke
         @Composable get() = BorderStroke(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim)
 
-    /** A collection is a bank tab's square box, in the menu's brown rim. */
-    override val cardShape: Shape
-        get() = RectangleShape
+    /** A collection is the game's bank, its title on the bank's tab and its header's buttons the game's stone ones. */
+    @Composable
+    override fun CollectionCardBox(
+        colour: CardColour,
+        dragged: Boolean,
+        dropTarget: Boolean,
+        modifier: Modifier,
+        header: @Composable () -> Unit,
+        body: @Composable () -> Unit,
+    ) = BankCard(colour, dropTarget, modifier, header, body)
 
-    override val cardRim: BorderStroke
-        @Composable get() = menuRim
+    @Composable
+    override fun CardTitle(glyph: ImageVector, title: String, modifier: Modifier) = BankTab(glyph, title, modifier)
+
+    @Composable
+    override fun CardButtonFace(glyph: ImageVector, contentDescription: String?, tint: Color, glyphModifier: Modifier) =
+        StoneButtonFace(glyph, contentDescription, glyphModifier)
+
+    @Composable
+    override fun BinFace(highlighted: Boolean, modifier: Modifier) = StoneBin(highlighted, modifier)
+
+    /** A card's settings are boxed square in the menu's brown rim, and its choices are square as the game's buttons are. */
+    @Composable
+    override fun settingBox(): Modifier =
+        Modifier.border(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim).background(MaterialTheme.colorScheme.surfaceContainerHighest)
+
+    @Composable
+    override fun segmentShape(index: Int, count: Int): Shape = RectangleShape
+
+    override val swatchShape: Shape
+        get() = RectangleShape
 
     /** The game's stone-framed interface box: square, rimmed in black outside the menu's brown, a game pixel each. */
     @Composable
@@ -460,7 +487,7 @@ object OldSchoolArt : ThemeArt {
 private const val ITEM_FIT = 28f
 
 @Composable
-private fun sprite(@DrawableRes id: Int): ImageBitmap = ImageBitmap.imageResource(id)
+internal fun sprite(@DrawableRes id: Int): ImageBitmap = ImageBitmap.imageResource(id)
 
 /** [image] at [scale], taking the room it is drawn in. */
 @Composable
@@ -505,11 +532,11 @@ private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLe
 }
 
 /** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
-private fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
+internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
     drawSpritePart(image, 0, image.width, topLeft, scale, tint, alpha)
 
 /** The columns of [image] from [from], [width] of them, drawn as [drawSprite] draws the whole. */
-private fun DrawScope.drawSpritePart(
+internal fun DrawScope.drawSpritePart(
     image: ImageBitmap,
     from: Int,
     width: Int,
