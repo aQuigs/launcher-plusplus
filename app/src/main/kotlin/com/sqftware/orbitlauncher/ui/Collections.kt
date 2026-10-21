@@ -340,15 +340,16 @@ private fun CollectionCardView(
     val dragged = reorder.dragging == index
     val colours = MaterialTheme.colorScheme
     val tint = LocalCardTints.current.of(look.colour)
+    val art = LocalThemeArt.current
 
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = art.cardShape,
         // Solid while dragged, so the card it passes over does not show through it.
         colors = CardDefaults.cardColors(
             containerColor = if (dragged) tint.compositeOver(colours.surfaceContainerHigh) else tint,
             contentColor = colours.onSurface,
         ),
-        border = if (dropTarget) BorderStroke(2.dp, colours.primary) else null,
+        border = if (dropTarget) BorderStroke(2.dp, colours.primary) else art.cardRim,
         modifier = modifier
             .fillMaxWidth()
             .reorderItem(reorder, index)

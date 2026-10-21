@@ -3,7 +3,6 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +20,7 @@ import kotlinx.coroutines.flow.first
 // Every dialog and menu of the launcher is one of these, so each sits on the drawer's ground (held by the
 // panel-ground-only hook) and a theme reaches them all.
 
-/** Material's alert dialog on the solid [PanelGround]. */
+/** Material's alert dialog in the theme's box on the solid [PanelGround]. */
 @Composable
 fun GroundDialog(
     onDismissRequest: () -> Unit,
@@ -35,7 +34,7 @@ fun GroundDialog(
     AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = confirmButton,
-        modifier = modifier.solidGround(panelGround(), AlertDialogDefaults.shape),
+        modifier = modifier.then(LocalThemeArt.current.dialogBox(panelGround())),
         dismissButton = dismissButton,
         icon = icon,
         title = title,

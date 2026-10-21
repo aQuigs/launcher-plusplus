@@ -14,6 +14,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.border
 import com.sqftware.orbitlauncher.ui.theme.MenuTarget
 import com.sqftware.orbitlauncher.ui.theme.MenuVerb
 import com.sqftware.orbitlauncher.ui.theme.MenuRim
@@ -302,6 +305,20 @@ object OldSchoolArt : ThemeArt {
 
     override val menuRim: BorderStroke
         @Composable get() = BorderStroke(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim)
+
+    /** A collection is a bank tab's square box, in the menu's brown rim. */
+    override val cardShape: Shape
+        get() = RectangleShape
+
+    override val cardRim: BorderStroke
+        @Composable get() = menuRim
+
+    /** The game's stone-framed interface box: square, rimmed in black outside the menu's brown, a game pixel each. */
+    @Composable
+    override fun dialogBox(ground: PanelGround): Modifier {
+        val rim = with(LocalDensity.current) { gamePixel.toDp() }
+        return Modifier.border(rim, GameShadow).padding(rim).border(rim, MenuRim).solidGround(ground, RectangleShape)
+    }
 
     /** "Choose Option" in the rim's brown over the items, which are in white with any secondary text in the target's orange. */
     @Composable

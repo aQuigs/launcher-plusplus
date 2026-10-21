@@ -1,6 +1,9 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.InteractionSource
@@ -153,6 +156,17 @@ interface ThemeArt {
 
     val menuRim: BorderStroke?
         @Composable get() = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+
+    /** A collection card's shape and its rim, if any: by default a rounded card with none. */
+    val cardShape: Shape
+        get() = RoundedCornerShape(20.dp)
+
+    val cardRim: BorderStroke?
+        @Composable get() = null
+
+    /** A dialog's box on [ground]: by default the solid ground in Material's dialog shape. */
+    @Composable
+    fun dialogBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, AlertDialogDefaults.shape)
 
     /** A menu's items, [content], as the theme sets them out: by default as they are. */
     @Composable
