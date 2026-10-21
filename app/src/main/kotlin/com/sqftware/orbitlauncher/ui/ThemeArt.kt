@@ -1,6 +1,8 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
@@ -154,6 +156,15 @@ interface ThemeArt {
     fun dockGround(glowColour: Color): DrawScope.(DockSlots) -> Unit = { slots ->
         if (slots.glow > 0f) drawRoundRect(glowColour.copy(alpha = 0.12f * slots.glow), cornerRadius = CornerRadius(size.height / 2))
     }
+
+    /** The drawer's sheet: by default with Material's rounded top corners. */
+    val drawerShape: Shape
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable get() = BottomSheetDefaults.ExpandedShape
+
+    /** How much of the closed drawer peeks above the pages, room for its [DrawerHandle]. */
+    val drawerPeek: Dp
+        @Composable get() = 48.dp
 
     /** What opens and closes the drawer above the pages, pointing the way it will move: by default a chevron. */
     @Composable

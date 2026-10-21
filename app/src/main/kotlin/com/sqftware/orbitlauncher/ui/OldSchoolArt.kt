@@ -391,6 +391,12 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
+    override val drawerShape: Shape
+        @Composable get() = RectangleShape
+
+    override val drawerPeek: Dp
+        @Composable get() = with(LocalDensity.current) { (STONE_HEIGHT * gamePixel).toDp() }
+
     /** The inventory tab: a stone with the game's backpack, lit red while the drawer is open as a selected tab is. */
     @Composable
     override fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) {

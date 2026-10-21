@@ -149,7 +149,6 @@ object LauncherTags {
     fun page(page: LauncherPage) = "page_${page.id}"
 }
 
-private val DRAWER_PEEK = 48.dp
 
 const val AUTO_SET_UP = "Auto set up"
 const val PICK_TIP = "Long-press the centre to choose the ring's apps"
@@ -1296,6 +1295,8 @@ fun LauncherScreen(
     // the system bars, so it is the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
     val ground = panelGround()
+    val art = LocalThemeArt.current
+    val drawerPeek = art.drawerPeek
     // How far the drawer's list has been dragged and flung, for the stars to follow. A jump by the letter rail is a cut,
     // after which no one could tell where the stars ought to be, so it need not count.
     val drawerScrolled = remember { mutableFloatStateOf(0f) }
@@ -1322,7 +1323,7 @@ fun LauncherScreen(
                 .windowInsetsPadding(insets)
                 .onGloballyPositioned { origin = it.positionInRoot() }
                 .drawBehind {
-                    val top = size.height - (DRAWER_PEEK + BOTTOM_SHADE_FADE).toPx()
+                    val top = size.height - (drawerPeek + BOTTOM_SHADE_FADE).toPx()
                     val bottom = size.height + navigationBar.toPx()
                     val shade = Brush.verticalGradient(
                         0f to Color.Transparent,
@@ -1334,7 +1335,7 @@ fun LauncherScreen(
                     drawRect(shade, Offset(0f, top), Size(size.width, bottom - top))
 
                     val offset = drawerState.requireOffset()
-                    val travel = size.height - DRAWER_PEEK.toPx()
+                    val travel = size.height - drawerPeek.toPx()
                     val open = if (travel > 0f) 1f - (offset / travel).coerceIn(0f, 1f) else 1f
                     // A fling into the end of the list settles the open sheet with a bounce past the top. The sheet is placed
                     // at its rounded offset, so the gap is rounded too, or the join shows a seam.
@@ -1344,7 +1345,8 @@ fun LauncherScreen(
         ) {
             BottomSheetScaffold(
                 scaffoldState = rememberBottomSheetScaffoldState(drawerState),
-                sheetPeekHeight = DRAWER_PEEK,
+                sheetPeekHeight = drawerPeek,
+                sheetShape = art.drawerShape,
                 // The handle is the drawer's own, not the sheet's, so the panel can fill in the strip behind it: clear while the
                 // drawer is down, so only the chevron shows over the wallpaper, and solid once it is open, so the open drawer
                 // reaches the top as Arc's does. The panel is translucent so the wallpaper still shows through.
@@ -1355,7 +1357,7 @@ fun LauncherScreen(
                 sheetContent = {
                     Column(
                         Modifier.drawBehind {
-                            val strip = DRAWER_PEEK.toPx()
+                            val strip = drawerPeek.toPx()
                             // The drawer under the strip is as tall as it travels, like the pages.
                             val travel = size.height - strip
                             val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
@@ -1721,7 +1723,7 @@ fun LauncherScreen(
                 }
             }
             if (layout.showsDots && !drawerOpen) {
-                PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = DRAWER_PEEK - 8.dp))
+                PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = drawerPeek - 8.dp))
             }
             if (editingPages) {
                 PageEditor(
