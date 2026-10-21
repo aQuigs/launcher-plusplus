@@ -10,17 +10,27 @@ import android.os.CancellationSignal
 import android.util.Log
 import androidx.core.location.LocationListenerCompat
 import androidx.core.location.LocationManagerCompat
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.core.location.LocationRequestCompat
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.receiveAsFlow
 import java.util.concurrent.Executor
 
 interface LocationSource {
     /** Whether the user lets the launcher know roughly where they are. */
     fun isGranted(): Boolean
+
+    /** Asks the user for it; the answer comes on [answers]. */
+    fun request()
+
+    /** Each answer to a [request]: whether the user granted it. */
+    fun answers(): Flow<Boolean>
 
     /**
      * Where the user is, roughly: a fix as soon as one is to be had, then a new one as they move, for as long as it is
@@ -30,6 +40,7 @@ interface LocationSource {
 }
 
 private const val TAG = "PlatformLocationSource"
+private const val REQUEST_KEY = "location"
 private const val UPDATE_MILLIS = 60_000L
 private const val UPDATE_METRES = 50f
 
@@ -38,13 +49,22 @@ private const val FRESH_MILLIS = 10 * 60_000L
 
 /**
  * The platform's LocationManager with coarse location, at low power: the last fix if it is fresh, one current fix, then
- * updates no more often than a minute or 50 m apart. No Play services: the launcher has no other use for them.
+ * updates no more often than a minute or 50 m apart. No Play services: the launcher has no other use for them. The
+ * permission is asked through the activity's [registry], as the home role is; the adapter lives as long as the activity.
  */
-class PlatformLocationSource(private val context: Context) : LocationSource {
+class PlatformLocationSource(private val context: Context, registry: ActivityResultRegistry) : LocationSource {
     private val manager = context.getSystemService(LocationManager::class.java)
+
+    // Kept until heard, since an answer can arrive as a recreated activity registers, before the screen collects.
+    private val granted = Channel<Boolean>(Channel.CONFLATED)
+    private val dialog = registry.register(REQUEST_KEY, RequestPermission()) { granted.trySend(it) }
 
     override fun isGranted() =
         context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    override fun request() = dialog.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+    override fun answers(): Flow<Boolean> = granted.receiveAsFlow()
 
     override fun locations(): Flow<LatLon> = callbackFlow {
         val provider = provider()

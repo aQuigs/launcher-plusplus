@@ -7,24 +7,24 @@ class Sprite(val width: Int, val height: Int, val argb: IntArray) {
     }
 }
 
-/** The map icons the minimap marks places with. */
-enum class MapIcon {
-    Bank,
-    Altar,
-    QuestStart,
-    Transportation,
-    Pub,
-    CookeryShop,
-    KebabShop,
-    FoodShop,
-    Apothecary,
-    WaterSource,
-    GrandExchange,
-    ClothesShop,
-    JewelleryShop,
-    Hairdresser,
-    PetShop,
-    GeneralStore,
+/** The map icons the minimap marks places with. Where they crowd, the lower [priority] shows. */
+enum class MapIcon(val priority: Int) {
+    Bank(0),
+    Altar(1),
+    QuestStart(2),
+    Transportation(3),
+    Pub(4),
+    CookeryShop(5),
+    KebabShop(5),
+    FoodShop(5),
+    Apothecary(6),
+    WaterSource(6),
+    GrandExchange(6),
+    ClothesShop(7),
+    JewelleryShop(7),
+    Hairdresser(7),
+    PetShop(7),
+    GeneralStore(8),
 }
 
 /**

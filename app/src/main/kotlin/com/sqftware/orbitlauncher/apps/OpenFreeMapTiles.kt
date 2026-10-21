@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.apps
 
 import android.content.Context
 import android.util.Log
+import com.sqftware.orbitlauncher.domain.minimap.MapTiles
 import com.sqftware.orbitlauncher.domain.minimap.TileId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -13,14 +14,6 @@ import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-
-interface MapTiles {
-    /** The vector tile [id], an OpenMapTiles Mapbox Vector Tile, or null when it cannot be had now (offline, say). */
-    suspend fun tile(id: TileId): ByteArray?
-
-    /** Forgets the tile [id], which turned out unreadable, so the next ask fetches it afresh. */
-    suspend fun discard(id: TileId)
-}
 
 private const val TAG = "OpenFreeMapTiles"
 private const val TILE_JSON = "https://tiles.openfreemap.org/planet"

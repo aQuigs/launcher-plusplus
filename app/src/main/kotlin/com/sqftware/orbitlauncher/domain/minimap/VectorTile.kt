@@ -38,14 +38,17 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
     operator fun get(layer: String): VectorLayer? = layers[layer]
 
     companion object {
-        /** Decodes [bytes], keeping only the layers named in [only] if given, since a city tile carries far more than a minimap draws. */
-        fun decode(bytes: ByteArray, only: Set<String>? = null): VectorTile {
+        /**
+         * Decodes [bytes], keeping only the layers named in [only] and the tags named in [keys] if given, since a city
+         * tile carries far more than a minimap draws, its places' names in dozens of languages among it.
+         */
+        fun decode(bytes: ByteArray, only: Set<String>? = null, keys: Set<String>? = null): VectorTile {
             val layers = mutableMapOf<String, VectorLayer>()
             val tile = Protobuf(bytes, 0, bytes.size)
             while (tile.hasMore()) {
                 val (field, wire) = tile.key()
                 if (field == 3 && wire == WIRE_BYTES) {
-                    tile.message().let { decodeLayer(it, only) }?.let { layers[it.name] = it }
+                    tile.message().let { decodeLayer(it, only, keys) }?.let { layers[it.name] = it }
                 } else {
                     tile.skip(wire)
                 }
@@ -53,7 +56,7 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
             return VectorTile(layers)
         }
 
-        private fun decodeLayer(layer: Protobuf, only: Set<String>?): VectorLayer? {
+        private fun decodeLayer(layer: Protobuf, only: Set<String>?, wanted: Set<String>?): VectorLayer? {
             var name = ""
             var extent = 4096
             val keys = mutableListOf<String>()
@@ -73,7 +76,8 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
                     else -> layer.skip(wire)
                 }
             }
-            return VectorLayer(name, extent, features.map { decodeFeature(it, keys, values) })
+            val kept = keys.map { key -> key.takeIf { wanted == null || it in wanted } }
+            return VectorLayer(name, extent, features.map { decodeFeature(it, kept, values) })
         }
 
         private fun decodeValue(value: Protobuf): Any {
@@ -96,7 +100,7 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
             return decoded
         }
 
-        private fun decodeFeature(feature: Protobuf, keys: List<String>, values: List<Any>): VectorFeature {
+        private fun decodeFeature(feature: Protobuf, keys: List<String?>, values: List<Any>): VectorFeature {
             var id: Long? = null
             var type = GeometryType.Unknown
             val tags = mutableMapOf<String, Any>()
@@ -165,7 +169,7 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
 }
 
 /** Twice the signed area of [ring] with y down: positive when it winds clockwise on screen. */
-internal fun signedArea(ring: List<TilePoint>): Long {
+private fun signedArea(ring: List<TilePoint>): Long {
     var sum = 0L
     for (i in ring.indices) {
         val a = ring[i]

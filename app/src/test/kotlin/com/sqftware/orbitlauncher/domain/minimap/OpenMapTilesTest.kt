@@ -117,7 +117,6 @@ class OpenMapTilesTest {
             listOf(MapIcon.Bank, MapIcon.Altar, MapIcon.Transportation, MapIcon.KebabShop, MapIcon.GeneralStore, MapIcon.ClothesShop, null, MapIcon.QuestStart),
             pois.map { it.icon },
         )
-        assertEquals(listOf(0, 1, 3, 5, 8, 7, Int.MAX_VALUE, 2), pois.map { it.iconPriority })
         assertEquals(listOf(true, false, true, true, true, true, true, false), pois.map { it.npc })
         val parking = pois[6]
         assertFalse(parking.door)
@@ -132,7 +131,7 @@ class OpenMapTilesTest {
     @Test
     fun buildsBryantParkFromRealTiles() {
         val bryantPark = LatLon(40.7536, -73.9832)
-        val tiles = OpenMapTiles.tilesFor(bryantPark).associateWith { VectorTile.decode(fixture("${it.z}-${it.x}-${it.y}.mvt"), OpenMapTiles.LAYERS) }
+        val tiles = OpenMapTiles.tilesFor(bryantPark).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
         val scene = OpenMapTiles.scene(bryantPark, tiles)
 
         assertTrue(scene.buildings.isNotEmpty())

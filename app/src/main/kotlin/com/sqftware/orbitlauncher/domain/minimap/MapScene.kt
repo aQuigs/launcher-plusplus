@@ -31,10 +31,10 @@ class Way(val kind: WayKind, val widthM: Double, val points: List<Local>)
 class Building(val polygon: Polygon, val seed: Long)
 
 /**
- * Something mapped at a spot: a map [icon] of [iconPriority] (lower wins), whether someone stands there ([npc]), and
- * whether it is entered from the street, so the wall of the building it is in gets a [door].
+ * Something mapped at a spot: its map [icon], whether someone stands there ([npc]), and whether it is entered from the
+ * street, so the wall of the building it is in gets a [door].
  */
-class Poi(val at: Local, val icon: MapIcon? = null, val iconPriority: Int = Int.MAX_VALUE, val npc: Boolean = false, val door: Boolean = false)
+class Poi(val at: Local, val icon: MapIcon? = null, val npc: Boolean = false, val door: Boolean = false)
 
 /** Everything a minimap centred on [centre] draws, in ground metres around it. */
 class MapScene(

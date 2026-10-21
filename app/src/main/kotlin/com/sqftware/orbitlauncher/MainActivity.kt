@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher
 
-import android.Manifest
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -9,7 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import com.sqftware.orbitlauncher.ui.LocalMinimap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -92,7 +90,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
-private const val LOCATION_REQUEST_KEY = "location"
 
 // Drawables by name, so a build without the art still draws the ground, walls and doors of the map.
 private val MINIMAP_SPRITES = MinimapSpriteNames(npc = "osrs_300_1")
@@ -142,14 +139,8 @@ class MainActivity : ComponentActivity() {
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
-        val location = PlatformLocationSource(this)
+        val location = PlatformLocationSource(this, activityResultRegistry)
         val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this, MINIMAP_SPRITES))
-        // The user's answer, kept until the screen is there to hear it, as a pin request is. Registered for as long as
-        // the activity lives, as the home role's dialog is.
-        val locationGrants = Channel<Boolean>(Channel.CONFLATED)
-        val askForLocation = activityResultRegistry.register(LOCATION_REQUEST_KEY, ActivityResultContracts.RequestPermission()) {
-            locationGrants.trySend(it)
-        }
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
         val widgetActions = { page: String ->
             WidgetActions(
@@ -268,7 +259,7 @@ class MainActivity : ComponentActivity() {
                     whereIAmStore.save(on)
                 }
                 LaunchedEffect(Unit) {
-                    locationGrants.receiveAsFlow().collect { granted ->
+                    location.answers().collect { granted ->
                         if (granted) {
                             changeShowWhereIAm(true)
                         } else {
@@ -445,7 +436,7 @@ class MainActivity : ComponentActivity() {
                             when {
                                 !on -> changeShowWhereIAm(false)
                                 location.isGranted() -> changeShowWhereIAm(true)
-                                else -> askForLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                else -> location.request()
                             }
                         },
                         isHomeApp = isHomeApp,

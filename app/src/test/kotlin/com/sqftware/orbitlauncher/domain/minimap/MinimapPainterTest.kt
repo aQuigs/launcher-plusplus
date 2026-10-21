@@ -93,16 +93,16 @@ class MinimapPainterTest {
 
     @Test
     fun capsIconsSpacesThemAndLimitsEachKind() {
-        val spread = MapIcon.entries.take(8).mapIndexed { i, icon -> Poi(local(30 + (i % 4) * 30, 40 + (i / 4) * 60), icon, iconPriority = i) }
+        val spread = MapIcon.entries.take(8).mapIndexed { i, icon -> Poi(local(30 + (i % 4) * 30, 40 + (i / 4) * 60), icon) }
         val disc = painter.paint(MapScene(centre, pois = spread))
         val shown = MapIcon.entries.filter { icon -> disc.any { it == ICON or icon.ordinal } }
         assertEquals(MAX_ICONS, shown.size)
         assertEquals(MapIcon.entries.take(MAX_ICONS), shown)
 
-        val banks = (0 until 4).map { Poi(local(30 + it * 30, 40), MapIcon.Bank, 0) }
+        val banks = (0 until 4).map { Poi(local(30 + it * 30, 40), MapIcon.Bank) }
         assertEquals(MAX_PER_ICON * 9, painter.paint(MapScene(centre, pois = banks)).count { it == ICON or MapIcon.Bank.ordinal })
 
-        val crowded = listOf(Poi(local(40, 40), MapIcon.Bank, 0), Poi(local(50, 40), MapIcon.Altar, 1))
+        val crowded = listOf(Poi(local(40, 40), MapIcon.Bank), Poi(local(50, 40), MapIcon.Altar))
         val close = painter.paint(MapScene(centre, pois = crowded))
         assertEquals(9, close.count { it == ICON or MapIcon.Bank.ordinal })
         assertEquals(0, close.count { it == ICON or MapIcon.Altar.ordinal })
@@ -126,7 +126,7 @@ class MinimapPainterTest {
 
     @Test
     fun paintsTheSameSceneTheSameWay() {
-        val tiles = OpenMapTiles.tilesFor(centre).associateWith { VectorTile.decode(fixture("${it.z}-${it.x}-${it.y}.mvt"), OpenMapTiles.LAYERS) }
+        val tiles = OpenMapTiles.tilesFor(centre).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
         val scene = OpenMapTiles.scene(centre, tiles)
         val disc = painter.paint(scene)
         assertArrayEquals(disc, painter.paint(scene))
