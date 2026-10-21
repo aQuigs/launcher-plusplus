@@ -34,6 +34,13 @@ val MenuTarget = Color(0xFFFF9040)
 /** The orange of the game's interface text, such as a window's title. */
 val GameOrange = Color(0xFFFF981F)
 
+/**
+ * The line typed into the chatbox, with the asterisk the game shows for a caret: the light blue it takes over the
+ * see-through chatbox, on the night's stone, and the blue over the opaque one's parchment, the day's ground.
+ */
+val ChatTypedNight = Color(0xFF9090FF)
+val ChatTypedDay = Color(0xFF0000FF)
+
 /** What shows through the minimap's frame before the map has loaded: the game's grass. */
 val MinimapGrass = Color(0xFF698F24)
 

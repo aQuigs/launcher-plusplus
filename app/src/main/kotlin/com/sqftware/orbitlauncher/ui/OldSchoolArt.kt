@@ -17,6 +17,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.IntRect
+import com.sqftware.orbitlauncher.ui.theme.ChatTypedDay
+import com.sqftware.orbitlauncher.ui.theme.ChatTypedNight
+import com.sqftware.orbitlauncher.ui.theme.GameOrange
 import com.sqftware.orbitlauncher.ui.theme.MenuTarget
 import com.sqftware.orbitlauncher.ui.theme.MenuVerb
 import com.sqftware.orbitlauncher.ui.theme.MenuRim
@@ -183,6 +203,99 @@ object OldSchoolArt : ThemeArt {
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = Unit
 
+    /**
+     * By night the stone of the game's side panel, as the inventory has it, and by day the flat parchment of its
+     * chatbox, which the day's dark text is read on.
+     */
+    @Composable
+    override fun panelVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit {
+        val stone = sprite(R.drawable.osrs_1031_0)
+        val px = gamePixel
+        val night = onStone
+        return remember(veil, stone, px, night) {
+            if (night) {
+                { alpha, topLeft, size -> drawStone(stone, px, veil.alpha * alpha, topLeft, size) }
+            } else {
+                flatVeil(veil)
+            }
+        }
+    }
+
+    /**
+     * The chatbox's input line: the typed text in the game's blue, with its asterisk for a caret, in a square box
+     * rimmed as its interface boxes are, behind its magnifying glass.
+     */
+    @Composable
+    override fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
+        val glass = sprite(R.drawable.osrs_535_0)
+        val clear = sprite(R.drawable.osrs_773_0)
+        val px = gamePixel
+        val typed = if (onStone) ChatTypedNight else ChatTypedDay
+        val style = MaterialTheme.typography.bodyLarge
+        var focused by remember { mutableStateOf(false) }
+
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = modifier.onFocusChanged { focused = it.isFocused },
+            textStyle = style.copy(color = typed),
+            singleLine = true,
+            cursorBrush = SolidColor(Color.Transparent),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            decorationBox = { field ->
+                Row(
+                    Modifier.gameRim(px).heightIn(min = 56.dp).padding(start = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SpriteImage(glass, max(1, px / 2))
+                    Row(Modifier.weight(1f).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f, fill = false)) { field() }
+                        if (focused) Text("*", style = style, color = typed)
+                        if (query.isEmpty()) {
+                            Text("Search apps", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    }
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            SpriteImage(clear, px, Modifier.semantics { contentDescription = "Clear the search" })
+                        }
+                    }
+                }
+            },
+        )
+    }
+
+    /** The chatbox's filter buttons: a stone each, the chosen one sunk, its label in white, or the game's orange once chosen. */
+    @Composable
+    override fun ChoiceButtons(choices: List<Choice>, modifier: Modifier) {
+        val stone = sprite(R.drawable.osrs_3051_0)
+        val sunk = sprite(R.drawable.osrs_3053_0)
+        val px = gamePixel
+        with(LocalDensity.current) {
+            Row(modifier, horizontalArrangement = Arrangement.spacedBy(px.toDp())) {
+                choices.forEach { choice ->
+                    val face = if (choice.selected) sunk else stone
+                    Box(
+                        Modifier
+                            .selectable(choice.selected, role = Role.Tab, onClick = choice.onSelect)
+                            .testTag(choice.tag)
+                            .size((face.width * px).toDp(), (face.height * px).toDp())
+                            .drawBehind { drawSprite(face, Offset.Zero, px) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            choice.label,
+                            color = if (choice.selected) GameOrange else MenuVerb,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     @Composable
     override fun IconGround(
         place: IconPlace,
@@ -315,10 +428,7 @@ object OldSchoolArt : ThemeArt {
 
     /** The game's stone-framed interface box: square, rimmed in black outside the menu's brown, a game pixel each. */
     @Composable
-    override fun dialogBox(ground: PanelGround): Modifier {
-        val rim = with(LocalDensity.current) { gamePixel.toDp() }
-        return Modifier.border(rim, GameShadow).padding(rim).border(rim, MenuRim).solidGround(ground, RectangleShape)
-    }
+    override fun dialogBox(ground: PanelGround): Modifier = Modifier.gameRim(gamePixel).solidGround(ground, RectangleShape)
 
     /** "Choose Option" in the rim's brown over the items, which are in white with any secondary text in the target's orange. */
     @Composable
@@ -345,6 +455,48 @@ private const val ITEM_FIT = 28f
 
 @Composable
 private fun sprite(@DrawableRes id: Int): ImageBitmap = ImageBitmap.imageResource(id)
+
+/** [image] at [scale], taking the room it is drawn in. */
+@Composable
+private fun SpriteImage(image: ImageBitmap, scale: Int, modifier: Modifier = Modifier) {
+    with(LocalDensity.current) {
+        Spacer(modifier.size((image.width * scale).toDp(), (image.height * scale).toDp()).drawBehind { drawSprite(image, Offset.Zero, scale) })
+    }
+}
+
+/** The night scheme, whose light text reads on the game's dark stone; by day the panels are its chatbox's parchment. */
+private val onStone: Boolean
+    @Composable get() = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
+
+/** The rim of the game's interface boxes: black outside the menu's brown, [px] screen pixels each. */
+@Composable
+private fun Modifier.gameRim(px: Int): Modifier {
+    val rim = with(LocalDensity.current) { px.toDp() }
+    return border(rim, GameShadow).padding(rim).border(rim, MenuRim)
+}
+
+/** The stone in the side panel's sprite, less the shadow its frame casts along the top and left and the marks at its corners. */
+private val STONE = IntRect(left = 10, top = 8, right = 185, bottom = 255)
+
+/**
+ * The side panel's [stone] over [size] from [topLeft] at [alpha], each of its pixels [px] screen pixels, in tiles from
+ * the drawing's origin so the parts of one panel line up, each mirroring the one before so they meet without a seam.
+ */
+private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLeft: Offset, size: Size) {
+    val tile = IntSize(STONE.width * px, STONE.height * px)
+    val bottomRight = topLeft + Offset(size.width, size.height)
+    clipRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y) {
+        for (row in floor(topLeft.y / tile.height).toInt()..floor(bottomRight.y / tile.height).toInt()) {
+            for (column in floor(topLeft.x / tile.width).toInt()..floor(bottomRight.x / tile.width).toInt()) {
+                val at = IntOffset(column * tile.width, row * tile.height)
+                val centre = Offset(at.x + tile.width / 2f, at.y + tile.height / 2f)
+                withTransform({ scale(if (column.mod(2) == 0) 1f else -1f, if (row.mod(2) == 0) 1f else -1f, centre) }) {
+                    drawImage(stone, STONE.topLeft, STONE.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
+                }
+            }
+        }
+    }
+}
 
 /** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
 private fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =

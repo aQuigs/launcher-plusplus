@@ -20,15 +20,17 @@ import com.sqftware.orbitlauncher.ui.theme.LocalPanelMark
 
 /**
  * The ground of every full-screen view over the launcher, the drawer's and each [Panel]'s alike, and of every pop-up:
- * the veil of `surfaceDim`, and the theme's faint marks over it. Views draw it from here rather than picking colours of
- * their own, so a theme reaches all of them at once.
+ * the veil of `surfaceDim`, as the theme lays it, and the theme's faint marks over it. Views draw it from here rather
+ * than picking colours of their own, so a theme reaches all of them at once.
  */
-class PanelGround(private val veil: Color, private val mark: Color, private val art: ThemeArt) {
-    private val solid = veil.copy(alpha = 1f)
-
+class PanelGround(
+    private val veil: DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit,
+    private val solid: DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit,
+    private val mark: Color,
+    private val art: ThemeArt,
+) {
     /** The veil at [alpha] of its own, over [size] from [topLeft]. */
-    fun DrawScope.drawVeil(alpha: Float = 1f, topLeft: Offset = Offset.Zero, size: Size = this.size) =
-        drawRect(veil.copy(alpha = veil.alpha * alpha), topLeft, size)
+    fun DrawScope.drawVeil(alpha: Float = 1f, topLeft: Offset = Offset.Zero, size: Size = this.size) = veil(alpha, topLeft, size)
 
     /** The theme's marks at [alpha] of their brightest, drifted by how far a list has [scrolled]. */
     fun DrawScope.drawMarks(alpha: Float = 1f, scrolled: Float = 0f) =
@@ -36,7 +38,7 @@ class PanelGround(private val veil: Color, private val mark: Color, private val 
 
     /** The veil made opaque, with the marks over it, for what floats over other content and must hide it. */
     fun DrawScope.drawSolid() {
-        drawRect(solid)
+        solid(1f, Offset.Zero, size)
         drawMarks()
     }
 }
@@ -46,11 +48,13 @@ fun Modifier.solidGround(ground: PanelGround, shape: Shape) = clip(shape).drawBe
 
 @Composable
 fun panelGround(): PanelGround {
-    val veil = MaterialTheme.colorScheme.surfaceDim
+    val colour = MaterialTheme.colorScheme.surfaceDim
     val mark = LocalPanelMark.current
     val art = LocalThemeArt.current
+    val veil = art.panelVeil(colour)
+    val solid = art.panelVeil(colour.copy(alpha = 1f))
     // The same ground across recompositions, so the draw lambdas holding it are kept and do not redraw for nothing.
-    return remember(veil, mark, art) { PanelGround(veil, mark, art) }
+    return remember(veil, solid, mark, art) { PanelGround(veil, solid, mark, art) }
 }
 
 /**

@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -97,6 +99,13 @@ interface ThemeArt {
     /** The faint pattern over a panel's veil, in [colour] at its brightest, drifting by a share of how far the list has [scrolled]. */
     fun DrawScope.drawBackdrop(colour: Color, scrolled: Float)
 
+    /**
+     * Builds what lays a panel's [veil] over a rect at a share of its own alpha: by default the flat colour. Every part
+     * of one panel is drawn in the same coordinates, so a texture lines up across them.
+     */
+    @Composable
+    fun panelVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit = remember(veil) { flatVeil(veil) }
+
     /** The theme's world as a scene the launcher's menu offers to set as the wallpaper, if it has one. */
     val scene: ThemeScene?
         get() = null
@@ -168,6 +177,15 @@ interface ThemeArt {
     @Composable
     fun dialogBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, AlertDialogDefaults.shape)
 
+    /** The drawer's search field, editing [query] and calling [onSearch] from the keyboard's search key: by default Material's outlined field. */
+    @Composable
+    fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) =
+        PlainSearchField(query, onQueryChange, onSearch, modifier)
+
+    /** A row of buttons, one to each of the [choices], one of them chosen: by default Material's segmented buttons. */
+    @Composable
+    fun ChoiceButtons(choices: List<Choice>, modifier: Modifier) = SegmentedChoices(choices, modifier)
+
     /** A menu's items, [content], as the theme sets them out: by default as they are. */
     @Composable
     fun MenuBody(content: @Composable () -> Unit) = content()
@@ -176,6 +194,10 @@ interface ThemeArt {
     val typography: Typography?
         @Composable get() = null
 }
+
+/** A flat [veil], at a share of its own alpha. */
+fun flatVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit =
+    { alpha, topLeft, size -> drawRect(veil.copy(alpha = veil.alpha * alpha), topLeft, size) }
 
 /** The dock's slots as laid out on its row: each icon [iconSize] across, the nth starting [starts] along, and how much it [glow]s. */
 class DockSlots(val iconSize: Float, val starts: List<Float>, val glow: Float)

@@ -328,7 +328,20 @@ fun AppDrawer(
 private val profileTabs = listOf(false to "Personal", true to "Work")
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) =
+    LocalThemeArt.current.SearchField(
+        query,
+        onQueryChange,
+        onSearch,
+        modifier
+            // The placeholder goes once there is text, and a screen reader should still say what the field is for.
+            .semantics { contentDescription = "Search apps" }
+            .testTag(AppDrawerTags.SEARCH),
+    )
+
+/** The drawer's search field as most themes draw it: Material's outlined field, rounded at the ends. */
+@Composable
+internal fun PlainSearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -343,10 +356,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
         shape = CircleShape,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        modifier = modifier
-            // The placeholder goes once there is text, and a screen reader should still say what the field is for.
-            .semantics { contentDescription = "Search apps" }
-            .testTag(AppDrawerTags.SEARCH),
+        modifier = modifier,
     )
 }
 

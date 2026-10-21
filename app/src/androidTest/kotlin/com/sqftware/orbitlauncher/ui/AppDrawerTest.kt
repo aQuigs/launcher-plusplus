@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import com.sqftware.orbitlauncher.domain.DrawerOrder
 import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.OTHER_INITIAL
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -66,24 +68,28 @@ class AppDrawerTest {
         onStyleChange: (DrawerStyle) -> Unit = { this.style = it },
         foregroundTime: ForegroundTime? = null,
         onOpenUsageSettings: () -> Unit = {},
+        theme: Theme? = null,
     ) {
         this.style = style
         compose.setContent {
             var query by remember { mutableStateOf("") }
             var sorting by remember { mutableStateOf(false) }
-            AppDrawer(
-                apps,
-                icon = { null },
-                onLaunch,
-                picking = picking,
-                gridState = gridState,
-                query = query,
-                onQueryChange = { query = it },
-                unread = unread,
-                controls = DrawerControls(this.style, onStyleChange, sorting, onSortingChange = { sorting = it }),
-                foregroundTime = foregroundTime,
-                onOpenUsageSettings = onOpenUsageSettings,
-            )
+            val drawer = @Composable {
+                AppDrawer(
+                    apps,
+                    icon = { null },
+                    onLaunch,
+                    picking = picking,
+                    gridState = gridState,
+                    query = query,
+                    onQueryChange = { query = it },
+                    unread = unread,
+                    controls = DrawerControls(this.style, onStyleChange, sorting, onSortingChange = { sorting = it }),
+                    foregroundTime = foregroundTime,
+                    onOpenUsageSettings = onOpenUsageSettings,
+                )
+            }
+            if (theme == null) drawer() else Themed(theme, theme.colourways.first(), lightWallpaper = false, drawer)
         }
     }
 
@@ -224,9 +230,20 @@ class AppDrawerTest {
     }
 
     @Test
-    fun workAppsHaveATabOfTheirOwnAndASearchFindsBoth() {
+    fun workAppsHaveATabOfTheirOwnAndASearchFindsBoth() = workTabsAndSearch(theme = null)
+
+    // Old School draws its own tabs and search field, the game's stone buttons and chat line.
+    @Test
+    fun oldSchoolsTabsAndSearchFieldWorkAsMaterialsDo() {
+        workTabsAndSearch(Theme.OldSchool)
+
+        compose.onNodeWithContentDescription("Clear the search").performClick()
+        compose.onNodeWithTag(AppDrawerTags.WORK).assertIsSelected()
+    }
+
+    private fun workTabsAndSearch(theme: Theme?) {
         val workMail = mail.copy(workProfile = 10)
-        show(listOf(clock, mail, workMail))
+        show(listOf(clock, mail, workMail), theme = theme)
 
         compose.onNodeWithTag(AppDrawerTags.PERSONAL).assertIsSelected()
         compose.onNodeWithText("Clock").assertIsDisplayed()
