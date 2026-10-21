@@ -14,6 +14,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.sqftware.orbitlauncher.domain.CardColour
@@ -105,6 +107,10 @@ internal val gamePixel: Int
 /** The minimap's frame and its compass, as the game draws them: where the frame's map hole is centred, and its radius. */
 private val FRAME_HOLE_CENTRE = IntOffset(100, 84)
 private const val MAP_RADIUS = 76
+
+/** The map data's credit, which its licence asks to show with the map, along the bottom of the disc, in game pixels below its centre. */
+private const val MAP_CREDIT = "© OpenStreetMap"
+private const val CREDIT_DROP = 66
 private const val COMPASS_RADIUS = 17
 private val COMPASS_CENTRE = IntOffset(22, 22)
 
@@ -159,6 +165,8 @@ object OldSchoolArt : ThemeArt {
         val frame = sprite(R.drawable.osrs_1177_0)
         val compass = sprite(R.drawable.osrs_169_0)
         val px = gamePixel
+        val map = LocalMinimap.current
+        val credit = rememberTextMeasurer().measure(MAP_CREDIT, MaterialTheme.typography.labelSmall.copy(color = MinimapSelf))
         Spacer(
             modifier.drawWithCache {
                 // As large as fits the emblem, and never larger than the rest of the game's pixels.
@@ -168,8 +176,14 @@ object OldSchoolArt : ThemeArt {
                 val compassAt = origin + (COMPASS_CENTRE * scale).toOffset()
                 val compassHole = Path().apply { addOval(Rect(compassAt, COMPASS_RADIUS * scale.toFloat())) }
                 onDrawBehind {
-                    drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat(), centre)
-                    if (marked) selfMarker(centre, scale)
+                    // The painted map has the self marker at its centre already; the grass stands in until there is one.
+                    if (map != null) {
+                        drawSprite(map, centre - Offset(map.width.toFloat(), map.height.toFloat()) * (scale / 2f), scale)
+                        drawText(credit, topLeft = Offset(centre.x - credit.size.width / 2f, centre.y + CREDIT_DROP * scale - credit.size.height))
+                    } else {
+                        drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat(), centre)
+                        if (marked) selfMarker(centre, scale)
+                    }
                     clipPath(compassHole) { drawSprite(compass, compassAt - Offset(compass.width.toFloat(), compass.height.toFloat()) * (scale / 2f), scale) }
                     drawSprite(frame, origin, scale)
                 }

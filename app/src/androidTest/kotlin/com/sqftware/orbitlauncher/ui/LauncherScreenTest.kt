@@ -2233,6 +2233,7 @@ class LauncherScreenTest {
 
     @Test
     fun theLauncherMenusWhereIAmRowShowsWhetherTheMapFollowsTheUserAndATapFlipsIt() {
+        theme = Theme.OldSchool
         show()
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Show where I am").assertIsOff()
@@ -2242,6 +2243,14 @@ class LauncherScreenTest {
         compose.runOnIdle { assertTrue(showWhereIAm) }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Show where I am").assertIsOn()
+    }
+
+    @Test
+    fun onlyAThemeThatMapsWhereTheUserIsOffersTheRow() {
+        show()
+        compose.longPressEmptyHomeSpace()
+
+        compose.onNodeWithText("Show where I am").assertDoesNotExist()
     }
 
     @Test

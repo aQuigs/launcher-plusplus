@@ -1210,7 +1210,7 @@ fun LauncherScreen(
                                 on = latestShowWhereIAm,
                                 flips = true,
                                 onClick = { latestOnShowWhereIAmChange(!latestShowWhereIAm) },
-                            ),
+                            ).takeIf { latestTheme.mapsWhereIAm },
                             LauncherMenuRow(
                                 "Check for updates",
                                 on = latestCheckForUpdates,

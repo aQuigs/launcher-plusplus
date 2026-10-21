@@ -11,7 +11,7 @@ import android.util.Log
 import androidx.core.location.LocationListenerCompat
 import androidx.core.location.LocationManagerCompat
 import androidx.activity.result.ActivityResultRegistry
-import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.core.location.LocationRequestCompat
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import kotlinx.coroutines.channels.Channel
@@ -48,8 +48,10 @@ private const val UPDATE_METRES = 50f
 private const val FRESH_MILLIS = 10 * 60_000L
 
 /**
- * The platform's LocationManager with coarse location, at low power: the last fix if it is fresh, one current fix, then
- * updates no more often than a minute or 50 m apart. No Play services: the launcher has no other use for them. The
+ * The platform's LocationManager, asking for precise location, since a coarse fix is snapped to a grid about 2 km wide and
+ * puts the map on the wrong streets; a user who allows only an approximate place still gets a map, of roughly where they
+ * are. It runs at balanced power: the last fix if it is fresh, one current fix, then updates no more often than a minute
+ * or 50 m apart. No Play services: the launcher has no other use for them. The
  * permission is asked through the activity's [registry], as the home role is; the adapter lives as long as the activity.
  */
 class PlatformLocationSource(private val context: Context, registry: ActivityResultRegistry) : LocationSource {
@@ -57,12 +59,13 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
 
     // Kept until heard, since an answer can arrive as a recreated activity registers, before the screen collects.
     private val granted = Channel<Boolean>(Channel.CONFLATED)
-    private val dialog = registry.register(REQUEST_KEY, RequestPermission()) { granted.trySend(it) }
+    private val dialog = registry.register(REQUEST_KEY, RequestMultiplePermissions()) { answers -> granted.trySend(answers.values.any { it }) }
 
     override fun isGranted() =
         context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    override fun request() = dialog.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+    // Android asks for precise location only alongside approximate, so the user can still choose either.
+    override fun request() = dialog.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
 
     override fun answers(): Flow<Boolean> = granted.receiveAsFlow()
 
@@ -81,7 +84,7 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
             LocationManagerCompat.getCurrentLocation(manager, provider, cancel, executor) { send(it) }
             val request = LocationRequestCompat.Builder(UPDATE_MILLIS)
                 .setMinUpdateDistanceMeters(UPDATE_METRES)
-                .setQuality(LocationRequestCompat.QUALITY_LOW_POWER)
+                .setQuality(LocationRequestCompat.QUALITY_BALANCED_POWER_ACCURACY)
                 .build()
             LocationManagerCompat.requestLocationUpdates(manager, provider, request, executor, listener)
         } catch (e: SecurityException) {
@@ -99,14 +102,13 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
         }
     }.conflate()
 
-    // The fused provider, on Android 12 and up, mixes in Wi-Fi and cell fixes and spends the least power for a rough
-    // place; the network provider does the same before it. GPS is the fallback where neither is on, from Android 12,
-    // which serves it to coarse access; Android 11 wants fine access for it.
+    // The fused provider, on Android 12 and up, mixes in Wi-Fi and cell fixes for the least power; the network provider
+    // does the same before it. GPS is the fallback where neither is on.
     private fun provider(): String? {
         val candidates = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
         } else {
-            listOf(LocationManager.NETWORK_PROVIDER)
+            listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
         }
         return candidates.firstOrNull { it in manager.allProviders && manager.isProviderEnabled(it) }
     }

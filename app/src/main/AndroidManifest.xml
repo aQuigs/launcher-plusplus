@@ -21,6 +21,7 @@
     <!-- "Show where I am" draws the map around the user from a rough fix, asked for only when they turn it on, and from
          map tiles downloaded for the places they go. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <queries>

@@ -62,6 +62,7 @@ import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.CollectionPages
+import com.sqftware.orbitlauncher.domain.minimap.MapIcon
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.GridPages
@@ -92,7 +93,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
 // Drawables by name, so a build without the art still draws the ground, walls and doors of the map.
-private val MINIMAP_SPRITES = MinimapSpriteNames(npc = "osrs_300_1")
+private val MINIMAP_SPRITES = MinimapSpriteNames(
+    trees = listOf("osrs_map_tree_0", "osrs_map_tree_1"),
+    npc = "osrs_300_1",
+    icons = MapIcon.entries.associateWith { icon -> "osrs_map_" + icon.name.replace(Regex("(?<=.)(?=[A-Z])"), "_").lowercase() },
+)
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -269,9 +274,10 @@ class MainActivity : ComponentActivity() {
                 }
                 // The map follows the user only while the launcher is visible, like the clock, and each return reads the
                 // grant again. The state outlives a change of key, so turning it off must drop the last map.
-                val minimap by produceState<ImageBitmap?>(null, showWhereIAm) {
+                val mapping = showWhereIAm && shownTheme.mapsWhereIAm
+                val minimap by produceState<ImageBitmap?>(null, mapping) {
                     value = null
-                    if (showWhereIAm) {
+                    if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             if (location.isGranted()) liveMinimap.images().collect { value = it } else changeShowWhereIAm(false)
                         }
