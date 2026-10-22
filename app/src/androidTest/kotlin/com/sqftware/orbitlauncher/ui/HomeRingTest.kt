@@ -89,7 +89,7 @@ class HomeRingTest {
                     Box(Modifier.spinsRing(spin)) {
                         HomeRing(
                             ring = ring,
-                            hint = shownHint,
+                            hint = shownHint?.let { RingHint(it, onEdit) },
                             icon = { _, _ -> null },
                             onLaunch = onLaunch,
                             onOpenFolder = onOpenFolder,

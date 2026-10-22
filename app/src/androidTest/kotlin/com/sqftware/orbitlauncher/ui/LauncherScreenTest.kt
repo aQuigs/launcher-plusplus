@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.TouchInjectionScope
@@ -61,6 +62,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppSettings
@@ -168,7 +170,7 @@ class LauncherScreenTest {
     private var updateAvailable by mutableStateOf(false)
     private var updatesOpened = 0
     private var checkForUpdates by mutableStateOf(true)
-    private var showWhereIAm by mutableStateOf(false)
+    private var whereIAm by mutableStateOf(WhereIAm.Hidden)
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -302,8 +304,9 @@ class LauncherScreenTest {
             onOpenUpdate = { updatesOpened++ },
             checkForUpdates = checkForUpdates,
             onCheckForUpdatesChange = { checkForUpdates = it },
-            showWhereIAm = showWhereIAm,
-            onShowWhereIAmChange = { showWhereIAm = it },
+            whereIAm = whereIAm,
+            onShowWhereIAmChange = { whereIAm = if (it) WhereIAm.Shown else WhereIAm.Hidden },
+            onOpenMapLicence = {},
             minimap = { null },
             heading = { null },
             isHomeApp = isHomeApp,
@@ -2241,13 +2244,54 @@ class LauncherScreenTest {
         theme = Theme.OldSchool
         show()
         compose.longPressEmptyHomeSpace()
-        compose.onNodeWithText("Show where I am").assertIsOff()
+        val row = hasText(SHOW_WHERE_I_AM) and isToggleable()
+        compose.onNode(row).assertIsOff()
 
-        compose.onNodeWithText("Show where I am").performClick()
+        compose.onNode(row).performClick()
 
-        compose.runOnIdle { assertTrue(showWhereIAm) }
+        compose.runOnIdle { assertEquals(WhereIAm.Shown, whereIAm) }
         compose.longPressEmptyHomeSpace()
-        compose.onNodeWithText("Show where I am").assertIsOn()
+        compose.onNode(row).assertIsOn()
+    }
+
+    @Test
+    fun afterLocationIsRefusedTheEmblemOffersTheMapAndATapAsksAgain() {
+        theme = Theme.OldSchool
+        homeApps = HomeApps(ring = ringOf(clock))
+        whereIAm = WhereIAm.Refused
+        show()
+
+        compose.onNodeWithTag(HomeRingTags.EMBLEM).performClick()
+
+        compose.runOnIdle { assertEquals(WhereIAm.Shown, whereIAm) }
+        compose.onNodeWithText(SHOW_WHERE_I_AM).assertDoesNotExist()
+    }
+
+    @Test
+    fun theRingSpinsWhileTheEmblemOffersTheMap() {
+        theme = Theme.OldSchool
+        whereIAm = WhereIAm.Refused
+        homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
+        show()
+        compose.onNodeWithText(SHOW_WHERE_I_AM).assertExists()
+        val top = centreOf(compose.ringSlot(clock))
+        val bottom = centreOf(compose.ringSlot(mail))
+        val side = (top + bottom) / 2f + Offset((bottom.y - top.y) / 2, 0f)
+        compose.onRoot().performTouchInput {
+            val along = Offset(0f, 60.dp.toPx())
+            swipe(side - along, side + along, 80)
+        }
+
+        compose.runOnIdle { assertEquals(1, spinStats.spins) }
+    }
+
+    @Test
+    fun aMapTheUserTurnedOffLeavesTheEmblemToSearch() {
+        theme = Theme.OldSchool
+        homeApps = HomeApps(ring = ringOf(clock))
+        show()
+
+        compose.onNodeWithText(SHOW_WHERE_I_AM).assertDoesNotExist()
     }
 
     @Test

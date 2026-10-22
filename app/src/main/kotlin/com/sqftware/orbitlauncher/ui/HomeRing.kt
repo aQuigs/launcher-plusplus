@@ -156,7 +156,7 @@ private sealed interface Part {
  * The [ring] of favourite apps and folders round an emblem, both drawn as the theme's [LocalThemeArt] draws them. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
  * the emblem to [onSearch] the apps, or long-press it to [onEdit] the favourites on the ring and in the dock. With a
- * [hint] the emblem says what a tap there does instead of showing its mark, and a tap edits. While [highlighted], the disc the ring fills glows as the place an app being dragged would
+ * [hint] the emblem says what a tap there does instead of showing its mark, and a tap does it. While [highlighted], the disc the ring fills glows as the place an app being dragged would
  * land. A folder is a planet: an [openFolder] glides from its slot into the centre in the emblem's place, its apps
  * spiralling out round it into the slots, each with the [folderAppMenu], while the ring drifts outward and fades; a tap
  * on the planet calls [onCloseFolder], and it goes back the way it came, and a long press there calls [onAddToFolder].
@@ -172,10 +172,13 @@ private sealed interface Part {
  * name under it, kept clear of its neighbours, the emblem and the ring's box. The ring, or an open folder once its apps
  * are out, shows turned as far as [spin] says, which spins it only while nothing is on the move.
  */
+/** What the emblem says in place of its mark, and what a tap there does. */
+class RingHint(val label: String, val onTap: () -> Unit)
+
 @Composable
 fun HomeRing(
     ring: List<RingItem>,
-    hint: String?,
+    hint: RingHint?,
     icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
@@ -260,9 +263,8 @@ fun HomeRing(
         else -> moving.shown(ring) + listOfNotNull(held?.let(RingItem::App))
     }
     val landsAt = arrival?.to ?: moving?.at
-    // The ring spins, or an open folder once its apps are all out, while nothing else moves their items; the hint is the
-    // ring's, which an open folder hides.
-    val spins = (centred == null && hint == null || openFolder != null && !spreadingOut) &&
+    // The ring spins, or an open folder once its apps are all out, while nothing else moves their items.
+    val spins = (centred == null || openFolder != null && !spreadingOut) &&
         moving == null && arrival == null && held == null && slots > 0
     SideEffect { spin.spinning = if (spins) openFolder?.at ?: HomePlace.Ring else null }
     // A folder closing as it spins folds in from where it was left, though the spin itself is over.
@@ -513,11 +515,11 @@ private fun Modifier.inert(): Modifier = clearAndSetSemantics {}.pointerInput(Un
 
 /**
  * The ring's centre: the theme's emblem in a disc edged by a hairline, or the [hint] over it. Quiet, so the icons stay
- * the eye's first stop. A tap calls [onSearch] and a long press [onEdit], but with a hint a tap does what it says.
+ * the eye's first stop. A tap calls [onSearch], or does what the hint says, and a long press [onEdit].
  */
 @Composable
 private fun Emblem(
-    hint: String?,
+    hint: RingHint?,
     slowTurn: () -> Float,
     fastTurn: () -> Float,
     minuteOfDay: () -> Int,
@@ -533,10 +535,10 @@ private fun Emblem(
         modifier = modifier
             .then(art.emblemBox(edgeMark))
             .combinedClickable(
-                onClickLabel = hint ?: "Search apps",
-                onLongClickLabel = "Choose the apps on the home screen".takeIf { hint == null },
-                onLongClick = onEdit.takeIf { hint == null },
-                onClick = if (hint == null) onSearch else onEdit,
+                onClickLabel = hint?.label ?: "Search apps",
+                onLongClickLabel = "Choose the apps on the home screen",
+                onLongClick = onEdit,
+                onClick = hint?.onTap ?: onSearch,
             )
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (hint == null) contentDescription = "Favourites" },
@@ -544,7 +546,7 @@ private fun Emblem(
         art.EmblemFace(hint == null, slowTurn, fastTurn, minuteOfDay, Modifier.fillMaxSize())
         if (hint != null) {
             Text(
-                text = hint,
+                text = hint.label,
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
                 style = MaterialTheme.typography.labelLarge.legible(art.hintInk),
                 color = art.hintInk,
