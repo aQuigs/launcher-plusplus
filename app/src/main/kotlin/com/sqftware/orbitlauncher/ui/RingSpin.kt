@@ -95,13 +95,18 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
     private var ring: LayoutCoordinates? = null
     private var inner = 0f
     private var outer = 0f
+    private var rim = 0f
     private var area: LayoutCoordinates? = null
 
-    /** Where the ring is: [coordinates] centred on it, with its band from [inner] to [outer] from the centre. */
-    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float) {
+    /**
+     * Where the ring is: [coordinates] centred on it, with its band from [inner] to [outer] from the centre and its icons
+     * [rim] from it.
+     */
+    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float, rim: Float) {
         ring = coordinates
         this.inner = inner
         this.outer = outer
+        this.rim = rim
     }
 
     /** [position] in the area the spin is dragged in, as an offset from the ring's centre, if the ring can spin. */
@@ -173,7 +178,8 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
             glide?.cancel()
 
             val velocity = VelocityTracker()
-            val tally = Tally()
+            // Taken now, as what spins may have changed, and laid out another rim, by the time the coast ends.
+            val tally = Tally(rim = rim.toDp().value.toDouble())
             var at = start
             velocity.addPosition(down.uptimeMillis, down.position)
             while (crossing != null && crossing.pressed) {
@@ -194,8 +200,8 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
         }
     }
 
-    /** How far a spin under way has turned each way, in radians. */
-    private class Tally {
+    /** How far a spin under way has turned each way, in radians, round a [rim] in dp. */
+    private class Tally(private val rim: Double) {
         private var clockwise = 0.0
         private var anticlockwise = 0.0
 
@@ -203,7 +209,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
             if (by > 0) clockwise += by else anticlockwise -= by
         }
 
-        fun spin(letGo: Float, coast: Double) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast)
+        fun spin(letGo: Float, coast: Double) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast, rim)
     }
 }
 

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,6 +34,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.SpinStats
+import com.sqftware.orbitlauncher.domain.distanceText
+import com.sqftware.orbitlauncher.domain.durationText
+import com.sqftware.orbitlauncher.domain.yardstickText
 import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 /** Where the two directions meet on the dial, in degrees, so each reads as its own arc. */
@@ -44,20 +49,26 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
     fun decimal(n: Double, places: Int) = String.format(locale, "%,.${places}f", n)
 
     InfoDialog(title = "Spin stats", onDone = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.SPIN_STATS_DIALOG)) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(
+            Modifier.verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
             SpinDial(stats, count = String.format(locale, "%,d", stats.spins))
             if (stats.spins == 0) {
                 SupportingText("Drag up or down round the ring's side and let go to start counting.", textAlign = TextAlign.Center)
             } else {
                 // As tall as each other, though one label wraps.
                 Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.Gap)) {
-                    DirectionTile(
+                    StatTile(
+                        RotateRightGlyph,
                         MaterialTheme.colorScheme.primary,
                         decimal(stats.clockwise, 1),
                         "turns clockwise",
                         Modifier.weight(1f),
                     )
-                    DirectionTile(
+                    StatTile(
+                        RotateRightGlyph,
                         MaterialTheme.colorScheme.tertiary,
                         decimal(stats.anticlockwise, 1),
                         "turns counterclockwise",
@@ -65,11 +76,24 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
                         mirrored = true,
                     )
                 }
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    SectionLabel("Records")
+                StatTile(
+                    RulerGlyph,
+                    MaterialTheme.colorScheme.primary,
+                    distanceText(stats.distance, locale),
+                    "spun round the rim",
+                    Modifier.fillMaxWidth(),
+                    note = yardstickText(stats.distance, locale),
+                )
+                RecordSection("Records") {
                     RecordRow(LoopGlyph, "Most in one spin", "${decimal(stats.mostTurns, 1)} turns")
                     RecordRow(SpeedGlyph, "Top speed", "${decimal(stats.topRpm, 0)} rpm")
-                    RecordRow(TimerGlyph, "Longest coast", "${decimal(stats.longestCoast, 1)} s")
+                    RecordRow(TimerGlyph, "Longest coast", durationText(stats.longestCoast, locale))
+                    RecordRow(StreakGlyph, "Longest streak", counted(stats.longestStreak, "day"))
+                    RecordRow(DayGlyph, "Busiest day", counted(stats.busiestDay, "spin"))
+                }
+                RecordSection("All time") {
+                    RecordRow(HourglassGlyph, "Time coasting", durationText(stats.coasting, locale))
+                    RecordRow(DaysGlyph, "Days spun on", counted(stats.daysSpun, "day"))
                 }
             }
         }
@@ -118,12 +142,21 @@ private fun SpinDial(stats: SpinStats, count: String) {
     }
 }
 
+/** A [glyph] over a [value] in its [tint] and what it counts, its [label], with a [note] under them if there is one. */
 @Composable
-private fun DirectionTile(tint: Color, value: String, label: String, modifier: Modifier, mirrored: Boolean = false) {
+private fun StatTile(
+    glyph: ImageVector,
+    tint: Color,
+    value: String,
+    label: String,
+    modifier: Modifier,
+    mirrored: Boolean = false,
+    note: String? = null,
+) {
     Pane(modifier.fillMaxHeight().semantics(mergeDescendants = true) {}) {
         Column(Modifier.padding(12.dp)) {
             Icon(
-                RotateRightGlyph,
+                glyph,
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(20.dp).graphicsLayer { if (mirrored) scaleX = -1f },
@@ -131,7 +164,19 @@ private fun DirectionTile(tint: Color, value: String, label: String, modifier: M
             Spacer(Modifier.size(6.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            note?.let {
+                Spacer(Modifier.size(6.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
         }
+    }
+}
+
+@Composable
+private fun RecordSection(label: String, rows: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SectionLabel(label)
+        rows()
     }
 }
 
@@ -165,4 +210,29 @@ private val TimerGlyph = materialGlyph(
     "Timer",
     "M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4" +
         "c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z",
+)
+private val RulerGlyph = materialGlyph(
+    "Straighten",
+    "M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h2v4h2V8h2v4h2V8h2v4h2V8h2v4h2V8h2v8z",
+)
+private val StreakGlyph = materialGlyph(
+    "Whatshot",
+    "M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14" +
+        "c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12" +
+        " 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z",
+)
+private val DayGlyph = materialGlyph(
+    "Today",
+    "M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z" +
+        "M7 10h5v5H7z",
+)
+private val HourglassGlyph = materialGlyph(
+    "HourglassEmpty",
+    "M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4z" +
+        "m-4-5l-4-4V4h8v3.5l-4 4z",
+)
+private val DaysGlyph = materialGlyph(
+    "DateRange",
+    "M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14" +
+        "c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z",
 )
