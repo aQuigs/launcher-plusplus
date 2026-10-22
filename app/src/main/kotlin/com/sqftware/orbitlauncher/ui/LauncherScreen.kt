@@ -130,6 +130,7 @@ import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
+import com.sqftware.orbitlauncher.domain.minimap.Minimap
 import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -150,7 +151,6 @@ object LauncherTags {
 
     fun page(page: LauncherPage) = "page_${page.id}"
 }
-
 
 const val AUTO_SET_UP = "Auto set up"
 const val SHOW_WHERE_I_AM = "Show where I am"
@@ -297,7 +297,7 @@ fun LauncherScreen(
     whereIAm: WhereIAm,
     onShowWhereIAmChange: (Boolean) -> Unit,
     onOpenMapLicence: () -> Unit,
-    minimap: () -> ImageBitmap?,
+    minimap: () -> Minimap<ImageBitmap>?,
     heading: () -> Float?,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
@@ -1180,9 +1180,8 @@ fun LauncherScreen(
                                     showClockRing()
                                     latestOnPreviewThemeChange(latestTheme)
                                 },
-                                // A theme with one folder look has nothing to choose.
                                 MenuRow("Folder look", end = RowEnd.Value(latestFolderLook.label)) { choosingLook = true }
-                                    .takeIf { latestTheme.folderLooks.size > 1 },
+                                    .takeIf { latestTheme.choosesFolderLook },
                                 MenuRow("Showcase wallpaper") { showingWallpaper = true },
                                 LocalThemeArt.current.scene?.let { MenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             ),
@@ -1205,7 +1204,6 @@ fun LauncherScreen(
                                 MenuRow("Restart launcher") { latestOnRestart() },
                                 MenuRow("Reset launcher", destructive = true) { confirmingReset = true },
                             ),
-
                         ),
                         onDismiss = ::closeMenu,
                     )

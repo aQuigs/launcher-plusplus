@@ -102,9 +102,10 @@ class LauncherColorsTest {
 
     @Test
     fun `the bank's text reads on its ground in every card colour`() {
+        val night = lookOf(Colourway.Classic, lightWallpaper = false).colors
         CardColour.entries.forEach { colour ->
-            val ground = bankTint(colour).compositeOver(BankGround)
-            listOf(BankColors.onSurface, BankColors.onSurfaceVariant).forEach { text ->
+            val ground = bankSwatch(colour)
+            listOf(night.onSurface, BankDimText).forEach { text ->
                 assertTrue("$text on $colour", contrast(text, ground) >= 4.5f)
             }
         }

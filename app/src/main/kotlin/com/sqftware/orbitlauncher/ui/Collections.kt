@@ -198,7 +198,7 @@ private const val PICKER_COLUMNS = 3
 private const val MIN_KEPT_LABEL_SCALE = 0.75f
 private const val MIN_LABEL_SCALE = 0.25f
 private val TILE_PADDING = 4.dp
-internal const val EXPAND_MILLIS = 200
+private const val EXPAND_MILLIS = 200
 
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
@@ -324,6 +324,7 @@ private fun CollectionCardView(
             .fillMaxWidth()
             .reorderItem(reorder, index)
             .graphicsLayer { alpha = if (dragged) 0.7f else 1f }
+            .animateContentSize(tween(EXPAND_MILLIS))
             .testTag(CollectionTags.card(card.kind)),
         header = { CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onSettings, onEdit) },
     ) {
@@ -355,7 +356,7 @@ internal fun PlainCardBox(
         marked = dropTarget,
         modifier = modifier,
     ) {
-        Column(Modifier.animateContentSize(tween(EXPAND_MILLIS)).padding(start = 12.dp, end = 4.dp)) {
+        Column(Modifier.padding(start = 12.dp, end = 4.dp)) {
             header()
             body()
         }
@@ -582,7 +583,6 @@ private fun Bin(bin: BinTarget, modifier: Modifier = Modifier) {
                 scaleX = scale
                 scaleY = scale
             }
-
             .semantics { contentDescription = "Remove from the collection" }
             .testTag(CollectionTags.BIN),
     )
@@ -859,7 +859,7 @@ private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) 
  */
 @Composable
 private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
-    val tints = LocalCardTints.current
+    val art = LocalThemeArt.current
     val colours = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.extraLarge
 
@@ -875,7 +875,7 @@ private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) 
                     .border(2.dp, if (selected) colours.primary else Color.Transparent, shape)
                     .padding(5.dp)
                     .border(1.dp, colours.outline, shape)
-                    .background(tints.swatch(choice as CardColour), shape)
+                    .background(art.cardSwatch(choice as CardColour), shape)
                     .semantics { contentDescription = choice.name }
                     .testTag(CollectionTags.choice(setting, choice)),
             )

@@ -14,7 +14,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -42,17 +41,13 @@ private val BADGE_RING = 2.dp
  */
 @Composable
 fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
-    if (unread.count > 0) LocalThemeArt.current.BadgeFace(unread, modifier)
+    // Over the corner rather than inside it: a round icon has no room there.
+    if (unread.count > 0) LocalThemeArt.current.BadgeFace(unread, modifier.overCorner(top = true).testTag(BadgeTags.BUBBLE))
 }
 
-/** The corner of an icon its badge sits on, in the theme. */
-internal val badgeCorner: Alignment
-    @Composable get() = LocalThemeArt.current.badgeCorner
-
-/** [UnreadBadge] as most themes draw it: a ringed bubble over the corner. */
+/** [UnreadBadge] as most themes draw it: a ringed bubble. */
 @Composable
 internal fun BubbleBadge(unread: Unread, modifier: Modifier) {
-
     val colors = MaterialTheme.colorScheme
     Text(
         text = badgeText(unread.count),
@@ -61,12 +56,10 @@ internal fun BubbleBadge(unread: Unread, modifier: Modifier) {
         maxLines = 1,
         textAlign = TextAlign.Center,
         modifier = modifier
-            // Over the corner rather than inside it: a round icon has no room there.
-            .cornerBubble(top = true, fill = if (unread.dismissed) colors.error else LocalBoxColors.current.floating, edge = colors.error)
+            .ringed(fill = if (unread.dismissed) colors.error else LocalBoxColors.current.floating, edge = colors.error)
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
             .padding(horizontal = 5.dp)
-            .wrapContentHeight()
-            .testTag(BadgeTags.BUBBLE),
+            .wrapContentHeight(),
     )
 }
 
@@ -84,7 +77,8 @@ fun WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
         contentDescription = "Work",
         tint = colors.primary,
         modifier = modifier
-            .cornerBubble(top = false, fill = LocalBoxColors.current.floating, edge = colors.primary)
+            .overCorner(top = false)
+            .ringed(fill = LocalBoxColors.current.floating, edge = colors.primary)
             .size(18.dp)
             .padding(4.dp),
     )
@@ -105,10 +99,12 @@ fun PickedMark(modifier: Modifier = Modifier) {
     )
 }
 
-/** A ringed bubble reaching [BADGE_OVERHANG] past the top-end corner, or past the bottom-end one unless [top]. */
-private fun Modifier.cornerBubble(top: Boolean, fill: Color, edge: Color) =
-    offset(x = BADGE_OVERHANG, y = if (top) -BADGE_OVERHANG else BADGE_OVERHANG)
-        .background(fill, CircleShape)
+/** Reaching [BADGE_OVERHANG] past an icon's top-end corner, or past the bottom-end one unless [top]. */
+internal fun Modifier.overCorner(top: Boolean) = offset(x = BADGE_OVERHANG, y = if (top) -BADGE_OVERHANG else BADGE_OVERHANG)
+
+/** A bubble of [fill] ringed in [edge]. */
+private fun Modifier.ringed(fill: Color, edge: Color) =
+    background(fill, CircleShape)
         .border(BADGE_RING, edge, CircleShape)
 
 /** This label for a screen reader, with how many [unread] when there are any. */

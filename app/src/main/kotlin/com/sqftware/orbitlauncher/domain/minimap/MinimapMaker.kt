@@ -35,7 +35,7 @@ class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
      * The disc around [centre], or null while a tile it needs cannot be had: a map with a tile missing would show
      * made-up grass where that tile belongs.
      */
-    suspend fun paint(centre: LatLon): Pixels? {
+    suspend fun paint(centre: LatLon): Minimap<Pixels>? {
         val needed = OpenMapTiles.tilesFor(centre)
         decoded.keys.retainAll(needed.toSet())
         for (id in needed - decoded.keys) {

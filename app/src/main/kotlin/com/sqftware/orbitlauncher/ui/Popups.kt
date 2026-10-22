@@ -115,10 +115,6 @@ fun toggleRow(label: String, on: Boolean, onChange: (Boolean) -> Unit) = MenuRow
 /** A menu row's icon drawn from [glyph]. */
 fun glyph(glyph: ImageVector): @Composable () -> Unit = { Icon(glyph, contentDescription = null) }
 
-/**
- * Material's dropdown menu in the theme's box on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground, with
- * its [groups] of rows divided from each other. Choosing a row dismisses the menu, then hands on the choice.
- */
 /** The padding Material's menu puts above and below its items. */
 internal val MATERIAL_MENU_PADDING = 8.dp
 
@@ -129,6 +125,10 @@ private fun Modifier.bleedVertically(by: Dp) = layout { measurable, constraints 
     layout(placeable.width, placeable.height - 2 * bleed) { placeable.place(0, -bleed) }
 }
 
+/**
+ * Material's dropdown menu in the theme's box on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground, with
+ * its [groups] of rows divided from each other. Choosing a row dismisses the menu, then hands on the choice.
+ */
 @Composable
 fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, groups: List<List<MenuRow>>, modifier: Modifier = Modifier) {
     val art = LocalThemeArt.current

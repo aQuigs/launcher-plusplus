@@ -1,8 +1,6 @@
 package com.sqftware.orbitlauncher.apps
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -27,9 +25,9 @@ interface HeadingSource {
 /**
  * The rotation vector sensor, which fuses the magnetometer with the gyroscope, so the heading turns smoothly. The heading
  * is the way the top of the screen faces, in whichever way the display is turned, and is moved from magnetic north to
- * the true north a map is drawn to by the declination where the phone last had a fix.
+ * the true north a map is drawn to by the declination where the phone last had a fix, when [location] may know it.
  */
-class SensorHeadingSource(private val context: Context) : HeadingSource {
+class SensorHeadingSource(private val context: Context, private val location: LocationSource) : HeadingSource {
     private val sensors = context.getSystemService(SensorManager::class.java)
     private val locations = context.getSystemService(LocationManager::class.java)
 
@@ -65,7 +63,7 @@ class SensorHeadingSource(private val context: Context) : HeadingSource {
 
     /** How far true north is clockwise of magnetic north where the phone last had a fix, or none without one. */
     private fun declination(): Float {
-        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return 0f
+        if (!location.isGranted()) return 0f
         val fix = try {
             locations.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
         } catch (_: SecurityException) {

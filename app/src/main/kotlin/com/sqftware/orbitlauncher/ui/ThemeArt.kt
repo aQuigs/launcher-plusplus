@@ -48,6 +48,7 @@ import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
+import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 
 /**
@@ -130,11 +131,7 @@ interface ThemeArt {
     @Composable
     fun IconImage(bitmap: ImageBitmap, modifier: Modifier) = Image(bitmap, contentDescription = null, modifier = modifier)
 
-    /** Which corner of an icon its badge sits on. */
-    val badgeCorner: Alignment
-        get() = Alignment.TopEnd
-
-    /** The badge for [unread] notifications, or nothing for none: by default a bubble over the corner. */
+    /** The badge for [unread] notifications, placed over an icon's corner by [modifier]: by default a bubble. */
     @Composable
     fun BadgeFace(unread: Unread, modifier: Modifier) = BubbleBadge(unread, modifier)
 
@@ -186,6 +183,10 @@ interface ThemeArt {
         header: @Composable () -> Unit,
         body: @Composable () -> Unit,
     ) = PlainCardBox(colour, dragged, dropTarget, modifier, header, body)
+
+    /** [colour] made opaque as [CollectionCardBox] shows it, so a swatch looks as the card will: by default the tint's swatch. */
+    @Composable
+    fun cardSwatch(colour: CardColour): Color = LocalCardTints.current.swatch(colour)
 
     /** A collection's [glyph] and [title] at the start of its card's header: by default the glyph beside the title. */
     @Composable

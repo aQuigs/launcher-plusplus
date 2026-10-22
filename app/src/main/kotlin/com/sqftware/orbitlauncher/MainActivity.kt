@@ -75,6 +75,7 @@ import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.suggestSetup
+import com.sqftware.orbitlauncher.domain.minimap.Minimap
 import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
 import com.sqftware.orbitlauncher.ui.LauncherScreen
@@ -150,7 +151,7 @@ class MainActivity : ComponentActivity() {
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
-        val headingSource = SensorHeadingSource(this)
+        val headingSource = SensorHeadingSource(this, location)
         val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this))
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
         val widgetActions = { page: String ->
@@ -288,7 +289,7 @@ class MainActivity : ComponentActivity() {
                 // The map follows the user only while the launcher is visible, like the clock. The state outlives a change
                 // of key, so turning it off must drop the last map.
                 val mapping = whereIAm == WhereIAm.Shown && shownTheme.mapsWhereIAm
-                val minimap = produceState<ImageBitmap?>(null, mapping) {
+                val minimap = produceState<Minimap<ImageBitmap>?>(null, mapping) {
                     value = null
                     if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {

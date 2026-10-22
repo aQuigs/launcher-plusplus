@@ -1,9 +1,9 @@
 package com.sqftware.orbitlauncher.ui.theme
 
-import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import com.sqftware.orbitlauncher.domain.CardColour
-import com.sqftware.orbitlauncher.domain.Colourway
+import com.sqftware.orbitlauncher.domain.minimap.GRASS_DARK
 
 // The game's interface: its chatbox parchment by day, and by night a shade under its bank brown, with cream text so the
 // scheme's dimmed text still reads on the glass, its yellow for what is lit and the orange of a menu's target. What is
@@ -50,20 +50,23 @@ val ChatTypedNight = Color(0xFF9090FF)
 val ChatTypedDay = Color(0xFF0000FF)
 
 /**
- * The bank: its brown ground, the panel texture's own colour, which the card draws under the texture; and its colours,
- * the night scheme's whatever the wallpaper, as the bank is dark in the game by day as well. Its dimmer text is the
- * parchment rather than the night's mist, which a card colour's wash would leave too dim.
+ * The bank's brown ground, the panel texture's own colour, which the card draws under the texture. The bank's text is in
+ * the night scheme whatever the wallpaper, its [BankDimText] the parchment rather than the night's mist, which a card
+ * colour's wash would leave too dim.
  */
 val BankGround = Color(0xFF3E3429)
-val BankColors: ColorScheme = lookOf(Colourway.Classic, lightWallpaper = false).colors.copy(onSurfaceVariant = Parchment)
+val BankDimText = Parchment
 
 /** What a card [colour] washes the bank's ground in, over the texture: its hue, faint enough that the bank's text reads on it. */
 fun bankTint(colour: CardColour): Color = colour.hue?.copy(alpha = BANK_TINT) ?: Color.Transparent
 
+/** [colour] as the bank shows it, its wash over the bank's ground, for a swatch that looks as the card will. */
+fun bankSwatch(colour: CardColour): Color = bankTint(colour).compositeOver(BankGround)
+
 private const val BANK_TINT = 0.25f
 
 /** What shows through the minimap's frame before the map has loaded: the game's grass. */
-val MinimapGrass = Color(0xFF698F24)
+val MinimapGrass = Color(0xFF000000.toInt() or GRASS_DARK)
 
 /** The player's own square at the minimap's middle, outlined so it shows on a white wall. */
 val MinimapSelf = Color.White
