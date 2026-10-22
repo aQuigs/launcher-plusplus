@@ -478,8 +478,9 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
-    /** The inventory tab's backpack, on the dock's last stone, which opens the drawer as the game's tab opens its inventory. */
-    override val dockDrawerTab: @Composable (onClick: () -> Unit, modifier: Modifier) -> Unit = { onClick, modifier -> InventoryTab(onClick, modifier) }
+    /** The home page keeps only its dock, as the game's bottom bar does; a swipe up opens the drawer. */
+    override val drawerHandleOnHome: Boolean
+        get() = false
 
     /** The inventory tab: a stone with the game's backpack, lit red while the drawer is open as a selected tab is. */
     @Composable
@@ -559,20 +560,6 @@ object OldSchoolArt : ThemeArt {
 }
 
 private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it) }
-
-/** The inventory tab's backpack, filling its slot of the dock at whole game pixels, which opens the drawer. */
-@Composable
-private fun InventoryTab(onClick: () -> Unit, modifier: Modifier) {
-    val bag = sprite(R.drawable.osrs_777_0)
-    val px = gamePixel
-    Spacer(
-        modifier
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = "Open the app drawer" }
-            .testTag(AppDrawerTags.DOCK_TAB)
-            .drawBehind { drawSpriteCentred(bag, center, fitScale(size.minDimension, STONE_FACE.toFloat(), px)) },
-    )
-}
 
 /** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
 private const val ITEM_FIT = 28f

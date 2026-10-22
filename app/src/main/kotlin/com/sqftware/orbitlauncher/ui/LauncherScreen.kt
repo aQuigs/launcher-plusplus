@@ -1285,10 +1285,7 @@ fun LauncherScreen(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val ground = panelGround()
     val art = LocalThemeArt.current
-    val dockTab = art.dockDrawerTab
-    // A theme whose dock ends with the drawer's tab leaves no handle peeking below the home page; the other pages,
-    // without the dock, keep it.
-    val drawerPeek = if (dockTab != null && inView == LauncherPage.Home) 0.dp else DRAWER_PEEK
+    val drawerPeek = if (!art.drawerHandleOnHome && inView == LauncherPage.Home) 0.dp else DRAWER_PEEK
     // How far the drawer's list has been dragged and flung, for the stars to follow. A jump by the letter rail is a cut,
     // after which no one could tell where the stars ought to be, so it need not count.
     val drawerScrolled = remember { mutableFloatStateOf(0f) }
@@ -1602,10 +1599,10 @@ fun LauncherScreen(
                                             // to the drawer handle. Stored dock apps hold its row until the apps and shortcuts load, so the
                                             // ring does not move when they arrive. An empty dock shows while an app is dragged from the
                                             // drawer or another home place, as a place to drop it, and slides in and out so the ring above
-                                            // moves rather than jumps. A dock that ends with the drawer's tab always shows.
+                                            // moves rather than jumps.
                                             if (isHome) {
                                                 val dockShown = dock.isNotEmpty() || (onHome == null && !pageApps.dock.isEmpty) ||
-                                                    (active || page == inView) && dragged?.app != null || dockTab != null
+                                                    (active || page == inView) && dragged?.app != null
                                                 AnimatedVisibility(visible = dockShown) {
                                                     Dock(
                                                         items = dock,
@@ -1620,7 +1617,6 @@ fun LauncherScreen(
                                                         onClearBadge = actions.clearBadge,
                                                         rearrange = dockRearrange.takeIf { active },
                                                         foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Dock }?.index,
-                                                        tab = dockTab?.let { tab -> { modifier -> tab(::openDrawer, modifier) } },
                                                     )
                                                 }
                                             }

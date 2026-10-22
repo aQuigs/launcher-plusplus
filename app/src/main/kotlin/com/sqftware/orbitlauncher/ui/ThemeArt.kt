@@ -222,11 +222,11 @@ interface ThemeArt {
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
     /**
-     * The tab that opens the drawer, calling its `onClick`, as the last of the dock's slots, or null for the drawer's
-     * [DrawerHandle] to peek below the pages instead.
+     * Whether the drawer's [DrawerHandle] peeks below the home page, or the drawer opens there by a swipe up alone. The
+     * pages without the dock, which have no swipe up, always show it.
      */
-    val dockDrawerTab: (@Composable (onClick: () -> Unit, modifier: Modifier) -> Unit)?
-        get() = null
+    val drawerHandleOnHome: Boolean
+        get() = true
 
     /** The type every text is set in. */
     val typography: Typography

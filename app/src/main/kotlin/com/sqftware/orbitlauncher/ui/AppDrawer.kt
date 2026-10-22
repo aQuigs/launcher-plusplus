@@ -91,7 +91,6 @@ import kotlinx.coroutines.launch
 
 object AppDrawerTags {
     const val HANDLE = "drawer_handle"
-    const val DOCK_TAB = "drawer_dock_tab"
     const val LIST = "app_list"
     const val SEARCH = "app_search"
     const val MOST_USED = "drawer_most_used"

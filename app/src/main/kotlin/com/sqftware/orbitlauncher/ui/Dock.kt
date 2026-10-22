@@ -41,7 +41,6 @@ object DockTags {
  * move it along the row; while one is on the move, the row shows where everything would be if it were dropped. The item
  * at [foldTarget] is lit as the one an app let go now would fold into, and one arriving from another place shows where
  * it would land among the others.
- * A theme's [tab], if any, ends the row on a slot of its own, after the apps.
  */
 @Composable
 fun Dock(
@@ -57,7 +56,6 @@ fun Dock(
     onClearBadge: ((AppEntry) -> Unit)? = null,
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
-    tab: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
     val marks = LocalRingColors.current
@@ -80,7 +78,6 @@ fun Dock(
                     SlotIcon(item, icon, onLaunch, onOpenFolder, slot, menu, folderMenu, unread, rearrange?.drag(index), onClearBadge)
                 }
             }
-            tab?.invoke(Modifier)
         },
         modifier = modifier
             .fillMaxWidth()
