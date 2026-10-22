@@ -1,9 +1,7 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
 import kotlin.math.PI
-import kotlin.math.atan
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.ln
@@ -32,11 +30,6 @@ object WebMercator {
             y = ln(tan(PI / 4 + Math.toRadians(lat) / 2)) * EARTH_RADIUS_M,
         )
     }
-
-    fun toLatLon(at: Mercator) = LatLon(
-        lat = Math.toDegrees(2 * atan(exp(at.y / EARTH_RADIUS_M)) - PI / 2),
-        lon = Math.toDegrees(at.x / EARTH_RADIUS_M),
-    )
 
     /**
      * Ground metres per mercator metre at [lat]: mercator stretches everything away from the equator by 1 / cos(lat).

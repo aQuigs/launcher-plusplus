@@ -8,7 +8,7 @@ import org.junit.Test
 
 class OpenMapTilesTest {
     private val id = TileId(14, 4824, 6157)
-    private val centre = WebMercator.toLatLon(WebMercator.fromTile(id, EXTENT, TilePoint(2048, 2048)))
+    private val centre = toLatLon(WebMercator.fromTile(id, EXTENT, TilePoint(2048, 2048)))
 
     private fun scene(vararg layers: Pair<String, List<VectorFeature>>) =
         OpenMapTiles.scene(centre, mapOf(id to VectorTile(layers.associate { (name, features) -> name to VectorLayer(name, EXTENT, features) })))

@@ -76,16 +76,16 @@ object OpenMapTiles {
     }
 
     /** One layer of one tile placed around the map's centre at [origin], [scale] ground metres to the mercator metre. */
-    private class Frame(tile: TileId, extent: Int, private val origin: Mercator, private val scale: Double) {
+    private class Frame(private val tile: TileId, private val extent: Int, private val origin: Mercator, private val scale: Double) {
         private val box = WebMercator.bounds(tile)
         private val unit = (box.maxX - box.minX) / extent
         private val centreX = (origin.x - box.minX) / unit
         private val centreY = (box.maxY - origin.y) / unit
         private val reach = REACH_M / scale / unit
 
-        fun mercator(p: TilePoint) = Mercator(box.minX + p.x * unit, box.maxY - p.y * unit)
+        fun mercator(p: TilePoint) = WebMercator.fromTile(tile, extent, p)
 
-        fun local(p: TilePoint) = Local((box.minX + p.x * unit - origin.x) * scale, (box.maxY - p.y * unit - origin.y) * scale)
+        fun local(p: TilePoint) = mercator(p).let { Local((it.x - origin.x) * scale, (it.y - origin.y) * scale) }
 
         fun local(polygon: List<List<TilePoint>>): Polygon = polygon.map { ring -> ring.map(::local) }
 

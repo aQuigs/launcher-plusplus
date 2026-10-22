@@ -3,6 +3,15 @@ package com.sqftware.orbitlauncher.domain.minimap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.PI
+import kotlin.math.atan
+import kotlin.math.exp
+
+/** The place at [at], the inverse of [WebMercator.toMercator], which only tests need. */
+internal fun toLatLon(at: Mercator): LatLon {
+    val radius = WebMercator.HALF_WORLD_M / PI
+    return LatLon(lat = Math.toDegrees(2 * atan(exp(at.y / radius)) - PI / 2), lon = Math.toDegrees(at.x / radius))
+}
 
 class WebMercatorTest {
     private val bryantPark = LatLon(40.7536, -73.9832)
@@ -12,7 +21,7 @@ class WebMercatorTest {
     fun projectsToMercatorMetresAndBack() {
         assertEquals(20_037_508.34, WebMercator.toMercator(LatLon(0.0, 180.0)).x, 0.01)
         assertEquals(0.0, WebMercator.toMercator(LatLon(0.0, 0.0)).y, 1e-9)
-        val back = WebMercator.toLatLon(WebMercator.toMercator(bryantPark))
+        val back = toLatLon(WebMercator.toMercator(bryantPark))
         assertEquals(bryantPark.lat, back.lat, 1e-9)
         assertEquals(bryantPark.lon, back.lon, 1e-9)
     }
