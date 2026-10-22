@@ -168,6 +168,7 @@ class LauncherScreenTest {
     private var updateAvailable by mutableStateOf(false)
     private var updatesOpened = 0
     private var checkForUpdates by mutableStateOf(true)
+    private var showWhereIAm by mutableStateOf(false)
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -221,7 +222,7 @@ class LauncherScreenTest {
     private var restarts = 0
     private var resets = 0
     private val actions = AppActions(
-        icon = { null },
+        icon = { _, _ -> null },
         launch = launched::add,
         clearBadge = {},
         shortcuts = {
@@ -301,6 +302,10 @@ class LauncherScreenTest {
             onOpenUpdate = { updatesOpened++ },
             checkForUpdates = checkForUpdates,
             onCheckForUpdatesChange = { checkForUpdates = it },
+            showWhereIAm = showWhereIAm,
+            onShowWhereIAmChange = { showWhereIAm = it },
+            minimap = { null },
+            heading = { null },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPages = widgetPages,
@@ -2229,6 +2234,28 @@ class LauncherScreenTest {
 
         leaveAndReturn()
         assertSettledOn(LauncherPage.Home)
+    }
+
+    @Test
+    fun theLauncherMenusWhereIAmRowShowsWhetherTheMapFollowsTheUserAndATapFlipsIt() {
+        theme = Theme.OldSchool
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Show where I am").assertIsOff()
+
+        compose.onNodeWithText("Show where I am").performClick()
+
+        compose.runOnIdle { assertTrue(showWhereIAm) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText("Show where I am").assertIsOn()
+    }
+
+    @Test
+    fun onlyAThemeThatMapsWhereTheUserIsOffersTheRow() {
+        show()
+        compose.longPressEmptyHomeSpace()
+
+        compose.onNodeWithText("Show where I am").assertDoesNotExist()
     }
 
     @Test

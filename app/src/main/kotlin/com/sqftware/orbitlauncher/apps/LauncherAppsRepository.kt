@@ -31,6 +31,10 @@ import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.EntryKind
+import com.sqftware.orbitlauncher.domain.IconStyle
+import com.sqftware.orbitlauncher.domain.ITEM_LAYER_SIZE
+import com.sqftware.orbitlauncher.domain.itemMark
+import com.sqftware.orbitlauncher.domain.itemSprite
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.isStorable
 import com.sqftware.orbitlauncher.domain.sortedByLabel
@@ -49,6 +53,9 @@ private const val MAX_SHORTCUTS = 4
 // Room for a few hundred icons at the largest launcher size: every drawer row asks for its app's, and a cache the drawer
 // churns through would evict the ring's and the dock's, which would then come back blank on the way home.
 private const val ICON_CACHE_BYTES = 32 shl 20
+// Only an app drawn at two sizes, as one on the ring and in the dock or drawer is, asks for its mark again; a mark is
+// some 20 kB.
+private const val MARK_CACHE_APPS = 64
 private const val SHOWN_SHORTCUTS = ShortcutQuery.FLAG_MATCH_MANIFEST or ShortcutQuery.FLAG_MATCH_DYNAMIC
 
 // What a square leaves free on each side when its corners touch a circle as wide: (1 - 1/√2) / 2.
@@ -70,12 +77,18 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     // An icon is asked for again each time its app comes back into view, and a collection card brings dozens back at a
     // tap; every icon shown asks again after a package change, which redraws only that package's.
     private val icons = IconCache(ICON_CACHE_BYTES)
+    private val marks = ItemMarks(MARK_CACHE_APPS) { app ->
+        rendered(app.key, { density -> entryIcon(app, density) }) { itemMark(it.layers(ITEM_LAYER_SIZE)) }
+    }
 
     // One at a time and in order, so unpinning for an older home screen never lands after a newer one's.
     private val pinWork = Dispatchers.IO.limitedParallelism(1)
 
     override fun installedApps(): Flow<List<AppEntry>> =
-        changes(withShortcuts = false, icons::forget)
+        changes(withShortcuts = false) {
+            icons.forget(it)
+            marks.forget(it)
+        }
             .map { loadApps() }
             .flowOn(Dispatchers.IO)
 
@@ -138,17 +151,22 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     private val AppEntry.user: UserHandle? get() = userOf(workProfile)
 
-    // A pair has no icon of its own: the screen draws its apps' together.
-    override suspend fun icon(app: AppEntry): ImageBitmap? = icons[app.key]
-        ?: icons.keep(app) {
-            draw(app.key) { density ->
-                when (val kind = app.kind) {
-                    EntryKind.App -> activityIcon(app, density)
-                    is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
-                    is EntryKind.AppPair -> null
-                }
+    override suspend fun icon(app: AppEntry, style: IconStyle): ImageBitmap? {
+        val key = if (style == IconStyle.Plain) app.key else "$style:${app.key}"
+        return icons[key] ?: icons.keep(app, key) {
+            when (style) {
+                IconStyle.Plain -> draw(app.key) { density -> entryIcon(app, density) }
+                is IconStyle.Item -> marks[app]?.let { withContext(Dispatchers.IO) { itemSprite(it, style.size).toImageBitmap() } }
             }
         }
+    }
+
+    // A pair has no icon of its own: the screen draws its apps' together.
+    private fun entryIcon(app: AppEntry, density: Int): Drawable? = when (val kind = app.kind) {
+        EntryKind.App -> activityIcon(app, density)
+        is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
+        is EntryKind.AppPair -> null
+    }
 
     private fun activityIcon(app: AppEntry, density: Int): Drawable? = app.user?.let { user ->
         launcherApps.resolveActivity(Intent().setComponent(app.component), user)?.getIcon(density)
@@ -294,14 +312,16 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
     }
 
     private suspend fun draw(what: String, drawable: (density: Int) -> Drawable?): ImageBitmap? = withContext(Dispatchers.IO) {
-        try {
-            val size = activityManager.launcherLargeIconSize
-            drawable(activityManager.launcherLargeIconDensity)?.toBitmap(size, size)?.asImageBitmap()
-        } catch (e: RuntimeException) {
-            // An app on the home screen whose icon cannot be drawn would otherwise crash the launcher on every start.
-            Log.w(TAG, "No icon for $what", e)
-            null
-        }
+        val size = activityManager.launcherLargeIconSize
+        rendered(what, drawable) { it.toBitmap(size, size).asImageBitmap() }
+    }
+
+    private fun <T> rendered(what: String, drawable: (density: Int) -> Drawable?, render: (Drawable) -> T): T? = try {
+        drawable(activityManager.launcherLargeIconDensity)?.let(render)
+    } catch (e: RuntimeException) {
+        // An app on the home screen whose icon cannot be drawn would otherwise crash the launcher on every start.
+        Log.w(TAG, "No icon for $what", e)
+        null
     }
 
     private fun shortcutQuery(packageName: String, flags: Int = SHOWN_SHORTCUTS) =

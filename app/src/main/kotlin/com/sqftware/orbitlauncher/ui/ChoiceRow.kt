@@ -13,7 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 
 /**
- * One segmented button per option, under its label, the [selected] one lit; a tap picks one. Each segment takes its [item]
+ * One button per option, under its label, the [selected] one lit; a tap picks one. Each button takes its [item]
  * modifier, such as a tag.
  */
 @Composable
@@ -24,22 +24,32 @@ fun <T> ChoiceRow(
     modifier: Modifier = Modifier,
     item: (T) -> Modifier = { Modifier },
 ) {
+    val choices = options.map { (option, label) -> Choice(label, option == selected, item(option)) { onSelect(option) } }
+    LocalThemeArt.current.ChoiceButtons(choices, modifier)
+}
+
+/** One of a row of buttons: its [label], whether it is [selected], the [modifier] it takes, and what a tap does. */
+class Choice(val label: String, val selected: Boolean, val modifier: Modifier, val onSelect: () -> Unit)
+
+/** [ChoiceRow]'s buttons as most themes draw them: Material's segmented buttons. */
+@Composable
+internal fun SegmentedChoices(choices: List<Choice>, modifier: Modifier) {
     // Lit as a selected Pane is: the default fill is a faint tint that vanishes on a pop-up.
     val boxes = LocalBoxColors.current
     val colors = SegmentedButtonDefaults.colors(activeContainerColor = boxes.lit, activeContentColor = boxes.onLit)
 
     SingleChoiceSegmentedButtonRow(modifier) {
-        options.forEachIndexed { index, (option, label) ->
+        choices.forEachIndexed { index, choice ->
             SegmentedButton(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                selected = choice.selected,
+                onClick = choice.onSelect,
+                shape = SegmentedButtonDefaults.itemShape(index, choices.size, MaterialTheme.shapes.extraLarge),
                 colors = colors,
                 // No tick: it would crowd out the label in a narrow segment, and the fill already marks the choice.
                 icon = {},
                 // One size for every choice, small enough that a word fits a narrow segment in a box.
-                label = { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = item(option),
+                label = { Text(choice.label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                modifier = choice.modifier,
             )
         }
     }

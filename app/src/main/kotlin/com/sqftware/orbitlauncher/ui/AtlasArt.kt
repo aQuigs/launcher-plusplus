@@ -16,7 +16,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -123,7 +122,7 @@ object AtlasArt : ThemeArt {
     @Composable
     override fun FolderFace(
         folder: RingItem.Folder,
-        icon: suspend (AppEntry) -> ImageBitmap?,
+        icon: IconLoader,
         modifier: Modifier,
         presses: InteractionSource?,
         inner: () -> Float,

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -33,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -43,10 +43,8 @@ import androidx.compose.ui.geometry.center
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.GraphicsLayerScope
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
@@ -71,6 +69,7 @@ import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.HangingNames
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
@@ -177,7 +176,7 @@ private sealed interface Part {
 fun HomeRing(
     ring: List<RingItem>,
     hint: String?,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
     onCloseFolder: () -> Unit,
@@ -270,7 +269,7 @@ fun HomeRing(
     val foldTurn = remember(folding?.at) { Snapshot.withoutReadObservation { spin.turn } }
 
     Layout(
-        content = {
+        content = { CompositionLocalProvider(LocalIconPlace provides IconPlace.Ring) {
             if (openFolder == null || spreadingOut) {
                 Emblem(hint, { slowTurn.value }, { fastTurn.value }, minuteOfDay, onSearch, onEdit, Modifier.layoutId(Part.Emblem))
             }
@@ -316,7 +315,7 @@ fun HomeRing(
                 }
             }
             if (spreadingOut) Spacer(Modifier.layoutId(Part.Shield).inert())
-        },
+        } },
         modifier = modifier
             .fillMaxSize()
             // Cached, so the glow and the planet moving do not lay the ring out again every frame.
@@ -532,14 +531,13 @@ private fun Emblem(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(CircleShape)
+            .then(art.emblemBox(edgeMark))
             .combinedClickable(
                 onClickLabel = hint ?: "Search apps",
                 onLongClickLabel = "Choose the apps on the home screen".takeIf { hint == null },
                 onLongClick = onEdit.takeIf { hint == null },
                 onClick = if (hint == null) onSearch else onEdit,
             )
-            .drawBehind { drawCircle(edgeMark.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
             .testTag(HomeRingTags.EMBLEM)
             .semantics { if (hint == null) contentDescription = "Favourites" },
     ) {
@@ -592,7 +590,7 @@ private val RingItem.tag: String
 @Composable
 private fun CentrePlanet(
     folder: RingItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onClose: (() -> Unit)?,
     onAddApps: (() -> Unit)?,
     inner: () -> Float,

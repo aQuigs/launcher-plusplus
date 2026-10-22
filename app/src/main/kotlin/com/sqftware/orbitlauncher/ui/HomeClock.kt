@@ -42,22 +42,28 @@ object HomeClockTags {
 @Composable
 fun HomeClock(face: ClockFace, onTimeClick: () -> Unit, onDateClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        val display = MaterialTheme.typography.displayLarge
-        Text(
-            text = face.time,
-            style = display.legible(),
-            fontWeight = FontWeight.Light,
-            maxLines = 1,
-            // A large font scale would otherwise wrap the time onto a second line and push the ring down.
-            autoSize = TextAutoSize.StepBased(minFontSize = 24.sp, maxFontSize = display.fontSize),
-            modifier = Modifier.target("Open the clock", onTimeClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.TIME),
-        )
+        LocalThemeArt.current.ClockTime(face.time, Modifier.target("Open the clock", onTimeClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.TIME))
         Text(
             text = face.date,
             style = MaterialTheme.typography.titleMedium.legible(),
             modifier = Modifier.target("Open the calendar", onDateClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.DATE),
         )
     }
+}
+
+/** The clock's time as most themes show it: the scheme's largest type, light. */
+@Composable
+internal fun PlainClockTime(time: String, modifier: Modifier) {
+    val display = MaterialTheme.typography.displayLarge
+    Text(
+        text = time,
+        style = display.legible(),
+        fontWeight = FontWeight.Light,
+        maxLines = 1,
+        // A large font scale would otherwise wrap the time onto a second line and push the ring down.
+        autoSize = TextAutoSize.StepBased(minFontSize = 24.sp, maxFontSize = display.fontSize),
+        modifier = modifier,
+    )
 }
 
 /** The ringer's [mode], for under the clock's date. A tap calls [onClick]. */

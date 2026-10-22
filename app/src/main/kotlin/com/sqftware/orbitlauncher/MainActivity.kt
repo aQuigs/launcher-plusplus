@@ -1,5 +1,9 @@
 package com.sqftware.orbitlauncher
 
+import com.sqftware.orbitlauncher.domain.turnedPast
+import kotlinx.coroutines.flow.runningReduce
+import com.sqftware.orbitlauncher.domain.easeHeading
+import com.sqftware.orbitlauncher.apps.SensorHeadingSource
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -15,12 +19,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
+import com.sqftware.orbitlauncher.apps.LiveMinimap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
+import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
+import com.sqftware.orbitlauncher.apps.PlatformLocationSource
 import com.sqftware.orbitlauncher.apps.PlayAppUpdates
+import com.sqftware.orbitlauncher.apps.ResourceMinimapArt
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAmbientMotionStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppNamesStore
@@ -38,6 +47,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesSpinStatsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesWhereIAmStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
 import com.sqftware.orbitlauncher.apps.SystemAppUsage
@@ -55,6 +65,7 @@ import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.GridPages
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
@@ -81,6 +92,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
+
+// The share of the way a heading moves to each reading of the compass, so the map settles rather than shivers, and the
+// least turn worth redrawing for: under one of the map's pixels at its edge, so the sensor's jitter at rest draws nothing.
+private const val HEADING_EASE = 0.25f
+private const val HEADING_STEP = 0.5f
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
@@ -129,6 +145,10 @@ class MainActivity : ComponentActivity() {
         val shade = StatusBarNotificationShade(this)
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
+        val whereIAmStore = SharedPreferencesWhereIAmStore(this)
+        val location = PlatformLocationSource(this, activityResultRegistry)
+        val headingSource = SensorHeadingSource(this)
+        val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this))
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
@@ -163,9 +183,11 @@ class MainActivity : ComponentActivity() {
                 // Each app list after the first follows a package change, which may bring an app a new icon, so every icon
                 // shown is handed a new way to ask, a new lambda rather than a reference equal to the last, and asks again.
                 // Counted, not compared: an update leaves the app's entry as it was.
-                val actions = remember(appLists?.index ?: 0) {
+                // By value, so a theme that draws icons as another does keeps the icons shown.
+                val iconStyles = IconPlace.entries.associateWith(shownTheme::iconStyle)
+                val actions = remember(appLists?.index ?: 0, iconStyles) {
                     AppActions(
-                        icon = { repository.icon(it) },
+                        icon = { app, place -> repository.icon(app, iconStyles.getValue(place)) },
                         launch = {
                             clearBadge(it)
                             repository.launch(it)
@@ -237,6 +259,47 @@ class MainActivity : ComponentActivity() {
                 }
                 val unread by produceState(UnreadCounts()) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
+                }
+                // On only with the grant, which Settings may have taken back while the launcher was out of sight.
+                var showWhereIAm by remember { mutableStateOf(whereIAmStore.load() && location.isGranted()) }
+                fun changeShowWhereIAm(on: Boolean) {
+                    showWhereIAm = on
+                    whereIAmStore.save(on)
+                }
+                LaunchedEffect(Unit) {
+                    location.answers().collect { granted ->
+                        if (granted) {
+                            changeShowWhereIAm(true)
+                        } else {
+                            noticeChannel.trySend("The map needs location access, which Settings can allow")
+                        }
+                    }
+                }
+                // The map follows the user only while the launcher is visible, like the clock, and each return reads the
+                // grant again. The state outlives a change of key, so turning it off must drop the last map.
+                val mapping = showWhereIAm && shownTheme.mapsWhereIAm
+                val minimap = produceState<ImageBitmap?>(null, mapping) {
+                    value = null
+                    if (mapping) {
+                        repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            if (location.isGranted()) liveMinimap.images().collect { value = it } else changeShowWhereIAm(false)
+                        }
+                    }
+                }
+                // The map turns with the phone only while it shows, as the map follows the user. Both are read where
+                // they are drawn, so a new map or a turn redraws the emblem alone.
+                val heading = remember { mutableStateOf<Float?>(null) }
+                val readMinimap = remember { { minimap.value } }
+                val readHeading = remember { { heading.value } }
+                LaunchedEffect(mapping) {
+                    heading.value = null
+                    if (mapping) {
+                        repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            headingSource.headings().runningReduce { from, to -> easeHeading(from, to, HEADING_EASE) }.collect { eased ->
+                                if (heading.value?.let { turnedPast(it, eased, HEADING_STEP) } != false) heading.value = eased
+                            }
+                        }
+                    }
                 }
                 var collectionPages by remember { mutableStateOf(collectionsStore.load()) }
                 var gridPages by remember { mutableStateOf(gridPagesStore.load()) }
@@ -391,6 +454,16 @@ class MainActivity : ComponentActivity() {
                         checkForUpdates = it
                         updateCheckStore.save(it)
                     },
+                    showWhereIAm = showWhereIAm,
+                    onShowWhereIAmChange = { on ->
+                        when {
+                            !on -> changeShowWhereIAm(false)
+                            location.isGranted() -> changeShowWhereIAm(true)
+                            else -> location.request()
+                        }
+                    },
+                    minimap = readMinimap,
+                    heading = readHeading,
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPages = widgetPages,

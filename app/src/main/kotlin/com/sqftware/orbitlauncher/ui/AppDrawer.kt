@@ -60,7 +60,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -105,12 +104,17 @@ object AppDrawerTags {
     fun letter(initial: Char) = "rail_$initial"
 }
 
+/** What peeks above the pages to open the drawer and close it, in the theme. A tap calls [onClick]. */
+@Composable
+fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) =
+    LocalThemeArt.current.DrawerHandle(open, onClick, modifier)
+
 /**
- * The chevron that peeks above the pages, pointing the way the drawer will move, on a soft halo in the scrim so it reads on
- * any wallpaper. A tap calls [onClick].
+ * [DrawerHandle] as most themes draw it: a chevron pointing the way the drawer will move, on a soft halo in the scrim so
+ * it reads on any wallpaper.
  */
 @Composable
-fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ChevronHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "chevron")
     val scrim = MaterialTheme.colorScheme.scrim
 
@@ -174,7 +178,7 @@ data class DrawerControls(
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     picking: Picking? = null,
@@ -328,7 +332,20 @@ fun AppDrawer(
 private val profileTabs = listOf(false to "Personal", true to "Work")
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) =
+    LocalThemeArt.current.SearchField(
+        query,
+        onQueryChange,
+        onSearch,
+        modifier
+            // The placeholder goes once there is text, and a screen reader should still say what the field is for.
+            .semantics { contentDescription = "Search apps" }
+            .testTag(AppDrawerTags.SEARCH),
+    )
+
+/** The drawer's search field as most themes draw it: Material's outlined field, rounded at the ends. */
+@Composable
+internal fun PlainSearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -343,10 +360,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
         shape = CircleShape,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        modifier = modifier
-            // The placeholder goes once there is text, and a screen reader should still say what the field is for.
-            .semantics { contentDescription = "Search apps" }
-            .testTag(AppDrawerTags.SEARCH),
+        modifier = modifier,
     )
 }
 
@@ -408,7 +422,7 @@ private fun LazyGridScope.apps(apps: List<AppEntry>, entry: DrawerEntry, detail:
 /** What every app in the drawer is shown with, in its [layout]: a row, or a cell of the grid. */
 private data class DrawerEntry(
     val layout: DrawerLayout,
-    val icon: suspend (AppEntry) -> ImageBitmap?,
+    val icon: IconLoader,
     val onLaunch: (AppEntry) -> Unit,
     val picking: Picking?,
     val menu: AppMenu?,
@@ -526,7 +540,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
     ) {
         Box(Modifier.size(GRID_ICON_SIZE)) {
             AppFace(app, entry.icon, Modifier.fillMaxSize())
-            UnreadBadge(unread, Modifier.align(Alignment.TopEnd).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
+            UnreadBadge(unread, Modifier.align(badgeCorner).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {
                     PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))

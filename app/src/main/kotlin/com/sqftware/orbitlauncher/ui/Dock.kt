@@ -7,15 +7,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.DockRow
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.dockRow
@@ -30,8 +32,6 @@ object DockTags {
     fun folder(index: Int) = "dock_folder_$index"
 }
 
-private val FULL_DOCK_ICON_SIZE = 56.dp
-
 /**
  * The user's dock [items], apps and folders, in one row of equal slots, together in the middle of the width. The row is
  * as tall as a full-size icon, so a crowded dock shrinks its icons but not the row, and an empty dock still holds its
@@ -45,7 +45,7 @@ private val FULL_DOCK_ICON_SIZE = 56.dp
 @Composable
 fun Dock(
     items: List<RingItem>,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,
@@ -57,9 +57,13 @@ fun Dock(
     rearrange: Rearrange? = null,
     foldTarget: Int? = null,
 ) {
-    val primary = MaterialTheme.colorScheme.primary
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
     val marks = LocalRingColors.current
+    val art = LocalThemeArt.current
+    val fullSize = art.dockIconSize
+    val ground = art.dockGround(MaterialTheme.colorScheme.primary)
+    // Written by measure and read by draw, so a new layout of the row redraws its ground.
+    var laidOut by remember { mutableStateOf<DockRow?>(null) }
 
     Layout(
         content = {
@@ -77,15 +81,19 @@ fun Dock(
         },
         modifier = modifier
             .fillMaxWidth()
-            .drawBehind { if (glow > 0f) drawRoundRect(primary.copy(alpha = 0.12f * glow), cornerRadius = CornerRadius(size.height / 2)) }
+            .drawBehind { laidOut?.let { ground(DockSlots(it.iconSize, it.starts, glow)) } }
             .padding(vertical = 12.dp)
             .testTag(DockTags.DOCK),
     ) { measurables, constraints ->
         val width = constraints.maxWidth
-        val height = FULL_DOCK_ICON_SIZE.roundToPx()
-        if (measurables.isEmpty()) return@Layout layout(width, height) {}
+        val height = fullSize.roundToPx()
+        if (measurables.isEmpty()) {
+            laidOut = DockRow(fullSize.toPx(), emptyList())
+            return@Layout layout(width, height) {}
+        }
 
-        val row = dockRow(FULL_DOCK_ICON_SIZE.toPx(), width.toFloat(), measurables.size)
+        val row = dockRow(fullSize.toPx(), width.toFloat(), measurables.size, art.dockIconFill)
+        laidOut = row
         val size = row.iconSize.roundToInt()
         val icons = measurables.map { it.measure(Constraints.fixed(size, size)) }
 

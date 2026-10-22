@@ -1,7 +1,23 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.sqftware.orbitlauncher.domain.CardColour
+import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.ui.Alignment
+import com.sqftware.orbitlauncher.domain.Unread
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -9,19 +25,25 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.CornerRadius
+import com.sqftware.orbitlauncher.domain.DOCK_ICON_FILL
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.toSize
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
@@ -71,7 +93,7 @@ interface ThemeArt {
     @Composable
     fun FolderFace(
         folder: RingItem.Folder,
-        icon: suspend (AppEntry) -> ImageBitmap?,
+        icon: IconLoader,
         modifier: Modifier,
         presses: InteractionSource?,
         inner: () -> Float,
@@ -80,10 +102,152 @@ interface ThemeArt {
     /** The faint pattern over a panel's veil, in [colour] at its brightest, drifting by a share of how far the list has [scrolled]. */
     fun DrawScope.drawBackdrop(colour: Color, scrolled: Float)
 
+    /**
+     * Builds what lays a panel's [veil] over a rect at a share of its own alpha: by default the flat colour. Every part
+     * of one panel is drawn in the same coordinates, so a texture lines up across them.
+     */
+    @Composable
+    fun panelVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit = remember(veil) { flatVeil(veil) }
+
     /** The theme's world as a scene the launcher's menu offers to set as the wallpaper, if it has one. */
     val scene: ThemeScene?
         get() = null
+
+    /**
+     * What an app's icon sits on, filling the item, with [content] over it and rippling for [presses]: by default a
+     * disc. [LocalIconPlace] says whether the icon is on the home ring or elsewhere, where a theme may frame it
+     * differently.
+     */
+    @Composable
+    fun IconGround(
+        presses: InteractionSource?,
+        modifier: Modifier,
+        contentAlignment: Alignment,
+        content: @Composable BoxScope.() -> Unit,
+    ) = PlainIconGround(presses, modifier, contentAlignment, content)
+
+    /** An icon's [bitmap] filling its square: by default scaled smoothly. */
+    @Composable
+    fun IconImage(bitmap: ImageBitmap, modifier: Modifier) = Image(bitmap, contentDescription = null, modifier = modifier)
+
+    /** Which corner of an icon its badge sits on. */
+    val badgeCorner: Alignment
+        get() = Alignment.TopEnd
+
+    /** The badge for [unread] notifications, or nothing for none: by default a bubble over the corner. */
+    @Composable
+    fun BadgeFace(unread: Unread, modifier: Modifier) = BubbleBadge(unread, modifier)
+
+    /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
+    @Composable
+    fun ClockTime(time: String, modifier: Modifier) = PlainClockTime(time, modifier)
+
+    /** How large a dock's icons are while they all fit, and what share of its slot each fills. */
+    val dockIconSize: Dp
+        @Composable get() = 56.dp
+
+    val dockIconFill: Float
+        get() = DOCK_ICON_FILL
+
+    /**
+     * Builds what draws under the dock's [slots][DockSlots], glowing by how much the dock is lit as a drop target: by
+     * default nothing but that glow, in [glowColour].
+     */
+    @Composable
+    fun dockGround(glowColour: Color): DrawScope.(DockSlots) -> Unit = { slots ->
+        if (slots.glow > 0f) drawRoundRect(glowColour.copy(alpha = 0.12f * slots.glow), cornerRadius = CornerRadius(size.height / 2))
+    }
+
+    /** What opens and closes the drawer above the pages, pointing the way it will move: by default a chevron. */
+    @Composable
+    fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) = ChevronHandle(open, onClick, modifier)
+
+    /** A menu's box on [ground]: by default the solid ground in Material's menu shape, rimmed so it holds its edge. */
+    @Composable
+    fun menuBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, MenuDefaults.shape)
+
+    val menuRim: BorderStroke?
+        @Composable get() = popupRim()
+
+    /**
+     * A collection card round its [header] and its [body], on the ground of the [colour] the user chose, solid while
+     * [dragged] and marked while it is the [dropTarget]: by default a rounded card of the colour's tint.
+     */
+    @Composable
+    fun CollectionCardBox(
+        colour: CardColour,
+        dragged: Boolean,
+        dropTarget: Boolean,
+        modifier: Modifier,
+        header: @Composable () -> Unit,
+        body: @Composable () -> Unit,
+    ) = PlainCardBox(colour, dragged, dropTarget, modifier, header, body)
+
+    /** A collection's [glyph] and [title] at the start of its card's header: by default the glyph beside the title. */
+    @Composable
+    fun CardTitle(glyph: ImageVector, title: String, modifier: Modifier) = PlainCardTitle(glyph, title, modifier)
+
+    /** The face of a card header's button, its [glyph] in [tint] and turned by [glyphModifier]: by default the glyph alone. */
+    @Composable
+    fun CardButtonFace(glyph: ImageVector, contentDescription: String?, tint: Color, glyphModifier: Modifier) =
+        Icon(glyph, contentDescription, glyphModifier, tint)
+
+    /** The bin an app is dropped on to take it out of a collection, filling its target, lit while [highlighted]: by default a disc. */
+    @Composable
+    fun BinFace(highlighted: Boolean, modifier: Modifier) = PlainBinFace(highlighted, modifier)
+
+    /** A dialog's box on [ground]: by default the solid ground in Material's dialog shape. */
+    @Composable
+    fun dialogBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, AlertDialogDefaults.shape)
+
+    /** The drawer's search field, editing [query] and calling [onSearch] from the keyboard's search key: by default Material's outlined field. */
+    @Composable
+    fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) =
+        PlainSearchField(query, onQueryChange, onSearch, modifier)
+
+    /** A row of buttons, one to each of the [choices], one of them chosen: by default Material's segmented buttons. */
+    @Composable
+    fun ChoiceButtons(choices: List<Choice>, modifier: Modifier) = SegmentedChoices(choices, modifier)
+
+    /** A menu's items, [content], as the theme sets them out: by default as they are. */
+    @Composable
+    fun MenuBody(content: @Composable () -> Unit) = content()
+
+    /**
+     * What the emblem's box clips its face and its touch to, and draws round the face: by default the circle of its
+     * cell, rimmed faintly in [edge].
+     */
+    @Composable
+    fun emblemBox(edge: Color): Modifier =
+        Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
+
+    /**
+     * Whether the drawer's [DrawerHandle] peeks below the home page, or the drawer opens there by a swipe up alone. The
+     * pages without the dock, which have no swipe up, always show it.
+     */
+    val drawerHandleOnHome: Boolean
+        get() = true
+
+    /** The type every text is set in. */
+    val typography: Typography
+        @Composable get() = MaterialTypography
+
+    /**
+     * The corners of every surface: by default Material's. The fully round ones, a choice's segments and a colour's
+     * swatch, are drawn in the largest, so a theme of square corners squares them too.
+     */
+    val shapes: Shapes
+        get() = MaterialShapes
 }
+
+/** A flat [veil], at a share of its own alpha. */
+fun flatVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit =
+    { alpha, topLeft, size -> drawRect(veil.copy(alpha = veil.alpha * alpha), topLeft, size) }
+
+/** The dock's slots as laid out on its row: each icon [iconSize] across, the nth starting [starts] along, and how much it [glow]s. */
+class DockSlots(val iconSize: Float, val starts: List<Float>, val glow: Float)
+
+val LocalIconPlace = staticCompositionLocalOf { IconPlace.Elsewhere }
 
 /**
  * How many times something done [perTurn] times a turn has been done when an angle that turns has come [turn] degrees
@@ -110,6 +274,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.Paper -> PaperArt
     Theme.CrystalCity -> CrystalArt
     Theme.GreenCore -> GreenCoreArt
+    Theme.OldSchool -> OldSchoolArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
@@ -117,10 +282,14 @@ val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
 /** [content] in [theme]: its [colourway] for a light or a dark wallpaper, and its art, chosen together. */
 @Composable
 fun Themed(theme: Theme, colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
-    LauncherTheme(colourway, lightWallpaper) {
-        CompositionLocalProvider(LocalThemeArt provides artOf(theme), content = content)
+    val art = artOf(theme)
+    LauncherTheme(colourway, lightWallpaper, art.typography, art.shapes) {
+        CompositionLocalProvider(LocalThemeArt provides art, content = content)
     }
 }
+
+private val MaterialTypography = Typography()
+private val MaterialShapes = Shapes()
 
 /**
  * How every folder on the screen draws itself: the [look] the user chose, the [planets] the folders are in the Solar

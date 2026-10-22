@@ -12,7 +12,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -58,7 +57,7 @@ import kotlinx.coroutines.flow.first
 // kinds below, so each kind ends the same way wherever it is used: one that shows or sets things as they change closes
 // with Done, one that asks closes with its verb and Cancel, and one that offers choices closes with Cancel.
 
-/** Material's alert dialog on the solid [PanelGround]. */
+/** Material's alert dialog in the theme's box on the solid [PanelGround]. */
 @Composable
 private fun GroundDialog(
     onDismissRequest: () -> Unit,
@@ -74,7 +73,7 @@ private fun GroundDialog(
         AlertDialog(
             onDismissRequest = onDismissRequest,
             confirmButton = confirmButton,
-            modifier = modifier.solidGround(panelGround(), AlertDialogDefaults.shape),
+            modifier = modifier.then(LocalThemeArt.current.dialogBox(panelGround())),
             dismissButton = dismissButton,
             icon = icon,
             title = title,
@@ -115,22 +114,25 @@ fun toggleRow(label: String, on: Boolean, onChange: (Boolean) -> Unit) = MenuRow
 fun glyph(glyph: ImageVector): @Composable () -> Unit = { Icon(glyph, contentDescription = null) }
 
 /**
- * Material's dropdown menu on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground, with
+ * Material's dropdown menu in the theme's box on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground, with
  * its [groups] of rows divided from each other. Choosing a row dismisses the menu, then hands on the choice.
  */
 @Composable
 fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, groups: List<List<MenuRow>>, modifier: Modifier = Modifier) {
+    val art = LocalThemeArt.current
     OnGround(Ground.Popup) {
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = onDismissRequest,
-            modifier = modifier.solidGround(panelGround(), MenuDefaults.shape),
+            modifier = modifier.then(art.menuBox(panelGround())),
             containerColor = Color.Transparent,
-            border = popupRim(),
+            border = art.menuRim,
         ) {
-            groups.filter { it.isNotEmpty() }.forEachIndexed { index, group ->
-                if (index > 0) HorizontalDivider()
-                group.forEach { MenuItem(it, expanded, onDismissRequest) }
+            art.MenuBody {
+                groups.filter { it.isNotEmpty() }.forEachIndexed { index, group ->
+                    if (index > 0) HorizontalDivider()
+                    group.forEach { MenuItem(it, expanded, onDismissRequest) }
+                }
             }
         }
     }

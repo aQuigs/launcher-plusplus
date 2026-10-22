@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -74,7 +76,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -197,7 +198,7 @@ private const val PICKER_COLUMNS = 3
 private const val MIN_KEPT_LABEL_SCALE = 0.75f
 private const val MIN_LABEL_SCALE = 0.25f
 private val TILE_PADDING = 4.dp
-private const val EXPAND_MILLIS = 200
+internal const val EXPAND_MILLIS = 200
 
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
@@ -219,7 +220,7 @@ fun CollectionsColumn(
     apps: List<AppEntry>,
     builtInApps: List<AppEntry>,
     foregroundTime: ForegroundTime?,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: (CollectionKind) -> Unit,
     onSettings: (CollectionKind) -> Unit,
@@ -297,7 +298,7 @@ private fun CollectionCardView(
     apps: List<AppEntry>?,
     index: Int,
     reorder: ListReorder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: () -> Unit,
     onSettings: () -> Unit,
@@ -313,28 +314,50 @@ private fun CollectionCardView(
     modifier: Modifier = Modifier,
 ) {
     val dragged = reorder.dragging == index
-    val colours = MaterialTheme.colorScheme
-    val tint = LocalCardTints.current.of(look.colour)
+    val hidden = apps?.let { look.hiddenApps(it.size, card.expanded) } ?: 0
 
-    Pane(
-        // Solid while dragged, so the card it passes over does not show through it.
-        fill = if (dragged) tint.compositeOver(LocalBoxColors.current.floating) else tint,
-        marked = dropTarget,
+    LocalThemeArt.current.CollectionCardBox(
+        colour = look.colour,
+        dragged = dragged,
+        dropTarget = dropTarget,
         modifier = modifier
             .fillMaxWidth()
             .reorderItem(reorder, index)
             .graphicsLayer { alpha = if (dragged) 0.7f else 1f }
             .testTag(CollectionTags.card(card.kind)),
+        header = { CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onSettings, onEdit) },
     ) {
-        val hidden = apps?.let { look.hiddenApps(it.size, card.expanded) } ?: 0
+        if (apps == null) {
+            PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
+        } else {
+            AppGrid(card.kind, apps, card.expanded, look, icon, onLaunch, rearrange, drag, menu, unread, onClearBadge)
+        }
+        if (hidden > 0) MoreApps(card.kind, hidden, look.more, onToggleExpanded) else Spacer(Modifier.height(12.dp))
+    }
+}
+
+/** [ThemeArt.CollectionCardBox] as most themes draw it: a rounded card of the colour's tint, outlined in the primary as a drop target. */
+@Composable
+internal fun PlainCardBox(
+    colour: CardColour,
+    dragged: Boolean,
+    dropTarget: Boolean,
+    modifier: Modifier,
+    header: @Composable () -> Unit,
+    body: @Composable () -> Unit,
+) {
+    val colours = MaterialTheme.colorScheme
+    val tint = LocalCardTints.current.of(colour)
+
+    Pane(
+        // Solid while dragged, so the card it passes over does not show through it.
+        fill = if (dragged) tint.compositeOver(LocalBoxColors.current.floating) else tint,
+        marked = dropTarget,
+        modifier = modifier,
+    ) {
         Column(Modifier.animateContentSize(tween(EXPAND_MILLIS)).padding(start = 12.dp, end = 4.dp)) {
-            CardHeader(card.kind, card.expanded, index, reorder, onMove, onToggleExpanded, onSettings, onEdit)
-            if (apps == null) {
-                PermissionRequired(onOpenUsageSettings, Modifier.padding(end = 8.dp))
-            } else {
-                AppGrid(card.kind, apps, card.expanded, look, icon, onLaunch, rearrange, drag, menu, unread, onClearBadge)
-            }
-            if (hidden > 0) MoreApps(card.kind, hidden, look.more, onToggleExpanded) else Spacer(Modifier.height(12.dp))
+            header()
+            body()
         }
     }
 }
@@ -353,24 +376,15 @@ private fun CardHeader(
     val latestOnMove by rememberUpdatedState(onMove)
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, tween(EXPAND_MILLIS), label = "chevron")
 
-    BoxWithConstraints(Modifier.fillMaxWidth().height(HEADER_BUTTON)) {
+    val art = LocalThemeArt.current
+
+    // At least a button high, and as high as a theme's title needs.
+    BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = HEADER_BUTTON)) {
         // In the middle, unless a narrow card would put it under the buttons. Room is left for all three on every card, so
         // the handles line up down the page.
         val handleStart = minOf((maxWidth - HEADER_BUTTON) / 2, maxWidth - HEADER_BUTTON * 4)
         // Kept clear of the handle, which a long title on a narrow screen would otherwise run under.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.align(Alignment.CenterStart).width(handleStart - 4.dp),
-        ) {
-            Icon(kind.glyph, contentDescription = null, modifier = Modifier.size(22.dp))
-            Text(
-                text = kind.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 10.dp),
-            )
-        }
+        art.CardTitle(kind.glyph, kind.title, Modifier.align(Alignment.CenterStart).width(handleStart - 4.dp))
         // A drag straight from the touch, with no long press: a vertical one, so a swipe across the handle still pages.
         Box(
             contentAlignment = Alignment.Center,
@@ -405,25 +419,42 @@ private fun CardHeader(
                 .semantics { contentDescription = "Reorder ${kind.title}" }
                 .testTag(CollectionTags.handle(kind)),
         ) {
-            Icon(DragHandleGlyph, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            art.CardButtonFace(DragHandleGlyph, null, MaterialTheme.colorScheme.primary, Modifier)
         }
         Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+            val tint = LocalContentColor.current
             if (onEdit != null) {
                 IconButton(onClick = onEdit, modifier = Modifier.testTag(CollectionTags.edit(kind))) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit ${kind.title}")
+                    art.CardButtonFace(Icons.Default.Edit, "Edit ${kind.title}", tint, Modifier)
                 }
             }
             IconButton(onClick = onSettings, modifier = Modifier.testTag(CollectionTags.settings(kind))) {
-                Icon(Icons.Default.Settings, contentDescription = "${kind.title} settings")
+                art.CardButtonFace(Icons.Default.Settings, "${kind.title} settings", tint, Modifier)
             }
             IconButton(onClick = onToggleExpanded, modifier = Modifier.testTag(CollectionTags.chevron(kind))) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
+                art.CardButtonFace(
+                    glyph = Icons.Default.KeyboardArrowDown,
                     contentDescription = if (expanded) "Show fewer" else SHOW_ALL,
-                    modifier = Modifier.graphicsLayer { rotationZ = rotation },
+                    tint = tint,
+                    glyphModifier = Modifier.graphicsLayer { rotationZ = rotation },
                 )
             }
         }
+    }
+}
+
+/** [ThemeArt.CardTitle] as most themes set it: the glyph, then the title on one line. */
+@Composable
+internal fun PlainCardTitle(glyph: ImageVector, title: String, modifier: Modifier) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+        Icon(glyph, contentDescription = null, modifier = Modifier.size(22.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 10.dp),
+        )
     }
 }
 
@@ -462,7 +493,7 @@ private fun AppGrid(
     apps: List<AppEntry>,
     expanded: Boolean,
     look: CardLook,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     rearrange: Rearrange?,
     drag: AppDrag?,
@@ -541,23 +572,32 @@ internal fun PermissionRequired(onClick: () -> Unit, modifier: Modifier = Modifi
 @Composable
 private fun Bin(bin: BinTarget, modifier: Modifier = Modifier) {
     val scale by animateFloatAsState(if (bin.highlighted) 1.2f else 1f, label = "bin")
-    val colours = MaterialTheme.colorScheme
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
+    LocalThemeArt.current.BinFace(
+        bin.highlighted,
+        modifier
             .size(BIN_SIZE)
             .onGloballyPositioned { bin.onPositioned(it.rootBounds()) }
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(CircleShape)
-            .background(if (bin.highlighted) colours.error else LocalBoxColors.current.floating)
+
             .semantics { contentDescription = "Remove from the collection" }
             .testTag(CollectionTags.BIN),
+    )
+}
+
+/** [ThemeArt.BinFace] as most themes draw it: a raised disc with a bin, red while an app is over it. */
+@Composable
+internal fun PlainBinFace(highlighted: Boolean, modifier: Modifier) {
+    val colours = MaterialTheme.colorScheme
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.clip(CircleShape).background(if (highlighted) colours.error else LocalBoxColors.current.floating),
     ) {
-        Icon(Icons.Default.Delete, contentDescription = null, tint = if (bin.highlighted) colours.onError else colours.onSurfaceVariant)
+        Icon(Icons.Default.Delete, contentDescription = null, tint = if (highlighted) colours.onError else colours.onSurfaceVariant)
     }
 }
 
@@ -814,13 +854,14 @@ private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) 
 }
 
 /**
- * A round swatch per colour of [setting], which is only ever [CardSetting.Colour], in the card's own tint so the choice
+ * A swatch per colour of [setting], round in Material's corners, which is only ever [CardSetting.Colour], in the card's own tint so the choice
  * looks as the card will; the chosen one is ringed.
  */
 @Composable
 private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
     val tints = LocalCardTints.current
     val colours = MaterialTheme.colorScheme
+    val shape = MaterialTheme.shapes.extraLarge
 
     // Wrapping rather than squeezed into one row, so each swatch keeps a full touch target.
     FlowRow(maxItemsInEachRow = 5, modifier = Modifier.fillMaxWidth().selectableGroup()) {
@@ -829,12 +870,12 @@ private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) 
             Box(
                 Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
+                    .clip(shape)
                     .selectable(selected, role = Role.RadioButton) { onChoose(choice) }
-                    .border(2.dp, if (selected) colours.primary else Color.Transparent, CircleShape)
+                    .border(2.dp, if (selected) colours.primary else Color.Transparent, shape)
                     .padding(5.dp)
-                    .border(1.dp, colours.outline, CircleShape)
-                    .background(tints.swatch(choice as CardColour), CircleShape)
+                    .border(1.dp, colours.outline, shape)
+                    .background(tints.swatch(choice as CardColour), shape)
                     .semantics { contentDescription = choice.name }
                     .testTag(CollectionTags.choice(setting, choice)),
             )
