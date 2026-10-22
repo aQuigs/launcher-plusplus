@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
@@ -152,6 +153,8 @@ object LauncherTags {
 
 
 const val AUTO_SET_UP = "Auto set up"
+const val SHOW_WHERE_I_AM = "Show where I am"
+const val MAP_DATA_CREDIT = "Map data © OpenStreetMap"
 const val PICK_TIP = "Long-press the centre to choose the ring's apps"
 
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
@@ -230,7 +233,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([showWhereIAm], [onShowWhereIAmChange]), with the [minimap] and the phone's [heading] read where they are drawn,
+ * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap] and the phone's [heading] read where they are drawn,
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -291,8 +294,9 @@ fun LauncherScreen(
     onOpenUpdate: () -> Unit,
     checkForUpdates: Boolean,
     onCheckForUpdatesChange: (Boolean) -> Unit,
-    showWhereIAm: Boolean,
+    whereIAm: WhereIAm,
     onShowWhereIAmChange: (Boolean) -> Unit,
+    onOpenMapLicence: () -> Unit,
     minimap: () -> ImageBitmap?,
     heading: () -> Float?,
     isHomeApp: Boolean,
@@ -388,8 +392,9 @@ fun LauncherScreen(
     val latestOnRestart by rememberUpdatedState(onRestart)
     val latestCheckForUpdates by rememberUpdatedState(checkForUpdates)
     val latestOnCheckForUpdatesChange by rememberUpdatedState(onCheckForUpdatesChange)
-    val latestShowWhereIAm by rememberUpdatedState(showWhereIAm)
+    val latestWhereIAm by rememberUpdatedState(whereIAm)
     val latestOnShowWhereIAmChange by rememberUpdatedState(onShowWhereIAmChange)
+    val latestOnOpenMapLicence by rememberUpdatedState(onOpenMapLicence)
 
     // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
     // through this screen's BackHandler.
@@ -1189,7 +1194,9 @@ fun LauncherScreen(
                                 MenuRow("Unread badges", end = RowEnd.Toggle(latestBadgesEnabled, flips = false)) { latestOnOpenBadgeSettings() },
                                 toggleRow("Open on home page", latestHomeOnReturn) { latestOnHomeOnReturnChange(it) },
                                 toggleRow("Ambient motion", latestAmbientMotion) { latestOnAmbientMotionChange(it) },
-                                toggleRow("Show where I am", latestShowWhereIAm) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
+                                toggleRow(SHOW_WHERE_I_AM, latestWhereIAm == WhereIAm.Shown) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
+                                // The map shows its credit only for a moment, so the licence is always a tap away here.
+                                MenuRow(MAP_DATA_CREDIT) { latestOnOpenMapLicence() }.takeIf { latestTheme.mapsWhereIAm },
                                 toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
                             listOf(
@@ -1488,8 +1495,12 @@ fun LauncherScreen(
                                                     // theirs is there, so neither the hint nor the mark flashes while they load.
                                                     // A home with nothing stored is known before the first frame, so its offer never flashes.
                                                     val hint = when {
-                                                        isHome && pageApps.isEmpty -> AUTO_SET_UP
-                                                        pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
+                                                        isHome && pageApps.isEmpty -> RingHint(AUTO_SET_UP) { if (active) onSetUpHome() }
+                                                        // The tap that picks teaches nothing of the long press, so the pick tip stays.
+                                                        pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) ->
+                                                            RingHint("Add apps") { if (active) pickFor(HomePlace.Ring) }
+                                                        theme.mapsWhereIAm && whereIAm == WhereIAm.Refused ->
+                                                            RingHint(SHOW_WHERE_I_AM) { if (active) onShowWhereIAmChange(true) }
                                                         else -> null
                                                     }
                                                     HomeRing(
@@ -1500,14 +1511,9 @@ fun LauncherScreen(
                                                         onOpenFolder = { if (active) tapFolder(page.id, it.at) },
                                                         onCloseFolder = { if (active) openFolder = null },
                                                         onEdit = {
-                                                            when {
-                                                                !active -> Unit
-                                                                isHome && pageApps.isEmpty -> onSetUpHome()
-                                                                else -> {
-                                                                    pickFor(HomePlace.Ring)
-                                                                    // Without a hint, only a long press edits; with one, the tap that picks taught nothing.
-                                                                    if (hint == null && pickTip) onPickTipLearned()
-                                                                }
+                                                            if (active) {
+                                                                pickFor(HomePlace.Ring)
+                                                                if (pickTip) onPickTipLearned()
                                                             }
                                                         },
                                                         onSearch = {

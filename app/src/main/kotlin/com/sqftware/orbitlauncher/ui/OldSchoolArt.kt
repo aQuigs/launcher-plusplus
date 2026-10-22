@@ -29,7 +29,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -143,6 +148,8 @@ private const val EMBLEM_REACH = 1.15f
 private const val MAP_CREDIT = "© OpenMapTiles\n© OpenStreetMap"
 private const val CREDIT_WIDTH = 104
 private const val CREDIT_DROP = 70
+private const val CREDIT_MILLIS = 5_000L
+private const val CREDIT_FADE_MILLIS = 1_000
 
 /** The whole game pixels the minimap is drawn at in an emblem of [size]: as large as reaches its room, and no larger than the rest of the game. */
 private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_REACH, 2f * FRAME_RADIUS, px)
@@ -202,6 +209,17 @@ object OldSchoolArt : ThemeArt {
         val heading = LocalHeading.current
         val measurer = rememberTextMeasurer()
         val creditStyle = MaterialTheme.typography.labelSmall.copy(color = MinimapSelf, textAlign = TextAlign.Center)
+        // OpenStreetMap's attribution rules let the credit fade five seconds after a map first shows; the launcher's
+        // menu keeps it a tap away.
+        val creditAlpha = remember { Animatable(1f) }
+        val mapShown by remember { derivedStateOf { map() != null } }
+        LaunchedEffect(mapShown) {
+            if (mapShown) {
+                creditAlpha.snapTo(1f)
+                delay(CREDIT_MILLIS)
+                creditAlpha.animateTo(0f, tween(CREDIT_FADE_MILLIS))
+            }
+        }
         Box(modifier) {
             Spacer(
                 Modifier
@@ -222,7 +240,9 @@ object OldSchoolArt : ThemeArt {
                     onDrawBehind {
                         // Upright over the turned map, as the game keeps the player's square.
                         if (marked) selfMarker(center, scale)
-                        if (map() != null) drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + CREDIT_DROP * scale - credit.size.height))
+                        if (map() != null && creditAlpha.value > 0f) {
+                            drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + CREDIT_DROP * scale - credit.size.height), alpha = creditAlpha.value)
+                        }
                         // The frame's own ring alone: its compass socket would reach out among the ring's apps, so the
                         // compass sits just inside the frame's edge, over the map, as in the game's fixed-size view.
                         clipPath(ring) { drawSprite(frame, center - (FRAME_HOLE_CENTRE * scale).toOffset(), scale) }

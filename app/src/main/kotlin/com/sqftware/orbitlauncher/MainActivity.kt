@@ -27,6 +27,7 @@ import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
+import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
 import com.sqftware.orbitlauncher.apps.PlatformLocationSource
 import com.sqftware.orbitlauncher.apps.PlayAppUpdates
 import com.sqftware.orbitlauncher.apps.ResourceMinimapArt
@@ -72,6 +73,7 @@ import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
@@ -146,6 +148,7 @@ class MainActivity : ComponentActivity() {
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
+        val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this)
         val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this))
@@ -260,29 +263,36 @@ class MainActivity : ComponentActivity() {
                 val unread by produceState(UnreadCounts()) {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { badges.counts().collect { value = it } }
                 }
-                // On only with the grant, which Settings may have taken back while the launcher was out of sight.
-                var showWhereIAm by remember { mutableStateOf(whereIAmStore.load() && location.isGranted()) }
-                fun changeShowWhereIAm(on: Boolean) {
-                    showWhereIAm = on
-                    whereIAmStore.save(on)
+                // On by default. Only picking a theme that maps, or the user's own tap, asks for the grant: a refusal, or a
+                // grant lost since, such as one allowed only once, leaves the emblem offering to ask again.
+                var whereIAm by remember {
+                    mutableStateOf(whereIAmStore.load().withGrant(location.isGranted()))
+                }
+                fun changeWhereIAm(to: WhereIAm) {
+                    whereIAm = to
+                    whereIAmStore.save(to)
+                }
+                fun showWhereIAm() {
+                    if (location.isGranted()) changeWhereIAm(WhereIAm.Shown) else location.request()
                 }
                 LaunchedEffect(Unit) {
                     location.answers().collect { granted ->
-                        if (granted) {
-                            changeShowWhereIAm(true)
-                        } else {
-                            noticeChannel.trySend("The map needs location access, which Settings can allow")
-                        }
+                        changeWhereIAm(WhereIAm.answered(granted))
+                        if (!granted) noticeChannel.trySend("The map needs location access, which Settings can allow")
                     }
                 }
-                // The map follows the user only while the launcher is visible, like the clock, and each return reads the
-                // grant again. The state outlives a change of key, so turning it off must drop the last map.
-                val mapping = showWhereIAm && shownTheme.mapsWhereIAm
+                // Each return reads the grant again, so one given in Settings, or lost while away, shows at once.
+                LaunchedEffect(Unit) {
+                    repeatOnLifecycle(Lifecycle.State.STARTED) { changeWhereIAm(whereIAm.withGrant(location.isGranted())) }
+                }
+                // The map follows the user only while the launcher is visible, like the clock. The state outlives a change
+                // of key, so turning it off must drop the last map.
+                val mapping = whereIAm == WhereIAm.Shown && shownTheme.mapsWhereIAm
                 val minimap = produceState<ImageBitmap?>(null, mapping) {
                     value = null
                     if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            if (location.isGranted()) liveMinimap.images().collect { value = it } else changeShowWhereIAm(false)
+                            if (location.isGranted()) liveMinimap.images().collect { value = it }
                         }
                     }
                 }
@@ -395,6 +405,7 @@ class MainActivity : ComponentActivity() {
                     onThemeChange = {
                         theme = it
                         themeStore.save(it)
+                        if (it.mapsWhereIAm && whereIAm.asksOnPick) showWhereIAm()
                     },
                     previewing = previewTheme != null,
                     onPreviewThemeChange = { previewTheme = it },
@@ -454,14 +465,9 @@ class MainActivity : ComponentActivity() {
                         checkForUpdates = it
                         updateCheckStore.save(it)
                     },
-                    showWhereIAm = showWhereIAm,
-                    onShowWhereIAmChange = { on ->
-                        when {
-                            !on -> changeShowWhereIAm(false)
-                            location.isGranted() -> changeShowWhereIAm(true)
-                            else -> location.request()
-                        }
-                    },
+                    whereIAm = whereIAm,
+                    onShowWhereIAmChange = { on -> if (on) showWhereIAm() else changeWhereIAm(WhereIAm.Hidden) },
+                    onOpenMapLicence = mapLicence::open,
                     minimap = readMinimap,
                     heading = readHeading,
                     isHomeApp = isHomeApp,

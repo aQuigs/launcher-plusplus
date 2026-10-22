@@ -41,7 +41,9 @@ interface LocationSource {
 
 private const val TAG = "PlatformLocationSource"
 private const val REQUEST_KEY = "location"
-private const val UPDATE_MILLIS = 60_000L
+// Often enough that the map keeps up with a car. The provider still works out a fix this often, but only while the
+// launcher is in sight; the distance gate spares the repaints.
+private const val UPDATE_MILLIS = 5_000L
 // Also how far a fix must be from the last map's centre for LiveMinimap to paint a new one.
 internal const val UPDATE_METRES = 50f
 
@@ -52,7 +54,7 @@ private const val FRESH_MILLIS = 10 * 60_000L
  * The platform's LocationManager, asking for precise location, since a coarse fix is snapped to a grid about 2 km wide and
  * puts the map on the wrong streets; a user who allows only an approximate place still gets a map, of roughly where they
  * are. It runs at balanced power: the last fix if it is fresh, or else one current fix, then updates no more often than
- * a minute or 50 m apart. No Play services: the launcher has no other use for them. The
+ * 5 s or 50 m apart. No Play services: the launcher has no other use for them. The
  * permission is asked through the activity's [registry], as the home role is; the adapter lives as long as the activity.
  */
 class PlatformLocationSource(private val context: Context, registry: ActivityResultRegistry) : LocationSource {
