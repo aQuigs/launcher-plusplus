@@ -130,11 +130,7 @@ interface ThemeArt {
     @Composable
     fun IconImage(bitmap: ImageBitmap, modifier: Modifier) = Image(bitmap, contentDescription = null, modifier = modifier)
 
-    /** Which corner of an icon its badge sits on. */
-    val badgeCorner: Alignment
-        get() = Alignment.TopEnd
-
-    /** The badge for [unread] notifications, or nothing for none: by default a bubble over the corner. */
+    /** The badge for [unread] notifications, placed over an icon's corner by [modifier]: by default a bubble. */
     @Composable
     fun BadgeFace(unread: Unread, modifier: Modifier) = BubbleBadge(unread, modifier)
 

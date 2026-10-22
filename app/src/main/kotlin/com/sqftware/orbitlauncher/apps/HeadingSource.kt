@@ -1,14 +1,11 @@
 package com.sqftware.orbitlauncher.apps
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.location.LocationManager
 import android.view.Surface
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -27,11 +24,10 @@ interface HeadingSource {
 /**
  * The rotation vector sensor, which fuses the magnetometer with the gyroscope, so the heading turns smoothly. The heading
  * is the way the top of the screen faces, in whichever way the display is turned, and is moved from magnetic north to
- * the true north a map is drawn to by the declination where the phone last had a fix.
+ * the true north a map is drawn to by the declination at the [location]'s last fix.
  */
-class SensorHeadingSource(private val context: Context) : HeadingSource {
+class SensorHeadingSource(private val context: Context, private val location: LocationSource) : HeadingSource {
     private val sensors = context.getSystemService(SensorManager::class.java)
-    private val locations = context.getSystemService(LocationManager::class.java)
 
     override fun headings(): Flow<Float> = callbackFlow {
         val sensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -65,12 +61,8 @@ class SensorHeadingSource(private val context: Context) : HeadingSource {
 
     /** How far true north is clockwise of magnetic north where the phone last had a fix, or none without one. */
     private fun declination(): Float {
-        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return 0f
-        val fix = try {
-            locations.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-        } catch (_: SecurityException) {
-            null
-        } ?: return 0f
-        return GeomagneticField(fix.latitude.toFloat(), fix.longitude.toFloat(), fix.altitude.toFloat(), System.currentTimeMillis()).declination
+        val fix = location.lastFix() ?: return 0f
+        // Sea level: the field barely changes with the height a phone is carried at.
+        return GeomagneticField(fix.lat.toFloat(), fix.lon.toFloat(), 0f, System.currentTimeMillis()).declination
     }
 }

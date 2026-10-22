@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -35,24 +36,20 @@ internal val BADGE_OVERHANG = 4.dp
 private val BADGE_RING = 2.dp
 
 /**
- * A bubble saying how many notifications are [unread], meant for an icon's top-end corner, or nothing for none. It is
+ * A bubble saying how many notifications are [unread], on the top-end corner of the icon it is in, or nothing for none. It is
  * filled when it holds some the user dismissed unread, which a double tap on an app clears, and a ring when all are
  * still in the shade, so a double tap is not tried where it does nothing. A folder's is filled when an app in it is.
  * The ring's fill is opaque, as it overlaps the icon and the digits must not hang on what is beneath.
  */
 @Composable
-fun UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
-    if (unread.count > 0) LocalThemeArt.current.BadgeFace(unread, modifier)
+fun BoxScope.UnreadBadge(unread: Unread, modifier: Modifier = Modifier) {
+    // Over the corner rather than inside it: a round icon has no room there.
+    if (unread.count > 0) LocalThemeArt.current.BadgeFace(unread, overCorner(modifier, top = true).testTag(BadgeTags.BUBBLE))
 }
 
-/** The corner of an icon its badge sits on, in the theme. */
-internal val badgeCorner: Alignment
-    @Composable get() = LocalThemeArt.current.badgeCorner
-
-/** [UnreadBadge] as most themes draw it: a ringed bubble over the corner. */
+/** [UnreadBadge] as most themes draw it: a ringed bubble. */
 @Composable
 internal fun BubbleBadge(unread: Unread, modifier: Modifier) {
-
     val colors = MaterialTheme.colorScheme
     Text(
         text = badgeText(unread.count),
@@ -61,21 +58,19 @@ internal fun BubbleBadge(unread: Unread, modifier: Modifier) {
         maxLines = 1,
         textAlign = TextAlign.Center,
         modifier = modifier
-            // Over the corner rather than inside it: a round icon has no room there.
-            .cornerBubble(top = true, fill = if (unread.dismissed) colors.error else LocalBoxColors.current.floating, edge = colors.error)
+            .ringed(fill = if (unread.dismissed) colors.error else LocalBoxColors.current.floating, edge = colors.error)
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
             .padding(horizontal = 5.dp)
-            .wrapContentHeight()
-            .testTag(BadgeTags.BUBBLE),
+            .wrapContentHeight(),
     )
 }
 
 /**
- * A briefcase on a work app, meant for its icon's bottom-end corner where the system's own work badge sits, or nothing
+ * A briefcase on a work app, on the bottom-end corner of the icon it is in, where the system's own work badge sits, or nothing
  * for an app of the user's own. Over the corner, as the round icon would cut the system's badge drawn into it.
  */
 @Composable
-fun WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
+fun BoxScope.WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
     if (!app.isWork) return
 
     val colors = MaterialTheme.colorScheme
@@ -83,8 +78,8 @@ fun WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
         imageVector = WorkGlyph,
         contentDescription = "Work",
         tint = colors.primary,
-        modifier = modifier
-            .cornerBubble(top = false, fill = LocalBoxColors.current.floating, edge = colors.primary)
+        modifier = overCorner(modifier, top = false)
+            .ringed(fill = LocalBoxColors.current.floating, edge = colors.primary)
             .size(18.dp)
             .padding(4.dp),
     )
@@ -105,10 +100,13 @@ fun PickedMark(modifier: Modifier = Modifier) {
     )
 }
 
-/** A ringed bubble reaching [BADGE_OVERHANG] past the top-end corner, or past the bottom-end one unless [top]. */
-private fun Modifier.cornerBubble(top: Boolean, fill: Color, edge: Color) =
-    offset(x = BADGE_OVERHANG, y = if (top) -BADGE_OVERHANG else BADGE_OVERHANG)
-        .background(fill, CircleShape)
+/** On the icon's top-end corner, or its bottom-end one unless [top], reaching [BADGE_OVERHANG] past it. */
+private fun BoxScope.overCorner(modifier: Modifier, top: Boolean) =
+    modifier.align(if (top) Alignment.TopEnd else Alignment.BottomEnd).offset(x = BADGE_OVERHANG, y = if (top) -BADGE_OVERHANG else BADGE_OVERHANG)
+
+/** A bubble of [fill] ringed in [edge]. */
+private fun Modifier.ringed(fill: Color, edge: Color) =
+    background(fill, CircleShape)
         .border(BADGE_RING, edge, CircleShape)
 
 /** This label for a screen reader, with how many [unread] when there are any. */

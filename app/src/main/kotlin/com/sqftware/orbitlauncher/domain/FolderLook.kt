@@ -86,7 +86,7 @@ enum class FolderLook(val label: String) {
     /** A hexagonal cell, its previews in its well. */
     HexCell("Hex cell"),
 
-    /** Its first four apps as game items, two by two, in an open orb. */
+    /** Its previews as game items in the game's orb. */
     Items("Items"),
 }
 

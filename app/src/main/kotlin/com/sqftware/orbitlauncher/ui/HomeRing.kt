@@ -152,6 +152,9 @@ private sealed interface Part {
     data class Folding(val index: Int) : Part
 }
 
+/** What the emblem says in place of its mark, and what a tap there does. */
+class RingHint(val label: String, val onTap: () -> Unit)
+
 /**
  * The [ring] of favourite apps and folders round an emblem, both drawn as the theme's [LocalThemeArt] draws them. Tap an
  * app to launch it or long-press it for its [menu]; tap a folder to open it or long-press it for its [folderMenu]; tap
@@ -172,9 +175,6 @@ private sealed interface Part {
  * name under it, kept clear of its neighbours, the emblem and the ring's box. The ring, or an open folder once its apps
  * are out, shows turned as far as [spin] says, which spins it only while nothing is on the move.
  */
-/** What the emblem says in place of its mark, and what a tap there does. */
-class RingHint(val label: String, val onTap: () -> Unit)
-
 @Composable
 fun HomeRing(
     ring: List<RingItem>,

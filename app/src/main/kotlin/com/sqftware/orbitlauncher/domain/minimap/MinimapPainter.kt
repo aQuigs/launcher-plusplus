@@ -31,7 +31,8 @@ private const val N = MINIMAP_SIZE
 private const val WALL = 0xFFEEEEEE.toInt()
 private const val DOOR = 0xFFEE0000.toInt()
 private const val RAIL = 0xFF3A3024.toInt()
-private const val GRASS_DARK = 0x698F24
+/** The grass's darker shade, as RGB. */
+const val GRASS_DARK = 0x698F24
 private const val GRASS_LIGHT = 0x718F24
 private const val WATER_BASE = 0xFF2E5596.toInt()
 private const val WATER_EDGE = 0xFF213E75.toInt()
@@ -83,13 +84,13 @@ private val DISC_PIXELS = DISC.count { it }
 /**
  * Paints the Old School minimap of a [MapScene]: a [MINIMAP_SIZE] px disc at [METRES_PER_PIXEL], built the way the game
  * builds its minimap. Every 4 px tile gets a flat ground colour; walls are 1 px lines round each structure with a few
- * doors; trees, map icons and the dots of people go on top. The self marker is left to whoever shows the map, so it
- * stays upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
+ * doors; trees and the dots of people go on top. The map icons and the self marker are left to whoever shows the map,
+ * so they stay upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
  * it moves.
  */
 class MinimapPainter(private val sprites: MinimapSprites) {
-    /** The disc: opaque inside the circle, clear outside it. */
-    fun paint(scene: MapScene): Pixels = Painting(scene, sprites).run()
+    /** The disc, opaque inside the circle and clear outside it, and where its icons go. */
+    fun paint(scene: MapScene): Minimap<Pixels> = Painting(scene, sprites).run()
 }
 
 private class Px(val x: Double, val y: Double)
@@ -118,7 +119,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 
     private fun pxRings(polygon: Polygon) = polygon.map { ring -> ring.map(::px) }
 
-    fun run(): Pixels {
+    fun run(): Minimap<Pixels> {
         // 1. footprints, whose cover says whether the place is built up
         val bid = IntArray(N * N)
         scene.buildings.forEachIndexed { i, b -> scanPolygon(pxRings(b.polygon)) { bid[it] = i + 1 } }
@@ -183,10 +184,11 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 
         paintDoors(walls, comp)
         paintTrees()
-        paintNpcs(paintIcons())
+        val icons = placeIcons()
+        paintNpcs(icons)
 
         for (i in 0 until N * N) if (!DISC[i]) img[i] = 0
-        return Pixels(N, N, img)
+        return Minimap(Pixels(N, N, img), icons)
     }
 
     private fun groundOf(kind: WayKind) = when (kind) {
@@ -386,8 +388,8 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 
     private class Candidate(val distance: Double, val at: Px, val icon: MapIcon, val sprite: Pixels)
 
-    /** Map icons decluttered by priority, then by nearness to the centre. Returns where they went. */
-    private fun paintIcons(): List<Px> {
+    /** Map icons decluttered by priority, then by nearness to the centre. */
+    private fun placeIcons(): List<MapMark<Pixels>> {
         val candidates = scene.pois.mapNotNull { poi ->
             val icon = poi.icon ?: return@mapNotNull null
             val sprite = sprites.icons[icon] ?: return@mapNotNull null
@@ -403,12 +405,11 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             icons += cand
             perKind[cand.icon] = (perKind[cand.icon] ?: 0) + 1
         }
-        icons.forEach { blit(it.sprite, it.at.x.toInt() - it.sprite.width / 2, it.at.y.toInt() - it.sprite.height / 2) }
-        return icons.map { it.at }
+        return icons.map { MapMark(it.sprite, it.at.x.toFloat(), it.at.y.toFloat()) }
     }
 
     /** Yellow dots where the map has someone to meet; the white self marker stays the only white mark. */
-    private fun paintNpcs(icons: List<Px>) {
+    private fun paintNpcs(icons: List<MapMark<Pixels>>) {
         val sprite = sprites.npc ?: return
         val dots = mutableListOf<Pair<Int, Int>>()
         // Nearest first, so which people make the cap does not depend on the order they came in.
@@ -419,7 +420,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             val d = hypot(x - C, y - C)
             if (d > RADIUS - 4 || d < 5) continue
             if (dots.size >= MAX_NPCS || dots.any { (a, b) -> abs(x - a) < 5 && abs(y - b) < 5 }) continue
-            if (icons.any { hypot(x - it.x, y - it.y) < 9 }) continue
+            if (icons.any { hypot(x - it.x.toDouble(), y - it.y.toDouble()) < 9 }) continue
             dots += x to y
         }
         dots.forEach { (x, y) -> blit(sprite, x - sprite.width / 2, y - sprite.height / 2) }

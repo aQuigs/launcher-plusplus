@@ -339,9 +339,20 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onSearch
         onSearch,
         modifier
             // The placeholder goes once there is text, and a screen reader should still say what the field is for.
-            .semantics { contentDescription = "Search apps" }
+            .semantics { contentDescription = SEARCH_PLACEHOLDER }
             .testTag(AppDrawerTags.SEARCH),
     )
+
+/** What the drawer's search field asks for, shown until there is text and read out always. */
+internal const val SEARCH_PLACEHOLDER = "Search apps"
+
+/** The button that empties the search, there once there is a [query], its [face] in the theme's look. */
+@Composable
+internal fun ClearSearchButton(query: String, onQueryChange: (String) -> Unit, face: @Composable () -> Unit) {
+    if (query.isNotEmpty()) {
+        IconButton(onClick = { onQueryChange("") }, modifier = Modifier.semantics { contentDescription = "Clear the search" }) { face() }
+    }
+}
 
 /** The drawer's search field as most themes draw it: Material's outlined field, rounded at the ends. */
 @Composable
@@ -349,13 +360,9 @@ internal fun PlainSearchField(query: String, onQueryChange: (String) -> Unit, on
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        placeholder = { Text("Search apps") },
+        placeholder = { Text(SEARCH_PLACEHOLDER) },
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Clear, contentDescription = "Clear the search") }
-            }
-        },
+        trailingIcon = { ClearSearchButton(query, onQueryChange) { Icon(Icons.Default.Clear, contentDescription = null) } },
         singleLine = true,
         shape = CircleShape,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -540,7 +547,7 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
     ) {
         Box(Modifier.size(GRID_ICON_SIZE)) {
             AppFace(app, entry.icon, Modifier.fillMaxSize())
-            UnreadBadge(unread, Modifier.align(badgeCorner).clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
+            UnreadBadge(unread, Modifier.clearAndSetSemantics { text = AnnotatedString("${unread.count} unread") })
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {
                     PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))

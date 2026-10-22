@@ -1,9 +1,9 @@
 package com.sqftware.orbitlauncher.ui.theme
 
-import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
-import com.sqftware.orbitlauncher.domain.CardColour
-import com.sqftware.orbitlauncher.domain.Colourway
+import androidx.compose.material3.ColorScheme
+import com.sqftware.orbitlauncher.domain.minimap.GRASS_DARK
+import com.sqftware.orbitlauncher.domain.opaque
 
 // The game's interface: its chatbox parchment by day, and by night a shade under its bank brown, with cream text so the
 // scheme's dimmed text still reads on the glass, its yellow for what is lit and the orange of a menu's target. What is
@@ -14,6 +14,14 @@ private val Cream = Color(0xFFF2E8CC)
 private val Yellow = Color(0xFFFFFF00)
 private val Target = Color(0xFFFF9040)
 
+/**
+ * The bank's brown ground, the panel texture's own colour, which the card draws under the texture. The bank's text is in
+ * the night scheme whatever the wallpaper, its [BankDimText] the parchment rather than the night's mist, which a card
+ * colour's wash would leave too dim; the wash is a card colour's hue, faint enough that the text reads on it.
+ */
+val BankGround = Color(0xFF3E3429)
+val BankDimText = Parchment
+
 internal val OldSchoolPalette = Palette(
     deep = Bank,
     accent = Yellow,
@@ -23,6 +31,7 @@ internal val OldSchoolPalette = Palette(
     alarm = Color(0xFFFF8C8C),
     frost = Parchment,
     ringMark = Color(0xFFEEEEEE),
+    cards = CardTints.ground(BankGround, alpha = 0.25f, text = listOf(Cream, BankDimText)),
 )
 
 /**
@@ -49,21 +58,14 @@ val GameOrange = Color(0xFFFF981F)
 val ChatTypedNight = Color(0xFF9090FF)
 val ChatTypedDay = Color(0xFF0000FF)
 
-/**
- * The bank: its brown ground, the panel texture's own colour, which the card draws under the texture; and its colours,
- * the night scheme's whatever the wallpaper, as the bank is dark in the game by day as well. Its dimmer text is the
- * parchment rather than the night's mist, which a card colour's wash would leave too dim.
- */
-val BankGround = Color(0xFF3E3429)
-val BankColors: ColorScheme = lookOf(Colourway.Classic, lightWallpaper = false).colors.copy(onSurfaceVariant = Parchment)
+/** The game's menu in the night scheme: its verbs in white and its targets in orange. */
+val MenuRoles: ColorScheme.() -> ColorScheme = { copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget) }
 
-/** What a card [colour] washes the bank's ground in, over the texture: its hue, faint enough that the bank's text reads on it. */
-fun bankTint(colour: CardColour): Color = colour.hue?.copy(alpha = BANK_TINT) ?: Color.Transparent
-
-private const val BANK_TINT = 0.25f
+/** The bank in the night scheme, its dimmed text in [BankDimText]. */
+val BankRoles: ColorScheme.() -> ColorScheme = { copy(onSurfaceVariant = BankDimText) }
 
 /** What shows through the minimap's frame before the map has loaded: the game's grass. */
-val MinimapGrass = Color(0xFF698F24)
+val MinimapGrass = Color(opaque(GRASS_DARK))
 
 /** The player's own square at the minimap's middle, outlined so it shows on a white wall. */
 val MinimapSelf = Color.White

@@ -49,6 +49,12 @@ enum class Theme(
     ;
 
     fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)
+
+    /** Whether the user has a folder look to choose, which a theme with one has not. */
+    val choosesFolderLook: Boolean get() = folderLooks.size > 1
+
+    /** Whether the user has a colourway to choose, which a theme with one has not. */
+    val choosesColourway: Boolean get() = colourways.size > 1
 }
 
 /**

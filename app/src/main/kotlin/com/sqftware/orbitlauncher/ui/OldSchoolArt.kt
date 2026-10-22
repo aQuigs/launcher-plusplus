@@ -1,10 +1,8 @@
 package com.sqftware.orbitlauncher.ui
 
 import com.sqftware.orbitlauncher.domain.Colourway
-import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
 import com.sqftware.orbitlauncher.domain.ITEM_HEIGHT
 import com.sqftware.orbitlauncher.domain.ITEM_WIDTH
-import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.toOffset
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.TransformOrigin
@@ -18,8 +16,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.PathOperation
-import androidx.compose.material3.ripple
-import androidx.compose.foundation.indication
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.annotation.DrawableRes
@@ -27,8 +23,6 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,15 +42,15 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.sqftware.orbitlauncher.domain.CardColour
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -70,19 +64,17 @@ import androidx.compose.ui.unit.IntRect
 import com.sqftware.orbitlauncher.ui.theme.ChatTypedDay
 import com.sqftware.orbitlauncher.ui.theme.ChatTypedNight
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
-import com.sqftware.orbitlauncher.ui.theme.MenuTarget
 import com.sqftware.orbitlauncher.ui.theme.MenuVerb
 import com.sqftware.orbitlauncher.ui.theme.MenuLine
+import com.sqftware.orbitlauncher.ui.theme.MenuRoles
 import com.sqftware.orbitlauncher.ui.theme.MenuGround
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
@@ -109,8 +101,10 @@ import androidx.compose.ui.unit.IntSize
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
+import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.ui.theme.GameShadow
 import com.sqftware.orbitlauncher.ui.theme.gameTypography
 import com.sqftware.orbitlauncher.ui.theme.MinimapGrass
@@ -118,9 +112,11 @@ import com.sqftware.orbitlauncher.ui.theme.MinimapSelf
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelfEdge
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.StackCount
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 /** How many of the game's pixels wide the screen is: the mobile client's portrait width, which sets how big one is. */
 private const val GAME_WIDTH = 270
@@ -135,7 +131,7 @@ internal val gamePixel: Int
  * drawn to, inside the socket's rim, which covers its edge, and the radius of the socket's outer edge.
  */
 private val FRAME_HOLE_CENTRE = IntOffset(100, 84)
-private const val MAP_RADIUS = 76
+private const val MAP_RADIUS = MINIMAP_SIZE / 2
 private const val FRAME_RADIUS = 82
 private val COMPASS_CENTRE = IntOffset(22, 22)
 private const val COMPASS_RADIUS = 20
@@ -182,7 +178,6 @@ private const val ORB_RADIUS = 17
  */
 private const val STONE_FACE = 31
 private const val STONE_PITCH = 33
-private const val STONE_HEIGHT = 36
 private const val END_STONE = 38
 
 /** The quill digits of the game's clock, '0' to '9' and ':', each a sprite of the cache's quill font. */
@@ -198,7 +193,7 @@ private const val CLOCK_SCALE = 2
 /**
  * Old School: an homage to the old game's interface, drawn from its own sprites at whole game pixels. The emblem is the
  * minimap in its frame with the compass, the ring's apps sit in its round orbs, every app is one of its items, a
- * folder shows its first four items at half size and opens round the minimap, badges are hitsplats, and text is in its fonts.
+ * folder shows its previews in an orb and opens round the minimap, badges are hitsplats, and text is in its fonts.
  */
 object OldSchoolArt : ThemeArt {
     override val hintInk: Color
@@ -240,8 +235,24 @@ object OldSchoolArt : ThemeArt {
                     .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                     .drawBehind {
                         val scale = mapScale(size, px)
-                        map()?.let { drawSpriteCentred(it, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
+                        map()?.let { drawSpriteCentred(it.disc, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
                     },
+            )
+            // Each icon goes round with the map but stays upright, as the game keeps them: placed by hand rather than
+            // turned back on a turned canvas, so its pixels land whole on the screen's, in a layer of its own, so a turn
+            // draws only the icons again.
+            Spacer(
+                Modifier.matchParentSize().graphicsLayer().drawBehind {
+                    val minimap = map()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
+                    val scale = mapScale(size, px)
+                    val turn = Math.toRadians(-(heading() ?: 0f).toDouble())
+                    val (cos, sin) = cos(turn).toFloat() to sin(turn).toFloat()
+                    minimap.icons.forEach { icon ->
+                        val dx = (icon.x - MAP_RADIUS) * scale
+                        val dy = (icon.y - MAP_RADIUS) * scale
+                        drawSpriteCentred(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos), scale)
+                    }
+                },
             )
             // Under the frame, whose socket's own pixels edge it.
             Spacer(
@@ -302,27 +313,7 @@ object OldSchoolArt : ThemeArt {
         modifier: Modifier,
         presses: InteractionSource?,
         inner: () -> Float,
-    ) {
-        // On the ring, its cells in the room one item takes, so even a folder of one shows a quarter-size item and is told
-        // from an app; elsewhere, all the folder's room.
-        val room = if (LocalIconPlace.current == IconPlace.Ring) {
-            with(LocalDensity.current) { Modifier.size((ITEM_FIT * gamePixel).toDp()) }
-        } else {
-            Modifier.fillMaxSize()
-        }
-        ItemGround(presses, modifier) {
-            Column(room.graphicsLayer { alpha = inner() }) {
-                repeat(FOLDER_SIDE) { row ->
-                    Row(Modifier.weight(1f)) {
-                        repeat(FOLDER_SIDE) { column ->
-                            val cell = Modifier.weight(1f).fillMaxHeight()
-                            folder.apps.getOrNull(row * FOLDER_SIDE + column)?.let { AppImage(it, icon, cell) } ?: Spacer(cell)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    ) = FolderDisc(folder, icon, presses, inner, modifier)
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = Unit
 
@@ -373,14 +364,10 @@ object OldSchoolArt : ThemeArt {
                         Box(Modifier.weight(1f, fill = false)) { field() }
                         if (focused) Text("*", style = style, color = typed)
                         if (query.isEmpty()) {
-                            Text("Search apps", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            Text(SEARCH_PLACEHOLDER, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
                     }
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { onQueryChange("") }) {
-                            SpriteImage(clear, px, Modifier.semantics { contentDescription = "Clear the search" })
-                        }
-                    }
+                    ClearSearchButton(query, onQueryChange) { SpriteImage(clear, px) }
                 }
             },
         )
@@ -392,25 +379,21 @@ object OldSchoolArt : ThemeArt {
         val stone = sprite(R.drawable.osrs_3051_0)
         val sunk = sprite(R.drawable.osrs_3053_0)
         val px = gamePixel
-        with(LocalDensity.current) {
-            Row(modifier, horizontalArrangement = Arrangement.spacedBy(px.toDp())) {
-                choices.forEach { choice ->
-                    val face = if (choice.selected) sunk else stone
-                    Box(
-                        Modifier
-                            .selectable(choice.selected, role = Role.Tab, onClick = choice.onSelect)
-                            .then(choice.modifier)
-                            .size((face.width * px).toDp(), (face.height * px).toDp())
-                            .drawBehind { drawSprite(face, Offset.Zero, px) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            choice.label,
-                            color = if (choice.selected) GameOrange else MenuVerb,
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                        )
-                    }
+        Row(modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(px.asDp())) {
+            choices.forEach { choice ->
+                Box(
+                    Modifier
+                        .selectable(choice.selected, role = Role.RadioButton, onClick = choice.onSelect)
+                        .then(choice.modifier)
+                        .spriteSized(if (choice.selected) sunk else stone, px),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        choice.label,
+                        color = if (choice.selected) GameOrange else MenuVerb,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
                 }
             }
         }
@@ -423,7 +406,9 @@ object OldSchoolArt : ThemeArt {
         contentAlignment: Alignment,
         content: @Composable BoxScope.() -> Unit,
     ) {
-        ItemGround(presses, modifier, contentAlignment, content)
+        // On the ring, the game's orb; elsewhere nothing. The ripple is unbounded, so it never clips the item's pixels.
+        val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
+        Box(modifier.then(ground).ripples(presses, bounded = false), contentAlignment = contentAlignment, content = content)
     }
 
     /**
@@ -432,7 +417,7 @@ object OldSchoolArt : ThemeArt {
      */
     @Composable
     override fun IconImage(bitmap: ImageBitmap, modifier: Modifier) {
-        if (bitmap.width > ITEM_WIDTH || bitmap.height > ITEM_HEIGHT) return Image(bitmap, contentDescription = null, modifier = modifier)
+        if (bitmap.width > ITEM_WIDTH || bitmap.height > ITEM_HEIGHT) return super.IconImage(bitmap, modifier)
         val px = gamePixel
         Spacer(modifier.drawBehind { drawSpriteCentred(bitmap, center, fitScale(size.minDimension, ITEM_FIT, px)) })
     }
@@ -440,12 +425,12 @@ object OldSchoolArt : ThemeArt {
     /**
      * A hitsplat with the count on it, as the game marks a hit: blue, the game's splat for a hit that did no harm, while
      * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread. Half the
-     * game's size and over the corner, as the other themes' bubbles are, so the item stays in sight.
+     * game's size, so the item stays in sight.
      */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
         val splat = sprite(if (unread.dismissed) R.drawable.osrs_1359_0 else R.drawable.osrs_1358_0)
-        Box(modifier.offset(x = BADGE_OVERHANG, y = -BADGE_OVERHANG).testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
+        Box(modifier, contentAlignment = Alignment.Center) {
             SpriteImage(splat, max(1, gamePixel / 2))
             Text(badgeText(unread.count), color = HitsplatCount, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
@@ -466,7 +451,7 @@ object OldSchoolArt : ThemeArt {
 
     /** A dock icon is as wide as a tab stone's face, so the stones meet as the game's row does. */
     override val dockIconSize: Dp
-        @Composable get() = (STONE_FACE * gamePixel).dp()
+        @Composable get() = (STONE_FACE * gamePixel).asDp()
 
     override val dockIconFill: Float
         get() = STONE_FACE.toFloat() / STONE_PITCH
@@ -484,16 +469,17 @@ object OldSchoolArt : ThemeArt {
         return { slots ->
             val count = slots.starts.size
             val scale = fitScale(slots.iconSize, STONE_FACE.toFloat(), px)
-            val top = size.height / 2 - STONE_HEIGHT * scale / 2f
+            val middle = size.height / 2
+            val top = middle - stone.height * scale / 2f
             slots.starts.forEachIndexed { index, start ->
                 val centre = start + slots.iconSize / 2
                 val half = STONE_PITCH * scale / 2f
                 when {
-                    count == 1 || index in 1 until count - 1 -> drawSprite(stone, Offset(centre - stone.width * scale / 2f, top), scale)
+                    count == 1 || index in 1 until count - 1 -> drawSpriteCentred(stone, Offset(centre, middle), scale)
                     index == 0 -> drawSpritePart(row, IntRect(0, 0, END_STONE, row.height), Offset(centre + half - END_STONE * scale, top), scale)
                     else -> drawSpritePart(row, IntRect(row.width - END_STONE, 0, row.width, row.height), Offset(centre - half, top), scale)
                 }
-                if (slots.glow > 0f) drawSprite(lit, Offset(centre - lit.width * scale / 2f, top), scale, alpha = slots.glow * 0.7f)
+                if (slots.glow > 0f) drawSpriteCentred(lit, Offset(centre, middle), scale, alpha = slots.glow * 0.7f)
             }
         }
     }
@@ -507,7 +493,7 @@ object OldSchoolArt : ThemeArt {
     override fun menuBox(ground: PanelGround): Modifier = Modifier.background(MenuGround)
 
     override val menuRim: BorderStroke
-        @Composable get() = BorderStroke(gamePixel.dp(), MenuGround)
+        @Composable get() = BorderStroke(gamePixel.asDp(), MenuGround)
 
     /** The "Choose Option" bar tops the box, as the game's does. */
     override val menuPadding: Dp
@@ -536,7 +522,7 @@ object OldSchoolArt : ThemeArt {
 
     /** The game's stone-framed interface box, rimmed in black outside the menu's brown, a game pixel each. */
     @Composable
-    override fun dialogBox(ground: PanelGround): Modifier = Modifier.gameRim(gamePixel).solidGround(ground, RectangleShape)
+    override fun dialogBox(ground: PanelGround): Modifier = Modifier.gameRim(gamePixel).then(super.dialogBox(ground))
 
     /**
      * "Choose Option" in the box's brown on a black bar, over the items in a black line, which are in white with any
@@ -544,7 +530,7 @@ object OldSchoolArt : ThemeArt {
      */
     @Composable
     override fun MenuBody(content: @Composable () -> Unit) {
-        Column(Modifier.padding(gamePixel.dp())) {
+        Column(Modifier.padding(gamePixel.asDp())) {
             Text(
                 "Choose Option",
                 color = MenuGround,
@@ -555,10 +541,8 @@ object OldSchoolArt : ThemeArt {
                     .padding(horizontal = 12.dp, vertical = 4.dp)
                     .semantics { hideFromAccessibility() },
             )
-            Column(Modifier.border(gamePixel.dp(), MenuLine)) {
-                LauncherTheme(Colourway.Classic, lightWallpaper = false, typography(day = false), MaterialTheme.shapes) {
-                    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
-                }
+            Column(Modifier.border(gamePixel.asDp(), MenuLine)) {
+                GameNight(MenuRoles) { content() }
             }
         }
     }
@@ -580,9 +564,6 @@ private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it
 /** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
 private const val ITEM_FIT = 28f
 
-/** How many cells across and down a folder shows its first items in. */
-private const val FOLDER_SIDE = 2
-
 /** Each sprite decoded once for the whole launcher, not once for every badge, orb and frame that shows it. */
 private val sprites = mutableMapOf<Int, ImageBitmap>()
 
@@ -594,23 +575,25 @@ internal fun sprite(@DrawableRes id: Int): ImageBitmap {
 
 /** [image] at [scale], taking the room it is drawn in. */
 @Composable
-private fun SpriteImage(image: ImageBitmap, scale: Int, modifier: Modifier = Modifier) {
-    with(LocalDensity.current) {
-        Spacer(modifier.size((image.width * scale).toDp(), (image.height * scale).toDp()).drawBehind { drawSprite(image, Offset.Zero, scale) })
-    }
-}
+private fun SpriteImage(image: ImageBitmap, scale: Int, modifier: Modifier = Modifier) = Spacer(modifier.spriteSized(image, scale))
+
+/** The size of [image] at [scale], with the image drawn behind from the top left. */
+@Composable
+internal fun Modifier.spriteSized(image: ImageBitmap, scale: Int): Modifier =
+    size((image.width * scale).asDp(), (image.height * scale).asDp()).drawBehind { drawSprite(image, Offset.Zero, scale) }
 
 /** The night scheme, whose light text reads on the game's dark stone; by day the panels are its chatbox's parchment. */
 private val onStone: Boolean
     @Composable get() = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
 
+/** These screen pixels in dp. */
 @Composable
-private fun Int.dp() = with(LocalDensity.current) { toDp() }
+internal fun Int.asDp() = with(LocalDensity.current) { toDp() }
 
 /** The rim of the game's interface boxes: black outside the menu's brown, [px] screen pixels each. */
 @Composable
 private fun Modifier.gameRim(px: Int): Modifier {
-    val rim = px.dp()
+    val rim = px.asDp()
     return border(rim, GameShadow).padding(rim).border(rim, MenuGround)
 }
 
@@ -622,9 +605,18 @@ private val PARCHMENT = IntRect(left = 20, top = 17, right = 513, bottom = 136)
 
 /**
  * The [part] of [image] over [size] from [topLeft] at [alpha], each of its pixels [px] screen pixels, in tiles from
- * the drawing's origin so the parts of one panel line up, each mirroring the one before so they meet without a seam.
+ * the drawing's origin so the parts of one panel line up, each mirroring the one before so they meet without a seam
+ * unless the image tiles by itself and not [mirror].
  */
-private fun DrawScope.drawTiled(image: ImageBitmap, part: IntRect, px: Int, alpha: Float, topLeft: Offset, size: Size) {
+internal fun DrawScope.drawTiled(
+    image: ImageBitmap,
+    part: IntRect = IntRect(0, 0, image.width, image.height),
+    px: Int,
+    alpha: Float = 1f,
+    topLeft: Offset = Offset.Zero,
+    size: Size = this.size,
+    mirror: Boolean = true,
+) {
     val tile = IntSize(part.width * px, part.height * px)
     val bottomRight = topLeft + Offset(size.width, size.height)
     clipRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y) {
@@ -632,16 +624,24 @@ private fun DrawScope.drawTiled(image: ImageBitmap, part: IntRect, px: Int, alph
             for (column in floor(topLeft.x / tile.width).toInt()..floor(bottomRight.x / tile.width).toInt()) {
                 val at = IntOffset(column * tile.width, row * tile.height)
                 val centre = Offset(at.x + tile.width / 2f, at.y + tile.height / 2f)
-                withTransform({ scale(if (column.mod(2) == 0) 1f else -1f, if (row.mod(2) == 0) 1f else -1f, centre) }) {
-                    drawImage(image, part.topLeft, part.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
+                withTransform({ scale(if (!mirror || column.mod(2) == 0) 1f else -1f, if (!mirror || row.mod(2) == 0) 1f else -1f, centre) }) {
+                    drawSpritePart(image, part, at.toOffset(), px, alpha = alpha)
                 }
             }
         }
     }
 }
 
-/** The ripple of a press on an icon, unbounded, so it never clips the item's pixels. */
-private fun Modifier.pressed(presses: InteractionSource?) = if (presses == null) this else indication(presses, ripple(bounded = false))
+/**
+ * [content] in Old School's night look whatever the wallpaper, as the game's menu and bank are dark by day too, with
+ * its [roles] changed.
+ */
+@Composable
+internal fun GameNight(roles: ColorScheme.() -> ColorScheme = { this }, content: @Composable () -> Unit) =
+    Themed(Theme.OldSchool, Colourway.Classic, lightWallpaper = false) {
+        val night = MaterialTheme.colorScheme
+        MaterialTheme(colorScheme = remember(night, roles) { night.roles() }, content = content)
+    }
 
 /** The largest whole scale, from one to [most], at which [units] of the game's pixels fit in [room] screen pixels. */
 internal fun fitScale(room: Float, units: Float, most: Int) = max(1, min(most, floor(room / units).toInt()))
@@ -651,10 +651,10 @@ internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: In
     drawSpritePart(image, IntRect(0, 0, image.width, image.height), topLeft, scale, tint, alpha)
 
 /** [image] as [drawSprite] draws it, centred on [centre]. */
-internal fun DrawScope.drawSpriteCentred(image: ImageBitmap, centre: Offset, scale: Int) =
-    drawSprite(image, centre - Offset(image.width.toFloat(), image.height.toFloat()) * (scale / 2f), scale)
+internal fun DrawScope.drawSpriteCentred(image: ImageBitmap, centre: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
+    drawSprite(image, centre - Offset(image.width.toFloat(), image.height.toFloat()) * (scale / 2f), scale, tint, alpha)
 
-/** The part [from] of [image], drawn as [drawSprite] draws the whole. */
+/** The part [from] of [image], drawn as [drawSprite] draws the whole, or stretched to [dstSize]. */
 internal fun DrawScope.drawSpritePart(
     image: ImageBitmap,
     from: IntRect,
@@ -662,30 +662,17 @@ internal fun DrawScope.drawSpritePart(
     scale: Int,
     tint: Color? = null,
     alpha: Float = 1f,
+    dstSize: IntSize = IntSize(from.width * scale, from.height * scale),
 ) = drawImage(
     image,
     srcOffset = from.topLeft,
     srcSize = from.size,
     dstOffset = IntOffset(topLeft.x.toInt(), topLeft.y.toInt()),
-    dstSize = IntSize(from.width * scale, from.height * scale),
+    dstSize = dstSize,
     alpha = alpha,
     colorFilter = tint?.let { ColorFilter.tint(it) },
     filterQuality = FilterQuality.None,
 )
-
-private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)
-
-/** What an item sits on: on the ring, the game's round orb, and elsewhere nothing. */
-@Composable
-private fun ItemGround(
-    presses: InteractionSource?,
-    modifier: Modifier,
-    contentAlignment: Alignment = Alignment.Center,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
-    Box(modifier.then(ground).pressed(presses), contentAlignment = contentAlignment, content = content)
-}
 
 /**
  * The game's round orb behind what is drawn here, filled with the brown of its right-click menu rather than the orb's
@@ -698,10 +685,9 @@ private fun Modifier.orb(): Modifier {
     val px = gamePixel
     return drawWithCache {
         val orb = circle(size.center, ORB_RADIUS * px)
-        val fillAt = size.center - Offset(fill.width.toFloat(), fill.height.toFloat()) * (px / 2f)
         onDrawBehind {
             clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
-            drawSprite(fill, fillAt, px, tint = MenuGround)
+            drawSpriteCentred(fill, center, px, tint = MenuGround)
         }
     }
 }
@@ -722,20 +708,18 @@ private fun QuillLine(text: String, digits: List<ImageBitmap>, px: Int) {
     val width = glyphs.sumOf { inks[it].last - inks[it].first + QUILL_GAP } * px
     val height = (digits.first().height + 1) * px
     val shadow = px / CLOCK_SCALE
-    with(LocalDensity.current) {
-        Spacer(
-            Modifier.size(width.toDp(), height.toDp()).drawBehind {
-                var x = 0
-                glyphs.forEach { index ->
-                    val ink = inks[index]
-                    val at = Offset(((x - ink.first) * px).toFloat(), 0f)
-                    drawSprite(digits[index], at + Offset(shadow.toFloat(), shadow.toFloat()), px, GameShadow)
-                    drawSprite(digits[index], at, px, StackCount)
-                    x += ink.last - ink.first + QUILL_GAP
-                }
-            },
-        )
-    }
+    Spacer(
+        Modifier.size(width.asDp(), height.asDp()).drawBehind {
+            var x = 0
+            glyphs.forEach { index ->
+                val ink = inks[index]
+                val at = Offset(((x - ink.first) * px).toFloat(), 0f)
+                drawSprite(digits[index], at + Offset(shadow.toFloat(), shadow.toFloat()), px, GameShadow)
+                drawSprite(digits[index], at, px, StackCount)
+                x += ink.last - ink.first + QUILL_GAP
+            }
+        },
+    )
 }
 
 /** The pixels between two quill glyphs, as the game sets them. */
@@ -748,3 +732,6 @@ private fun inkColumns(glyph: ImageBitmap): IntRange {
     val inked = (0 until glyph.width).filter { x -> (0 until glyph.height).any { y -> argb[y * glyph.width + x] ushr 24 != 0 } }
     return if (inked.isEmpty()) 0..2 else inked.first()..inked.last()
 }
+
+/** Each whole game pixel of a sprite offset as [scale] screen pixels. */
+private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)

@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
@@ -84,7 +83,7 @@ fun AppIcon(
     ) {
         AppFace(app, icon, Modifier.fillMaxSize(), presses)
         menu?.content?.invoke(app)
-        UnreadBadge(unread, Modifier.align(badgeCorner))
+        UnreadBadge(unread)
         nameRoom?.let { HangingName(app.label, it) }
     }
 }
@@ -167,18 +166,22 @@ internal fun PlainIconGround(
         modifier
             .clip(CircleShape)
             .background(LocalBoxColors.current.on(LocalGround.current))
-            .then(if (presses != null) Modifier.indication(presses, ripple()) else Modifier),
+            .ripples(presses),
         contentAlignment = contentAlignment,
         content = content,
     )
 }
+
+/** A ripple for [presses] on an icon's ground, kept inside its bounds unless not [bounded]; none without presses. */
+internal fun Modifier.ripples(presses: InteractionSource?, bounded: Boolean = true) =
+    if (presses == null) this else indication(presses, ripple(bounded = bounded))
 
 /** An app's image on its [IconDisc], rippling for [presses], and over the disc's corner the [WorkMark] of a work app. */
 @Composable
 fun AppFace(app: AppEntry, icon: IconLoader, modifier: Modifier = Modifier, presses: InteractionSource? = null) {
     Box(modifier) {
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
-        WorkMark(app, Modifier.align(Alignment.BottomEnd))
+        WorkMark(app)
     }
 }
 

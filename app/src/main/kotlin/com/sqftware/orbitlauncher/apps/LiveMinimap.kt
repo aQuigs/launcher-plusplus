@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.MapTiles
+import com.sqftware.orbitlauncher.domain.minimap.Minimap
 import com.sqftware.orbitlauncher.domain.minimap.MinimapMaker
 import com.sqftware.orbitlauncher.domain.minimap.WebMercator
 import com.sqftware.orbitlauncher.domain.minimap.paintRetryDelay
@@ -26,31 +27,31 @@ class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: Mi
     // A paint runs on past its collection's end until it next suspends, so a collection restarted at once would share
     // the maker with it.
     private val painting = Mutex()
-    private var shown: Pair<LatLon, ImageBitmap>? = null
+    private var shown: Pair<LatLon, Minimap<ImageBitmap>>? = null
 
     /**
-     * A new [MINIMAP_SIZE] px disc each time the user moves far enough for a new fix, once the tiles it needs are to
-     * be had. Collect it only while the launcher is visible: it keeps location updates running while collected.
+     * A new map, its [MINIMAP_SIZE] px disc and its icons, each time the user moves far enough for a new fix, once the
+     * tiles it needs are to be had. Collect it only while the launcher is visible: it keeps location updates running while collected.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun images(): Flow<ImageBitmap> = location.locations()
+    fun maps(): Flow<Minimap<ImageBitmap>> = location.locations()
         .mapLatest { centre ->
             // Nothing else comes until the user moves on, so a tile not to be had yet is asked for again; a new fix
             // cancels the wait.
             var retry = 0
-            var image = paint(centre)
-            while (image == null) {
+            var map = paint(centre)
+            while (map == null) {
                 delay(paintRetryDelay(retry++))
-                image = paint(centre)
+                map = paint(centre)
             }
-            image
+            map
         }
         .flowOn(Dispatchers.Default)
 
     // A fix within the update distance of the last map's centre, such as the first fix on a return home, keeps that map.
-    private suspend fun paint(centre: LatLon): ImageBitmap? = painting.withLock {
-        shown?.let { (at, image) -> if (WebMercator.groundDistance(at, centre) < UPDATE_METRES) return@withLock image }
-        val disc = maker.paint(centre) ?: return@withLock null
-        disc.toImageBitmap().also { shown = centre to it }
+    private suspend fun paint(centre: LatLon): Minimap<ImageBitmap>? = painting.withLock {
+        shown?.let { (at, map) -> if (WebMercator.groundDistance(at, centre) < UPDATE_METRES) return@withLock map }
+        val map = maker.paint(centre) ?: return@withLock null
+        map.map { it.toImageBitmap() }.also { shown = centre to it }
     }
 }

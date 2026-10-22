@@ -86,8 +86,8 @@ fun ThemePreviewBar(
             }
             ChipRow { ChoiceChips(Theme.entries, shown, Theme::label, onShow) }
             // One row for both, so the bar is no taller than the clock whose room it takes; a choice of one is left out.
-            val looks = shown.folderLooks.size > 1
-            val colourways = shown.colourways.size > 1
+            val looks = shown.choosesFolderLook
+            val colourways = shown.choosesColourway
             if (looks || colourways) {
                 ChipRow {
                     if (looks) ChoiceChips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)

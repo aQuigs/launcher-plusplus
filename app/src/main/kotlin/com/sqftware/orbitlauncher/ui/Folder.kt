@@ -121,7 +121,7 @@ fun FolderIcon(
     ) {
         LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses) { 1f }
         menu?.content?.invoke(folder)
-        UnreadBadge(unread, Modifier.align(badgeCorner))
+        UnreadBadge(unread)
         if (folder.name.isNotEmpty()) nameRoom?.let { HangingName(folder.name, it) }
     }
 }

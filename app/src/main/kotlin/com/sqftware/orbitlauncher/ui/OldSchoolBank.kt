@@ -1,10 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +13,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -24,25 +20,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.CardColour
-import com.sqftware.orbitlauncher.ui.theme.BankColors
 import com.sqftware.orbitlauncher.ui.theme.BankGround
+import com.sqftware.orbitlauncher.ui.theme.BankRoles
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
+import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import com.sqftware.orbitlauncher.ui.theme.StackCount
-import com.sqftware.orbitlauncher.ui.theme.bankTint
 import kotlin.math.min
 
 /** How many of the game's pixels thick its interface frame is, and how far a card's content keeps inside it. */
@@ -73,7 +65,6 @@ private const val TAB_MIDDLE = 20
 private const val TAB_HEIGHT = 32
 
 /** The game's small stone button, in its pixels. */
-private const val STONE_BUTTON = 25
 
 /** The bank's sprites a card is drawn from, loaded once for every card. */
 private class BankSprites(
@@ -116,42 +107,31 @@ internal fun BankCard(
 ) {
     val sprites = bankSprites()
     val px = gamePixel
-    val tint = bankTint(colour)
-    val inset = with(LocalDensity.current) { ((FRAME + FRAME_GAP) * px).toDp() }
-    val frame = with(LocalDensity.current) { (FRAME * px).toDp() }
+    val inset = ((FRAME + FRAME_GAP) * px).asDp()
+    val frame = (FRAME * px).asDp()
 
-    MaterialTheme(colorScheme = BankColors) {
-        CompositionLocalProvider(LocalContentColor provides BankColors.onSurface) {
-            Column(
-                modifier
-                    .drawBehind {
-                        clipRect {
-                            drawRect(BankGround)
-                            drawTiled(sprites.texture, px)
-                            drawRect(tint)
-                        }
-                        drawFrame(sprites, px)
-                        if (dropTarget) {
-                            val rim = (FRAME * px).toFloat()
-                            drawRect(StackCount, Offset(rim + px / 2f, rim + px / 2f), Size(size.width - 2 * rim - px, size.height - 2 * rim - px), style = Stroke(px.toFloat()))
-                        }
+    GameNight(BankRoles) {
+        val tint = LocalCardTints.current.of(colour)
+        Column(
+            modifier
+                .drawBehind {
+                    drawRect(BankGround)
+                    drawTiled(sprites.texture, px = px, mirror = false)
+                    drawRect(tint)
+                    drawFrame(sprites, px)
+                    if (dropTarget) {
+                        val rim = (FRAME * px).toFloat()
+                        drawRect(StackCount, Offset(rim + px / 2f, rim + px / 2f), Size(size.width - 2 * rim - px, size.height - 2 * rim - px), style = Stroke(px.toFloat()))
                     }
-                    .animateContentSize(tween(EXPAND_MILLIS)),
-            ) {
+                },
+        ) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
                 // The buttons' own padding keeps them off the frame's right edge.
                 Box(Modifier.padding(start = inset, end = frame, top = inset)) { header() }
                 Spacer(Modifier.fillMaxWidth().height(inset).drawBehind { drawDivider(sprites, px) })
                 Column(Modifier.padding(start = inset, end = frame, bottom = frame)) { body() }
             }
         }
-    }
-}
-
-/** [image] repeated across the whole of the draw scope from its top left, each of its pixels [scale] square. */
-private fun DrawScope.drawTiled(image: ImageBitmap, scale: Int) {
-    val step = IntSize(image.width * scale, image.height * scale)
-    for (y in 0 until size.height.toInt() step step.height) {
-        for (x in 0 until size.width.toInt() step step.width) drawSprite(image, Offset(x.toFloat(), y.toFloat()), scale)
     }
 }
 
@@ -162,10 +142,10 @@ private fun DrawScope.drawFrame(sprites: BankSprites, scale: Int) {
     val corner = CORNER * scale
     val thick = FRAME * scale
 
-    repeatAcross(sprites.top, TOP_EDGE, IntOffset(corner, 0), width - corner, scale)
-    repeatAcross(sprites.bottom, TOP_EDGE, IntOffset(corner, height - thick), width - corner, scale)
-    repeatDown(sprites.left, LEFT_EDGE, IntOffset(0, corner), height - corner, scale)
-    repeatDown(sprites.right, RIGHT_EDGE, IntOffset(width - thick, corner), height - corner, scale)
+    repeatAlong(sprites.top, TOP_EDGE, IntOffset(corner, 0), width - corner, scale, across = true)
+    repeatAlong(sprites.bottom, TOP_EDGE, IntOffset(corner, height - thick), width - corner, scale, across = true)
+    repeatAlong(sprites.left, LEFT_EDGE, IntOffset(0, corner), height - corner, scale, across = false)
+    repeatAlong(sprites.right, RIGHT_EDGE, IntOffset(width - thick, corner), height - corner, scale, across = false)
     listOf(IntOffset(0, 0), IntOffset(width - corner, 0), IntOffset(0, height - corner), IntOffset(width - corner, height - corner))
         .zip(sprites.corners)
         .forEach { (at, image) -> drawSprite(image, Offset(at.x.toFloat(), at.y.toFloat()), scale) }
@@ -174,60 +154,46 @@ private fun DrawScope.drawFrame(sprites: BankSprites, scale: Int) {
 /** The frame's divider across the top of the draw scope, joined to the frame's edges at both ends as the game joins it. */
 private fun DrawScope.drawDivider(sprites: BankSprites, scale: Int) {
     val width = size.width.toInt()
-    repeatAcross(sprites.divider, DIVIDER, IntOffset(0, 0), width, scale)
+    repeatAlong(sprites.divider, DIVIDER, IntOffset(0, 0), width, scale, across = true)
     val joinTop = (-JOIN_STUB * scale).toFloat()
     drawSprite(sprites.joinLeft, Offset(0f, joinTop), scale)
     drawSprite(sprites.joinRight, Offset((width - CORNER * scale).toFloat(), joinTop), scale)
 }
 
-/** The part [from] of [image], repeated rightwards from [start] up to [end], each pixel [scale] square; the last cut short. */
-private fun DrawScope.repeatAcross(image: ImageBitmap, from: IntRect, start: IntOffset, end: Int, scale: Int) {
-    var x = start.x
-    while (x < end) {
-        val columns = min(from.width, (end - x + scale - 1) / scale)
-        drawSpritePart(image, IntRect(from.topLeft, IntSize(columns, from.height)), Offset(x.toFloat(), start.y.toFloat()), scale)
-        x += columns * scale
-    }
-}
-
-/** The part [from] of [image], repeated downwards from [start] up to [end], as [repeatAcross] does across. */
-private fun DrawScope.repeatDown(image: ImageBitmap, from: IntRect, start: IntOffset, end: Int, scale: Int) {
-    var y = start.y
-    while (y < end) {
-        val rows = min(from.height, (end - y + scale - 1) / scale)
-        drawSpritePart(image, IntRect(from.topLeft, IntSize(from.width, rows)), Offset(start.x.toFloat(), y.toFloat()), scale)
-        y += rows * scale
+/**
+ * The part [from] of [image], repeated rightwards from [start] up to [end] if [across], or else downwards, each pixel
+ * [scale] square; the last cut short.
+ */
+private fun DrawScope.repeatAlong(image: ImageBitmap, from: IntRect, start: IntOffset, end: Int, scale: Int, across: Boolean) {
+    var at = if (across) start.x else start.y
+    while (at < end) {
+        val run = min(if (across) from.width else from.height, (end - at + scale - 1) / scale)
+        val part = IntRect(from.topLeft, if (across) IntSize(run, from.height) else IntSize(from.width, run))
+        drawSpritePart(image, part, if (across) Offset(at.toFloat(), start.y.toFloat()) else Offset(start.x.toFloat(), at.toFloat()), scale)
+        at += run * scale
     }
 }
 
 /**
- * The game's selected bank tab with the collection's [glyph] and [title] on it in the interface's orange, as wide as
- * they need up to the room [modifier] gives: its rim and bevelled corner as the game draws them, its face stretched
- * from one of its own pixels, so every pixel stays whole.
+ * The game's selected bank tab with the collection's [glyph] and [title] on it, set as every theme sets them, in the
+ * interface's orange, as wide as they need up to the room [modifier] gives: its rim and bevelled corner as the game draws
+ * them, its face stretched from one of its own pixels, so every pixel stays whole.
  */
 @Composable
 internal fun BankTab(glyph: ImageVector, title: String, modifier: Modifier) {
     val tab = sprite(R.drawable.osrs_1079_0)
     val px = gamePixel
-    val density = LocalDensity.current
-    val height = with(density) { (TAB_HEIGHT * px).toDp() }
+    val height = (TAB_HEIGHT * px).asDp()
 
     Box(modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .heightIn(min = height)
-                .drawBehind { drawStretched(tab, px) }
-                .padding(start = with(density) { (TAB_LEFT * px).toDp() } + 4.dp, end = with(density) { (TAB_RIGHT * px).toDp() }),
-        ) {
-            Icon(glyph, contentDescription = null, tint = GameOrange, modifier = Modifier.size(20.dp))
-            Text(
-                text = title,
-                color = GameOrange,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
+        CompositionLocalProvider(LocalContentColor provides GameOrange) {
+            PlainCardTitle(
+                glyph,
+                title,
+                Modifier
+                    .heightIn(min = height)
+                    .drawBehind { drawStretched(tab, px) }
+                    .padding(start = (TAB_LEFT * px).asDp() + 4.dp, end = (TAB_RIGHT * px).asDp()),
             )
         }
     }
@@ -247,14 +213,8 @@ private fun DrawScope.drawStretched(image: ImageBitmap, scale: Int) {
     rows.zip(ys).forEach { (row, y) ->
         columns.zip(xs).forEach { (column, x) ->
             if (x.second > 0 && y.second > 0) {
-                drawImage(
-                    image,
-                    IntOffset(column.first, row.first),
-                    IntSize(column.second, row.second),
-                    IntOffset(x.first, y.first),
-                    IntSize(x.second, y.second),
-                    filterQuality = FilterQuality.None,
-                )
+                val part = IntRect(IntOffset(column.first, row.first), IntSize(column.second, row.second))
+                drawSpritePart(image, part, Offset(x.first.toFloat(), y.first.toFloat()), scale, dstSize = IntSize(x.second, y.second))
             }
         }
     }
@@ -265,9 +225,7 @@ private fun DrawScope.drawStretched(image: ImageBitmap, scale: Int) {
 internal fun StoneButtonFace(glyph: ImageVector, contentDescription: String?, glyphModifier: Modifier) {
     val stone = sprite(R.drawable.osrs_195_0)
     val px = gamePixel
-    val side = with(LocalDensity.current) { (STONE_BUTTON * px).toDp() }
-
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(side).drawBehind { drawSprite(stone, Offset.Zero, px) }) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.spriteSized(stone, px)) {
         Icon(glyph, contentDescription, glyphModifier.size(20.dp), tint = GameOrange)
     }
 }
@@ -282,7 +240,7 @@ internal fun StoneBin(highlighted: Boolean, modifier: Modifier) {
         contentAlignment = Alignment.Center,
         modifier = modifier.drawBehind {
             // Twice the game's pixels, as its largest type is drawn, unless the bin is smaller.
-            drawSpriteCentred(stone, center, fitScale(size.minDimension, STONE_BUTTON.toFloat(), 2 * px))
+            drawSpriteCentred(stone, center, fitScale(size.minDimension, stone.width.toFloat(), 2 * px))
         },
     ) {
         Icon(Icons.Default.Delete, contentDescription = null, tint = if (highlighted) StackCount else GameOrange)
