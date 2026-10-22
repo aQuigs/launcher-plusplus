@@ -14,17 +14,16 @@ class OpenMapTilesTest {
         OpenMapTiles.scene(centre, mapOf(id to VectorTile(layers.associate { (name, features) -> name to VectorLayer(name, EXTENT, features) })))
 
     private fun square(tags: Map<String, Any>, size: Int = 20) = VectorFeature(
-        null,
         GeometryType.Polygon,
         tags,
         listOf(listOf(TilePoint(2040, 2040), TilePoint(2040 + size, 2040), TilePoint(2040 + size, 2040 + size), TilePoint(2040, 2040 + size))),
     )
 
     private fun line(tags: Map<String, Any>) =
-        VectorFeature(null, GeometryType.Line, tags, listOf(listOf(TilePoint(2000, 2048), TilePoint(2100, 2048))))
+        VectorFeature(GeometryType.Line, tags, listOf(listOf(TilePoint(2000, 2048), TilePoint(2100, 2048))))
 
     private fun point(tags: Map<String, Any>, at: TilePoint = TilePoint(2050, 2050)) =
-        VectorFeature(null, GeometryType.Point, tags, listOf(listOf(at)))
+        VectorFeature(GeometryType.Point, tags, listOf(listOf(at)))
 
     @Test
     fun scalesAPolarCentreAsTheEdgeOfTheMapItIsDrawnAt() {
@@ -85,7 +84,6 @@ class OpenMapTilesTest {
     @Test
     fun makesEachBuildingPolygonABuildingAndSkipsLiftedParts() {
         val two = VectorFeature(
-            null,
             GeometryType.Polygon,
             emptyMap(),
             listOf(
@@ -100,7 +98,7 @@ class OpenMapTilesTest {
 
     @Test
     fun leavesOutWhatIsFarFromTheCentre() {
-        val far = VectorFeature(null, GeometryType.Polygon, mapOf("class" to "lake"), listOf(listOf(TilePoint(0, 0), TilePoint(10, 0), TilePoint(10, 10))))
+        val far = VectorFeature(GeometryType.Polygon, mapOf("class" to "lake"), listOf(listOf(TilePoint(0, 0), TilePoint(10, 0), TilePoint(10, 10))))
         assertTrue(scene("water" to listOf(far)).areas.isEmpty())
         assertTrue(scene("poi" to listOf(point(mapOf("class" to "bank", "subclass" to "bank"), TilePoint(100, 100)))).pois.isEmpty())
     }

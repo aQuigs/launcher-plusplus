@@ -287,9 +287,8 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
     /** Each entered place turns one tile's length of the nearest wall red, at most [MAX_DOORS] per structure. */
     private fun paintDoors(walls: BooleanArray, comp: IntArray) {
         val doorsPer = mutableMapOf<Int, Int>()
-        val doorPx = BooleanArray(N * N)
         // Nearest first, so which places get the doors does not depend on the order they came in.
-        for (poi in scene.pois.filter { it.door }.sortedBy { it.at.east * it.at.east + it.at.north * it.at.north }) {
+        for (poi in scene.pois.filter { it.door }.sortedBy { it.at.distanceSq() }) {
             val p = px(poi.at)
             var start = -1
             var bestD = Double.MAX_VALUE
@@ -304,7 +303,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
                     }
                 }
             }
-            if (start < 0 || (doorsPer[comp[start]] ?: 0) >= MAX_DOORS || doorPx[start]) continue
+            if (start < 0 || (doorsPer[comp[start]] ?: 0) >= MAX_DOORS || img[start] == DOOR) continue
             val run = mutableListOf(start)
             val frontier = ArrayDeque<Int>().apply { add(start) }
             while (frontier.isNotEmpty() && run.size < DOOR_PX) {
@@ -318,10 +317,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
                     }
                 }
             }
-            run.forEach {
-                img[it] = DOOR
-                doorPx[it] = true
-            }
+            run.forEach { img[it] = DOOR }
             doorsPer[comp[start]] = (doorsPer[comp[start]] ?: 0) + 1
         }
     }
@@ -416,7 +412,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         val sprite = sprites.npc ?: return
         val dots = mutableListOf<Pair<Int, Int>>()
         // Nearest first, so which people make the cap does not depend on the order they came in.
-        for (poi in scene.pois.filter { it.npc }.sortedBy { it.at.east * it.at.east + it.at.north * it.at.north }) {
+        for (poi in scene.pois.filter { it.npc }.sortedBy { it.at.distanceSq() }) {
             val p = px(poi.at)
             val x = floor(p.x).toInt()
             val y = floor(p.y).toInt()
@@ -547,6 +543,8 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 }
 
 private fun sq(v: Double) = v * v
+
+private fun Local.distanceSq() = sq(east) + sq(north)
 
 /** A number in [0, 1) that depends only on [key]: SplitMix64 over its parts. */
 private fun stableRandom(vararg key: Long): Double {

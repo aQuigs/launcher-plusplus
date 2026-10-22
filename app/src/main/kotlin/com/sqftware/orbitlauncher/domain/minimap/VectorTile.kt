@@ -9,7 +9,7 @@ enum class GeometryType { Unknown, Point, Line, Polygon }
  * One feature of a Mapbox Vector Tile layer. [parts] are its points for a point feature (one per part), its line strings
  * for a line, and its rings for a polygon, each ring open (the closing point not repeated).
  */
-class VectorFeature(val id: Long?, val type: GeometryType, val tags: Map<String, Any>, val parts: List<List<TilePoint>>) {
+class VectorFeature(val type: GeometryType, val tags: Map<String, Any>, val parts: List<List<TilePoint>>) {
     fun string(key: String) = tags[key] as? String
 
     fun number(key: String) = (tags[key] as? Number)?.toDouble()
@@ -101,14 +101,12 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
         }
 
         private fun decodeFeature(feature: Protobuf, keys: List<String?>, values: List<Any>): VectorFeature {
-            var id: Long? = null
             var type = GeometryType.Unknown
             val tags = mutableMapOf<String, Any>()
             var geometry = IntArray(0)
             while (feature.hasMore()) {
                 val (field, wire) = feature.key()
                 when {
-                    field == 1 && wire == WIRE_VARINT -> id = feature.varint()
                     field == 2 && wire == WIRE_BYTES -> feature.packed().let { tagIndices ->
                         for (i in 0 until tagIndices.size - 1 step 2) {
                             val key = keys.getOrNull(tagIndices[i])
@@ -121,7 +119,7 @@ class VectorTile(val layers: Map<String, VectorLayer>) {
                     else -> feature.skip(wire)
                 }
             }
-            return VectorFeature(id, type, tags, decodeGeometry(geometry))
+            return VectorFeature(type, tags, decodeGeometry(geometry))
         }
 
         // Each MoveTo starts a part, so each point of a multipoint is a part of its own.

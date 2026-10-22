@@ -160,23 +160,31 @@ object OpenMapTiles {
 
     private fun isShop(cls: String, subclass: String) = cls in SHOP_CLASSES || subclass == "books"
 
+    private val QUEST_STARTS = setOf("townhall", "library", "school", "college", "university")
+    private val STOPS = setOf("subway_entrance", "ferry_terminal", "bus_station", "fuel")
+    private val RAILWAY_STATIONS = setOf("station", "subway", "halt")
+    private val PUBS = setOf("pub", "bar", "nightclub")
+    private val FOOD_SHOPS = setOf("cafe", "ice_cream", "bakery")
+    private val APOTHECARIES = setOf("pharmacy", "chemist")
+    private val CLOTHES_SHOPS = setOf("clothes", "shoes", "fashion", "boutique")
+    private val JEWELLERS = setOf("jewelry", "jewellery")
+    private val HAIRDRESSERS = setOf("hairdresser", "beauty")
+
     private val ICON_RULES: List<Pair<MapIcon, (cls: String, subclass: String) -> Boolean>> = listOf(
         MapIcon.Bank to { _, s -> s == "bank" },
         MapIcon.Altar to { c, _ -> c == "place_of_worship" },
-        MapIcon.QuestStart to { _, s -> s in setOf("townhall", "library", "school", "college", "university") },
-        MapIcon.Transportation to { c, s ->
-            s in setOf("subway_entrance", "ferry_terminal", "bus_station", "fuel") || (c == "railway" && s in setOf("station", "subway", "halt"))
-        },
-        MapIcon.Pub to { _, s -> s in setOf("pub", "bar", "nightclub") },
+        MapIcon.QuestStart to { _, s -> s in QUEST_STARTS },
+        MapIcon.Transportation to { c, s -> s in STOPS || (c == "railway" && s in RAILWAY_STATIONS) },
+        MapIcon.Pub to { _, s -> s in PUBS },
         MapIcon.CookeryShop to { _, s -> s == "restaurant" },
         MapIcon.KebabShop to { _, s -> s == "fast_food" },
-        MapIcon.FoodShop to { _, s -> s in setOf("cafe", "ice_cream", "bakery") },
-        MapIcon.Apothecary to { _, s -> s in setOf("pharmacy", "chemist") },
+        MapIcon.FoodShop to { _, s -> s in FOOD_SHOPS },
+        MapIcon.Apothecary to { _, s -> s in APOTHECARIES },
         MapIcon.WaterSource to { _, s -> s == "fountain" },
         MapIcon.GrandExchange to { _, s -> s == "marketplace" },
-        MapIcon.ClothesShop to { _, s -> s in setOf("clothes", "shoes", "fashion", "boutique") },
-        MapIcon.JewelleryShop to { _, s -> s in setOf("jewelry", "jewellery") },
-        MapIcon.Hairdresser to { _, s -> s in setOf("hairdresser", "beauty") },
+        MapIcon.ClothesShop to { _, s -> s in CLOTHES_SHOPS },
+        MapIcon.JewelleryShop to { _, s -> s in JEWELLERS },
+        MapIcon.Hairdresser to { _, s -> s in HAIRDRESSERS },
         MapIcon.PetShop to { _, s -> s == "pet" },
         MapIcon.GeneralStore to ::isShop,
     )

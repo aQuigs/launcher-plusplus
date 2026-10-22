@@ -41,7 +41,6 @@ class VectorTileTest {
         val poi = tile["poi"]!!
         assertEquals(512, poi.extent)
         val bank = poi.features.single()
-        assertEquals(42L, bank.id)
         assertEquals(GeometryType.Point, bank.type)
         assertEquals("bank", bank.string("class"))
         assertEquals(3.0, bank.number("rank")!!, 0.0)

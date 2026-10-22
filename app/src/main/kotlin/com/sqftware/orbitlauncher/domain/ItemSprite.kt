@@ -10,8 +10,8 @@ import kotlin.math.roundToInt
 class IconLayers(val foreground: Pixels, val background: Pixels? = null)
 
 /** The game's item canvas, which every item sprite fills. */
-const val ITEM_WIDTH = 36
-const val ITEM_HEIGHT = 32
+internal const val ITEM_WIDTH = 36
+internal const val ITEM_HEIGHT = 32
 
 /**
  * How many pixels across to draw an icon's layers for its [itemMark]: one to each of an adaptive icon's 108 units, which
