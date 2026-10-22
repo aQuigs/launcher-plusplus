@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -175,9 +176,9 @@ private fun DrawScope.repeatAlong(image: ImageBitmap, from: IntRect, start: IntO
 }
 
 /**
- * The game's selected bank tab with the collection's [glyph] and [title] on it, set as every theme sets them, in the
- * interface's orange, as wide as they need up to the room [modifier] gives: its rim and bevelled corner as the game draws
- * them, its face stretched from one of its own pixels, so every pixel stays whole.
+ * The game's selected bank tab with the collection's [glyph] and [title] on it, in the interface's orange and a size
+ * smaller than other themes set them, as wide as they need up to the room [modifier] gives: its rim and bevelled corner
+ * as the game draws them, its face stretched from one of its own pixels, so every pixel stays whole.
  */
 @Composable
 internal fun BankTab(glyph: ImageVector, title: String, modifier: Modifier) {
@@ -194,6 +195,7 @@ internal fun BankTab(glyph: ImageVector, title: String, modifier: Modifier) {
                     .heightIn(min = height)
                     .drawBehind { drawStretched(tab, px) }
                     .padding(start = (TAB_LEFT * px).asDp() + 4.dp, end = (TAB_RIGHT * px).asDp()),
+                MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
             )
         }
     }

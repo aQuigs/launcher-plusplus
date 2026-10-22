@@ -12,13 +12,17 @@ interface MinimapArt {
     fun sprites(): MinimapSprites
 }
 
-/** The minimap's sprites from the app's drawables, at their own pixel size, as the game draws them. */
+/** The minimap's sprites from the app's drawables, at their own pixel size, as the game draws them, decoded once. */
 class ResourceMinimapArt(private val context: Context) : MinimapArt {
-    override fun sprites() = MinimapSprites(
-        trees = listOf(R.drawable.osrs_map_tree_0, R.drawable.osrs_map_tree_1).map(::sprite),
-        npc = sprite(R.drawable.osrs_300_1),
-        icons = MapIcon.entries.associateWith { sprite(drawableOf(it)) },
-    )
+    private val decoded by lazy {
+        MinimapSprites(
+            trees = listOf(R.drawable.osrs_map_tree_0, R.drawable.osrs_map_tree_1).map(::sprite),
+            npc = sprite(R.drawable.osrs_300_1),
+            icons = MapIcon.entries.associateWith { sprite(drawableOf(it)) },
+        )
+    }
+
+    override fun sprites() = decoded
 
     private fun drawableOf(icon: MapIcon) = when (icon) {
         MapIcon.Bank -> R.drawable.osrs_map_bank

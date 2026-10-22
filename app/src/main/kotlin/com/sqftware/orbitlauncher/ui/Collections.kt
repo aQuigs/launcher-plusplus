@@ -446,12 +446,17 @@ private fun CardHeader(
 
 /** [ThemeArt.CardTitle] as most themes set it: the glyph, then the title on one line. */
 @Composable
-internal fun PlainCardTitle(glyph: ImageVector, title: String, modifier: Modifier) {
+internal fun PlainCardTitle(
+    glyph: ImageVector,
+    title: String,
+    modifier: Modifier,
+    style: TextStyle = MaterialTheme.typography.titleMedium,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
         Icon(glyph, contentDescription = null, modifier = Modifier.size(22.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = style,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 10.dp),
