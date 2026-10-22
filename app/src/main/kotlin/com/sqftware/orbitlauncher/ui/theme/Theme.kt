@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui.theme
 
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTonalElevationEnabled
@@ -266,9 +267,9 @@ private fun Palette.dayLook() = nightLook().let { night ->
 }
 
 @Composable
-fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, typography: Typography, content: @Composable () -> Unit) {
+fun LauncherTheme(colourway: Colourway, lightWallpaper: Boolean, typography: Typography, shapes: Shapes, content: @Composable () -> Unit) {
     val look = remember(colourway, lightWallpaper) { lookOf(colourway, lightWallpaper) }
-    MaterialTheme(colorScheme = look.colors, typography = typography) {
+    MaterialTheme(colorScheme = look.colors, typography = typography, shapes = shapes) {
         CompositionLocalProvider(
             // Pages sit straight on the wallpaper, so text defaults to the on-background colour; surfaces set their own.
             LocalContentColor provides look.colors.onBackground,

@@ -1,19 +1,15 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.Image
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.sqftware.orbitlauncher.domain.CardColour
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.foundation.BorderStroke
@@ -166,15 +162,6 @@ interface ThemeArt {
         if (slots.glow > 0f) drawRoundRect(glowColour.copy(alpha = 0.12f * slots.glow), cornerRadius = CornerRadius(size.height / 2))
     }
 
-    /** The drawer's sheet: by default with Material's rounded top corners. */
-    val drawerShape: Shape
-        @OptIn(ExperimentalMaterial3Api::class)
-        @Composable get() = BottomSheetDefaults.ExpandedShape
-
-    /** How much of the closed drawer peeks above the pages, room for its [DrawerHandle]. */
-    val drawerPeek: Dp
-        @Composable get() = 48.dp
-
     /** What opens and closes the drawer above the pages, pointing the way it will move: by default a chevron. */
     @Composable
     fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) = ChevronHandle(open, onClick, modifier)
@@ -213,17 +200,9 @@ interface ThemeArt {
     @Composable
     fun BinFace(highlighted: Boolean, modifier: Modifier) = PlainBinFace(highlighted, modifier)
 
-    /** What a card setting's title and choices are boxed in, in a collection's settings: by default a rounded raised box. */
+    /** What a card setting's title and choices are boxed in, in a collection's settings: by default a raised box. */
     @Composable
-    fun settingBox(): Modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)
-
-    /** The shape of the [index]th of [count] segments of a setting's choices: by default Material's rounded row. */
-    @Composable
-    fun segmentShape(index: Int, count: Int): Shape = SegmentedButtonDefaults.itemShape(index, count)
-
-    /** The shape of a colour swatch in a card's settings. */
-    val swatchShape: Shape
-        get() = CircleShape
+    fun settingBox(): Modifier = Modifier.clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerHighest)
 
     /** A dialog's box on [ground]: by default the solid ground in Material's dialog shape. */
     @Composable
@@ -250,17 +229,23 @@ interface ThemeArt {
     fun emblemBox(edge: Color): Modifier =
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
-    /** Whether the tab that opens the drawer ends the dock's row, as [DockDrawerTab], rather than peeking below it. */
-    val drawerTabInDock: Boolean
-        get() = false
+    /**
+     * The tab that opens the drawer, calling its `onClick`, as the last of the dock's slots, or null for the drawer's
+     * [DrawerHandle] to peek below the pages instead.
+     */
+    val dockDrawerTab: (@Composable (onClick: () -> Unit, modifier: Modifier) -> Unit)?
+        get() = null
 
-    /** The tab that opens the drawer, in the last of the dock's slots, for a theme with its [drawerTabInDock]. */
-    @Composable
-    fun DockDrawerTab(onClick: () -> Unit, modifier: Modifier) = Unit
+    /** The type every text is set in. */
+    val typography: Typography
+        @Composable get() = MaterialTypography
 
-    /** The type every text is set in, or null for Material's own. */
-    val typography: Typography?
-        @Composable get() = null
+    /**
+     * The corners of every surface: by default Material's. The fully round ones, a choice's segments and a colour's
+     * swatch, are drawn in the largest, so a theme of square corners squares them too.
+     */
+    val shapes: Shapes
+        get() = MaterialShapes
 }
 
 /** A flat [veil], at a share of its own alpha. */
@@ -309,12 +294,13 @@ val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
 @Composable
 fun Themed(theme: Theme, colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
     val art = artOf(theme)
-    LauncherTheme(colourway, lightWallpaper, art.typography ?: MaterialTypography) {
+    LauncherTheme(colourway, lightWallpaper, art.typography, art.shapes) {
         CompositionLocalProvider(LocalThemeArt provides art, content = content)
     }
 }
 
 private val MaterialTypography = Typography()
+private val MaterialShapes = Shapes()
 
 /**
  * How every folder on the screen draws itself: the [look] the user chose, the [planets] the folders are in the Solar

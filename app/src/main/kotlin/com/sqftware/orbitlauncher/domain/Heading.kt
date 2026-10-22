@@ -1,13 +1,12 @@
 package com.sqftware.orbitlauncher.domain
 
-/** [degrees] wrapped into 0 until 360. */
-fun wrapDegrees(degrees: Float): Float = ((degrees % 360f) + 360f) % 360f
+import kotlin.math.abs
 
-/**
- * A compass heading moved [share] of the way from [from] to [to], both in degrees clockwise from north, the short way
- * round, so a needle settles rather than jitters with each reading and never swings the long way past north.
- */
-fun easeHeading(from: Float, to: Float, share: Float): Float {
-    val turn = wrapDegrees(to - from + 180f) - 180f
-    return wrapDegrees(from + turn * share)
-}
+/** The shortest turn from heading [from] to heading [to], in degrees, clockwise positive, never more than half a circle. */
+fun turnBetween(from: Float, to: Float): Float = (to - from + 180f).mod(360f) - 180f
+
+/** A heading [share] of the shortest way from [from] to [to], within a circle. */
+fun easeHeading(from: Float, to: Float, share: Float): Float = (from + turnBetween(from, to) * share).mod(360f)
+
+/** Whether a heading moved from [from] to [to] has turned at least [step] degrees, either way. */
+fun turnedPast(from: Float, to: Float, step: Float): Boolean = abs(turnBetween(from, to)) >= step

@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher
 
+import com.sqftware.orbitlauncher.domain.turnedPast
+import kotlinx.coroutines.flow.runningReduce
 import com.sqftware.orbitlauncher.ui.LocalHeading
 import com.sqftware.orbitlauncher.domain.easeHeading
 import com.sqftware.orbitlauncher.apps.SensorHeadingSource
@@ -95,8 +97,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
-// The share of the way a heading moves to each reading of the compass, so the map settles rather than shivers.
+// The share of the way a heading moves to each reading of the compass, so the map settles rather than shivers, and the
+// least turn worth redrawing for: under one of the map's pixels at its edge, so the sensor's jitter at rest draws nothing.
 private const val HEADING_EASE = 0.25f
+private const val HEADING_STEP = 0.5f
 
 // Drawables by name, so a build without the art still draws the ground, walls and doors of the map.
 private val MINIMAP_SPRITES = MinimapSpriteNames(
@@ -282,7 +286,7 @@ class MainActivity : ComponentActivity() {
                 // The map follows the user only while the launcher is visible, like the clock, and each return reads the
                 // grant again. The state outlives a change of key, so turning it off must drop the last map.
                 val mapping = showWhereIAm && shownTheme.mapsWhereIAm
-                val minimap by produceState<ImageBitmap?>(null, mapping) {
+                val minimap = produceState<ImageBitmap?>(null, mapping) {
                     value = null
                     if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -290,15 +294,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                // The map turns with the phone only while it shows, as the map follows the user.
+                // The map turns with the phone only while it shows, as the map follows the user. Both are read where
+                // they are drawn, so a new map or a turn redraws the emblem alone.
                 val heading = remember { mutableStateOf<Float?>(null) }
+                val readMinimap = remember { { minimap.value } }
                 val readHeading = remember { { heading.value } }
                 LaunchedEffect(mapping) {
                     heading.value = null
                     if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            headingSource.headings().collect { reading ->
-                                heading.value = heading.value?.let { easeHeading(it, reading, HEADING_EASE) } ?: reading
+                            headingSource.headings().runningReduce { from, to -> easeHeading(from, to, HEADING_EASE) }.collect { eased ->
+                                if (heading.value?.let { turnedPast(it, eased, HEADING_STEP) } != false) heading.value = eased
                             }
                         }
                     }
@@ -364,7 +370,7 @@ class MainActivity : ComponentActivity() {
                     setUpHome()
                 }
 
-                CompositionLocalProvider(LocalMinimap provides minimap, LocalHeading provides readHeading) {
+                CompositionLocalProvider(LocalMinimap provides readMinimap, LocalHeading provides readHeading) {
                     LauncherScreen(
                         layout = layout,
                         onLayoutChange = ::changeLayout,

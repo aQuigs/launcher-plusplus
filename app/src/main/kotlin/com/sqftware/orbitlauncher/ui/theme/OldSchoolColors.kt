@@ -12,13 +12,14 @@ private val Bank = Color(0xFF201B14)
 private val Parchment = Color(0xFFE6DABB)
 private val Cream = Color(0xFFF2E8CC)
 private val Yellow = Color(0xFFFFFF00)
+private val Target = Color(0xFFFF9040)
 
 internal val OldSchoolPalette = Palette(
     deep = Bank,
     accent = Yellow,
     pale = Cream,
     spark = Yellow,
-    warm = Color(0xFFFF9040),
+    warm = Target,
     alarm = Color(0xFFFF8C8C),
     frost = Parchment,
     ringMark = Color(0xFFEEEEEE),
@@ -33,7 +34,7 @@ val MenuVerb = Color.White
 /** The game's right-click menu: its black box and the brown of its rim and its "Choose Option" header. */
 val MenuGround = Color.Black
 val MenuRim = Color(0xFF5D5447)
-val MenuTarget = Color(0xFFFF9040)
+val MenuTarget = Target
 
 /** The orange of the game's interface text, such as a window's title. */
 val GameOrange = Color(0xFFFF981F)

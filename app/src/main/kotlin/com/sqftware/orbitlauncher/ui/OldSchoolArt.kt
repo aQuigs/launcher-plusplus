@@ -1,5 +1,11 @@
 package com.sqftware.orbitlauncher.ui
 
+import com.sqftware.orbitlauncher.domain.ITEM_HEIGHT
+import com.sqftware.orbitlauncher.domain.ITEM_WIDTH
+import androidx.compose.foundation.Image
+import androidx.compose.ui.unit.toOffset
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.center
 import com.sqftware.orbitlauncher.ui.theme.StackCountDismissed
@@ -8,18 +14,17 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.material3.ripple
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.sqftware.orbitlauncher.domain.CardColour
 import androidx.compose.ui.graphics.RectangleShape
@@ -145,7 +149,10 @@ private const val CREDIT_WIDTH = 104
 private const val CREDIT_DROP = 70
 
 /** The whole game pixels the minimap is drawn at in an emblem of [size]: as large as reaches its room, and no larger than the rest of the game. */
-private fun mapScale(size: Size, px: Int) = max(1, min(px, floor(size.minDimension * EMBLEM_REACH / (2f * FRAME_RADIUS)).toInt()))
+private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_REACH, 2f * FRAME_RADIUS, px)
+
+/** Where the compass is centred in an emblem of [size] with its minimap at [scale]. */
+private fun compassAt(size: Size, scale: Int) = size.center + COMPASS_WAY * ((FRAME_RADIUS - SOCKET_RADIUS) * scale.toFloat())
 
 private fun circle(centre: Offset, radius: Int) = Path().apply { addOval(Rect(centre, radius.toFloat())) }
 
@@ -197,7 +204,8 @@ object OldSchoolArt : ThemeArt {
 
     /**
      * The minimap in its frame: the map of where the user is, or the game's grass until there is one, turned with the
-     * phone as the game turns it with the camera, and the compass, turned with it, on the frame's edge.
+     * phone as the game turns it with the camera, and the compass, turned with it, on the frame's edge. What turns is a
+     * layer of its own, so a turn moves it without drawing the frame again.
      */
     @Composable
     override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) {
@@ -208,35 +216,50 @@ object OldSchoolArt : ThemeArt {
         val heading = LocalHeading.current
         val measurer = rememberTextMeasurer()
         val creditStyle = MaterialTheme.typography.labelSmall.copy(color = MinimapSelf, textAlign = TextAlign.Center)
-        Spacer(
-            modifier.drawWithCache {
-                val scale = mapScale(size, px)
-                val centre = size.center
-                val origin = centre - (FRAME_HOLE_CENTRE * scale).toOffset()
-                val ring = circle(centre, FRAME_RADIUS * scale)
-                val compassAt = centre + COMPASS_WAY * ((FRAME_RADIUS - SOCKET_RADIUS) * scale.toFloat())
-                val socketOrigin = compassAt - (COMPASS_CENTRE * scale).toOffset()
-                val socket = Path.combine(PathOperation.Difference, circle(compassAt, SOCKET_RADIUS * scale), circle(compassAt, COMPASS_RADIUS * scale))
-                val face = circle(compassAt, COMPASS_RADIUS * scale)
-                val credit = measurer.measure(MAP_CREDIT, creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
-                onDrawBehind {
-                    val turn = -(heading() ?: 0f)
-                    // The painted map has the self marker at its centre already; the grass stands in until there is one.
-                    if (map != null) {
-                        rotate(turn, centre) { drawSprite(map, centre - Offset(map.width.toFloat(), map.height.toFloat()) * (scale / 2f), scale) }
-                        drawText(credit, topLeft = Offset(centre.x - credit.size.width / 2f, centre.y + CREDIT_DROP * scale - credit.size.height))
-                    } else {
-                        drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat(), centre)
-                        if (marked) selfMarker(centre, scale)
+        Box(modifier) {
+            Spacer(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer { rotationZ = -(heading() ?: 0f) }
+                    .drawBehind {
+                        val scale = mapScale(size, px)
+                        map()?.let { drawSpriteCentred(it, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
+                    },
+            )
+            Spacer(
+                Modifier.matchParentSize().drawWithCache {
+                    val scale = mapScale(size, px)
+                    val ring = circle(size.center, FRAME_RADIUS * scale)
+                    val at = compassAt(size, scale)
+                    val socket = Path.combine(PathOperation.Difference, circle(at, SOCKET_RADIUS * scale), circle(at, COMPASS_RADIUS * scale))
+                    val credit = measurer.measure(MAP_CREDIT, creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
+                    onDrawBehind {
+                        // Upright over the turned map, as the game keeps the player's square.
+                        if (marked) selfMarker(center, scale)
+                        if (map() != null) drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + CREDIT_DROP * scale - credit.size.height))
+                        // The frame's own ring alone: its compass socket would reach out among the ring's apps, so the
+                        // compass sits just inside the frame's edge, over the map, as in the game's fixed-size view.
+                        clipPath(ring) { drawSprite(frame, center - (FRAME_HOLE_CENTRE * scale).toOffset(), scale) }
+                        clipPath(socket) { drawSprite(frame, at - (COMPASS_CENTRE * scale).toOffset(), scale) }
                     }
-                    // The frame's own ring alone: its compass socket would reach out among the ring's apps, so the
-                    // compass sits just inside the frame's edge, over the map, as in the game's fixed-size view.
-                    clipPath(ring) { drawSprite(frame, origin, scale) }
-                    clipPath(face) { rotate(turn, compassAt) { drawSprite(compass, compassAt - Offset(compass.width.toFloat(), compass.height.toFloat()) * (scale / 2f), scale) } }
-                    clipPath(socket) { drawSprite(frame, socketOrigin, scale) }
-                }
-            },
-        )
+                },
+            )
+            Spacer(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        val at = compassAt(size, mapScale(size, px))
+                        transformOrigin = TransformOrigin(at.x / size.width, at.y / size.height)
+                        rotationZ = -(heading() ?: 0f)
+                    }
+                    .drawWithCache {
+                        val scale = mapScale(size, px)
+                        val at = compassAt(size, scale)
+                        val face = circle(at, COMPASS_RADIUS * scale)
+                        onDrawBehind { clipPath(face) { drawSpriteCentred(compass, at, scale) } }
+                    },
+            )
+        }
     }
 
     /** The emblem clips to the frame's outer edge, which reaches past its cell, so the map and its compass show whole. */
@@ -266,10 +289,8 @@ object OldSchoolArt : ThemeArt {
     ) {
         val px = gamePixel
         IconGround(LocalIconPlace.current, presses, modifier, Alignment.Center) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                folder.apps.getOrNull(1)?.let { PileItem(it, icon, PILE_BEHIND, px, inner) }
-                folder.apps.firstOrNull()?.let { PileItem(it, icon, PILE_FRONT, px, inner) }
-            }
+            folder.apps.getOrNull(1)?.let { PileItem(it, icon, PILE_BEHIND, px, inner) }
+            folder.apps.firstOrNull()?.let { PileItem(it, icon, PILE_FRONT, px, inner) }
         }
     }
 
@@ -381,11 +402,12 @@ object OldSchoolArt : ThemeArt {
             val fill = sprite(R.drawable.osrs_1059_0)
             val px = gamePixel
             Box(
-                modifier.drawBehind {
-                    val centre = Offset(size.width / 2, size.height / 2)
-                    val orb = Path().apply { addOval(Rect(centre, ORB_RADIUS * px.toFloat())) }
-                    clipPath(orb) { drawSprite(frame, centre - (ORB_CENTRE * px).toOffset(), px) }
-                    drawSprite(fill, centre - Offset(fill.width.toFloat(), fill.height.toFloat()) * (px / 2f), px)
+                modifier.drawWithCache {
+                    val orb = circle(size.center, ORB_RADIUS * px)
+                    onDrawBehind {
+                        clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
+                        drawSpriteCentred(fill, center, px)
+                    }
                 }.pressed(presses),
                 contentAlignment = contentAlignment,
                 content = content,
@@ -395,28 +417,23 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
-    /** An item drawn as the game draws it, at whole game pixels, as large as its square takes and no larger than the game's. */
+    /**
+     * An item drawn as the game draws it, at whole game pixels, as large as its square takes and no larger than the
+     * game's. An image larger than an item's canvas is no item, such as a pinned shortcut's icon, and is fitted whole.
+     */
     @Composable
     override fun IconImage(bitmap: ImageBitmap, modifier: Modifier) {
+        if (bitmap.width > ITEM_WIDTH || bitmap.height > ITEM_HEIGHT) return Image(bitmap, contentDescription = null, modifier = modifier)
         val px = gamePixel
-        Spacer(
-            modifier.drawBehind {
-                if (bitmap.width > ITEM_FIT || bitmap.height > ITEM_FIT) {
-                    drawImage(bitmap, dstSize = IntSize(size.width.toInt(), size.height.toInt()), filterQuality = FilterQuality.None)
-                } else {
-                    val scale = max(1, min(px, floor(size.minDimension / ITEM_FIT).toInt()))
-                    drawSprite(bitmap, Offset(size.width, size.height) / 2f - Offset(bitmap.width.toFloat(), bitmap.height.toFloat()) * (scale / 2f), scale)
-                }
-            },
-        )
+        Spacer(modifier.drawBehind { drawSpriteCentred(bitmap, center, fitScale(size.minDimension, ITEM_FIT, px)) })
     }
 
     override val badgeCorner: Alignment
         get() = Alignment.TopStart
 
     /**
-     * An item's stack count, in the game's small font at the item's top left: yellow while it has notifications in the
-     * shade, white once they are all dismissed, as the game's white counts mark a different stack.
+     * An item's stack count, in the game's small font at the item's top left: yellow while all its notifications are in
+     * the shade, white once some are dismissed, as the game's white counts mark a different stack.
      */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
@@ -461,46 +478,23 @@ object OldSchoolArt : ThemeArt {
         val px = gamePixel
         return { slots ->
             val count = slots.starts.size
-            val scale = max(1, min(px, floor(slots.iconSize / STONE_FACE).toInt()))
+            val scale = fitScale(slots.iconSize, STONE_FACE.toFloat(), px)
             val top = size.height / 2 - STONE_HEIGHT * scale / 2f
             slots.starts.forEachIndexed { index, start ->
                 val centre = start + slots.iconSize / 2
                 val half = STONE_PITCH * scale / 2f
                 when {
                     count == 1 || index in 1 until count - 1 -> drawSprite(stone, Offset(centre - stone.width * scale / 2f, top), scale)
-                    index == 0 -> drawSpritePart(row, 0, END_STONE, Offset(centre + half - END_STONE * scale, top), scale)
-                    else -> drawSpritePart(row, row.width - END_STONE, END_STONE, Offset(centre - half, top), scale)
+                    index == 0 -> drawSpritePart(row, IntRect(0, 0, END_STONE, row.height), Offset(centre + half - END_STONE * scale, top), scale)
+                    else -> drawSpritePart(row, IntRect(row.width - END_STONE, 0, row.width, row.height), Offset(centre - half, top), scale)
                 }
                 if (slots.glow > 0f) drawSprite(lit, Offset(centre - lit.width * scale / 2f, top), scale, alpha = slots.glow * 0.7f)
             }
         }
     }
 
-    override val drawerShape: Shape
-        @Composable get() = RectangleShape
-
-    override val drawerPeek: Dp
-        @Composable get() = 0.dp
-
-    override val drawerTabInDock: Boolean
-        get() = true
-
     /** The inventory tab's backpack, on the dock's last stone, which opens the drawer as the game's tab opens its inventory. */
-    @Composable
-    override fun DockDrawerTab(onClick: () -> Unit, modifier: Modifier) {
-        val bag = sprite(R.drawable.osrs_777_0)
-        val px = gamePixel
-        Spacer(
-            modifier
-                .clickable(onClick = onClick)
-                .semantics { contentDescription = "Open the app drawer" }
-                .testTag(AppDrawerTags.HANDLE)
-                .drawBehind {
-                    val scale = max(1, min(px, floor(size.minDimension / STONE_FACE).toInt()))
-                    drawSprite(bag, Offset(size.width, size.height) / 2f - Offset(bag.width.toFloat(), bag.height.toFloat()) * (scale / 2f), scale)
-                },
-        )
-    }
+    override val dockDrawerTab: @Composable (onClick: () -> Unit, modifier: Modifier) -> Unit = { onClick, modifier -> InventoryTab(onClick, modifier) }
 
     /** The inventory tab: a stone with the game's backpack, lit red while the drawer is open as a selected tab is. */
     @Composable
@@ -551,18 +545,12 @@ object OldSchoolArt : ThemeArt {
     @Composable
     override fun BinFace(highlighted: Boolean, modifier: Modifier) = StoneBin(highlighted, modifier)
 
-    /** A card's settings are boxed square in the menu's brown rim, and its choices are square as the game's buttons are. */
+    /** A card's settings are boxed in the menu's brown rim. */
     @Composable
     override fun settingBox(): Modifier =
         Modifier.border(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim).background(MaterialTheme.colorScheme.surfaceContainerHighest)
 
-    @Composable
-    override fun segmentShape(index: Int, count: Int): Shape = RectangleShape
-
-    override val swatchShape: Shape
-        get() = RectangleShape
-
-    /** The game's stone-framed interface box: square, rimmed in black outside the menu's brown, a game pixel each. */
+    /** The game's stone-framed interface box, rimmed in black outside the menu's brown, a game pixel each. */
     @Composable
     override fun dialogBox(ground: PanelGround): Modifier = Modifier.gameRim(gamePixel).solidGround(ground, RectangleShape)
 
@@ -584,6 +572,26 @@ object OldSchoolArt : ThemeArt {
             val density = LocalDensity.current
             return remember(px, density) { gameTypography(px, density) }
         }
+
+    /** Every corner square, as the game's interface has them. */
+    override val shapes: Shapes
+        get() = SquareShapes
+}
+
+private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it) }
+
+/** The inventory tab's backpack, filling its slot of the dock at whole game pixels, which opens the drawer. */
+@Composable
+private fun InventoryTab(onClick: () -> Unit, modifier: Modifier) {
+    val bag = sprite(R.drawable.osrs_777_0)
+    val px = gamePixel
+    Spacer(
+        modifier
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Open the app drawer" }
+            .testTag(AppDrawerTags.DOCK_TAB)
+            .drawBehind { drawSpriteCentred(bag, center, fitScale(size.minDimension, STONE_FACE.toFloat(), px)) },
+    )
 }
 
 /** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
@@ -634,36 +642,40 @@ private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLe
     }
 }
 
-/** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
 /** The ripple of a press on an icon, unbounded, so it never clips the item's pixels. */
 private fun Modifier.pressed(presses: InteractionSource?) = if (presses == null) this else indication(presses, ripple(bounded = false))
 
-internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
-    drawSpritePart(image, 0, image.width, topLeft, scale, tint, alpha)
+/** The largest whole scale, from one to [most], at which [units] of the game's pixels fit in [room] screen pixels. */
+internal fun fitScale(room: Float, units: Float, most: Int) = max(1, min(most, floor(room / units).toInt()))
 
-/** The columns of [image] from [from], [width] of them, drawn as [drawSprite] draws the whole. */
+/** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
+internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
+    drawSpritePart(image, IntRect(0, 0, image.width, image.height), topLeft, scale, tint, alpha)
+
+/** [image] as [drawSprite] draws it, centred on [centre]. */
+internal fun DrawScope.drawSpriteCentred(image: ImageBitmap, centre: Offset, scale: Int) =
+    drawSprite(image, centre - Offset(image.width.toFloat(), image.height.toFloat()) * (scale / 2f), scale)
+
+/** The part [from] of [image], drawn as [drawSprite] draws the whole. */
 internal fun DrawScope.drawSpritePart(
     image: ImageBitmap,
-    from: Int,
-    width: Int,
+    from: IntRect,
     topLeft: Offset,
     scale: Int,
     tint: Color? = null,
     alpha: Float = 1f,
 ) = drawImage(
     image,
-    srcOffset = IntOffset(from, 0),
-    srcSize = IntSize(width, image.height),
+    srcOffset = from.topLeft,
+    srcSize = from.size,
     dstOffset = IntOffset(topLeft.x.toInt(), topLeft.y.toInt()),
-    dstSize = IntSize(width * scale, image.height * scale),
+    dstSize = IntSize(from.width * scale, from.height * scale),
     alpha = alpha,
     colorFilter = tint?.let { ColorFilter.tint(it) },
     filterQuality = FilterQuality.None,
 )
 
 private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)
-
-private fun IntOffset.toOffset() = Offset(x.toFloat(), y.toFloat())
 
 /** The player's own square in the minimap's middle, three game pixels wide in a ring of black so it shows on a white wall. */
 private fun DrawScope.selfMarker(centre: Offset, scale: Int) {

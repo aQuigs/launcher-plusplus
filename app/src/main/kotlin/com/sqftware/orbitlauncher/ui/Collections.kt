@@ -929,7 +929,7 @@ private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) 
             SegmentedButton(
                 selected = choice == value,
                 onClick = { onChoose(choice) },
-                shape = LocalThemeArt.current.segmentShape(index, setting.choices.size),
+                shape = SegmentedButtonDefaults.itemShape(index, setting.choices.size, MaterialTheme.shapes.extraLarge),
                 // Lit as the picker's tiles are: the default fill barely shows against the dialog.
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -945,14 +945,14 @@ private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) 
 }
 
 /**
- * A round swatch per colour of [setting], which is only ever [CardSetting.Colour], in the card's own tint so the choice
+ * A swatch per colour of [setting], round in Material's corners, which is only ever [CardSetting.Colour], in the card's own tint so the choice
  * looks as the card will; the chosen one is ringed.
  */
 @Composable
 private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
     val tints = LocalCardTints.current
     val colours = MaterialTheme.colorScheme
-    val shape = LocalThemeArt.current.swatchShape
+    val shape = MaterialTheme.shapes.extraLarge
 
     // Wrapping rather than squeezed into one row, so each swatch keeps a full touch target.
     FlowRow(maxItemsInEachRow = 5, modifier = Modifier.fillMaxWidth().selectableGroup()) {

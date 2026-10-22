@@ -43,8 +43,6 @@ import com.sqftware.orbitlauncher.ui.theme.BankGround
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
 import com.sqftware.orbitlauncher.ui.theme.StackCount
 import com.sqftware.orbitlauncher.ui.theme.bankTint
-import kotlin.math.floor
-import kotlin.math.max
 import kotlin.math.min
 
 /** How many of the game's pixels thick its interface frame is, and how far a card's content keeps inside it. */
@@ -187,7 +185,7 @@ private fun DrawScope.repeatAcross(image: ImageBitmap, from: IntRect, start: Int
     var x = start.x
     while (x < end) {
         val columns = min(from.width, (end - x + scale - 1) / scale)
-        drawPart(image, IntOffset(from.left, from.top), IntSize(columns, from.height), IntOffset(x, start.y), scale)
+        drawSpritePart(image, IntRect(from.topLeft, IntSize(columns, from.height)), Offset(x.toFloat(), start.y.toFloat()), scale)
         x += columns * scale
     }
 }
@@ -197,13 +195,10 @@ private fun DrawScope.repeatDown(image: ImageBitmap, from: IntRect, start: IntOf
     var y = start.y
     while (y < end) {
         val rows = min(from.height, (end - y + scale - 1) / scale)
-        drawPart(image, IntOffset(from.left, from.top), IntSize(from.width, rows), IntOffset(start.x, y), scale)
+        drawSpritePart(image, IntRect(from.topLeft, IntSize(from.width, rows)), Offset(start.x.toFloat(), y.toFloat()), scale)
         y += rows * scale
     }
 }
-
-private fun DrawScope.drawPart(image: ImageBitmap, srcOffset: IntOffset, srcSize: IntSize, at: IntOffset, scale: Int) =
-    drawImage(image, srcOffset, srcSize, at, IntSize(srcSize.width * scale, srcSize.height * scale), filterQuality = FilterQuality.None)
 
 /**
  * The game's selected bank tab with the collection's [glyph] and [title] on it in the interface's orange, as wide as
@@ -287,9 +282,7 @@ internal fun StoneBin(highlighted: Boolean, modifier: Modifier) {
         contentAlignment = Alignment.Center,
         modifier = modifier.drawBehind {
             // Twice the game's pixels, as its largest type is drawn, unless the bin is smaller.
-            val scale = max(1, min(2 * px, floor(size.minDimension / STONE_BUTTON).toInt()))
-            val side = STONE_BUTTON * scale
-            drawSprite(stone, Offset((size.width - side) / 2, (size.height - side) / 2), scale)
+            drawSpriteCentred(stone, center, fitScale(size.minDimension, STONE_BUTTON.toFloat(), 2 * px))
         },
     ) {
         Icon(Icons.Default.Delete, contentDescription = null, tint = if (highlighted) StackCount else GameOrange)

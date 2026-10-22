@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
@@ -169,6 +170,7 @@ private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
 
 /** How far above the drawer's strip the shade along the bottom edge starts. */
 private val BOTTOM_SHADE_FADE = 32.dp
+private val DRAWER_PEEK = 48.dp
 
 /**
  * How near either side of the screen what is dragged turns the pages, how long it rests there before the first turn, and
@@ -1306,7 +1308,10 @@ fun LauncherScreen(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val ground = panelGround()
     val art = LocalThemeArt.current
-    val drawerPeek = art.drawerPeek
+    val dockTab = art.dockDrawerTab
+    // A theme whose dock ends with the drawer's tab leaves no handle peeking below the home page; the other pages,
+    // without the dock, keep it.
+    val drawerPeek = if (dockTab != null && inView == LauncherPage.Home) 0.dp else DRAWER_PEEK
     // How far the drawer's list has been dragged and flung, for the stars to follow. A jump by the letter rail is a cut,
     // after which no one could tell where the stars ought to be, so it need not count.
     val drawerScrolled = remember { mutableFloatStateOf(0f) }
@@ -1356,7 +1361,7 @@ fun LauncherScreen(
             BottomSheetScaffold(
                 scaffoldState = rememberBottomSheetScaffoldState(drawerState),
                 sheetPeekHeight = drawerPeek,
-                sheetShape = art.drawerShape,
+                sheetShape = BottomSheetDefaults.ExpandedShape,
                 // The handle is the drawer's own, not the sheet's, so the panel can fill in the strip behind it: clear while the
                 // drawer is down, so only the chevron shows over the wallpaper, and solid once it is open, so the open drawer
                 // reaches the top as Arc's does. The panel is translucent so the wallpaper still shows through.
@@ -1618,10 +1623,10 @@ fun LauncherScreen(
                                         // to the drawer handle. Stored dock apps hold its row until the apps and shortcuts load, so the
                                         // ring does not move when they arrive. An empty dock shows while an app is dragged from the
                                         // drawer or another home place, as a place to drop it, and slides in and out so the ring above
-                                        // moves rather than jumps.
+                                        // moves rather than jumps. A dock that ends with the drawer's tab always shows.
                                         if (isHome) {
                                             val dockShown = dock.isNotEmpty() || (onHome == null && !pageApps.dock.isEmpty) ||
-                                                (active || page == inView) && dragged?.app != null || art.drawerTabInDock
+                                                (active || page == inView) && dragged?.app != null || dockTab != null
                                             AnimatedVisibility(visible = dockShown) {
                                                 Dock(
                                                     items = dock,
@@ -1636,7 +1641,7 @@ fun LauncherScreen(
                                                     onClearBadge = actions.clearBadge,
                                                     rearrange = dockRearrange.takeIf { active },
                                                     foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Dock }?.index,
-                                                    tab = if (art.drawerTabInDock) { tab -> art.DockDrawerTab(::openDrawer, tab) } else null,
+                                                    tab = dockTab?.let { tab -> { modifier -> tab(::openDrawer, modifier) } },
                                                 )
                                             }
                                         }

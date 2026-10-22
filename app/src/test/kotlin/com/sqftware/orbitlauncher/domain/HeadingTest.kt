@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.domain
 
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -16,8 +18,8 @@ class HeadingTest {
     }
 
     @Test
-    fun aHeadingStaysWithinACircle() {
-        assertEquals(10f, wrapDegrees(370f), 0.001f)
-        assertEquals(350f, wrapDegrees(-10f), 0.001f)
+    fun aTurnPastNorthCountsTheShortWay() {
+        assertTrue(turnedPast(359f, 1f, 1f))
+        assertFalse(turnedPast(359.8f, 0.2f, 1f))
     }
 }
