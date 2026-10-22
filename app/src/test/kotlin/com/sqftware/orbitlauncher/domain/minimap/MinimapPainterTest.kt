@@ -28,18 +28,9 @@ class MinimapPainterTest {
     }
 
     @Test
-    fun marksTheCentreWhiteInABlackOutline() {
-        val disc = painter.paint(MapScene(centre))
-        for (y in 74..78) for (x in 74..78) {
-            val inner = x in 75..77 && y in 75..77
-            assertEquals("($x, $y)", if (inner) WHITE else BLACK, disc[x, y])
-        }
-    }
-
-    @Test
-    fun paintsBareGroundAsGrassWithNoWalls() {
+    fun paintsBareGroundAsGrassWithNoWallsAndNoSelfMarker() {
         val disc = MinimapPainter(MinimapSprites()).paint(MapScene(centre)).argb
-        val ground = disc.indices.filter { disc[it] ushr 24 == 0xFF && it !in centreMarker }.map { disc[it] }.toSet()
+        val ground = disc.filter { it ushr 24 == 0xFF }.toSet()
         assertTrue(ground.all { it shr 8 and 0xFF == 0x8F && it and 0xFF == 0x24 })
         assertTrue(WALL !in ground)
     }
@@ -136,8 +127,6 @@ class MinimapPainterTest {
         assertTrue(disc.any { it == ROAD })
     }
 
-    private val centreMarker = (74..78).flatMap { y -> (74..78).map { x -> y * MINIMAP_SIZE + x } }.toSet()
-
     private fun Pixels.spots(colour: Int) = argb.indices.filter { argb[it] == colour }.map { (it % MINIMAP_SIZE).toDouble() to (it / MINIMAP_SIZE).toDouble() }
 
     // Spots are whole pixels of positions that were not, so two may sit up to a pixel's diagonal closer than placed.
@@ -162,8 +151,6 @@ class MinimapPainterTest {
         const val TREE = 0xFFFF00FF.toInt()
         const val NPC = 0xFF00FFFF.toInt()
         const val ICON = 0xFF0000E0.toInt()
-        const val WHITE = 0xFFFFFFFF.toInt()
-        const val BLACK = 0xFF000000.toInt()
         const val WALL = 0xFFEEEEEE.toInt()
         const val DOOR = 0xFFEE0000.toInt()
         const val PLAZA = 0xFF6F6A5E.toInt()

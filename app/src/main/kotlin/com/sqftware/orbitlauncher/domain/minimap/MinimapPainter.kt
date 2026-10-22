@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
-import com.sqftware.orbitlauncher.domain.BLACK
 import com.sqftware.orbitlauncher.domain.Pixels
 import com.sqftware.orbitlauncher.domain.alpha
 import com.sqftware.orbitlauncher.domain.blue
@@ -32,7 +31,6 @@ private const val N = MINIMAP_SIZE
 private const val WALL = 0xFFEEEEEE.toInt()
 private const val DOOR = 0xFFEE0000.toInt()
 private const val RAIL = 0xFF3A3024.toInt()
-private const val WHITE = 0xFFFFFFFF.toInt()
 private const val GRASS_DARK = 0x698F24
 private const val GRASS_LIGHT = 0x718F24
 private const val WATER_BASE = 0xFF2E5596.toInt()
@@ -71,7 +69,7 @@ internal const val MAX_PER_ICON = 2
 private const val ICON_SPACING_PX = 24.0
 internal const val MAX_NPCS = 10
 
-// The 3x3 self marker covers pixels c-1..c+1 of the even disc, so the location sits on its middle pixel.
+// The location sits on the middle of pixel N / 2, as the game's minimap centres its player on a pixel.
 private const val C = N / 2 + 0.5
 private const val RADIUS = N / 2.0
 
@@ -85,8 +83,9 @@ private val DISC_PIXELS = DISC.count { it }
 /**
  * Paints the Old School minimap of a [MapScene]: a [MINIMAP_SIZE] px disc at [METRES_PER_PIXEL], built the way the game
  * builds its minimap. Every 4 px tile gets a flat ground colour; walls are 1 px lines round each structure with a few
- * doors; trees, map icons and the dots of people go on top, and the self marker sits in the middle. Seeded choices are
- * keyed by places on Earth, so the map keeps its trees and grass as it moves.
+ * doors; trees, map icons and the dots of people go on top. The self marker is left to whoever shows the map, so it
+ * stays upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
+ * it moves.
  */
 class MinimapPainter(private val sprites: MinimapSprites) {
     /** The disc: opaque inside the circle, clear outside it. */
@@ -185,7 +184,6 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         paintDoors(walls, comp)
         paintTrees()
         paintNpcs(paintIcons())
-        paintSelf()
 
         for (i in 0 until N * N) if (!DISC[i]) img[i] = 0
         return Pixels(N, N, img)
@@ -429,12 +427,6 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             dots += x to y
         }
         dots.forEach { (x, y) -> blit(sprite, x - sprite.width / 2, y - sprite.height / 2) }
-    }
-
-    // Drawn last with a 1 px black outline so it never vanishes into a white wall.
-    private fun paintSelf() {
-        val m = C.toInt()
-        for (y in m - 2..m + 2) for (x in m - 2..m + 2) img[y * N + x] = if (abs(x - m) <= 1 && abs(y - m) <= 1) WHITE else BLACK
     }
 
     private fun blit(sprite: Pixels, ox: Int, oy: Int) {
