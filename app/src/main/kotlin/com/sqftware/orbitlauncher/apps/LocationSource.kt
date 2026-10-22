@@ -51,8 +51,8 @@ private const val FRESH_MILLIS = 10 * 60_000L
 /**
  * The platform's LocationManager, asking for precise location, since a coarse fix is snapped to a grid about 2 km wide and
  * puts the map on the wrong streets; a user who allows only an approximate place still gets a map, of roughly where they
- * are. It runs at balanced power: the last fix if it is fresh, one current fix, then updates no more often than a minute
- * or 50 m apart. No Play services: the launcher has no other use for them. The
+ * are. It runs at balanced power: the last fix if it is fresh, or else one current fix, then updates no more often than
+ * a minute or 50 m apart. No Play services: the launcher has no other use for them. The
  * permission is asked through the activity's [registry], as the home role is; the adapter lives as long as the activity.
  */
 class PlatformLocationSource(private val context: Context, registry: ActivityResultRegistry) : LocationSource {
@@ -81,8 +81,8 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
         val listener = LocationListenerCompat { send(it) }
         val cancel = CancellationSignal()
         try {
-            manager.getLastKnownLocation(provider)?.takeIf { System.currentTimeMillis() - it.time < FRESH_MILLIS }?.let(send)
-            LocationManagerCompat.getCurrentLocation(manager, provider, cancel, executor) { send(it) }
+            val last = manager.getLastKnownLocation(provider)?.takeIf { System.currentTimeMillis() - it.time < FRESH_MILLIS }
+            if (last != null) send(last) else LocationManagerCompat.getCurrentLocation(manager, provider, cancel, executor) { send(it) }
             val request = LocationRequestCompat.Builder(UPDATE_MILLIS)
                 .setMinUpdateDistanceMeters(UPDATE_METRES)
                 .setQuality(LocationRequestCompat.QUALITY_BALANCED_POWER_ACCURACY)
