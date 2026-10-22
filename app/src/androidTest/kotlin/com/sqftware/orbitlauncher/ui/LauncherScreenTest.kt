@@ -222,7 +222,7 @@ class LauncherScreenTest {
     private var restarts = 0
     private var resets = 0
     private val actions = AppActions(
-        icon = { null },
+        icon = { _, _ -> null },
         launch = launched::add,
         clearBadge = {},
         shortcuts = {

@@ -1519,7 +1519,7 @@ fun LauncherScreen(
                                                 HomeRing(
                                                     ring = pageRing,
                                                     hint = hint,
-                                                    icon = actions.ringIcon,
+                                                    icon = actions.icon,
                                                     onLaunch = actions.launch,
                                                     onOpenFolder = { if (active) tapFolder(page.id, it.at) },
                                                     onCloseFolder = { if (active) openFolder = null },

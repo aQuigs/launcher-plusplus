@@ -101,6 +101,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
@@ -282,7 +283,7 @@ object OldSchoolArt : ThemeArt {
     @Composable
     override fun FolderFace(
         folder: RingItem.Folder,
-        icon: suspend (AppEntry) -> ImageBitmap?,
+        icon: IconLoader,
         modifier: Modifier,
         presses: InteractionSource?,
         inner: () -> Float,
@@ -687,7 +688,7 @@ private fun DrawScope.selfMarker(centre: Offset, scale: Int) {
 
 /** One of a pile's items, [offset] game pixels from the middle, fading by [inner] as the open folder's previews do. */
 @Composable
-private fun PileItem(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, offset: IntOffset, px: Int, inner: () -> Float) {
+private fun PileItem(app: AppEntry, icon: IconLoader, offset: IntOffset, px: Int, inner: () -> Float) {
     val density = LocalDensity.current
     with(density) {
         AppImage(

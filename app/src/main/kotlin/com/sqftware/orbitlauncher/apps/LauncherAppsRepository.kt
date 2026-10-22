@@ -142,7 +142,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     // A pair has no icon of its own: the screen draws its apps' together.
     override suspend fun icon(app: AppEntry, style: IconStyle): ImageBitmap? {
-        val key = if (style == IconStyle.Plain) app.key else "${style.name}:${app.key}"
+        val key = if (style == IconStyle.Plain) app.key else "$style:${app.key}"
         return icons[key] ?: icons.keep(app, key) {
             draw(app.key, style) { density ->
                 when (val kind = app.kind) {
@@ -301,8 +301,10 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         try {
             val size = activityManager.launcherLargeIconSize
             val icon = drawable(activityManager.launcherLargeIconDensity) ?: return@withContext null
-            val itemSize = style.itemSize
-            if (itemSize == null) icon.toBitmap(size, size).asImageBitmap() else itemSprite(icon.layers(size), itemSize).toImageBitmap()
+            when (style) {
+                IconStyle.Plain -> icon.toBitmap(size, size).asImageBitmap()
+                is IconStyle.Item -> itemSprite(icon.layers(size), style.size).toImageBitmap()
+            }
         } catch (e: RuntimeException) {
             // An app on the home screen whose icon cannot be drawn would otherwise crash the launcher on every start.
             Log.w(TAG, "No icon for $what", e)

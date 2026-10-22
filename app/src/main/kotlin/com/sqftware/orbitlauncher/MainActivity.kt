@@ -71,6 +71,7 @@ import com.sqftware.orbitlauncher.domain.minimap.MapIcon
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.GridPages
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
@@ -191,11 +192,11 @@ class MainActivity : ComponentActivity() {
                 // Each app list after the first follows a package change, which may bring an app a new icon, so every icon
                 // shown is handed a new way to ask, a new lambda rather than a reference equal to the last, and asks again.
                 // Counted, not compared: an update leaves the app's entry as it was.
-                val iconStyle = shownTheme.iconStyle
-                val actions = remember(appLists?.index ?: 0, iconStyle) {
+                // By value, so a theme that draws icons as another does keeps the icons shown.
+                val iconStyles = IconPlace.entries.associateWith(shownTheme::iconStyle)
+                val actions = remember(appLists?.index ?: 0, iconStyles) {
                     AppActions(
-                        icon = { repository.icon(it, iconStyle) },
-                        ringIcon = { repository.icon(it, iconStyle.small) },
+                        icon = { app, place -> repository.icon(app, iconStyles.getValue(place)) },
                         launch = {
                             clearBadge(it)
                             repository.launch(it)

@@ -2,14 +2,14 @@ package com.sqftware.orbitlauncher.domain
 
 /**
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
- * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in its
- * [iconStyle], and, if it [mapsWhereIAm], a map of where the user is once they turn it on.
+ * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
+ * [iconStyle] it gives each place, and, if it [mapsWhereIAm], a map of where the user is once they turn it on.
  */
 enum class Theme(
     val label: String,
     val folderLooks: List<FolderLook>,
     val colourways: List<Colourway>,
-    val iconStyle: IconStyle = IconStyle.Plain,
+    private val iconStyles: (IconPlace) -> IconStyle = { IconStyle.Plain },
     val mapsWhereIAm: Boolean = false,
 ) {
     Space(
@@ -37,7 +37,17 @@ enum class Theme(
     Paper("Paper", listOf(FolderLook.FoldedSquare, FolderLook.Envelope, FolderLook.Pinwheel), listOf(Colourway.Coral)),
     CrystalCity("Crystal city", listOf(FolderLook.Cube, FolderLook.Octahedron, FolderLook.Geode), listOf(Colourway.Ice)),
     GreenCore("Green core", listOf(FolderLook.WireSphere, FolderLook.Orb, FolderLook.HexCell), listOf(Colourway.Green)),
-    OldSchool("Old School", listOf(FolderLook.Pile), listOf(Colourway.Classic), IconStyle.Item, mapsWhereIAm = true),
+    OldSchool(
+        "Old School",
+        listOf(FolderLook.Pile),
+        listOf(Colourway.Classic),
+        // The ring's icons sit in the game's round orbs, a smaller frame than an inventory slot, so an item there is a size down.
+        iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Ring) 17 else 26) },
+        mapsWhereIAm = true,
+    ),
+    ;
+
+    fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)
 }
 
 /**

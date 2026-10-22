@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -108,7 +107,7 @@ private const val PREVIEW_REACH = 0.3f
 @Composable
 fun FolderIcon(
     folder: RingItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onOpen: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,
     menu: FolderMenu? = null,
@@ -178,7 +177,7 @@ fun folderDescription(name: String, count: Int): String =
 @Composable
 fun FolderDisc(
     folder: RingItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     presses: InteractionSource?,
     inner: () -> Float,
     modifier: Modifier = Modifier,
@@ -196,7 +195,7 @@ fun FolderDisc(
  * small discs fit them too.
  */
 @Composable
-fun FolderPreviews(apps: List<AppEntry>, icon: suspend (AppEntry) -> ImageBitmap?) {
+fun FolderPreviews(apps: List<AppEntry>, icon: IconLoader) {
     val previews = apps.take(PREVIEWS)
     Layout(
         // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
@@ -227,7 +226,7 @@ fun FolderPreviews(apps: List<AppEntry>, icon: suspend (AppEntry) -> ImageBitmap
 @Composable
 internal fun SlotIcon(
     item: RingItem,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
     modifier: Modifier,

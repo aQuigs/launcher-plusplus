@@ -4,7 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -42,7 +41,7 @@ class CollectionsColumnTest {
     private val apps = recent + clock + mail
     private var page by mutableStateOf(CollectionsPage())
     private var foregroundTime by mutableStateOf<ForegroundTime?>(null)
-    private var icon by mutableStateOf<suspend (AppEntry) -> ImageBitmap?>({ null })
+    private var icon by mutableStateOf<IconLoader>({ _, _ -> null })
     private val launched = mutableListOf<AppEntry>()
     private val edited = mutableListOf<CollectionKind>()
     private var adds = 0
@@ -91,7 +90,7 @@ class CollectionsColumnTest {
         show()
         val asked = mutableListOf<AppEntry>()
 
-        compose.runOnIdle { icon = { asked += it; null } }
+        compose.runOnIdle { icon = { app, _ -> asked += app; null } }
         compose.waitForIdle()
 
         assertTrue(asked.toString(), asked.containsAll(recent.takeLast(5)))

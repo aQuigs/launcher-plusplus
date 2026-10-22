@@ -16,7 +16,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -55,7 +54,7 @@ import kotlin.math.sin
 @Composable
 fun PlanetFace(
     folder: RingItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     modifier: Modifier = Modifier,
     presses: InteractionSource? = null,
     inner: () -> Float = { 1f },
@@ -158,7 +157,7 @@ private const val RING_TILT = -22f
 @Composable
 private fun OrbitFace(
     folder: RingItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     minutes: () -> Float,
     inner: () -> Float,
     modifier: Modifier,

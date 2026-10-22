@@ -45,6 +45,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
@@ -97,7 +98,7 @@ interface ThemeArt {
     @Composable
     fun FolderFace(
         folder: RingItem.Folder,
-        icon: suspend (AppEntry) -> ImageBitmap?,
+        icon: IconLoader,
         modifier: Modifier,
         presses: InteractionSource?,
         inner: () -> Float,
@@ -254,9 +255,6 @@ fun flatVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size)
 
 /** The dock's slots as laid out on its row: each icon [iconSize] across, the nth starting [starts] along, and how much it [glow]s. */
 class DockSlots(val iconSize: Float, val starts: List<Float>, val glow: Float)
-
-/** Where an icon is drawn, for a theme that frames the home ring's icons apart from the rest. */
-enum class IconPlace { Ring, Elsewhere }
 
 val LocalIconPlace = staticCompositionLocalOf { IconPlace.Elsewhere }
 

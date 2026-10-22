@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -50,7 +49,7 @@ object GridTags {
 fun GridBlock(
     block: Int,
     item: GridItem,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpen: (GridItem.Folder) -> Unit,
     menu: AppMenu?,
@@ -93,7 +92,7 @@ fun GridBlock(
 @Composable
 fun GridFolderDialog(
     folder: GridItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     menu: AppMenu?,
     unread: UnreadCounts,

@@ -91,7 +91,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
@@ -246,7 +245,7 @@ fun CollectionsColumn(
     apps: List<AppEntry>,
     builtInApps: List<AppEntry>,
     foregroundTime: ForegroundTime?,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: (CollectionKind) -> Unit,
     onSettings: (CollectionKind) -> Unit,
@@ -324,7 +323,7 @@ private fun CollectionCardView(
     apps: List<AppEntry>?,
     index: Int,
     reorder: ListReorder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onToggleExpanded: () -> Unit,
     onSettings: () -> Unit,
@@ -523,7 +522,7 @@ private fun AppGrid(
     apps: List<AppEntry>,
     expanded: Boolean,
     look: CardLook,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     rearrange: Rearrange?,
     drag: AppDrag?,

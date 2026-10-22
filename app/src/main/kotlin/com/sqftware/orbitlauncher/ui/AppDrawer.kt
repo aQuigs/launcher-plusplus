@@ -60,7 +60,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -178,7 +177,7 @@ data class DrawerControls(
 @Composable
 fun AppDrawer(
     apps: List<AppEntry>,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     picking: Picking? = null,
@@ -441,7 +440,7 @@ private fun LazyGridScope.apps(apps: List<AppEntry>, entry: DrawerEntry, detail:
 /** What every app in the drawer is shown with, in its [layout]: a row, or a cell of the grid. */
 private data class DrawerEntry(
     val layout: DrawerLayout,
-    val icon: suspend (AppEntry) -> ImageBitmap?,
+    val icon: IconLoader,
     val onLaunch: (AppEntry) -> Unit,
     val picking: Picking?,
     val menu: AppMenu?,

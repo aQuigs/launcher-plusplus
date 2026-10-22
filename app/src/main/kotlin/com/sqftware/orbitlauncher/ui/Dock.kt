@@ -12,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Constraints
@@ -47,7 +46,7 @@ object DockTags {
 @Composable
 fun Dock(
     items: List<RingItem>,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
     modifier: Modifier = Modifier,

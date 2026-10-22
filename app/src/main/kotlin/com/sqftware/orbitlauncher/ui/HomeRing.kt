@@ -41,7 +41,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.GraphicsLayerScope
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -70,6 +69,7 @@ import com.sqftware.orbitlauncher.domain.HangingNames
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.rooms
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.folderSlotOffset
@@ -167,7 +167,7 @@ private sealed interface Part {
 fun HomeRing(
     ring: List<RingItem>,
     hint: String?,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     onOpenFolder: (RingItem.Folder) -> Unit,
     onCloseFolder: () -> Unit,
@@ -545,7 +545,7 @@ private val RingItem.tag: String
 @Composable
 private fun CentrePlanet(
     folder: RingItem.Folder,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onClose: (() -> Unit)?,
     onAddApps: (() -> Unit)?,
     inner: () -> Float,

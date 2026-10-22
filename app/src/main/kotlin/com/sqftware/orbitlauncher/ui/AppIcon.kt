@@ -62,7 +62,7 @@ import kotlin.math.roundToInt
 @Composable
 fun AppIcon(
     app: AppEntry,
-    icon: suspend (AppEntry) -> ImageBitmap?,
+    icon: IconLoader,
     onLaunch: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
     menu: AppMenu? = null,
@@ -172,7 +172,7 @@ internal fun PlainIconGround(
 
 /** An app's image on its [IconDisc], rippling for [presses], and over the disc's corner the [WorkMark] of a work app. */
 @Composable
-fun AppFace(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier = Modifier, presses: InteractionSource? = null) {
+fun AppFace(app: AppEntry, icon: IconLoader, modifier: Modifier = Modifier, presses: InteractionSource? = null) {
     Box(modifier) {
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
         WorkMark(app, Modifier.align(Alignment.BottomEnd))
@@ -196,7 +196,7 @@ fun AppLabel(label: String, modifier: Modifier = Modifier, maxLines: Int = 1) {
 
 /** An app's icon alone, with no name and nothing to tap, or a pair's; blank until it has loaded. */
 @Composable
-fun AppImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier = Modifier) {
+fun AppImage(app: AppEntry, icon: IconLoader, modifier: Modifier = Modifier) {
     val kind = app.kind
     if (kind is EntryKind.AppPair) PairImage(kind, icon, modifier) else OwnImage(app, icon, modifier)
 }
@@ -218,7 +218,7 @@ private fun secondIconOffset(side: Int): Int = ((side / PAIR_ICON_FRACTION - sid
  * gap between them is cut out of the first, so whatever is behind shows through it, a disc or the sky of a folder.
  */
 @Composable
-private fun PairImage(pair: EntryKind.AppPair, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier) {
+private fun PairImage(pair: EntryKind.AppPair, icon: IconLoader, modifier: Modifier) {
     Layout(
         content = {
             OwnImage(pair.first, icon, Modifier.clip(CircleShape).cutAroundSecond())
@@ -247,11 +247,12 @@ private fun Modifier.cutAroundSecond() = drawWithCache {
 }
 
 @Composable
-private fun OwnImage(app: AppEntry, icon: suspend (AppEntry) -> ImageBitmap?, modifier: Modifier) {
+private fun OwnImage(app: AppEntry, icon: IconLoader, modifier: Modifier) {
     // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one; asked
     // again for the same app, it keeps showing the icon it has until the new one is drawn.
+    val place = LocalIconPlace.current
     val bitmap by key(app.key) {
-        produceState<ImageBitmap?>(null, icon) { value = icon(app) ?: value }
+        produceState<ImageBitmap?>(null, icon, place) { value = icon(app, place) ?: value }
     }
 
     Box(modifier) {
