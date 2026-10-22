@@ -61,9 +61,19 @@ class ItemSpriteTest {
     }
 
     @Test
-    fun aDarkMarkWithNoTileIsKept() {
+    fun aDarkMarkWithNoTileIsKeptAndOutlinedInWhite() {
         val item = itemSprite(disc(96, 0xFF202020.toInt()), size = 26)
         assertTrue(item.argb.count { it != 0 } > 26 * 26 / 2)
+        assertTrue(white in item.colours())
+        assertTrue(black !in item.colours())
+    }
+
+    @Test
+    fun aWhiteTileUnderAMarkIsDropped() {
+        val play = square(96) { x, y -> if (x in 30..65 && y in 30..65) blue else white }
+        val item = itemSprite(play, size = 26)
+        val whiteish = item.argb.count { it != 0 && luma(it) > 215 }
+        assertTrue("only the mark is left, not the tile: $whiteish", whiteish < 26 * 4)
     }
 
     @Test
