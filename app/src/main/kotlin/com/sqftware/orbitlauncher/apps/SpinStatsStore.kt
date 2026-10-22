@@ -26,7 +26,7 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         daysSpun = prefs.getInt(DAYS_SPUN, 0),
         longestStreak = prefs.getInt(LONGEST_STREAK, 0),
         busiestDay = prefs.getInt(BUSIEST_DAY, 0),
-        lastDay = if (prefs.contains(LAST_DAY)) prefs.getLong(LAST_DAY, 0) else null,
+        lastDay = prefs.getLong(LAST_DAY, 0),
         lastDaySpins = prefs.getInt(LAST_DAY_SPINS, 0),
         streak = prefs.getInt(STREAK, 0),
     )
@@ -43,7 +43,7 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         putInt(DAYS_SPUN, stats.daysSpun)
         putInt(LONGEST_STREAK, stats.longestStreak)
         putInt(BUSIEST_DAY, stats.busiestDay)
-        stats.lastDay?.let { putLong(LAST_DAY, it) } ?: remove(LAST_DAY)
+        putLong(LAST_DAY, stats.lastDay)
         putInt(LAST_DAY_SPINS, stats.lastDaySpins)
         putInt(STREAK, stats.streak)
     }

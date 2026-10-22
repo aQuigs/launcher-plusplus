@@ -426,7 +426,7 @@ fun HomeRing(
             val middle = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
             val out = spread.value
             val turn = spin.turn.toDouble()
-            coordinates?.let { spin.place(it, centreSize / 2f, radius + iconSize / 2, radius.toDp()) }
+            coordinates?.let { spin.place(it, centreSize / 2f, radius + iconSize / 2, radius) }
             // Where the planet's slot is, as an offset from the centre, and how large: on the ring, or in the dock, which
             // lies outside the ring's box and is read where the dock placed it.
             val dockBounds = centred?.takeIf { it.at.holder == HomePlace.Dock }?.let(dockSlot)

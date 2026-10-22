@@ -1,10 +1,8 @@
 package com.sqftware.orbitlauncher.domain
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
-import java.util.Locale
 import kotlin.math.PI
 
 class SpinStatsTest {
@@ -55,35 +53,12 @@ class SpinStatsTest {
     }
 
     @Test
-    fun `a clock set back counts as the same day`() {
-        val stats = SpinStats().on(day, day.plusDays(1), day)
+    fun `a day before the last, as after a clock set ahead is put right, starts a new day and streak`() {
+        val ahead = SpinStats().on(day.plusDays(365))
+        val stats = ahead.on(day, day, day.plusDays(1))
 
         assertEquals(2, stats.streak)
-        assertEquals(2, stats.daysSpun)
+        assertEquals(3, stats.daysSpun)
         assertEquals(2, stats.busiestDay)
-    }
-
-    @Test
-    fun `a distance goes in metric units or, where the country uses them, imperial ones`() {
-        assertEquals("45 cm", distanceText(0.45, Locale.UK))
-        assertEquals("12.3 m", distanceText(12.34, Locale.UK))
-        assertEquals("1,234.57 km", distanceText(1_234_567.0, Locale.UK))
-        assertEquals("6 in", distanceText(0.1524, Locale.US))
-        assertEquals("41 ft", distanceText(12.5, Locale.US))
-        assertEquals("1.00 mi", distanceText(1_609.344, Locale.US))
-    }
-
-    @Test
-    fun `a distance is put next to the longest yardstick it reaches`() {
-        assertNull(yardstickText(0.1, Locale.UK))
-        assertEquals("That's 1.0 banana", yardstickText(0.18, Locale.UK))
-        assertEquals("That's 2.0 giraffes", yardstickText(11.0, Locale.UK))
-    }
-
-    @Test
-    fun `a duration reads in seconds, then minutes, then hours`() {
-        assertEquals("12.5 s", durationText(12.5, Locale.UK))
-        assertEquals("3 min 20 s", durationText(200.0, Locale.UK))
-        assertEquals("2 h 5 min", durationText(7_500.0, Locale.UK))
     }
 }

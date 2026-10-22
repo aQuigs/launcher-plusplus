@@ -60,13 +60,15 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
             } else {
                 // As tall as each other, though one label wraps.
                 Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.Gap)) {
-                    DirectionTile(
+                    StatTile(
+                        RotateRightGlyph,
                         MaterialTheme.colorScheme.primary,
                         decimal(stats.clockwise, 1),
                         "turns clockwise",
                         Modifier.weight(1f),
                     )
-                    DirectionTile(
+                    StatTile(
+                        RotateRightGlyph,
                         MaterialTheme.colorScheme.tertiary,
                         decimal(stats.anticlockwise, 1),
                         "turns counterclockwise",
@@ -74,17 +76,22 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
                         mirrored = true,
                     )
                 }
-                DistancePane(stats.distance)
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    SectionLabel("Records")
+                StatTile(
+                    RulerGlyph,
+                    MaterialTheme.colorScheme.primary,
+                    distanceText(stats.distance, locale),
+                    "spun round the rim",
+                    Modifier.fillMaxWidth(),
+                    note = yardstickText(stats.distance, locale),
+                )
+                RecordSection("Records") {
                     RecordRow(LoopGlyph, "Most in one spin", "${decimal(stats.mostTurns, 1)} turns")
                     RecordRow(SpeedGlyph, "Top speed", "${decimal(stats.topRpm, 0)} rpm")
-                    RecordRow(TimerGlyph, "Longest coast", "${decimal(stats.longestCoast, 1)} s")
+                    RecordRow(TimerGlyph, "Longest coast", durationText(stats.longestCoast, locale))
                     RecordRow(StreakGlyph, "Longest streak", counted(stats.longestStreak, "day"))
                     RecordRow(DayGlyph, "Busiest day", counted(stats.busiestDay, "spin"))
                 }
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    SectionLabel("All time")
+                RecordSection("All time") {
                     RecordRow(HourglassGlyph, "Time coasting", durationText(stats.coasting, locale))
                     RecordRow(DaysGlyph, "Days spun on", counted(stats.daysSpun, "day"))
                 }
@@ -135,31 +142,21 @@ private fun SpinDial(stats: SpinStats, count: String) {
     }
 }
 
-/** How far an icon on the rim has gone, [metres] in all, next to something about as long. */
+/** A [glyph] over a [value] in its [tint] and what it counts, its [label], with a [note] under them if there is one. */
 @Composable
-private fun DistancePane(metres: Double) {
-    val locale = LocalLocale.current.platformLocale
-    val tint = MaterialTheme.colorScheme.primary
-
-    Pane(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(RulerGlyph, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(distanceText(metres, locale), style = MaterialTheme.typography.titleLarge, color = tint)
-                Text("spun round the rim", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                yardstickText(metres, locale)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DirectionTile(tint: Color, value: String, label: String, modifier: Modifier, mirrored: Boolean = false) {
+private fun StatTile(
+    glyph: ImageVector,
+    tint: Color,
+    value: String,
+    label: String,
+    modifier: Modifier,
+    mirrored: Boolean = false,
+    note: String? = null,
+) {
     Pane(modifier.fillMaxHeight().semantics(mergeDescendants = true) {}) {
         Column(Modifier.padding(12.dp)) {
             Icon(
-                RotateRightGlyph,
+                glyph,
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(20.dp).graphicsLayer { if (mirrored) scaleX = -1f },
@@ -167,7 +164,19 @@ private fun DirectionTile(tint: Color, value: String, label: String, modifier: M
             Spacer(Modifier.size(6.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            note?.let {
+                Spacer(Modifier.size(6.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium)
+            }
         }
+    }
+}
+
+@Composable
+private fun RecordSection(label: String, rows: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SectionLabel(label)
+        rows()
     }
 }
 

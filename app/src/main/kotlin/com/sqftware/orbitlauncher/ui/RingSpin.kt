@@ -21,7 +21,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
@@ -96,14 +95,14 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
     private var ring: LayoutCoordinates? = null
     private var inner = 0f
     private var outer = 0f
-    private var rim = 0.dp
+    private var rim = 0f
     private var area: LayoutCoordinates? = null
 
     /**
      * Where the ring is: [coordinates] centred on it, with its band from [inner] to [outer] from the centre and its icons
      * [rim] from it.
      */
-    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float, rim: Dp) {
+    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float, rim: Float) {
         ring = coordinates
         this.inner = inner
         this.outer = outer
@@ -144,7 +143,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
                 turn = 0f
             } finally {
                 // However the coast ends: at rest, caught, or cut short as what spins changes.
-                tally?.let { onSpin(it.spin(velocity, coast = coastNanos / 1e9, rim)) }
+                tally?.let { onSpin(it.spin(velocity, coast = coastNanos / 1e9)) }
             }
         }
     }
@@ -179,7 +178,8 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
             glide?.cancel()
 
             val velocity = VelocityTracker()
-            val tally = Tally()
+            // Taken now, as what spins may have changed, and laid out another rim, by the time the coast ends.
+            val tally = Tally(rim = rim.toDp().value.toDouble())
             var at = start
             velocity.addPosition(down.uptimeMillis, down.position)
             while (crossing != null && crossing.pressed) {
@@ -200,8 +200,8 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
         }
     }
 
-    /** How far a spin under way has turned each way, in radians. */
-    private class Tally {
+    /** How far a spin under way has turned each way, in radians, round a [rim] in dp. */
+    private class Tally(private val rim: Double) {
         private var clockwise = 0.0
         private var anticlockwise = 0.0
 
@@ -209,7 +209,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
             if (by > 0) clockwise += by else anticlockwise -= by
         }
 
-        fun spin(letGo: Float, coast: Double, rim: Dp) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast, rim.value.toDouble())
+        fun spin(letGo: Float, coast: Double) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast, rim)
     }
 }
 
