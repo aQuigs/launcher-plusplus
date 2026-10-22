@@ -20,13 +20,14 @@ private const val GAME_FONT_SIZE = 16
 
 /**
  * Every style in the game's fonts, each a whole number of screen pixels to one of the font's, with the font's one pixel
- * shadow. Half the game's scale for most text, as a phone's type is smaller than the game's, and up to twice it for
- * display type.
+ * shadow if [shadowed]: the game draws it under light text on its stone, never under dark text on its chatbox's
+ * parchment, where it smears. Half the game's scale for most text, as a phone's type is smaller than the game's, and up
+ * to twice it for display type.
  */
-internal fun gameTypography(px: Int, density: Density): Typography {
+internal fun gameTypography(px: Int, density: Density, shadowed: Boolean): Typography {
     fun style(fontPixel: Int, family: FontFamily = GameFont, weight: FontWeight = FontWeight.Normal): TextStyle {
         val size = with(density) { (GAME_FONT_SIZE * fontPixel).toSp() }
-        val shadow = Shadow(GameShadow, Offset(fontPixel.toFloat(), fontPixel.toFloat()), 0f)
+        val shadow = Shadow(GameShadow, Offset(fontPixel.toFloat(), fontPixel.toFloat()), 0f).takeIf { shadowed }
         return TextStyle(fontFamily = family, fontWeight = weight, fontSize = size, lineHeight = size * 1.15f, shadow = shadow)
     }
     val small = max(1, px / 2)

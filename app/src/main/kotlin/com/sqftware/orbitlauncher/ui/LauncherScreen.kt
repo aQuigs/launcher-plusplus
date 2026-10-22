@@ -1180,7 +1180,9 @@ fun LauncherScreen(
                                     showClockRing()
                                     latestOnPreviewThemeChange(latestTheme)
                                 },
-                                MenuRow("Folder look", end = RowEnd.Value(latestFolderLook.label)) { choosingLook = true },
+                                // A theme with one folder look has nothing to choose.
+                                MenuRow("Folder look", end = RowEnd.Value(latestFolderLook.label)) { choosingLook = true }
+                                    .takeIf { latestTheme.folderLooks.size > 1 },
                                 MenuRow("Showcase wallpaper") { showingWallpaper = true },
                                 LocalThemeArt.current.scene?.let { MenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             ),

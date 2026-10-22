@@ -85,12 +85,14 @@ fun ThemePreviewBar(
                 LauncherButton(onUse, emphasis = Emphasis.Strong, modifier = Modifier.testTag(ThemePreviewTags.USE)) { Text("Use ${shown.label}") }
             }
             ChipRow { ChoiceChips(Theme.entries, shown, Theme::label, onShow) }
-            // One row for both, so the bar is no taller than the clock whose room it takes.
-            ChipRow {
-                ChoiceChips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)
-                if (shown.colourways.size > 1) {
-                    VerticalDivider(Modifier.height(24.dp).align(Alignment.CenterVertically))
-                    ChoiceChips(shown.colourways, colourway, Colourway::label, onColourwayChange)
+            // One row for both, so the bar is no taller than the clock whose room it takes; a choice of one is left out.
+            val looks = shown.folderLooks.size > 1
+            val colourways = shown.colourways.size > 1
+            if (looks || colourways) {
+                ChipRow {
+                    if (looks) ChoiceChips(shown.folderLooks, folderLook, { "${it.label} folders" }, onFolderLookChange)
+                    if (looks && colourways) VerticalDivider(Modifier.height(24.dp).align(Alignment.CenterVertically))
+                    if (colourways) ChoiceChips(shown.colourways, colourway, Colourway::label, onColourwayChange)
                 }
             }
         }

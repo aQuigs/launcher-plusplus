@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.center
 import com.sqftware.orbitlauncher.ui.theme.HitsplatCount
+import com.sqftware.orbitlauncher.ui.theme.legible
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
@@ -322,20 +323,17 @@ object OldSchoolArt : ThemeArt {
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = Unit
 
     /**
-     * By night the stone of the game's side panel, as the inventory has it, and by day the flat parchment of its
-     * chatbox, which the day's dark text is read on.
+     * By night the stone of the game's side panel, as the inventory has it, and by day the parchment of its chatbox,
+     * which the day's dark text is read on.
      */
     @Composable
     override fun panelVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit {
-        val stone = sprite(R.drawable.osrs_1031_0)
-        val px = gamePixel
         val night = onStone
-        return remember(veil, stone, px, night) {
-            if (night) {
-                { alpha, topLeft, size -> drawStone(stone, px, veil.alpha * alpha, topLeft, size) }
-            } else {
-                flatVeil(veil)
-            }
+        val ground = sprite(if (night) R.drawable.osrs_1031_0 else R.drawable.osrs_1017_0)
+        val part = if (night) STONE else PARCHMENT
+        val px = gamePixel
+        return remember(veil, ground, part, px) {
+            { alpha, topLeft, size -> drawTiled(ground, part, px, veil.alpha * alpha, topLeft, size) }
         }
     }
 
@@ -460,7 +458,7 @@ object OldSchoolArt : ThemeArt {
         val rest = time.drop(quill.length).trim()
         Row(modifier.clearAndSetSemantics { text = AnnotatedString(time) }, verticalAlignment = Alignment.CenterVertically) {
             QuillLine(quill, digits, px)
-            if (rest.isNotEmpty()) Text(" $rest", color = StackCount, style = MaterialTheme.typography.titleLarge)
+            if (rest.isNotEmpty()) Text(" $rest", color = StackCount, style = MaterialTheme.typography.titleLarge.legible(StackCount))
         }
     }
 
@@ -546,12 +544,12 @@ object OldSchoolArt : ThemeArt {
         MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
     }
 
-    override val typography: Typography
-        @Composable get() {
-            val px = gamePixel
-            val density = LocalDensity.current
-            return remember(px, density) { gameTypography(px, density) }
-        }
+    @Composable
+    override fun typography(day: Boolean): Typography {
+        val px = gamePixel
+        val density = LocalDensity.current
+        return remember(px, density, day) { gameTypography(px, density, shadowed = !day) }
+    }
 
     /** Every corner square, as the game's interface has them. */
     override val shapes: Shapes
@@ -597,12 +595,15 @@ private fun Modifier.gameRim(px: Int): Modifier {
 /** The stone in the side panel's sprite, less the shadow its frame casts along the top and left and the marks at its corners. */
 private val STONE = IntRect(left = 10, top = 8, right = 185, bottom = 255)
 
+/** The parchment in the chatbox's sprite, inside its frame and past the shadow it casts along the top and left. */
+private val PARCHMENT = IntRect(left = 20, top = 17, right = 513, bottom = 136)
+
 /**
- * The side panel's [stone] over [size] from [topLeft] at [alpha], each of its pixels [px] screen pixels, in tiles from
+ * The [part] of [image] over [size] from [topLeft] at [alpha], each of its pixels [px] screen pixels, in tiles from
  * the drawing's origin so the parts of one panel line up, each mirroring the one before so they meet without a seam.
  */
-private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLeft: Offset, size: Size) {
-    val tile = IntSize(STONE.width * px, STONE.height * px)
+private fun DrawScope.drawTiled(image: ImageBitmap, part: IntRect, px: Int, alpha: Float, topLeft: Offset, size: Size) {
+    val tile = IntSize(part.width * px, part.height * px)
     val bottomRight = topLeft + Offset(size.width, size.height)
     clipRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y) {
         for (row in floor(topLeft.y / tile.height).toInt()..floor(bottomRight.y / tile.height).toInt()) {
@@ -610,7 +611,7 @@ private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLe
                 val at = IntOffset(column * tile.width, row * tile.height)
                 val centre = Offset(at.x + tile.width / 2f, at.y + tile.height / 2f)
                 withTransform({ scale(if (column.mod(2) == 0) 1f else -1f, if (row.mod(2) == 0) 1f else -1f, centre) }) {
-                    drawImage(stone, STONE.topLeft, STONE.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
+                    drawImage(image, part.topLeft, part.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
                 }
             }
         }

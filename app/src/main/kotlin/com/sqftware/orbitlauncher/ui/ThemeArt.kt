@@ -232,9 +232,9 @@ interface ThemeArt {
     val foldersOpenRoundEmblem: Boolean
         get() = false
 
-    /** The type every text is set in. */
-    val typography: Typography
-        @Composable get() = MaterialTypography
+    /** The type every text is set in, by [day] when the day scheme is in use. */
+    @Composable
+    fun typography(day: Boolean): Typography = MaterialTypography
 
     /**
      * The corners of every surface: by default Material's. The fully round ones, a choice's segments and a colour's
@@ -287,7 +287,7 @@ val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
 @Composable
 fun Themed(theme: Theme, colourway: Colourway, lightWallpaper: Boolean, content: @Composable () -> Unit) {
     val art = artOf(theme)
-    LauncherTheme(colourway, lightWallpaper, art.typography, art.shapes) {
+    LauncherTheme(colourway, lightWallpaper, art.typography(lightWallpaper), art.shapes) {
         CompositionLocalProvider(LocalThemeArt provides art, content = content)
     }
 }
