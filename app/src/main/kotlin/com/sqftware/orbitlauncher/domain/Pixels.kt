@@ -12,6 +12,7 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
 }
 
 internal const val BLACK = 0xFF000000.toInt()
+internal const val WHITE = 0xFFFFFFFF.toInt()
 
 internal fun alpha(c: Int) = c ushr 24
 internal fun red(c: Int) = c shr 16 and 0xFF

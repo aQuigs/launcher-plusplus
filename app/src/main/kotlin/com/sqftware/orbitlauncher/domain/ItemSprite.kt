@@ -22,7 +22,8 @@ const val ITEM_LAYER_SIZE = 108
 /**
  * An app's [mark], as [itemMark] takes it from its icon, drawn as one of the game's inventory items: at most [size]
  * pixels across on the 36 by 32 item canvas, in a few flat colours with a hard edge, a black outline and the dark shadow
- * every item sprite carries.
+ * every item sprite carries. A dark item is outlined in white instead, as the game marks a chosen item, since it would
+ * vanish into the black of an orb or a panel.
  */
 fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
     val small = downscale(mark, size)
@@ -35,7 +36,7 @@ fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
     }
     dropBackingTile(item)
     posterize(item, colours)
-    outline(item)
+    outline(item, if (isDark(item)) WHITE else BLACK)
     return item
 }
 
@@ -106,13 +107,17 @@ internal fun downscale(pixels: Pixels, size: Int): Pixels {
 }
 
 /**
- * A mark on a dark tile (a red letter on black) would vanish into the game's dark panels, so a tile is dropped: the dark
- * colour that runs in from the item's whole edge, when it is most of the item and leaves a mark of some size.
+ * A mark on a tile (a red letter on black, a logo on a white square) is no item's shape, and a dark tile would vanish
+ * into the game's dark panels, so a tile is dropped: the very dark or very light colour that runs in from the item's
+ * whole edge, when it is most of the item and leaves a mark of some size.
  */
 private fun dropBackingTile(item: Pixels) {
     val solid = item.argb.indices.filter { item.argb[it] != 0 }
     val edge = solid.filter { i -> neighbours(i).any { it == null || item.argb[it] == 0 } }
-    if (edge.isEmpty() || edge.count { luma(item.argb[it]) < 60 } < edge.size * 0.85) return
+    if (edge.isEmpty()) return
+    val dark = edge.count { luma(item.argb[it]) < 60 }
+    val light = edge.count { luma(item.argb[it]) > 215 }
+    if (maxOf(dark, light) < edge.size * 0.85) return
     val mean = mean(edge.map { item.argb[it] })
     val tile = HashSet<Int>()
     val stack = ArrayDeque(edge)
@@ -151,9 +156,15 @@ private val CHANNELS = listOf(::red, ::green, ::blue)
 
 private const val SHADOW = 0xFF302020.toInt()
 
-private fun outline(item: Pixels) {
+/** Whether most of [item] is too dark to tell from the black it sits on. */
+private fun isDark(item: Pixels): Boolean {
+    val lumas = item.argb.filter { it != 0 }.map(::luma).sorted()
+    return lumas.isNotEmpty() && lumas[lumas.size / 2] < 50
+}
+
+private fun outline(item: Pixels, edge: Int) {
     val solid = BooleanArray(item.argb.size) { item.argb[it] != 0 }
-    for (i in item.argb.indices) if (!solid[i] && neighbours(i).any { it != null && solid[it] }) item.argb[i] = BLACK
+    for (i in item.argb.indices) if (!solid[i] && neighbours(i).any { it != null && solid[it] }) item.argb[i] = edge
     for (y in ITEM_HEIGHT - 1 downTo 1) for (x in ITEM_WIDTH - 1 downTo 1) {
         val i = y * ITEM_WIDTH + x
         if (item.argb[i] == 0 && item.argb[i - ITEM_WIDTH - 1] != 0) item.argb[i] = SHADOW

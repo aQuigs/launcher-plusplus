@@ -76,7 +76,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.drawBehind
@@ -504,27 +503,6 @@ object OldSchoolArt : ThemeArt {
     /** The home page keeps only its dock, as the game's bottom bar does; a swipe up opens the drawer. */
     override val drawerHandleOnHome: Boolean
         get() = false
-
-    /** The inventory tab: a stone with the game's backpack, lit red while the drawer is open as a selected tab is. */
-    @Composable
-    override fun DrawerHandle(open: Boolean, onClick: () -> Unit, modifier: Modifier) {
-        val stone = sprite(if (open) R.drawable.osrs_1181_0 else R.drawable.osrs_1180_0)
-        val bag = sprite(R.drawable.osrs_777_0)
-        val px = gamePixel
-        with(LocalDensity.current) {
-            Spacer(
-                modifier
-                    .clickable(onClickLabel = null, onClick = onClick)
-                    .semantics { contentDescription = if (open) "Close the app drawer" else "Open the app drawer" }
-                    .testTag(AppDrawerTags.HANDLE)
-                    .size((stone.width * px).toDp(), (stone.height * px).toDp())
-                    .drawBehind {
-                        drawSprite(stone, Offset.Zero, px)
-                        drawSprite(bag, Offset((stone.width - bag.width) * px / 2f, (stone.height - bag.height) * px / 2f), px)
-                    },
-            )
-        }
-    }
 
     /** The game's right-click menu: a black box in a one pixel brown rim. */
     @Composable
