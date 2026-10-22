@@ -56,9 +56,9 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/Popups\.kt$
       - id: folder-previews-shared
-        name: A theme's folder shows its apps through FolderDisc, laid out as every theme's are
+        name: A theme draws round icons and a folder's previews, which the shared IconDisc and FolderFace lay out
         language: pygrep
-        entry: '\bfolder\.apps\b|\bFolderPreviews\s*\(|\bfolderSlotOffset\s*\('
+        entry: '\bfolder\.apps\b|\bFolderPreviews\s*\(|\bfolderSlotOffset\s*\(|\bAppImage\s*\('
         files: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/\w+Art\.kt$
       - id: sideways-scroll
         name: A row that scrolls sideways is a sidewaysScroll, which shows there is more

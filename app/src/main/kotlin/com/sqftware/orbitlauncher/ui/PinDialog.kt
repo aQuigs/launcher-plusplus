@@ -31,7 +31,7 @@ fun PinDialog(request: PinRequest, onAdd: () -> Unit, onDismiss: () -> Unit) {
         verb = "Add",
         onConfirm = onAdd,
         onDismiss = onDismiss,
-        icon = { IconDisc(modifier = Modifier.size(48.dp)) { AppImage(request.shortcut, { _, _ -> request.icon() }, Modifier.fillMaxSize()) } },
+        icon = { IconDisc(modifier = Modifier.size(48.dp)) { AppImage(request.shortcut, { request.icon() }, Modifier.fillMaxSize()) } },
         modifier = Modifier.testTag(PinDialogTags.DIALOG),
     )
 }

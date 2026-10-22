@@ -1,12 +1,10 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.drawWithCache
@@ -26,7 +24,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.ui.theme.GardenEdge
@@ -134,21 +131,14 @@ object ZenArt : ThemeArt {
     }
 
     @Composable
-    override fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    ) {
+    override fun folderWear(folder: RingItem.Folder): FolderWear {
         val style = LocalFolderStyle.current
-        val (worn, disc) = when (style.look) {
-            FolderLook.KoiPond -> Modifier.pond { style.minutes() } to Modifier.fillMaxSize().edge(GardenEdge)
-            FolderLook.Moss -> Modifier.moss() to Modifier.fillMaxSize(PATCH_DISC)
+        return when (style.look) {
+            FolderLook.KoiPond -> FolderWear(behind = Modifier.pond { style.minutes() }, over = Modifier.edge(GardenEdge))
+            FolderLook.Moss -> FolderWear(PATCH_DISC, Modifier.moss())
             // Stones, and a look of another theme's met before the theme's own is picked.
-            else -> Modifier.stone { size.minDimension / 2 * 1.08f } to Modifier.fillMaxSize(PATCH_DISC)
+            else -> FolderWear(PATCH_DISC, Modifier.stone { size.minDimension / 2 * 1.08f })
         }
-        Box(modifier.then(worn), contentAlignment = Alignment.Center) { FolderDisc(folder, icon, presses, inner, disc) }
     }
 
     private val garden = DrawerTileArt { GardenTile(this, it) }

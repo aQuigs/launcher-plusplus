@@ -77,7 +77,7 @@ class AppDrawerTest {
             val drawer = @Composable {
                 AppDrawer(
                     apps,
-                    icon = { _, _ -> null },
+                    icon = { null },
                     onLaunch,
                     picking = picking,
                     gridState = gridState,

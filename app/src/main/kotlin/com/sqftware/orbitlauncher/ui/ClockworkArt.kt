@@ -1,13 +1,11 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.DrawResult
@@ -26,7 +24,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.hourHandDegrees
@@ -115,39 +112,24 @@ object ClockworkArt : ThemeArt {
     }
 
     @Composable
-    override fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    ) {
+    override fun folderWear(folder: RingItem.Folder): FolderWear {
         val style = LocalFolderStyle.current
-        val gear = style.look == FolderLook.Gear
-        Box(modifier, contentAlignment = Alignment.Center) {
-            if (gear) {
-                Spacer(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationZ = style.minutes() * 6f * GEAR_TURNS_PER_HOUR }
-                        .drawWithCache {
-                            val half = size.minDimension / 2
-                            // Only the toothed rim, so the glass disc over the hub stays glass, as a sub-dial's is.
-                            val cog = cogPath(size.center, half * GEAR_TIP, half * GEAR_ROOT).apply {
-                                fillType = PathFillType.EvenOdd
-                                addOval(Rect(size.center, half * GEAR_DISC * 0.97f))
-                            }
-                            val outline = Stroke(1.dp.toPx())
-                            onDrawBehind {
-                                drawPath(cog, GearCog.inner)
-                                drawPath(cog, GearCog.outer, style = outline)
-                            }
-                        },
-                )
+        if (style.look != FolderLook.Gear) return FolderWear(over = Modifier.subDialMarks().edge(DialEdge))
+
+        val cog = Modifier.graphicsLayer { rotationZ = style.minutes() * 6f * GEAR_TURNS_PER_HOUR }.drawWithCache {
+            val half = size.minDimension / 2
+            // Only the toothed rim, so the glass disc over the hub stays glass, as a sub-dial's is.
+            val cog = cogPath(size.center, half * GEAR_TIP, half * GEAR_ROOT).apply {
+                fillType = PathFillType.EvenOdd
+                addOval(Rect(size.center, half * GEAR_DISC * 0.97f))
             }
-            val face = if (gear) Modifier.fillMaxSize(GEAR_DISC) else Modifier.fillMaxSize().subDialMarks()
-            FolderDisc(folder, icon, presses, inner, face.edge(DialEdge))
+            val outline = Stroke(1.dp.toPx())
+            onDrawBehind {
+                drawPath(cog, GearCog.inner)
+                drawPath(cog, GearCog.outer, style = outline)
+            }
         }
+        return FolderWear(GEAR_DISC, cog, Modifier.edge(DialEdge))
     }
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) {

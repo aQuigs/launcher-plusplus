@@ -20,17 +20,27 @@ class ItemSpriteTest {
     private fun Pixels.colours() = argb.filter { it != 0 }.toSet()
 
     @Test
-    fun anItemFillsTheGameItemCanvas() {
-        val item = itemSprite(disc(96, red), size = 26)
-        assertEquals(ITEM_WIDTH, item.width)
-        assertEquals(ITEM_HEIGHT, item.height)
+    fun everyItemIsCutToTheSameSquare() {
+        val large = itemSprite(disc(96, red))
+        val small = itemSprite(disc(12, red))
+        assertEquals(large.width, large.height)
+        assertEquals(large.width, small.width)
+        assertEquals(large.height, small.height)
+        assertTrue((0 until large.height).any { large[0, it] != 0 } && (0 until large.width).any { large[it, large.height - 1] != 0 })
+    }
+
+    @Test
+    fun aSmallLogoIsDrawnAsLargeAsAFullMark() {
+        val logo = square(96) { x, y -> if (x in 30..65 && y in 30..65) red else 0 }
+        fun drawnWidth(item: Pixels) = item.argb.indices.filter { item.argb[it] != 0 }.map { it % item.width }.let { it.max() - it.min() }
+        assertEquals(drawnWidth(itemSprite(square(96) { _, _ -> red })), drawnWidth(itemSprite(logo)))
     }
 
     @Test
     fun theMarkKeepsWithinItsSizeAndIsOutlinedInBlack() {
         val item = itemSprite(disc(96, red), size = 17)
         val solid = item.argb.indices.filter { item.argb[it] != 0 && item.argb[it] != black && item.argb[it] != 0xFF302020.toInt() }
-        val xs = solid.map { it % ITEM_WIDTH }
+        val xs = solid.map { it % item.width }
         assertTrue(xs.max() - xs.min() + 1 <= 17)
         assertTrue(black in item.colours())
     }

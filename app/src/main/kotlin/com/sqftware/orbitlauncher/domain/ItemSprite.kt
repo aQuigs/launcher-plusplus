@@ -9,9 +9,12 @@ import kotlin.math.roundToInt
  */
 class IconLayers(val foreground: Pixels, val background: Pixels? = null)
 
-/** The game's item canvas, which every item sprite fills. */
+/** The game's item canvas, which an item is drawn on. */
 internal const val ITEM_WIDTH = 36
 internal const val ITEM_HEIGHT = 32
+
+/** How many pixels across an app's mark is drawn as an item at most: enough to tell the app by, as few as the game's own items have. */
+internal const val ITEM_MARK = 26
 
 /**
  * How many pixels across to draw an icon's layers for its [itemMark]: one to each of an adaptive icon's 108 units, which
@@ -23,10 +26,12 @@ const val ITEM_LAYER_SIZE = 108
  * An app's [mark], as [itemMark] takes it from its icon, drawn as one of the game's inventory items: at most [size]
  * pixels across on the 36 by 32 item canvas, in a few flat colours with a hard edge, a black outline and the dark shadow
  * every item sprite carries. A dark item is outlined in white instead, as the game marks a chosen item, since it would
- * vanish into the black of an orb or a panel.
+ * vanish into the black of an orb or a panel. Cut to the square any mark of [size] reaches with its outline and shadow,
+ * the same for every item, so each fills its square as any app's icon does and all of them show the game's pixels alike.
  */
-fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
-    val small = downscale(mark, size)
+fun itemSprite(mark: Pixels, size: Int = ITEM_MARK, colours: Int = 14): Pixels {
+    // Trimmed first, so a small logo is drawn as large as a disc filling its icon, and every item at one scale.
+    val small = downscale(opaquePart(mark), size)
     val item = Pixels(ITEM_WIDTH, ITEM_HEIGHT)
     val left = (ITEM_WIDTH - small.width) / 2
     val top = (ITEM_HEIGHT - small.height) / 2 - 1
@@ -37,7 +42,17 @@ fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
     dropBackingTile(item)
     posterize(item, colours)
     outline(item, if (isDark(item)) WHITE else BLACK)
-    return item
+    // A pixel of outline all round the mark, and the shadow a pixel past that below and to the right.
+    return item.part((ITEM_WIDTH - size) / 2 - 1, (ITEM_HEIGHT - size) / 2 - 2, size + 3, size + 3)
+}
+
+/** The smallest part of [pixels] that holds every one solid enough to draw, or all of them if none is. */
+private fun opaquePart(pixels: Pixels): Pixels {
+    val solid = pixels.argb.indices.filter { alpha(pixels.argb[it]) >= 128 }
+    if (solid.isEmpty()) return pixels
+    val left = solid.minOf { it % pixels.width }
+    val top = solid.minOf { it / pixels.width }
+    return pixels.part(left, top, solid.maxOf { it % pixels.width } - left + 1, solid.maxOf { it / pixels.width } - top + 1)
 }
 
 /**
@@ -65,7 +80,7 @@ fun itemMark(icon: IconLayers): Pixels {
 private fun safeZone(layer: Pixels): Pixels {
     val side = (layer.width * 72 / 108f).roundToInt()
     val from = (layer.width - side) / 2
-    return Pixels(side, side, IntArray(side * side) { i -> layer[from + i % side, from + i / side] })
+    return layer.part(from, from, side, side)
 }
 
 private fun isNearlyEmpty(layer: Pixels) = layer.argb.count { alpha(it) >= 128 } < layer.argb.size / 50

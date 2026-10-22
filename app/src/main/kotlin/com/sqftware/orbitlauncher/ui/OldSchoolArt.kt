@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
 import com.sqftware.orbitlauncher.domain.Colourway
+import com.sqftware.orbitlauncher.domain.DOCK_ICON_FILL
 import com.sqftware.orbitlauncher.domain.ITEM_HEIGHT
 import com.sqftware.orbitlauncher.domain.ITEM_WIDTH
 import androidx.compose.ui.unit.toOffset
@@ -16,10 +17,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -106,7 +107,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.IconPlace
-import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
@@ -179,21 +179,17 @@ private fun worldMapOrbAt(size: Size, scale: Int) = size.center + (WORLD_MAP_ORB
 
 /** The frame's ring, its compass socket and, [withOrb], the world map's orb: all the emblem draws or takes touches in. */
 private fun frameOutline(size: Size, scale: Int, withOrb: Boolean): Path {
-    val frame = Path.combine(PathOperation.Union, circle(size.center, FRAME_RADIUS * scale), circle(compassAt(size, scale), SOCKET_RADIUS * scale))
-    return if (withOrb) Path.combine(PathOperation.Union, frame, circle(worldMapOrbAt(size, scale), WORLD_MAP_ORB_RADIUS * scale)) else frame
+    val frame = Path.combine(PathOperation.Union, circle(size.center, FRAME_RADIUS * scale.toFloat()), circle(compassAt(size, scale), SOCKET_RADIUS * scale.toFloat()))
+    return if (withOrb) Path.combine(PathOperation.Union, frame, circle(worldMapOrbAt(size, scale), WORLD_MAP_ORB_RADIUS * scale.toFloat())) else frame
 }
 
-private fun circle(centre: Offset, radius: Int) = Path().apply { addOval(Rect(centre, radius.toFloat())) }
+private fun circle(centre: Offset, radius: Float) = Path().apply { addOval(Rect(centre, radius)) }
 
 /** The game's round orb, clipped from its frame: where its circle is centred in the sprite, and its radius. */
 private val ORB_CENTRE = IntOffset(40, 17)
 private const val ORB_RADIUS = 17
 
-/**
- * The game's row of tab stones: a stone's face, as wide as a dock icon, and the pitch they repeat at; how tall a stone
- * is; and how wide each of the row's rounded end stones is.
- */
-private const val STONE_FACE = 31
+/** The game's row of tab stones: the pitch its stones repeat at, and how wide each of its rounded end stones is. */
 private const val STONE_PITCH = 33
 private const val END_STONE = 38
 
@@ -283,7 +279,7 @@ object OldSchoolArt : ThemeArt {
                     .drawWithCache {
                         val scale = mapScale(size, px)
                         val at = compassAt(size, scale)
-                        val face = circle(at, COMPASS_RADIUS * scale)
+                        val face = circle(at, COMPASS_RADIUS * scale.toFloat())
                         onDrawBehind { clipPath(face) { drawSpriteCentred(compass, at, scale) } }
                     },
             )
@@ -364,15 +360,6 @@ object OldSchoolArt : ThemeArt {
         iconSize: Float,
         colours: RingColors,
     ): DrawScope.(glow: Float, alpha: Float) -> Unit = { _, _ -> }
-
-    @Composable
-    override fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    ) = FolderDisc(folder, icon, presses, inner, modifier)
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = Unit
 
@@ -458,28 +445,17 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
+    /** On the ring, the game's orb, the icon filling its well and the frame reaching past it; elsewhere nothing. */
     @Composable
-    override fun IconGround(
-        presses: InteractionSource?,
-        modifier: Modifier,
-        contentAlignment: Alignment,
-        content: @Composable BoxScope.() -> Unit,
-    ) {
-        // On the ring, the game's orb; elsewhere nothing. The ripple is unbounded, so it never clips the item's pixels.
-        val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
-        Box(modifier.then(ground).ripples(presses, bounded = false), contentAlignment = contentAlignment, content = content)
-    }
+    override fun iconGround(): Modifier = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
 
-    /**
-     * An item drawn as the game draws it, at whole game pixels, as large as its square takes and no larger than the
-     * game's. An image larger than an item's canvas is no item, such as a pinned shortcut's icon, and is fitted whole.
-     */
-    @Composable
-    override fun IconImage(bitmap: ImageBitmap, modifier: Modifier) {
-        if (bitmap.width > ITEM_WIDTH || bitmap.height > ITEM_HEIGHT) return super.IconImage(bitmap, modifier)
-        val px = gamePixel
-        Spacer(modifier.drawBehind { drawSpriteCentred(bitmap, center, fitScale(size.minDimension, ITEM_FIT, px)) })
-    }
+    /** An item keeps its own outline, so neither its pixels nor its ripple are cut to a disc. */
+    override val iconShape: Shape?
+        get() = null
+
+    /** An item in hard pixels, as the game draws it; an image larger than an item's canvas is no item, such as a shortcut's icon. */
+    override fun iconFilter(bitmap: ImageBitmap): FilterQuality =
+        if (bitmap.width > ITEM_WIDTH || bitmap.height > ITEM_HEIGHT) super.iconFilter(bitmap) else FilterQuality.None
 
     /**
      * A hitsplat with the count on it, as the game marks a hit: blue, the game's splat for a hit that did no harm, while
@@ -508,37 +484,40 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
-    /** A dock icon is as wide as a tab stone's face, so the stones meet as the game's row does. */
-    override val dockIconSize: Dp
-        @Composable get() = (STONE_FACE * gamePixel).asDp()
-
-    override val dockIconFill: Float
-        get() = STONE_FACE.toFloat() / STONE_PITCH
-
     /**
-     * The game's row of tab stones under the dock's slots, one stone to a slot: the row's rounded end stones at its ends
-     * and its middle stone between, all lit red, as a selected tab is, while the dock is a drop target.
+     * The game's row of tab stones under the dock's slots, one stone to a slot and as wide, so they meet as the game's
+     * row does: the row's rounded end stones at its ends and its middle stone between, all lit red, as a selected tab is,
+     * while the dock is a drop target.
      */
     @Composable
     override fun dockGround(glowColour: Color): DrawScope.(DockSlots) -> Unit {
         val row = sprite(R.drawable.osrs_1174_0)
         val stone = sprite(R.drawable.osrs_1180_0)
         val lit = sprite(R.drawable.osrs_1181_0)
-        val px = gamePixel
         return { slots ->
             val count = slots.starts.size
-            val scale = fitScale(slots.iconSize, STONE_FACE.toFloat(), px)
+            val scale = slots.iconSize / DOCK_ICON_FILL / STONE_PITCH
             val middle = size.height / 2
             val top = middle - stone.height * scale / 2f
-            slots.starts.forEachIndexed { index, start ->
-                val centre = start + slots.iconSize / 2
+            // The end stones first, their rounded ends at the row's ends and the rest under the stones beside them, so a
+            // row as wide as the screen keeps them on it.
+            slots.starts.indices.sortedBy { it in 1 until count - 1 }.forEach { index ->
+                val centre = slots.starts[index] + slots.iconSize / 2
                 val half = STONE_PITCH * scale / 2f
                 when {
-                    count == 1 || index in 1 until count - 1 -> drawSpriteCentred(stone, Offset(centre, middle), scale)
-                    index == 0 -> drawSpritePart(row, IntRect(0, 0, END_STONE, row.height), Offset(centre + half - END_STONE * scale, top), scale)
-                    else -> drawSpritePart(row, IntRect(row.width - END_STONE, 0, row.width, row.height), Offset(centre - half, top), scale)
+                    count == 1 || index in 1 until count - 1 -> inGamePixels(Offset(centre - stone.width * scale / 2f, top), scale) { drawSprite(stone, Offset.Zero, 1) }
+                    index == 0 -> inGamePixels(Offset(centre - half, top), scale) {
+                        drawSpritePart(row, IntRect(0, 0, END_STONE, row.height), Offset.Zero, 1)
+                    }
+                    else -> inGamePixels(Offset(centre + half - END_STONE * scale, top), scale) {
+                        drawSpritePart(row, IntRect(row.width - END_STONE, 0, row.width, row.height), Offset.Zero, 1)
+                    }
                 }
-                if (slots.glow > 0f) drawSpriteCentred(lit, Offset(centre, middle), scale, alpha = slots.glow * 0.7f)
+                if (slots.glow > 0f) {
+                    inGamePixels(Offset(centre - lit.width * scale / 2f, middle - lit.height * scale / 2f), scale) {
+                        drawSprite(lit, Offset.Zero, 1, alpha = slots.glow * 0.7f)
+                    }
+                }
             }
         }
     }
@@ -619,9 +598,6 @@ object OldSchoolArt : ThemeArt {
 }
 
 private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it) }
-
-/** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
-private const val ITEM_FIT = 28f
 
 /** Each sprite decoded once for the whole launcher, not once for every badge, orb and frame that shows it. */
 private val sprites = mutableMapOf<Int, ImageBitmap>()
@@ -741,15 +717,26 @@ internal fun DrawScope.drawSpritePart(
 private fun Modifier.orb(): Modifier {
     val frame = sprite(R.drawable.osrs_1071_0)
     val fill = sprite(R.drawable.osrs_1059_0)
-    val px = gamePixel
     return drawWithCache {
-        val orb = circle(size.center, ORB_RADIUS * px)
+        // The well, the fill inside the frame's rim, fills the item as an icon's disc does, so an item in it is the size
+        // every icon is, and the rim reaches past.
+        val scale = size.minDimension / fill.width
+        val orb = circle(size.center, ORB_RADIUS * scale)
         onDrawBehind {
-            clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
-            drawSpriteCentred(fill, center, px, tint = MenuGround)
+            clipPath(orb) { inGamePixels(center - ORB_CENTRE.toOffset() * scale, scale) { drawSprite(frame, Offset.Zero, 1) } }
+            inGamePixels(center - Offset(fill.width.toFloat(), fill.height.toFloat()) * (scale / 2), scale) {
+                drawSprite(fill, Offset.Zero, 1, tint = MenuGround)
+            }
         }
     }
 }
+
+/**
+ * Draws [draw] in the game's own pixels from [origin], each [scale] screen pixels square, however many that makes, for
+ * art sized by the shared layout rather than in whole game pixels.
+ */
+private inline fun DrawScope.inGamePixels(origin: Offset, scale: Float, draw: DrawScope.() -> Unit) =
+    withTransform({ translate(origin.x, origin.y); scale(scale, scale, Offset.Zero) }, draw)
 
 /** The player's own square in the minimap's middle, three game pixels wide in a ring of black so it shows on a white wall. */
 private fun DrawScope.selfMarker(centre: Offset, scale: Int) {

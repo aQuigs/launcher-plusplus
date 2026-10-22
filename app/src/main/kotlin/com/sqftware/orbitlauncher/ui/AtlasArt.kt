@@ -1,13 +1,11 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.DrawResult
@@ -31,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.ui.theme.ChartEdge
@@ -120,21 +117,14 @@ object AtlasArt : ThemeArt {
     )
 
     @Composable
-    override fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    ) {
+    override fun folderWear(folder: RingItem.Folder): FolderWear {
         val style = LocalFolderStyle.current
-        val (worn, disc) = when (style.look) {
-            FolderLook.Globe -> Modifier.globe { style.minutes() } to Modifier.fillMaxSize().edge(ChartEdge)
-            FolderLook.FoldedMap -> Modifier.foldedMap() to Modifier.fillMaxSize(MAP_DISC)
+        return when (style.look) {
+            FolderLook.Globe -> FolderWear(behind = Modifier.globe { style.minutes() }, over = Modifier.edge(ChartEdge))
+            FolderLook.FoldedMap -> FolderWear(MAP_DISC, Modifier.foldedMap())
             // Islands, and a look of another theme's met before the theme's own is picked.
-            else -> Modifier.island() to Modifier.fillMaxSize(ISLAND_DISC)
+            else -> FolderWear(ISLAND_DISC, Modifier.island())
         }
-        Box(modifier.then(worn), contentAlignment = Alignment.Center) { FolderDisc(folder, icon, presses, inner, disc) }
     }
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) {

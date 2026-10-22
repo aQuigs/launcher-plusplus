@@ -4,8 +4,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -16,9 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -32,6 +30,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.MAX_FOLDER_NAME
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
@@ -46,6 +45,8 @@ object FolderTags {
     const val PLANET_DIALOG = "folder_planet_dialog"
     const val NAME_DIALOG = "folder_name_dialog"
     const val NAME = "folder_name"
+
+    fun preview(index: Int) = "folder_preview_$index"
 }
 
 /** A folder's long-press menu, opened and shown like an [AppMenu]. */
@@ -77,11 +78,11 @@ val FolderGlyph: ImageVector = materialIcon("Folder") {
     }
 }
 
-private const val PREVIEWS = 4
+internal const val PREVIEWS = 4
 
 /**
- * The share of the disc's side each preview takes, and how far out from its middle they sit. Four fill the disc as in
- * Arc, their outer edges just inside its edge.
+ * The share of the item's side each preview takes, and how far out from its middle they sit. Four fill an app's disc as
+ * in Arc, their outer edges just inside its edge.
  */
 private const val PREVIEW_FRACTION = 0.39f
 private const val PREVIEW_REACH = 0.3f
@@ -119,7 +120,7 @@ fun FolderIcon(
             .itemDrag(folder, drag)
             .semantics { contentDescription = name.withUnread(unread.count) },
     ) {
-        LocalThemeArt.current.FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses) { 1f }
+        FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer(), presses)
         menu?.content?.invoke(folder)
         UnreadBadge(unread)
         if (folder.name.isNotEmpty()) nameRoom?.let { HangingName(folder.name, it) }
@@ -152,34 +153,52 @@ fun folderTitle(name: String): String = name.ifEmpty { "Folder" }
 fun folderDescription(name: String, count: Int): String =
     (if (name.isEmpty()) "Folder" else "$name folder") + ", " + counted(count, "app")
 
-/** [folder]'s disc of previews, filling the item: [presses] ripple it, and [inner] fades the previews. */
+/**
+ * What a folder look wears: a [disc] of that share of the item, [behind] drawn under it on the whole item, which it may
+ * reach past, and [over] drawn on the disc over the previews. Each is drawn on a layer of its own, never round the
+ * previews, so none of them can move or size them.
+ */
+class FolderWear(val disc: Float = 1f, val behind: Modifier = Modifier, val over: Modifier = Modifier)
+
+/**
+ * [folder] in the look of [LocalFolderStyle], filling the item: up to four previews of its apps, laid out the same in
+ * every theme and look, on the disc and in what the theme's [ThemeArt.folderWear] gives it. [inner] fades the previews,
+ * as when the folder takes the ring's centre and its apps are round it instead; [presses] ripple its disc. Give it a
+ * layer of its own, so what turns with the sky redraws only the folder, not the page round it.
+ */
 @Composable
-fun FolderDisc(
+fun FolderFace(
     folder: RingItem.Folder,
     icon: IconLoader,
-    presses: InteractionSource?,
-    inner: () -> Float,
     modifier: Modifier = Modifier,
+    presses: InteractionSource? = null,
+    inner: () -> Float = { 1f },
 ) {
-    IconDisc(presses, modifier, contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, contentAlignment = Alignment.Center) {
-            FolderPreviews(folder.apps, icon)
+    val style = LocalFolderStyle.current
+    // Every app circles the planet as a moon, rather than four sitting on it: the look is that arrangement.
+    if (style.look == FolderLook.Orbit) return OrbitFace(folder, icon, style.minutes, inner, modifier)
+
+    val wear = LocalThemeArt.current.folderWear(folder)
+    Box(modifier) {
+        Spacer(Modifier.matchParentSize().then(wear.behind))
+        IconDisc(presses, Modifier.matchParentSize(), wear.disc) {
+            FolderPreviews(folder.apps, icon, Modifier.graphicsLayer { alpha = inner() })
+            Spacer(Modifier.fillMaxSize(wear.disc).then(wear.over))
         }
     }
 }
 
 /**
  * Up to four of a folder's [apps]' icons, one alone in the middle, more where the open folder's ring puts them: two side by
- * side, three as a triangle, four as a square. Sized by shares of the disc rather than fixed gaps, so a shrunken ring's
- * small discs fit them too.
+ * side, three as a triangle, four as a square. Sized by shares of the item rather than fixed gaps, so a shrunken ring's
+ * small folders fit them too.
  */
 @Composable
-fun FolderPreviews(apps: List<AppEntry>, icon: IconLoader) {
+internal fun FolderPreviews(apps: List<AppEntry>, icon: IconLoader, modifier: Modifier = Modifier) {
     val previews = apps.take(PREVIEWS)
     Layout(
-        // Clipped round so a square or squircle icon mask keeps its corners inside the disc.
-        content = { previews.forEach { AppImage(it, icon, Modifier.clip(CircleShape)) } },
-        modifier = Modifier.fillMaxSize(),
+        content = { previews.forEachIndexed { index, app -> AppImage(app, icon, Modifier.testTag(FolderTags.preview(index))) } },
+        modifier = modifier.fillMaxSize(),
     ) { measurables, constraints ->
         val side = min(constraints.maxWidth, constraints.maxHeight)
         val size = (side * PREVIEW_FRACTION).roundToInt()

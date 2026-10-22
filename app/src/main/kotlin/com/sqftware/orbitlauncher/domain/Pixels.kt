@@ -9,6 +9,9 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
     }
 
     operator fun get(x: Int, y: Int) = argb[y * width + x]
+
+    /** The [width] by [height] part of these pixels whose top left is at [left], [top]. */
+    fun part(left: Int, top: Int, width: Int, height: Int) = Pixels(width, height, IntArray(width * height) { i -> this[left + i % width, top + i / width] })
 }
 
 internal const val BLACK = 0xFF000000.toInt()
