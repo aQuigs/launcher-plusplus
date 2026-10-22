@@ -115,6 +115,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.LocalDate
 import kotlin.math.abs
 
 private const val FOLD_TARGET = "Drop to put in a folder"
@@ -285,7 +286,7 @@ class LauncherScreenTest {
             ringSpin = ringSpin,
             onRingSpinChange = { ringSpin = it },
             spinStats = spinStats,
-            onSpin = { spinStats += it },
+            onSpin = { spinStats = spinStats.add(it, on = LocalDate.of(2026, 10, 21)) },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
@@ -2127,6 +2128,7 @@ class LauncherScreenTest {
             assertEquals(1, spinStats.spins)
             assertTrue("turned clockwise down the right side", spinStats.clockwise > 0)
             assertTrue("let go moving", spinStats.topRpm > 0)
+            assertTrue("carried the rim some way", spinStats.distance > 0)
         }
         compose.longPressEmptyHomeSpace()
         compose.onNodeWithText("Spin stats").performClick()

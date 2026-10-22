@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
@@ -95,13 +96,18 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
     private var ring: LayoutCoordinates? = null
     private var inner = 0f
     private var outer = 0f
+    private var rim = 0.dp
     private var area: LayoutCoordinates? = null
 
-    /** Where the ring is: [coordinates] centred on it, with its band from [inner] to [outer] from the centre. */
-    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float) {
+    /**
+     * Where the ring is: [coordinates] centred on it, with its band from [inner] to [outer] from the centre and its icons
+     * [rim] from it.
+     */
+    internal fun place(coordinates: LayoutCoordinates, inner: Float, outer: Float, rim: Dp) {
         ring = coordinates
         this.inner = inner
         this.outer = outer
+        this.rim = rim
     }
 
     /** [position] in the area the spin is dragged in, as an offset from the ring's centre, if the ring can spin. */
@@ -138,7 +144,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
                 turn = 0f
             } finally {
                 // However the coast ends: at rest, caught, or cut short as what spins changes.
-                tally?.let { onSpin(it.spin(velocity, coast = coastNanos / 1e9)) }
+                tally?.let { onSpin(it.spin(velocity, coast = coastNanos / 1e9, rim)) }
             }
         }
     }
@@ -203,7 +209,7 @@ class RingSpin internal constructor(private val scope: CoroutineScope, private v
             if (by > 0) clockwise += by else anticlockwise -= by
         }
 
-        fun spin(letGo: Float, coast: Double) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast)
+        fun spin(letGo: Float, coast: Double, rim: Dp) = Spin(clockwise, anticlockwise, letGo.toDouble(), coast, rim.value.toDouble())
     }
 }
 

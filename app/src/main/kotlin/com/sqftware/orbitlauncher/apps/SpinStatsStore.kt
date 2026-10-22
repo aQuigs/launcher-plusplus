@@ -18,18 +18,34 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         spins = prefs.getInt(SPINS, 0),
         clockwise = prefs.getDouble(CLOCKWISE),
         anticlockwise = prefs.getDouble(ANTICLOCKWISE),
+        distance = prefs.getDouble(DISTANCE),
+        coasting = prefs.getDouble(COASTING),
         mostTurns = prefs.getDouble(MOST_TURNS),
         topRpm = prefs.getDouble(TOP_RPM),
         longestCoast = prefs.getDouble(LONGEST_COAST),
+        daysSpun = prefs.getInt(DAYS_SPUN, 0),
+        longestStreak = prefs.getInt(LONGEST_STREAK, 0),
+        busiestDay = prefs.getInt(BUSIEST_DAY, 0),
+        lastDay = if (prefs.contains(LAST_DAY)) prefs.getLong(LAST_DAY, 0) else null,
+        lastDaySpins = prefs.getInt(LAST_DAY_SPINS, 0),
+        streak = prefs.getInt(STREAK, 0),
     )
 
     override fun save(stats: SpinStats) = prefs.edit {
         putInt(SPINS, stats.spins)
         putDouble(CLOCKWISE, stats.clockwise)
         putDouble(ANTICLOCKWISE, stats.anticlockwise)
+        putDouble(DISTANCE, stats.distance)
+        putDouble(COASTING, stats.coasting)
         putDouble(MOST_TURNS, stats.mostTurns)
         putDouble(TOP_RPM, stats.topRpm)
         putDouble(LONGEST_COAST, stats.longestCoast)
+        putInt(DAYS_SPUN, stats.daysSpun)
+        putInt(LONGEST_STREAK, stats.longestStreak)
+        putInt(BUSIEST_DAY, stats.busiestDay)
+        stats.lastDay?.let { putLong(LAST_DAY, it) } ?: remove(LAST_DAY)
+        putInt(LAST_DAY_SPINS, stats.lastDaySpins)
+        putInt(STREAK, stats.streak)
     }
 
     // Preferences hold no doubles, and a float total would start rounding off each spin's fraction of a turn as it grows.
@@ -44,5 +60,13 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         const val MOST_TURNS = "most_turns"
         const val TOP_RPM = "top_rpm"
         const val LONGEST_COAST = "longest_coast"
+        const val DISTANCE = "distance"
+        const val COASTING = "coasting"
+        const val DAYS_SPUN = "days_spun"
+        const val LONGEST_STREAK = "longest_streak"
+        const val BUSIEST_DAY = "busiest_day"
+        const val LAST_DAY = "last_day"
+        const val LAST_DAY_SPINS = "last_day_spins"
+        const val STREAK = "streak"
     }
 }
