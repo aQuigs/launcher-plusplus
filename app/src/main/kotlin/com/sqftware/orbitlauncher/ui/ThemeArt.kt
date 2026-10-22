@@ -228,6 +228,10 @@ interface ThemeArt {
     val drawerHandleOnHome: Boolean
         get() = true
 
+    /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
+    val foldersOpenRoundEmblem: Boolean
+        get() = false
+
     /** The type every text is set in. */
     val typography: Typography
         @Composable get() = MaterialTypography

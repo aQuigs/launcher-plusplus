@@ -8,7 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.center
-import com.sqftware.orbitlauncher.ui.theme.StackCountDismissed
+import com.sqftware.orbitlauncher.ui.theme.HitsplatCount
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
@@ -23,6 +23,9 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -94,11 +97,11 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.sqftware.orbitlauncher.R
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Unread
@@ -168,10 +171,6 @@ private fun circle(centre: Offset, radius: Int) = Path().apply { addOval(Rect(ce
 private val ORB_CENTRE = IntOffset(40, 17)
 private const val ORB_RADIUS = 17
 
-/** How far each of a pile's two items sits from the middle, in the game's pixels: the one behind up and over, the one in front down and back. */
-private val PILE_BEHIND = IntOffset(4, -3)
-private val PILE_FRONT = IntOffset(-3, 4)
-
 /**
  * The game's row of tab stones: a stone's face, as wide as a dock icon, and the pitch they repeat at; how tall a stone
  * is; and how wide each of the row's rounded end stones is.
@@ -194,11 +193,15 @@ private const val CLOCK_SCALE = 2
 /**
  * Old School: an homage to the old game's interface, drawn from its own sprites at whole game pixels. The emblem is the
  * minimap in its frame with the compass, the ring's apps sit in its round orbs, every app is one of its items, a
- * folder is a pile of two, badges are an item's yellow stack count, and text is in its fonts.
+ * folder shows its first four items at half size and opens round the minimap, badges are hitsplats, and text is in its fonts.
  */
 object OldSchoolArt : ThemeArt {
     override val hintInk: Color
         @Composable get() = StackCount
+
+    /** The game never hides its minimap. */
+    override val foldersOpenRoundEmblem: Boolean
+        get() = true
 
     /**
      * The minimap in its frame: the map of where the user is, or the game's grass until there is one, turned with the
@@ -295,10 +298,24 @@ object OldSchoolArt : ThemeArt {
         presses: InteractionSource?,
         inner: () -> Float,
     ) {
-        val px = gamePixel
-        IconGround(presses, modifier, Alignment.Center) {
-            folder.apps.getOrNull(1)?.let { PileItem(it, icon, PILE_BEHIND, px, inner) }
-            folder.apps.firstOrNull()?.let { PileItem(it, icon, PILE_FRONT, px, inner) }
+        // On the ring, an orb left open, so a folder is told from an app, its cells in the room one item takes, so even
+        // a folder of one shows a quarter-size item; elsewhere, all the folder's room.
+        val room = if (LocalIconPlace.current == IconPlace.Ring) {
+            with(LocalDensity.current) { Modifier.size((ITEM_FIT * gamePixel).toDp()) }
+        } else {
+            Modifier.fillMaxSize()
+        }
+        ItemGround(presses, modifier, filled = false) {
+            Column(room.graphicsLayer { alpha = inner() }) {
+                repeat(FOLDER_SIDE) { row ->
+                    Row(Modifier.weight(1f)) {
+                        repeat(FOLDER_SIDE) { column ->
+                            val cell = Modifier.weight(1f).fillMaxHeight()
+                            folder.apps.getOrNull(row * FOLDER_SIDE + column)?.let { AppImage(it, icon, cell) } ?: Spacer(cell)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -404,24 +421,7 @@ object OldSchoolArt : ThemeArt {
         contentAlignment: Alignment,
         content: @Composable BoxScope.() -> Unit,
     ) {
-        if (LocalIconPlace.current == IconPlace.Ring) {
-            val frame = sprite(R.drawable.osrs_1071_0)
-            val fill = sprite(R.drawable.osrs_1059_0)
-            val px = gamePixel
-            Box(
-                modifier.drawWithCache {
-                    val orb = circle(size.center, ORB_RADIUS * px)
-                    onDrawBehind {
-                        clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
-                        drawSpriteCentred(fill, center, px)
-                    }
-                }.pressed(presses),
-                contentAlignment = contentAlignment,
-                content = content,
-            )
-        } else {
-            Box(modifier.pressed(presses), contentAlignment = contentAlignment, content = content)
-        }
+        ItemGround(presses, modifier, filled = true, contentAlignment, content)
     }
 
     /**
@@ -439,18 +439,16 @@ object OldSchoolArt : ThemeArt {
         get() = Alignment.TopStart
 
     /**
-     * An item's stack count, in the game's small font at the item's top left: yellow while all its notifications are in
-     * the shade, white once some are dismissed, as the game's white counts mark a different stack.
+     * A hitsplat with the count on it, as the game marks a hit: blue, the game's splat for a hit that did no harm, while
+     * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread.
      */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
-        Text(
-            badgeText(unread.count),
-            modifier.testTag(BadgeTags.BUBBLE),
-            color = if (unread.dismissed) StackCountDismissed else StackCount,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-        )
+        val splat = sprite(if (unread.dismissed) R.drawable.osrs_1359_0 else R.drawable.osrs_1358_0)
+        Box(modifier.testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
+            SpriteImage(splat, gamePixel)
+            Text(badgeText(unread.count), color = HitsplatCount, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
     }
 
     /** The time in the quill digits the game draws its largest headings in, anything else in its bold type. */
@@ -565,8 +563,17 @@ private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it
 /** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
 private const val ITEM_FIT = 28f
 
+/** How many cells across and down a folder shows its first items in. */
+private const val FOLDER_SIDE = 2
+
+/** Each sprite decoded once for the whole launcher, not once for every badge, orb and frame that shows it. */
+private val sprites = mutableMapOf<Int, ImageBitmap>()
+
 @Composable
-internal fun sprite(@DrawableRes id: Int): ImageBitmap = ImageBitmap.imageResource(id)
+internal fun sprite(@DrawableRes id: Int): ImageBitmap {
+    val resources = LocalContext.current.resources
+    return remember(id) { sprites.getOrPut(id) { ImageBitmap.imageResource(resources, id) } }
+}
 
 /** [image] at [scale], taking the room it is drawn in. */
 @Composable
@@ -645,31 +652,40 @@ internal fun DrawScope.drawSpritePart(
 
 private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)
 
+/** What an item sits on: on the ring, the game's round orb, [filled] with its black or left open, and elsewhere nothing. */
+@Composable
+private fun ItemGround(
+    presses: InteractionSource?,
+    modifier: Modifier,
+    filled: Boolean,
+    contentAlignment: Alignment = Alignment.Center,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb(filled) else Modifier
+    Box(modifier.then(ground).pressed(presses), contentAlignment = contentAlignment, content = content)
+}
+
+/** The game's round orb behind what is drawn here, [filled] with its black or left open. */
+@Composable
+private fun Modifier.orb(filled: Boolean): Modifier {
+    val frame = sprite(R.drawable.osrs_1071_0)
+    val fill = sprite(R.drawable.osrs_1059_0)
+    val px = gamePixel
+    return drawWithCache {
+        val orb = circle(size.center, ORB_RADIUS * px)
+        onDrawBehind {
+            clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
+            if (filled) drawSpriteCentred(fill, center, px)
+        }
+    }
+}
+
 /** The player's own square in the minimap's middle, three game pixels wide in a ring of black so it shows on a white wall. */
 private fun DrawScope.selfMarker(centre: Offset, scale: Int) {
     val edge = Size(5f * scale, 5f * scale)
     val self = Size(3f * scale, 3f * scale)
     drawRect(MinimapSelfEdge, centre - Offset(edge.width, edge.height) / 2f, edge)
     drawRect(MinimapSelf, centre - Offset(self.width, self.height) / 2f, self)
-}
-
-/** One of a pile's items, [offset] game pixels from the middle, fading by [inner] as the open folder's previews do. */
-@Composable
-private fun PileItem(app: AppEntry, icon: IconLoader, offset: IntOffset, px: Int, inner: () -> Float) {
-    val density = LocalDensity.current
-    with(density) {
-        AppImage(
-            app,
-            icon,
-            Modifier
-                .size((ITEM_FIT * px).toDp())
-                .graphicsLayer {
-                    translationX = offset.x * px.toFloat()
-                    translationY = offset.y * px.toFloat()
-                    alpha = inner()
-                },
-        )
-    }
 }
 
 /** [text]'s digits and colons in the quill [digits], each pixel [px] screen pixels, with the game's drop shadow under them. */

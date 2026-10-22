@@ -86,8 +86,8 @@ enum class FolderLook(val label: String) {
     /** A hexagonal cell, its previews in its well. */
     HexCell("Hex cell"),
 
-    /** Its first two apps as game items, one piled on the other. */
-    Pile("Pile"),
+    /** Its first four apps as game items, two by two, in an open orb. */
+    Items("Items"),
 }
 
 /**
@@ -102,7 +102,7 @@ fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
     FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal,
     FolderLook.FoldedSquare, FolderLook.Envelope,
-    FolderLook.Cube, FolderLook.Geode, FolderLook.HexCell, FolderLook.Pile -> false
+    FolderLook.Cube, FolderLook.Geode, FolderLook.HexCell, FolderLook.Items -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */
