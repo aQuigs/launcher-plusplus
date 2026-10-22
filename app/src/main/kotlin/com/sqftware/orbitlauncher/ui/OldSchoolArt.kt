@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
+import com.sqftware.orbitlauncher.domain.Colourway
+import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
 import com.sqftware.orbitlauncher.domain.ITEM_HEIGHT
 import com.sqftware.orbitlauncher.domain.ITEM_WIDTH
 import androidx.compose.foundation.Image
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -69,7 +72,7 @@ import com.sqftware.orbitlauncher.ui.theme.ChatTypedNight
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
 import com.sqftware.orbitlauncher.ui.theme.MenuTarget
 import com.sqftware.orbitlauncher.ui.theme.MenuVerb
-import com.sqftware.orbitlauncher.ui.theme.MenuRim
+import com.sqftware.orbitlauncher.ui.theme.MenuLine
 import com.sqftware.orbitlauncher.ui.theme.MenuGround
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.dp
@@ -464,7 +467,7 @@ object OldSchoolArt : ThemeArt {
 
     /** A dock icon is as wide as a tab stone's face, so the stones meet as the game's row does. */
     override val dockIconSize: Dp
-        @Composable get() = with(LocalDensity.current) { (STONE_FACE * gamePixel).toDp() }
+        @Composable get() = (STONE_FACE * gamePixel).dp()
 
     override val dockIconFill: Float
         get() = STONE_FACE.toFloat() / STONE_PITCH
@@ -500,12 +503,16 @@ object OldSchoolArt : ThemeArt {
     override val drawerHandleOnHome: Boolean
         get() = false
 
-    /** The game's right-click menu: a black box in a one pixel brown rim. */
+    /** The game's right-click menu: a brown box, its edge a game pixel of the same brown outside the black inside it. */
     @Composable
     override fun menuBox(ground: PanelGround): Modifier = Modifier.background(MenuGround)
 
     override val menuRim: BorderStroke
-        @Composable get() = BorderStroke(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim)
+        @Composable get() = BorderStroke(gamePixel.dp(), MenuGround)
+
+    /** The "Choose Option" bar tops the box, as the game's does. */
+    override val menuPadding: Dp
+        get() = 0.dp
 
     /** A collection is the game's bank, its title on the bank's tab and its header's buttons the game's stone ones. */
     @Composable
@@ -532,16 +539,29 @@ object OldSchoolArt : ThemeArt {
     @Composable
     override fun dialogBox(ground: PanelGround): Modifier = Modifier.gameRim(gamePixel).solidGround(ground, RectangleShape)
 
-    /** "Choose Option" in the rim's brown over the items, which are in white with any secondary text in the target's orange. */
+    /**
+     * "Choose Option" in the box's brown on a black bar, over the items in a black line, which are in white with any
+     * secondary text in the target's orange. The game's menu is the same by day, so the items keep the night's look.
+     */
     @Composable
     override fun MenuBody(content: @Composable () -> Unit) {
-        Text(
-            "Choose Option",
-            color = MenuRim,
-            style = MaterialTheme.typography.labelLarge.copy(shadow = null),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp).semantics { hideFromAccessibility() },
-        )
-        MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
+        Column(Modifier.padding(gamePixel.dp())) {
+            Text(
+                "Choose Option",
+                color = MenuGround,
+                style = MaterialTheme.typography.labelLarge.copy(shadow = null),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MenuLine)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .semantics { hideFromAccessibility() },
+            )
+            Column(Modifier.border(gamePixel.dp(), MenuLine)) {
+                LauncherTheme(Colourway.Classic, lightWallpaper = false, typography(day = false), MaterialTheme.shapes) {
+                    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
+                }
+            }
+        }
     }
 
     @Composable
@@ -585,11 +605,14 @@ private fun SpriteImage(image: ImageBitmap, scale: Int, modifier: Modifier = Mod
 private val onStone: Boolean
     @Composable get() = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
 
+@Composable
+private fun Int.dp() = with(LocalDensity.current) { toDp() }
+
 /** The rim of the game's interface boxes: black outside the menu's brown, [px] screen pixels each. */
 @Composable
 private fun Modifier.gameRim(px: Int): Modifier {
-    val rim = with(LocalDensity.current) { px.toDp() }
-    return border(rim, GameShadow).padding(rim).border(rim, MenuRim)
+    val rim = px.dp()
+    return border(rim, GameShadow).padding(rim).border(rim, MenuGround)
 }
 
 /** The stone in the side panel's sprite, less the shadow its frame casts along the top and left and the marks at its corners. */

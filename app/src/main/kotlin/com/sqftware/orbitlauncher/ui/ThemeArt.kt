@@ -169,6 +169,10 @@ interface ThemeArt {
     val menuRim: BorderStroke?
         @Composable get() = popupRim()
 
+    /** The room above and below a menu's items: by default Material's. */
+    val menuPadding: Dp
+        get() = MATERIAL_MENU_PADDING
+
     /**
      * A collection card round its [header] and its [body], on the ground of the [colour] the user chose, solid while
      * [dragged] and marked while it is the [dropTarget]: by default a rounded card of the colour's tint.
