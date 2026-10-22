@@ -124,16 +124,15 @@ internal val gamePixel: Int
 
 /**
  * The minimap's frame and its compass, as the game draws them: where the frame's map hole is centred, the radius of
- * the map and of the frame's outer edge; where the compass socket is centred in the frame, the radius of the compass's
- * face and of its socket's outer edge; and the way from the map's centre to the socket.
+ * the map and of the frame's outer edge; where the compass socket is centred in the frame, the radius the compass is
+ * drawn to, inside the socket's rim, which covers its edge, and the radius of the socket's outer edge.
  */
 private val FRAME_HOLE_CENTRE = IntOffset(100, 84)
 private const val MAP_RADIUS = 76
 private const val FRAME_RADIUS = 82
 private val COMPASS_CENTRE = IntOffset(22, 22)
-private const val COMPASS_RADIUS = 17
+private const val COMPASS_RADIUS = 20
 private const val SOCKET_RADIUS = 23
-private val COMPASS_WAY = (COMPASS_CENTRE - FRAME_HOLE_CENTRE).toOffset().let { it / it.getDistance() }
 
 /**
  * How far past its cell the emblem may reach, as a share of the cell: the frame fills the room inside the ring's apps
@@ -154,8 +153,15 @@ private const val CREDIT_FADE_MILLIS = 1_000
 /** The whole game pixels the minimap is drawn at in an emblem of [size]: as large as reaches its room, and no larger than the rest of the game. */
 private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_REACH, 2f * FRAME_RADIUS, px)
 
-/** Where the compass is centred in an emblem of [size] with its minimap at [scale]. */
-private fun compassAt(size: Size, scale: Int) = size.center + COMPASS_WAY * ((FRAME_RADIUS - SOCKET_RADIUS) * scale.toFloat())
+/**
+ * Where the compass is centred in an emblem of [size] with its minimap at [scale]: in its socket off the frame's upper
+ * left, as the game has it, reaching out among the ring's apps.
+ */
+private fun compassAt(size: Size, scale: Int) = size.center + ((COMPASS_CENTRE - FRAME_HOLE_CENTRE) * scale).toOffset()
+
+/** The frame's ring and its compass socket, all the emblem draws or takes touches in. */
+private fun frameOutline(size: Size, scale: Int) =
+    Path.combine(PathOperation.Union, circle(size.center, FRAME_RADIUS * scale), circle(compassAt(size, scale), SOCKET_RADIUS * scale))
 
 private fun circle(centre: Offset, radius: Int) = Path().apply { addOval(Rect(centre, radius.toFloat())) }
 
@@ -230,26 +236,7 @@ object OldSchoolArt : ThemeArt {
                         map()?.let { drawSpriteCentred(it, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
                     },
             )
-            Spacer(
-                Modifier.matchParentSize().drawWithCache {
-                    val scale = mapScale(size, px)
-                    val ring = circle(size.center, FRAME_RADIUS * scale)
-                    val at = compassAt(size, scale)
-                    val socket = Path.combine(PathOperation.Difference, circle(at, SOCKET_RADIUS * scale), circle(at, COMPASS_RADIUS * scale))
-                    val credit = measurer.measure(MAP_CREDIT, creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
-                    onDrawBehind {
-                        // Upright over the turned map, as the game keeps the player's square.
-                        if (marked) selfMarker(center, scale)
-                        if (map() != null && creditAlpha.value > 0f) {
-                            drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + CREDIT_DROP * scale - credit.size.height), alpha = creditAlpha.value)
-                        }
-                        // The frame's own ring alone: its compass socket would reach out among the ring's apps, so the
-                        // compass sits just inside the frame's edge, over the map, as in the game's fixed-size view.
-                        clipPath(ring) { drawSprite(frame, center - (FRAME_HOLE_CENTRE * scale).toOffset(), scale) }
-                        clipPath(socket) { drawSprite(frame, at - (COMPASS_CENTRE * scale).toOffset(), scale) }
-                    }
-                },
-            )
+            // Under the frame, whose socket's own pixels edge it.
             Spacer(
                 Modifier
                     .matchParentSize()
@@ -265,14 +252,30 @@ object OldSchoolArt : ThemeArt {
                         onDrawBehind { clipPath(face) { drawSpriteCentred(compass, at, scale) } }
                     },
             )
+            Spacer(
+                Modifier.matchParentSize().drawWithCache {
+                    val scale = mapScale(size, px)
+                    val outline = frameOutline(size, scale)
+                    val credit = measurer.measure(MAP_CREDIT, creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
+                    onDrawBehind {
+                        // Upright over the turned map, as the game keeps the player's square.
+                        if (marked) selfMarker(center, scale)
+                        if (map() != null && creditAlpha.value > 0f) {
+                            drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + CREDIT_DROP * scale - credit.size.height), alpha = creditAlpha.value)
+                        }
+                        // The frame's ring and socket alone, without the orbs the game hangs off its side.
+                        clipPath(outline) { drawSprite(frame, center - (FRAME_HOLE_CENTRE * scale).toOffset(), scale) }
+                    }
+                },
+            )
         }
     }
 
-    /** The emblem clips to the frame's outer edge, which reaches past its cell, so the map and its compass show whole. */
+    /** The emblem clips to the frame and its compass socket, which reach past its cell, so both show whole. */
     @Composable
     override fun emblemBox(edge: Color): Modifier {
         val px = gamePixel
-        val shape = remember(px) { GenericShape { size, _ -> addOval(Rect(Offset(size.width / 2, size.height / 2), FRAME_RADIUS * mapScale(size, px).toFloat())) } }
+        val shape = remember(px) { GenericShape { size, _ -> addPath(frameOutline(size, mapScale(size, px))) } }
         return Modifier.clip(shape)
     }
 
