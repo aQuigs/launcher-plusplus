@@ -92,6 +92,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.LocalDate
 
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
@@ -428,7 +429,7 @@ class MainActivity : ComponentActivity() {
                         },
                         spinStats = spinStats,
                         onSpin = {
-                            spinStats += it
+                            spinStats = spinStats.add(it, on = LocalDate.now())
                             spinStatsStore.save(spinStats)
                         },
                         homeOnReturn = homeOnReturn,
