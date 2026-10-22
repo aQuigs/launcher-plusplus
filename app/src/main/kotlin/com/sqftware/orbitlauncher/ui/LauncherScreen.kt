@@ -230,7 +230,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([showWhereIAm], [onShowWhereIAmChange]),
+ * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([showWhereIAm], [onShowWhereIAmChange]), with the [minimap] and the phone's [heading] read where they are drawn,
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -293,6 +293,8 @@ fun LauncherScreen(
     onCheckForUpdatesChange: (Boolean) -> Unit,
     showWhereIAm: Boolean,
     onShowWhereIAmChange: (Boolean) -> Unit,
+    minimap: () -> ImageBitmap?,
+    heading: () -> Float?,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
@@ -1308,7 +1310,7 @@ fun LauncherScreen(
     // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back. The
     // keyboard is left to the drawer, the one place here that types: a dialog's keyboard must not reflow the pages behind it.
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
-    CompositionLocalProvider(LocalNotices provides shownNotices) {
+    CompositionLocalProvider(LocalNotices provides shownNotices, LocalMinimap provides minimap, LocalHeading provides heading) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
                 Modifier

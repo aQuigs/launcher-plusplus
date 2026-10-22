@@ -304,6 +304,8 @@ class LauncherScreenTest {
             onCheckForUpdatesChange = { checkForUpdates = it },
             showWhereIAm = showWhereIAm,
             onShowWhereIAmChange = { showWhereIAm = it },
+            minimap = { null },
+            heading = { null },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPages = widgetPages,

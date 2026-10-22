@@ -2,7 +2,6 @@ package com.sqftware.orbitlauncher
 
 import com.sqftware.orbitlauncher.domain.turnedPast
 import kotlinx.coroutines.flow.runningReduce
-import com.sqftware.orbitlauncher.ui.LocalHeading
 import com.sqftware.orbitlauncher.domain.easeHeading
 import com.sqftware.orbitlauncher.apps.SensorHeadingSource
 import android.content.Intent
@@ -12,8 +11,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.sqftware.orbitlauncher.ui.LocalMinimap
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -365,132 +362,132 @@ class MainActivity : ComponentActivity() {
                     setUpHome()
                 }
 
-                CompositionLocalProvider(LocalMinimap provides readMinimap, LocalHeading provides readHeading) {
-                    LauncherScreen(
-                        layout = layout,
-                        onLayoutChange = ::changeLayout,
-                        homePresses = homePresses,
-                        pinRequests = pinRequests,
-                        notices = notices,
-                        apps = apps,
-                        pinnedShortcuts = pinnedShortcuts,
-                        ringPages = ringPages,
-                        onRingPagesChange = ::changeRingPages,
-                        onSetUpHome = {
-                            if (appUsage.isUsageAccessGranted()) {
-                                setUpHome()
-                            } else {
-                                askingUsage = true
-                                appUsage.openUsageSettings()
-                            }
-                        },
-                        actions = actions,
-                        reorderMode = reorderMode,
-                        onReorderModeChange = {
-                            reorderMode = it
-                            reorderModeStore.save(it)
-                        },
-                        clock = clock,
-                        onTwentyFourHourChange = {
-                            twentyFourHour = it
-                            hourStyleStore.save(it)
-                        },
-                        theme = shownTheme,
-                        onThemeChange = {
-                            theme = it
-                            themeStore.save(it)
-                        },
-                        previewing = previewTheme != null,
-                        onPreviewThemeChange = { previewTheme = it },
-                        folderLooks = folderLooks,
-                        onFolderLooksChange = {
-                            folderLooks = it
-                            folderLookStore.save(folderLooks)
-                        },
-                        colourways = colourways,
-                        onColourwaysChange = {
-                            colourways = it
-                            colourwayStore.save(colourways)
-                        },
-                        ambientMotion = ambientMotion,
-                        onAmbientMotionChange = {
-                            ambientMotion = it
-                            ambientMotionStore.save(it)
-                        },
-                        appNames = appNames,
-                        onAppNamesChange = {
-                            appNames = it
-                            appNamesStore.save(it)
-                        },
-                        ringSpin = ringSpin,
-                        onRingSpinChange = {
-                            ringSpin = it
-                            ringSpinStore.save(it)
-                        },
-                        spinStats = spinStats,
-                        onSpin = {
-                            spinStats = spinStats.add(it, on = LocalDate.now())
-                            spinStatsStore.save(spinStats)
-                        },
-                        homeOnReturn = homeOnReturn,
-                        onHomeOnReturnChange = {
-                            homeOnReturn = it
-                            homeOnReturnStore.save(it)
-                        },
-                        pickTip = pickTip,
-                        onPickTipLearned = {
-                            pickTip = false
-                            pickTipStore.save(false)
-                        },
-                        drawerStyle = drawerStyle,
-                        onDrawerStyleChange = {
-                            drawerStyle = it
-                            drawerStyleStore.save(it)
-                        },
-                        onOpenClock = wallClock::openClock,
-                        onOpenCalendar = wallClock::openCalendar,
-                        ringerMode = ringerMode,
-                        onRingerTap = ringer::cycle,
-                        updateAvailable = updateAvailable,
-                        onOpenUpdate = appUpdates::openStorePage,
-                        checkForUpdates = checkForUpdates,
-                        onCheckForUpdatesChange = {
-                            checkForUpdates = it
-                            updateCheckStore.save(it)
-                        },
-                        showWhereIAm = showWhereIAm,
-                        onShowWhereIAmChange = { on ->
-                            when {
-                                !on -> changeShowWhereIAm(false)
-                                location.isGranted() -> changeShowWhereIAm(true)
-                                else -> location.request()
-                            }
-                        },
-                        isHomeApp = isHomeApp,
-                        onBecomeHomeApp = homeRole::request,
-                        widgetPages = widgetPages,
-                        widgets = widgetActions,
-                        gridPages = gridPages,
-                        onGridPagesChange = ::changeGridPages,
-                        collectionPages = collectionPages,
-                        onCollectionPagesChange = ::changeCollectionPages,
-                        foregroundTime = foregroundTime,
-                        onOpenUsageSettings = appUsage::openUsageSettings,
-                        unread = appSettings.badges(unread),
-                        badgesEnabled = badgesEnabled,
-                        onOpenBadgeSettings = badges::openSettings,
-                        appSettings = appSettings,
-                        onAppSettingsChange = {
-                            appSettings = it
-                            appSettingsStore.save(it)
-                        },
-                        onOpenNotifications = shade::open,
-                        onSystemBarsShownChange = systemBars::setShown,
-                        onSetWallpaper = { draw -> scope.launch(Dispatchers.IO) { wallpaper.set(draw().asAndroidBitmap()) } },
-                        onRestart = relauncher::restart,
-                        onReset = relauncher::reset,
-                    )
-                }
+                LauncherScreen(
+                    layout = layout,
+                    onLayoutChange = ::changeLayout,
+                    homePresses = homePresses,
+                    pinRequests = pinRequests,
+                    notices = notices,
+                    apps = apps,
+                    pinnedShortcuts = pinnedShortcuts,
+                    ringPages = ringPages,
+                    onRingPagesChange = ::changeRingPages,
+                    onSetUpHome = {
+                        if (appUsage.isUsageAccessGranted()) {
+                            setUpHome()
+                        } else {
+                            askingUsage = true
+                            appUsage.openUsageSettings()
+                        }
+                    },
+                    actions = actions,
+                    reorderMode = reorderMode,
+                    onReorderModeChange = {
+                        reorderMode = it
+                        reorderModeStore.save(it)
+                    },
+                    clock = clock,
+                    onTwentyFourHourChange = {
+                        twentyFourHour = it
+                        hourStyleStore.save(it)
+                    },
+                    theme = shownTheme,
+                    onThemeChange = {
+                        theme = it
+                        themeStore.save(it)
+                    },
+                    previewing = previewTheme != null,
+                    onPreviewThemeChange = { previewTheme = it },
+                    folderLooks = folderLooks,
+                    onFolderLooksChange = {
+                        folderLooks = it
+                        folderLookStore.save(folderLooks)
+                    },
+                    colourways = colourways,
+                    onColourwaysChange = {
+                        colourways = it
+                        colourwayStore.save(colourways)
+                    },
+                    ambientMotion = ambientMotion,
+                    onAmbientMotionChange = {
+                        ambientMotion = it
+                        ambientMotionStore.save(it)
+                    },
+                    appNames = appNames,
+                    onAppNamesChange = {
+                        appNames = it
+                        appNamesStore.save(it)
+                    },
+                    ringSpin = ringSpin,
+                    onRingSpinChange = {
+                        ringSpin = it
+                        ringSpinStore.save(it)
+                    },
+                    spinStats = spinStats,
+                    onSpin = {
+                        spinStats = spinStats.add(it, on = LocalDate.now())
+                        spinStatsStore.save(spinStats)
+                    },
+                    homeOnReturn = homeOnReturn,
+                    onHomeOnReturnChange = {
+                        homeOnReturn = it
+                        homeOnReturnStore.save(it)
+                    },
+                    pickTip = pickTip,
+                    onPickTipLearned = {
+                        pickTip = false
+                        pickTipStore.save(false)
+                    },
+                    drawerStyle = drawerStyle,
+                    onDrawerStyleChange = {
+                        drawerStyle = it
+                        drawerStyleStore.save(it)
+                    },
+                    onOpenClock = wallClock::openClock,
+                    onOpenCalendar = wallClock::openCalendar,
+                    ringerMode = ringerMode,
+                    onRingerTap = ringer::cycle,
+                    updateAvailable = updateAvailable,
+                    onOpenUpdate = appUpdates::openStorePage,
+                    checkForUpdates = checkForUpdates,
+                    onCheckForUpdatesChange = {
+                        checkForUpdates = it
+                        updateCheckStore.save(it)
+                    },
+                    showWhereIAm = showWhereIAm,
+                    onShowWhereIAmChange = { on ->
+                        when {
+                            !on -> changeShowWhereIAm(false)
+                            location.isGranted() -> changeShowWhereIAm(true)
+                            else -> location.request()
+                        }
+                    },
+                    minimap = readMinimap,
+                    heading = readHeading,
+                    isHomeApp = isHomeApp,
+                    onBecomeHomeApp = homeRole::request,
+                    widgetPages = widgetPages,
+                    widgets = widgetActions,
+                    gridPages = gridPages,
+                    onGridPagesChange = ::changeGridPages,
+                    collectionPages = collectionPages,
+                    onCollectionPagesChange = ::changeCollectionPages,
+                    foregroundTime = foregroundTime,
+                    onOpenUsageSettings = appUsage::openUsageSettings,
+                    unread = appSettings.badges(unread),
+                    badgesEnabled = badgesEnabled,
+                    onOpenBadgeSettings = badges::openSettings,
+                    appSettings = appSettings,
+                    onAppSettingsChange = {
+                        appSettings = it
+                        appSettingsStore.save(it)
+                    },
+                    onOpenNotifications = shade::open,
+                    onSystemBarsShownChange = systemBars::setShown,
+                    onSetWallpaper = { draw -> scope.launch(Dispatchers.IO) { wallpaper.set(draw().asAndroidBitmap()) } },
+                    onRestart = relauncher::restart,
+                    onReset = relauncher::reset,
+                )
             }
         }
     }
