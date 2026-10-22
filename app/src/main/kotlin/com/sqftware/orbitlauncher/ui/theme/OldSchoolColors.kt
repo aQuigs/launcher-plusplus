@@ -25,10 +25,13 @@ internal val OldSchoolPalette = Palette(
     ringMark = Color(0xFFEEEEEE),
 )
 
-/** The game's text: the shadow every line casts, the yellow of a stack's count, white for a menu's verb, orange for its target. */
+/**
+ * The game's text: the shadow every line casts, the yellow of a stack's count, which its clock and hints take too, white
+ * for a hitsplat's count and a menu's verb, and orange for a menu's target.
+ */
 val GameShadow = Color.Black
 val StackCount = Yellow
-val StackCountDismissed = Color.White
+val HitsplatCount = Color.White
 val MenuVerb = Color.White
 
 /** The game's right-click menu: its black box and the brown of its rim and its "Choose Option" header. */

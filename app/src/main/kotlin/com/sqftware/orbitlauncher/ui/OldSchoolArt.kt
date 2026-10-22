@@ -8,7 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.center
-import com.sqftware.orbitlauncher.ui.theme.StackCountDismissed
+import com.sqftware.orbitlauncher.ui.theme.HitsplatCount
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
@@ -94,6 +94,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -194,7 +195,7 @@ private const val CLOCK_SCALE = 2
 /**
  * Old School: an homage to the old game's interface, drawn from its own sprites at whole game pixels. The emblem is the
  * minimap in its frame with the compass, the ring's apps sit in its round orbs, every app is one of its items, a
- * folder is a pile of two, badges are an item's yellow stack count, and text is in its fonts.
+ * folder is a pile of two, badges are hitsplats, and text is in its fonts.
  */
 object OldSchoolArt : ThemeArt {
     override val hintInk: Color
@@ -439,18 +440,16 @@ object OldSchoolArt : ThemeArt {
         get() = Alignment.TopStart
 
     /**
-     * An item's stack count, in the game's small font at the item's top left: yellow while all its notifications are in
-     * the shade, white once some are dismissed, as the game's white counts mark a different stack.
+     * A hitsplat with the count on it, as the game marks a hit: blue, the game's splat for a hit that did no harm, while
+     * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread.
      */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
-        Text(
-            badgeText(unread.count),
-            modifier.testTag(BadgeTags.BUBBLE),
-            color = if (unread.dismissed) StackCountDismissed else StackCount,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-        )
+        val splat = sprite(if (unread.dismissed) R.drawable.osrs_1359_0 else R.drawable.osrs_1358_0)
+        Box(modifier.testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
+            SpriteImage(splat, gamePixel)
+            Text(badgeText(unread.count), color = HitsplatCount, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
     }
 
     /** The time in the quill digits the game draws its largest headings in, anything else in its bold type. */
@@ -565,8 +564,14 @@ private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it
 /** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
 private const val ITEM_FIT = 28f
 
+/** Each sprite decoded once for the whole launcher, not once for every badge, orb and frame that shows it. */
+private val sprites = mutableMapOf<Int, ImageBitmap>()
+
 @Composable
-internal fun sprite(@DrawableRes id: Int): ImageBitmap = ImageBitmap.imageResource(id)
+internal fun sprite(@DrawableRes id: Int): ImageBitmap {
+    val resources = LocalContext.current.resources
+    return remember(id) { sprites.getOrPut(id) { ImageBitmap.imageResource(resources, id) } }
+}
 
 /** [image] at [scale], taking the room it is drawn in. */
 @Composable
