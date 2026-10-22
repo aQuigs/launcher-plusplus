@@ -24,11 +24,12 @@ enum class MapIcon(val priority: Int) {
 
 /**
  * The art the painter draws with, which comes from outside the domain. A tree is one of [trees], picked by its spot and
- * standing on the point two rows above its bottom edge; an [npc] dot and each of the [icons] are centred on their spot.
- * A pixel under half opacity is not drawn, and whatever is missing is left out of the map.
+ * standing on the point two rows above its bottom edge; an [npc] or [player] dot and each of the [icons] are centred on
+ * their spot. A pixel under half opacity is not drawn, and whatever is missing is left out of the map.
  */
 class MinimapSprites(
     val trees: List<Pixels> = emptyList(),
     val npc: Pixels? = null,
+    val player: Pixels? = null,
     val icons: Map<MapIcon, Pixels> = emptyMap(),
 )

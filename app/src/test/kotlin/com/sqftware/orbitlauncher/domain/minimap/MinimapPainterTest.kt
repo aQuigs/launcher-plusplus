@@ -117,6 +117,17 @@ class MinimapPainterTest {
     }
 
     @Test
+    fun drawsEveryoneMovingAboutWithPlayersOverNpcs() {
+        val sprites = MinimapSprites(npc = solid(3, 3, NPC), player = solid(3, 3, PLAYER))
+        // Two NPCs closer than the mapped people's spacing both show, and a player on one of them covers it.
+        val figures = listOf(Figure(local(40, 40), Dot.Player), Figure(local(40, 40), Dot.Npc), Figure(local(42, 40), Dot.Npc))
+        val disc = MinimapPainter(sprites).paintDisc(MapScene(centre, figures = figures))
+        assertEquals(PLAYER, disc[40, 40])
+        assertEquals(NPC, disc[43, 40])
+        assertEquals(9, disc.argb.count { it == PLAYER })
+    }
+
+    @Test
     fun pavesBuiltUpPlaces() {
         val blocks = (0 until 4).flatMap { i -> (0 until 4).map { j -> Building(rect(20 + i * 30, 20 + j * 30, 40 + i * 30, 40 + j * 30), seed = (i * 4 + j).toLong()) } }
         val disc = MinimapPainter(MinimapSprites()).paintDisc(MapScene(centre, buildings = blocks))
@@ -206,6 +217,7 @@ class MinimapPainterTest {
         val WORLD_MAP = MapFrame.worldMap(WORLD_SIZE, WORLD_SIZE)
         const val TREE = 0xFFFF00FF.toInt()
         const val NPC = 0xFF00FFFF.toInt()
+        const val PLAYER = 0xFFFFFFFE.toInt()
         const val ICON = 0xFF0000E0.toInt()
         const val WALL = 0xFFEEEEEE.toInt()
         const val DOOR = 0xFFEE0000.toInt()

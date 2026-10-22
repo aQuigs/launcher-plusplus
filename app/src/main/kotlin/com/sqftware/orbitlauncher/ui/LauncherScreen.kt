@@ -243,7 +243,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap] and the phone's [heading] read where they are drawn,
+ * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn,
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -308,6 +308,7 @@ fun LauncherScreen(
     onShowWhereIAmChange: (Boolean) -> Unit,
     onOpenMapLicence: () -> Unit,
     minimap: () -> PaintedMap<ImageBitmap>?,
+    madeUpMap: () -> PaintedMap<ImageBitmap>?,
     heading: () -> Float?,
     worldMaps: () -> WorldMap,
     isHomeApp: Boolean,
@@ -327,6 +328,7 @@ fun LauncherScreen(
     onAppSettingsChange: (AppSettings) -> Unit,
     onOpenNotifications: () -> Unit,
     onSystemBarsShownChange: (Boolean) -> Unit,
+    onAmbientInSightChange: (Boolean) -> Unit,
     onSetWallpaper: (draw: () -> ImageBitmap) -> Unit,
     onRestart: () -> Unit,
     onReset: () -> Unit,
@@ -602,6 +604,8 @@ fun LauncherScreen(
     // round a whole number of times in it, so none jumps as the turn starts over.
     val planets = remember(ring, shownDock) { planetsOf(ring, shownDock) }
     val ambient = ambientMotion && ringInSight
+    val latestOnAmbientInSightChange by rememberUpdatedState(onAmbientInSightChange)
+    LaunchedEffect(ambient) { latestOnAmbientInSightChange(ambient) }
     val skyTurns = ambient && folderLook.moves(folders = (ring + shownDock).any { it is RingItem.Folder }, planets = planets.values)
     val sky = rememberUpdatedState(turnAngle(skyTurns, FOLDER_SKY_TURN_MILLIS))
     // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
@@ -1360,6 +1364,7 @@ fun LauncherScreen(
     CompositionLocalProvider(
         LocalNotices provides shownNotices,
         LocalMinimap provides minimap,
+        LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
         LocalOpenWorldMap provides openWorldMap,
     ) {
