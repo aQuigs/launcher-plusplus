@@ -74,6 +74,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
@@ -147,7 +153,7 @@ private const val EMBLEM_REACH = 1.15f
  * The credit the map data's licences ask to show with the map, along the bottom of the disc: how wide it may run and
  * how far below the centre its foot is, in game pixels.
  */
-private const val MAP_CREDIT = "© OpenMapTiles\n© OpenStreetMap"
+internal const val MAP_CREDIT = "© OpenMapTiles © OpenStreetMap"
 private const val CREDIT_WIDTH = 104
 private const val CREDIT_DROP = 70
 private const val CREDIT_MILLIS = 5_000L
@@ -162,9 +168,20 @@ private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_
  */
 private fun compassAt(size: Size, scale: Int) = size.center + ((COMPASS_CENTRE - FRAME_HOLE_CENTRE) * scale).toOffset()
 
-/** The frame's ring and its compass socket, all the emblem draws or takes touches in. */
-private fun frameOutline(size: Size, scale: Int) =
-    Path.combine(PathOperation.Union, circle(size.center, FRAME_RADIUS * scale), circle(compassAt(size, scale), SOCKET_RADIUS * scale))
+/**
+ * The world map's orb, as the game hangs it off the minimap's frame: where it is centred from the map's centre, low on
+ * the right where the game has it and inside the emblem's cell, so it takes touches, and its radius.
+ */
+private val WORLD_MAP_ORB = IntOffset(54, 54)
+private const val WORLD_MAP_ORB_RADIUS = 15
+
+private fun worldMapOrbAt(size: Size, scale: Int) = size.center + (WORLD_MAP_ORB * scale).toOffset()
+
+/** The frame's ring, its compass socket and, [withOrb], the world map's orb: all the emblem draws or takes touches in. */
+private fun frameOutline(size: Size, scale: Int, withOrb: Boolean): Path {
+    val frame = Path.combine(PathOperation.Union, circle(size.center, FRAME_RADIUS * scale), circle(compassAt(size, scale), SOCKET_RADIUS * scale))
+    return if (withOrb) Path.combine(PathOperation.Union, frame, circle(worldMapOrbAt(size, scale), WORLD_MAP_ORB_RADIUS * scale)) else frame
+}
 
 private fun circle(centre: Offset, radius: Int) = Path().apply { addOval(Rect(centre, radius.toFloat())) }
 
@@ -235,7 +252,7 @@ object OldSchoolArt : ThemeArt {
                     .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                     .drawBehind {
                         val scale = mapScale(size, px)
-                        map()?.let { drawSpriteCentred(it.disc, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
+                        map()?.let { drawSpriteCentred(it.ground, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
                     },
             )
             // Each icon goes round with the map but stays upright, as the game keeps them: placed by hand rather than
@@ -273,8 +290,8 @@ object OldSchoolArt : ThemeArt {
             Spacer(
                 Modifier.matchParentSize().drawWithCache {
                     val scale = mapScale(size, px)
-                    val outline = frameOutline(size, scale)
-                    val credit = measurer.measure(MAP_CREDIT, creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
+                    val outline = frameOutline(size, scale, withOrb = false)
+                    val credit = measurer.measure(MAP_CREDIT.replace(" ©", "\n©"), creditStyle, constraints = Constraints(maxWidth = CREDIT_WIDTH * scale))
                     onDrawBehind {
                         // Upright over the turned map, as the game keeps the player's square.
                         if (marked) selfMarker(center, scale)
@@ -286,14 +303,56 @@ object OldSchoolArt : ThemeArt {
                     }
                 },
             )
+            // Only once there is a map, as the world map opens round where the minimap last placed the user.
+            if (mapShown) WorldMapOrb(px)
         }
     }
 
-    /** The emblem clips to the frame and its compass socket, which reach past its cell, so both show whole. */
+    /** The globe the game opens its world map with, over the frame's lower right. */
+    @Composable
+    private fun BoxScope.WorldMapOrb(px: Int) {
+        val orb = sprite(R.drawable.osrs_1438_0)
+        val globe = sprite(R.drawable.osrs_1439_0)
+        val open = LocalOpenWorldMap.current
+        Spacer(
+            Modifier
+                .matchParentSize()
+                .layout { measurable, constraints ->
+                    val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+                    val scale = mapScale(size, px)
+                    val side = 2 * WORLD_MAP_ORB_RADIUS * scale
+                    val placeable = measurable.measure(Constraints.fixed(side, side))
+                    val at = worldMapOrbAt(size, scale)
+                    layout(constraints.maxWidth, constraints.maxHeight) {
+                        placeable.place((at.x - side / 2f).roundToInt(), (at.y - side / 2f).roundToInt())
+                    }
+                }
+                .drawBehind {
+                    val scale = (size.width / (2 * WORLD_MAP_ORB_RADIUS)).roundToInt()
+                    drawSpriteCentred(orb, center, scale)
+                    drawSpriteCentred(globe, center, scale)
+                }
+                // Its own tap, taken before the emblem's, which would search or, held, edit the ring.
+                .pointerInput(open) { detectTapGestures(onLongPress = {}) { open() } }
+                // A node of its own, or it would merge into the emblem's and lose its tap to the emblem's search.
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "World map"
+                    role = Role.Button
+                    onClick { open(); true }
+                },
+        )
+    }
+
+    /**
+     * The emblem clips to the frame and its compass socket, which reach past its cell, so both show whole, and to the
+     * world map's orb while there is a map, so without one the emblem takes no touch beside its frame.
+     */
     @Composable
     override fun emblemBox(edge: Color): Modifier {
         val px = gamePixel
-        val shape = remember(px) { GenericShape { size, _ -> addPath(frameOutline(size, mapScale(size, px))) } }
+        val map = LocalMinimap.current
+        val mapShown by remember { derivedStateOf { map() != null } }
+        val shape = remember(px, mapShown) { GenericShape { size, _ -> addPath(frameOutline(size, mapScale(size, px), mapShown)) } }
         return Modifier.clip(shape)
     }
 

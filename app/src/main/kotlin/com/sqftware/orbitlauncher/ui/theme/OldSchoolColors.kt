@@ -70,3 +70,9 @@ val MinimapGrass = Color(opaque(GRASS_DARK))
 /** The player's own square at the minimap's middle, outlined so it shows on a white wall. */
 val MinimapSelf = Color.White
 val MinimapSelfEdge = Color.Black
+
+/** The world map where nothing is painted yet: the black the game leaves past the edge of its world. */
+val WorldMapVoid = Color.Black
+
+/** What the world map says over itself, its credit and whether it is loading, in the game's white. */
+val WorldMapInk = Color.White

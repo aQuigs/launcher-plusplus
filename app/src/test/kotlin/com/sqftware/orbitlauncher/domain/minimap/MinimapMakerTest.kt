@@ -22,24 +22,24 @@ class MinimapMakerTest {
         }
     }
 
-    private fun fixtures() = OpenMapTiles.tilesFor(bryantPark).associateWith { fixture("${it.z}-${it.x}-${it.y}.mvt") }.toMutableMap()
+    private fun fixtures() = OpenMapTiles.tilesFor(bryantPark, MapFrame.MINIMAP).associateWith { fixture("${it.z}-${it.x}-${it.y}.mvt") }.toMutableMap()
 
     @Test
     fun decodesEachTileOnceAsTheUserMoves() = runBlocking {
         val tiles = FakeTiles(fixtures())
-        val maker = MinimapMaker(tiles) { MinimapSprites() }
+        val maker = MinimapMaker(tiles, MapFrame.MINIMAP) { MinimapSprites() }
 
         assertNotNull(maker.paint(bryantPark))
         assertNotNull(maker.paint(LatLon(bryantPark.lat + 0.0002, bryantPark.lon)))
 
-        assertEquals(OpenMapTiles.tilesFor(bryantPark), tiles.asked)
+        assertEquals(OpenMapTiles.tilesFor(bryantPark, MapFrame.MINIMAP), tiles.asked)
     }
 
     @Test
     fun drawsNothingWhileATileIsMissing() = runBlocking {
         val bytes = fixtures()
         bytes.remove(bytes.keys.last())
-        assertNull(MinimapMaker(FakeTiles(bytes)) { MinimapSprites() }.paint(bryantPark))
+        assertNull(MinimapMaker(FakeTiles(bytes), MapFrame.MINIMAP) { MinimapSprites() }.paint(bryantPark))
     }
 
     @Test
@@ -48,7 +48,7 @@ class MinimapMakerTest {
         bytes[bytes.keys.first()] = ByteArray(0)
         val tiles = FakeTiles(bytes)
 
-        assertNotNull(MinimapMaker(tiles) { MinimapSprites() }.paint(bryantPark))
+        assertNotNull(MinimapMaker(tiles, MapFrame.MINIMAP) { MinimapSprites() }.paint(bryantPark))
         assertEquals(emptyList<TileId>(), tiles.discarded)
     }
 
@@ -59,7 +59,7 @@ class MinimapMakerTest {
         bytes[bad] = "<html>captive portal</html>".toByteArray()
         val tiles = FakeTiles(bytes)
 
-        assertNull(MinimapMaker(tiles) { MinimapSprites() }.paint(bryantPark))
+        assertNull(MinimapMaker(tiles, MapFrame.MINIMAP) { MinimapSprites() }.paint(bryantPark))
         assertEquals(listOf(bad), tiles.discarded)
     }
 

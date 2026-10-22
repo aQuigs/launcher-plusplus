@@ -3,16 +3,6 @@ package com.sqftware.orbitlauncher.domain.minimap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.PI
-import kotlin.math.atan
-import kotlin.math.exp
-
-/** The place at [at], the inverse of [WebMercator.toMercator], which only tests need. */
-internal fun toLatLon(at: Mercator): LatLon {
-    val radius = WebMercator.HALF_WORLD_M / PI
-    return LatLon(lat = Math.toDegrees(2 * atan(exp(at.y / radius)) - PI / 2), lon = Math.toDegrees(at.x / radius))
-}
-
 class WebMercatorTest {
     private val bryantPark = LatLon(40.7536, -73.9832)
     private val livonia = LatLon(42.3961, -83.3707)
@@ -21,7 +11,7 @@ class WebMercatorTest {
     fun projectsToMercatorMetresAndBack() {
         assertEquals(20_037_508.34, WebMercator.toMercator(LatLon(0.0, 180.0)).x, 0.01)
         assertEquals(0.0, WebMercator.toMercator(LatLon(0.0, 0.0)).y, 1e-9)
-        val back = toLatLon(WebMercator.toMercator(bryantPark))
+        val back = WebMercator.toLatLon(WebMercator.toMercator(bryantPark))
         assertEquals(bryantPark.lat, back.lat, 1e-9)
         assertEquals(bryantPark.lon, back.lon, 1e-9)
     }
@@ -47,9 +37,9 @@ class WebMercatorTest {
     @Test
     fun gathersTheNeighbourWhenTheViewCrossesATileEdge() {
         // Bryant Park lies 94% of the way across its tile, under the map's reach of the eastern edge.
-        assertEquals(listOf(TileId(14, 4824, 6157), TileId(14, 4825, 6157)), OpenMapTiles.tilesFor(bryantPark))
-        assertEquals(listOf(TileId(14, 4397, 6057)), OpenMapTiles.tilesFor(livonia))
-        assertTrue(OpenMapTiles.tilesFor(LatLon(-90.0, 0.0)).size <= 4)
+        assertEquals(listOf(TileId(14, 4824, 6157), TileId(14, 4825, 6157)), OpenMapTiles.tilesFor(bryantPark, MapFrame.MINIMAP))
+        assertEquals(listOf(TileId(14, 4397, 6057)), OpenMapTiles.tilesFor(livonia, MapFrame.MINIMAP))
+        assertTrue(OpenMapTiles.tilesFor(LatLon(-90.0, 0.0), MapFrame.MINIMAP).size <= 4)
     }
 
     @Test

@@ -134,7 +134,8 @@ import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
-import com.sqftware.orbitlauncher.domain.minimap.Minimap
+import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -306,8 +307,9 @@ fun LauncherScreen(
     whereIAm: WhereIAm,
     onShowWhereIAmChange: (Boolean) -> Unit,
     onOpenMapLicence: () -> Unit,
-    minimap: () -> Minimap<ImageBitmap>?,
+    minimap: () -> PaintedMap<ImageBitmap>?,
     heading: () -> Float?,
+    worldMaps: () -> WorldMap,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
@@ -580,12 +582,17 @@ fun LauncherScreen(
     val shownNotices = remember { Notices() }
     // The page editor covers the whole screen the same way, until Back, HOME or a tap on a page.
     var editingPages by rememberSaveable { mutableStateOf(false) }
+    // The world map covers the whole screen the same way, until Back or HOME.
+    var showingWorldMap by rememberSaveable { mutableStateOf(false) }
     // The system bars go with the launcher while the wallpaper shows alone.
     var showingWallpaper by rememberSaveable { mutableStateOf(false) }
     val latestOnSystemBarsShownChange by rememberUpdatedState(onSystemBarsShownChange)
-    LaunchedEffect(showingWallpaper) { latestOnSystemBarsShownChange(!showingWallpaper) }
+    val barsHidden = showingWallpaper || showingWorldMap
+    LaunchedEffect(barsHidden) { latestOnSystemBarsShownChange(!barsHidden) }
     // Every page stays composed, so the ring page must be told when nobody can see it.
-    val ringInSight = settled.kind == PageKind.Ring && !drawerOpen && !pickingCollection && !editingPages && !showingWallpaper
+    // A screen of its own over the pages, which go while it is up.
+    val covered = pickingCollection || editingPages || showingWorldMap
+    val ringInSight = settled.kind == PageKind.Ring && !drawerOpen && !covered && !showingWallpaper
     // The first frame holds only the page in view, so the others' widgets and cards do not delay it.
     val firstFrameDrawn by produceState(false) {
         withFrameNanos {}
@@ -1232,6 +1239,7 @@ fun LauncherScreen(
         closeDrawer()
         pickingCollection = false
         editingPages = false
+        showingWorldMap = false
         confirmingReset = false
         confirmingScene = false
         confirmingPin = null
@@ -1277,7 +1285,7 @@ fun LauncherScreen(
     // left to the system, it would finish the home activity, which the system then starts afresh, reloading everything on
     // screen. Opened as an app instead, Back leaves it.
     BackHandler(
-        enabled = isHomeApp || showingWallpaper || dragged != null || drawerOpen || editingPages || pickingCollection ||
+        enabled = isHomeApp || showingWallpaper || dragged != null || drawerOpen || covered ||
             editedWidget != null || pagerState.currentPage != layout.homeIndex || open != null || previewing,
     ) {
         when {
@@ -1285,6 +1293,7 @@ fun LauncherScreen(
             dragged != null -> dragged = null
             drawerOpen -> closeDrawer()
             editingPages -> editingPages = false
+            showingWorldMap -> showingWorldMap = false
             pickingCollection -> pickingCollection = false
             editedWidget != null -> editingWidget = null
             open != null && settled == ringPage -> openFolder = null
@@ -1347,7 +1356,13 @@ fun LauncherScreen(
     // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back. The
     // keyboard is left to the drawer, the one place here that types: a dialog's keyboard must not reflow the pages behind it.
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
-    CompositionLocalProvider(LocalNotices provides shownNotices, LocalMinimap provides minimap, LocalHeading provides heading) {
+    val openWorldMap = remember { { showingWorldMap = true } }
+    CompositionLocalProvider(
+        LocalNotices provides shownNotices,
+        LocalMinimap provides minimap,
+        LocalHeading provides heading,
+        LocalOpenWorldMap provides openWorldMap,
+    ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -1474,7 +1489,7 @@ fun LauncherScreen(
                     // the page editor.
                     modifier = Modifier
                         .clipToBounds()
-                        .then(if (pickingCollection || editingPages) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
+                        .then(if (covered) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
                 ) { padding ->
                     HorizontalPager(
                         state = pagerState,
@@ -1938,6 +1953,12 @@ fun LauncherScreen(
                         .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = Spacing.Edge)
                         .aboveStrip(),
                 )
+            }
+            // The whole window, through the bars, which hide while it is up.
+            if (showingWorldMap) {
+                // One visit's map, so the tiles it decoded go with it.
+                val worldMap = remember { worldMaps() }
+                WorldMapScreen(here = { minimap()?.centre }, worldMap, onClose = { showingWorldMap = false })
             }
         }
     }

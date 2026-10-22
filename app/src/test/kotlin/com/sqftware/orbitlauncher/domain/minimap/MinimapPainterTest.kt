@@ -5,6 +5,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.floor
 import kotlin.math.hypot
 
 class MinimapPainterTest {
@@ -99,8 +100,8 @@ class MinimapPainterTest {
 
     @Test
     fun leavesIconsOffTheDiscAndCentresEachOnItsPlace() {
-        val map = painter.paint(MapScene(centre, pois = listOf(Poi(local(40, 60), MapIcon.Bank))))
-        assertTrue(map.disc.argb.none { it == ICON or MapIcon.Bank.ordinal })
+        val map = painter.paint(MapScene(centre, pois = listOf(Poi(local(40, 60), MapIcon.Bank))), MapFrame.MINIMAP)
+        assertTrue(map.ground.argb.none { it == ICON or MapIcon.Bank.ordinal })
         val bank = map.icons.single()
         assertEquals(40.0, bank.x.toDouble(), 1.0)
         assertEquals(60.0, bank.y.toDouble(), 1.0)
@@ -124,17 +125,61 @@ class MinimapPainterTest {
 
     @Test
     fun paintsTheSameSceneTheSameWay() {
-        val tiles = OpenMapTiles.tilesFor(centre).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
-        val scene = OpenMapTiles.scene(centre, tiles)
+        val tiles = OpenMapTiles.tilesFor(centre, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
+        val scene = OpenMapTiles.scene(centre, tiles, MapFrame.MINIMAP)
         val disc = painter.paintDisc(scene).argb
         assertArrayEquals(disc, painter.paintDisc(scene).argb)
         assertTrue(disc.any { it == WALL })
         assertTrue(disc.any { it == ROAD })
     }
 
-    private fun MinimapPainter.paintDisc(scene: MapScene) = paint(scene).disc
+    @Test
+    fun paintsTheWorldMapAsAnOpaqueSquareWithEveryIconAndNobody() {
+        val spread = MapIcon.entries.take(8).mapIndexed { i, icon -> Poi(local(30 + (i % 4) * 30, 40 + (i / 4) * 60), icon, npc = true) }
+        val map = painter.paint(MapScene(centre, pois = spread), MapFrame.WORLD_MAP)
+        assertEquals(WORLD_MAP_SIZE, map.ground.width)
+        assertEquals(WORLD_MAP_SIZE, map.ground.height)
+        assertTrue(map.ground.argb.all { it ushr 24 == 0xFF })
+        assertTrue(map.icons.isEmpty())
+        assertTrue(spread.all { poi -> (ICON or poi.icon!!.ordinal) in map.ground.argb })
+        assertTrue(map.ground.argb.none { it == NPC })
+    }
 
-    private fun MinimapPainter.iconsOn(scene: MapScene) = paint(scene).icons.map { mark -> icons.entries.first { it.value === mark.image }.key }
+    @Test
+    fun theWorldMapPavesOnlyWhereBuildingsStandClose() {
+        val blocks = (0 until 4).flatMap { i -> (0 until 4).map { j -> Building(rect(20 + i * 30, 20 + j * 30, 45 + i * 30, 45 + j * 30), seed = (i * 4 + j).toLong()) } }
+        val ground = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = blocks), MapFrame.WORLD_MAP).ground
+        // The world map's centre pixel is the minimap's, 436 px further in.
+        val offset = WORLD_MAP_SIZE / 2 - MINIMAP_SIZE / 2
+        assertEquals(PLAZA, ground[77 + offset, 77 + offset])
+        assertTrue(ground[10, 10] != PLAZA)
+    }
+
+    @Test
+    fun twoWorldMapsOfOnePlaceAgreeWhereTheyMeet() {
+        val tiles = OpenMapTiles.tilesFor(centre, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
+        fun paintRound(at: LatLon) = onSeedGrid(at).let { painter.paint(OpenMapTiles.scene(it, tiles, MapFrame.WORLD_MAP), MapFrame.WORLD_MAP) }
+        val a = paintRound(centre)
+        val b = paintRound(centre.shifted(MapShift(300.0, 200.0)))
+
+        // Where b's top left pixel lies in a, in the grid both keep to.
+        val scale = gridPixelsPerMetre(centre.lat)
+        fun column(at: LatLon) = floor(WebMercator.toMercator(at).x * scale).toInt()
+        fun row(at: LatLon) = floor(-WebMercator.toMercator(at).y * scale).toInt()
+        val dx = column(b.centre) - column(a.centre)
+        val dy = row(b.centre) - row(a.centre)
+        var shared = 0
+        var same = 0
+        for (y in maxOf(0, dy) until minOf(WORLD_MAP_SIZE, WORLD_MAP_SIZE + dy)) for (x in maxOf(0, dx) until minOf(WORLD_MAP_SIZE, WORLD_MAP_SIZE + dx)) {
+            shared++
+            if (a.ground[x, y] == b.ground[x - dx, y - dy]) same++
+        }
+        assertTrue("$same of $shared pixels agree", same >= shared * 0.98)
+    }
+
+    private fun MinimapPainter.paintDisc(scene: MapScene) = paint(scene, MapFrame.MINIMAP).ground
+
+    private fun MinimapPainter.iconsOn(scene: MapScene) = paint(scene, MapFrame.MINIMAP).icons.map { mark -> icons.entries.first { it.value === mark.image }.key }
 
     private fun Pixels.spots(colour: Int) = argb.indices.filter { argb[it] == colour }.map { (it % MINIMAP_SIZE).toDouble() to (it / MINIMAP_SIZE).toDouble() }
 

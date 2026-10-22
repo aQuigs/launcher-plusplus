@@ -1,10 +1,13 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
 import kotlin.math.PI
+import kotlin.math.atan
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.ln
+import kotlin.math.round
 import kotlin.math.tan
 
 data class LatLon(val lat: Double, val lon: Double)
@@ -31,12 +34,23 @@ object WebMercator {
         )
     }
 
+    fun toLatLon(at: Mercator) = LatLon(
+        lat = Math.toDegrees(2 * atan(exp(at.y / EARTH_RADIUS_M)) - PI / 2),
+        lon = Math.toDegrees(at.x / EARTH_RADIUS_M),
+    )
+
     /**
      * Ground metres per mercator metre at [lat]: mercator stretches everything away from the equator by 1 / cos(lat).
      * Taken at the latitude [toMercator] clamps to, since the map stops short of the poles, where the scale would reach
      * across the whole world.
      */
     fun groundScale(lat: Double) = cos(Math.toRadians(lat.coerceIn(-MAX_LAT, MAX_LAT)))
+
+    /**
+     * [groundScale] at the whole degree of latitude nearest [lat]: the scale of the world-wide pixel grid that seeded
+     * features and the world map keep to, which changes only a degree away, so the grid holds still as the view moves.
+     */
+    fun gridScale(lat: Double) = groundScale(round(lat))
 
     /** Ground metres from [a] to [b], close enough for places a few kilometres apart. */
     fun groundDistance(a: LatLon, b: LatLon): Double {

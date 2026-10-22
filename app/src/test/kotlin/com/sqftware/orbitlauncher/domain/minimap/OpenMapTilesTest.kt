@@ -8,10 +8,10 @@ import org.junit.Test
 
 class OpenMapTilesTest {
     private val id = TileId(14, 4824, 6157)
-    private val centre = toLatLon(WebMercator.fromTile(id, EXTENT, TilePoint(2048, 2048)))
+    private val centre = WebMercator.toLatLon(WebMercator.fromTile(id, EXTENT, TilePoint(2048, 2048)))
 
     private fun scene(vararg layers: Pair<String, List<VectorFeature>>) =
-        OpenMapTiles.scene(centre, mapOf(id to VectorTile(layers.associate { (name, features) -> name to VectorLayer(name, EXTENT, features) })))
+        OpenMapTiles.scene(centre, mapOf(id to VectorTile(layers.associate { (name, features) -> name to VectorLayer(name, EXTENT, features) })), MapFrame.MINIMAP)
 
     private fun square(tags: Map<String, Any>, size: Int = 20) = VectorFeature(
         GeometryType.Polygon,
@@ -29,7 +29,7 @@ class OpenMapTilesTest {
     fun scalesAPolarCentreAsTheEdgeOfTheMapItIsDrawnAt() {
         val top = TileId(14, 8192, 0)
         val tile = VectorTile(mapOf("landcover" to VectorLayer("landcover", EXTENT, listOf(square(mapOf("class" to "grass"))))))
-        fun polygons(lat: Double) = OpenMapTiles.scene(LatLon(lat, 0.0), mapOf(top to tile)).areas.single().polygons
+        fun polygons(lat: Double) = OpenMapTiles.scene(LatLon(lat, 0.0), mapOf(top to tile), MapFrame.MINIMAP).areas.single().polygons
 
         assertEquals(polygons(85.05112878), polygons(90.0))
     }
@@ -138,8 +138,8 @@ class OpenMapTilesTest {
     @Test
     fun buildsBryantParkFromRealTiles() {
         val bryantPark = LatLon(40.7536, -73.9832)
-        val tiles = OpenMapTiles.tilesFor(bryantPark).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
-        val scene = OpenMapTiles.scene(bryantPark, tiles)
+        val tiles = OpenMapTiles.tilesFor(bryantPark, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
+        val scene = OpenMapTiles.scene(bryantPark, tiles, MapFrame.MINIMAP)
 
         assertTrue(scene.buildings.isNotEmpty())
         assertTrue(scene.areas.any { it.ground == Ground.Grass })

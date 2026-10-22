@@ -9,7 +9,7 @@ private val FIRST_RETRY = 5.seconds
 private val LAST_RETRY = 2.minutes
 
 /**
- * How long to wait before the [retry]th try again (from 0) at a disc whose tiles could not be had: 5 s, doubling up to
+ * How long to wait before the [retry]th try again (from 0) at a map whose tiles could not be had: 5 s, doubling up to
  * 2 min, so a map left blank by a dropped connection fills in soon after it returns without asking the server often.
  */
 fun paintRetryDelay(retry: Int): Duration = (FIRST_RETRY * (1 shl retry.coerceAtMost(5))).coerceAtMost(LAST_RETRY)
@@ -24,19 +24,21 @@ interface MapTiles {
 }
 
 /**
- * Paints the minimap as the user moves: it picks the tiles each fix needs and keeps those it has decoded, since a fix
- * 50 m on usually needs the very same ones. One caller at a time. The [sprites] are read once, on the first paint.
+ * Paints maps in [frame] as the user moves or pans: it picks the tiles each centre needs and keeps those it has decoded,
+ * since a centre 50 m on usually needs the very same ones. One caller at a time. The [sprites] are read once, on the
+ * first paint.
  */
-class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
+class MinimapMaker(private val tiles: MapTiles, private val frame: MapFrame, sprites: () -> MinimapSprites) {
     private val painter by lazy { MinimapPainter(sprites()) }
     private val decoded = mutableMapOf<TileId, VectorTile>()
 
     /**
-     * The disc around [centre], or null while a tile it needs cannot be had: a map with a tile missing would show
-     * made-up grass where that tile belongs.
+     * The map round [at], centred as the frame centres it, or null while a tile it needs cannot be had: a map with a tile
+     * missing would show made-up grass where that tile belongs.
      */
-    suspend fun paint(centre: LatLon): Minimap<Pixels>? {
-        val needed = OpenMapTiles.tilesFor(centre)
+    suspend fun paint(at: LatLon): PaintedMap<Pixels>? {
+        val centre = frame.centreFor(at)
+        val needed = OpenMapTiles.tilesFor(centre, frame)
         decoded.keys.retainAll(needed.toSet())
         for (id in needed - decoded.keys) {
             val bytes = tiles.tile(id) ?: continue
@@ -48,6 +50,6 @@ class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
             }
         }
         if (decoded.size < needed.size) return null
-        return painter.paint(OpenMapTiles.scene(centre, decoded))
+        return painter.paint(OpenMapTiles.scene(centre, decoded, frame), frame)
     }
 }
