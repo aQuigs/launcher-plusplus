@@ -44,6 +44,14 @@ class WebMercatorTest {
     }
 
     @Test
+    fun measuresGroundMetresBetweenNearbyPlaces() {
+        // A thousandth of a degree of latitude is about 111 m anywhere; of longitude, that times cos(lat).
+        assertEquals(111.3, WebMercator.groundDistance(bryantPark, LatLon(bryantPark.lat + 0.001, bryantPark.lon)), 0.5)
+        assertEquals(84.3, WebMercator.groundDistance(bryantPark, LatLon(bryantPark.lat, bryantPark.lon + 0.001)), 0.5)
+        assertEquals(0.0, WebMercator.groundDistance(livonia, livonia), 0.0)
+    }
+
+    @Test
     fun shrinksMercatorToGroundMetresAwayFromTheEquator() {
         assertEquals(1.0, WebMercator.groundScale(0.0), 1e-12)
         assertEquals(0.5, WebMercator.groundScale(60.0), 1e-12)

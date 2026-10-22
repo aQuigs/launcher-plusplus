@@ -25,20 +25,17 @@ interface MapTiles {
 
 /**
  * Paints the minimap as the user moves: it picks the tiles each fix needs and keeps those it has decoded, since a fix
- * 50 m on usually needs the very same ones, and keeps the last disc for a fix that has not moved. One caller at a time.
- * The [sprites] are read once, on the first paint.
+ * 50 m on usually needs the very same ones. One caller at a time. The [sprites] are read once, on the first paint.
  */
 class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
     private val painter by lazy { MinimapPainter(sprites()) }
     private val decoded = mutableMapOf<TileId, VectorTile>()
-    private var last: Pair<LatLon, Pixels>? = null
 
     /**
-     * The disc around [centre], the very image of the last one if [centre] has not moved, or null while a tile it needs
-     * cannot be had: a map with a tile missing would show made-up grass where that tile belongs.
+     * The disc around [centre], or null while a tile it needs cannot be had: a map with a tile missing would show
+     * made-up grass where that tile belongs.
      */
     suspend fun paint(centre: LatLon): Pixels? {
-        last?.let { (at, disc) -> if (at == centre) return disc }
         val needed = OpenMapTiles.tilesFor(centre)
         decoded.keys.retainAll(needed.toSet())
         for (id in needed - decoded.keys) {
@@ -51,6 +48,6 @@ class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
             }
         }
         if (decoded.size < needed.size) return null
-        return painter.paint(OpenMapTiles.scene(centre, decoded)).also { last = centre to it }
+        return painter.paint(OpenMapTiles.scene(centre, decoded))
     }
 }

@@ -42,7 +42,8 @@ interface LocationSource {
 private const val TAG = "PlatformLocationSource"
 private const val REQUEST_KEY = "location"
 private const val UPDATE_MILLIS = 60_000L
-private const val UPDATE_METRES = 50f
+// Also how far a fix must be from the last map's centre for LiveMinimap to paint a new one.
+internal const val UPDATE_METRES = 50f
 
 // A fix this recent is as good as a fresh one for a map that moves every 50 m.
 private const val FRESH_MILLIS = 10 * 60_000L

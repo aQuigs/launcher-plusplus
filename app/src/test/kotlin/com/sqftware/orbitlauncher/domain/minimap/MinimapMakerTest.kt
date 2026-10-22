@@ -4,7 +4,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Test
 import kotlin.time.Duration.Companion.minutes
 
@@ -26,13 +25,11 @@ class MinimapMakerTest {
     private fun fixtures() = OpenMapTiles.tilesFor(bryantPark).associateWith { fixture("${it.z}-${it.x}-${it.y}.mvt") }.toMutableMap()
 
     @Test
-    fun decodesEachTileOnceAsTheUserMovesAndKeepsTheDiscOfAFixThatHasNotMoved() = runBlocking {
+    fun decodesEachTileOnceAsTheUserMoves() = runBlocking {
         val tiles = FakeTiles(fixtures())
         val maker = MinimapMaker(tiles) { MinimapSprites() }
 
-        val first = maker.paint(bryantPark)
-        assertNotNull(first)
-        assertSame(first, maker.paint(bryantPark))
+        assertNotNull(maker.paint(bryantPark))
         assertNotNull(maker.paint(LatLon(bryantPark.lat + 0.0002, bryantPark.lon)))
 
         assertEquals(OpenMapTiles.tilesFor(bryantPark), tiles.asked)

@@ -5,6 +5,7 @@ import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.tan
 
@@ -43,6 +44,13 @@ object WebMercator {
      * across the whole world.
      */
     fun groundScale(lat: Double) = cos(Math.toRadians(lat.coerceIn(-MAX_LAT, MAX_LAT)))
+
+    /** Ground metres from [a] to [b], close enough for places a few kilometres apart. */
+    fun groundDistance(a: LatLon, b: LatLon): Double {
+        val from = toMercator(a)
+        val to = toMercator(b)
+        return hypot(to.x - from.x, to.y - from.y) * groundScale((a.lat + b.lat) / 2)
+    }
 
     fun tileSize(z: Int) = 2 * HALF_WORLD_M / (1 shl z)
 
