@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -17,6 +18,7 @@ import com.sqftware.orbitlauncher.domain.PageContents
 import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +30,7 @@ class PageEditorTest {
 
     private var layout by mutableStateOf(PageLayout())
     private val opened = mutableListOf<LauncherPage>()
+    private var closed = false
     private val empty = LauncherPage("ring-2", PageKind.Ring)
 
     private fun show() = compose.setContent {
@@ -43,7 +46,17 @@ class PageEditorTest {
             },
             onLayoutChange = { layout = it },
             onOpen = opened::add,
+            onClose = { closed = true },
         )
+    }
+
+    @Test
+    fun theHeadersCloseButtonClosesIt() {
+        show()
+
+        compose.onNodeWithContentDescription("Close").performClick()
+
+        compose.runOnIdle { assertTrue(closed) }
     }
 
     @Test

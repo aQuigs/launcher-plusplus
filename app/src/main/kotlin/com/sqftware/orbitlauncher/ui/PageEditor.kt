@@ -2,19 +2,17 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -41,7 +39,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,6 +56,9 @@ import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.WIDGET_COLUMNS
 import com.sqftware.orbitlauncher.domain.edgePull
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
+import com.sqftware.orbitlauncher.ui.theme.Spacing
+import com.sqftware.orbitlauncher.ui.theme.sidewaysScroll
 
 object PageEditorTags {
     const val EDITOR = "page_editor"
@@ -72,9 +75,8 @@ object PageEditorTags {
 
 private val CARD_WIDTH = 88.dp
 private val CARD_HEIGHT = 176.dp
-private val CARD_GAP = 12.dp
-private val CARD_RADIUS = 10.dp
-private val CARD_SHAPE = RoundedCornerShape(CARD_RADIUS)
+// As far as a lifted card rises and tilts out of the strip.
+private val LIFT_ROOM = 8.dp
 
 // A finger dragging a page this near either end of the strip scrolls it, and at the edge itself this fast, a second.
 private val EDGE_ZONE = 48.dp
@@ -94,6 +96,7 @@ fun PageEditor(
     contentsOf: (LauncherPage) -> PageContents,
     onLayoutChange: (PageLayout) -> Unit,
     onOpen: (LauncherPage) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var addingAtStart by remember { mutableStateOf<Boolean?>(null) }
@@ -103,7 +106,7 @@ fun PageEditor(
     val latestOnLayoutChange by rememberUpdatedState(onLayoutChange)
     val density = LocalDensity.current
     val rightToLeft = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val reorder = remember(density, rightToLeft) { ListReorder(with(density) { CARD_GAP.toPx() }, horizontal = true, mirrored = rightToLeft) }
+    val reorder = remember(density, rightToLeft) { ListReorder(with(density) { Spacing.Gap.toPx() }, horizontal = true, mirrored = rightToLeft) }
     SideEffect { reorder.count = layout.pages.size }
     val scroll = rememberScrollState()
     var finger by remember { mutableFloatStateOf(Float.NaN) }
@@ -117,65 +120,60 @@ fun PageEditor(
         scroll.scrollAtEdges(speed, pull = { towardsEnd * edgePull(finger, scroll.viewportSize.toFloat(), zone) }) { reorder.offset += it }
     }
 
-    Panel(modifier.testTag(PageEditorTags.EDITOR)) {
-        Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Pages", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 20.dp))
-            Text(
-                "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(CARD_GAP),
-                modifier = Modifier
-                    .padding(top = 24.dp)
-                    // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
-                    // the strip's own place on screen.
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
-                        }
-                    }
-                    .horizontalScroll(scroll)
-                    .padding(horizontal = 20.dp),
-            ) {
-                if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
-                layout.pages.forEachIndexed { index, page ->
-                    key(page.id) {
-                        val held = contents.getValue(page)
-                        PageCard(
-                            page = page,
-                            label = layout.label(page),
-                            home = page == layout.home,
-                            contents = held,
-                            lifted = reorder.dragging == index,
-                            // A long press let go without moving reaches the card's tap first, and opens nothing.
-                            onOpen = { if (reorder.dragging == null) onOpen(page) },
-                            onDelete = { if (held.isEmpty) onLayoutChange(layout.remove(page)) else deleting = page },
-                            onMakeHome = { onLayoutChange(layout.withHome(page)) },
-                            modifier = Modifier
-                                .reorderItem(reorder, index)
-                                .pointerInput(index) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = { reorder.dragging = index },
-                                        onDrag = { change, amount ->
-                                            change.consume()
-                                            reorder.moveBy(amount.x)
-                                        },
-                                        onDragEnd = {
-                                            reorder.end()?.let { (from, to) ->
-                                                if (from != to) latestOnLayoutChange(latestLayout.move(from, to))
-                                            }
-                                        },
-                                        onDragCancel = { reorder.end() },
-                                    )
-                                },
-                        )
+    Panel(
+        "Pages",
+        onClose,
+        modifier.testTag(PageEditorTags.EDITOR),
+        subtitle = "In the order you swipe through them. Hold a page and drag to move it; tap one to go to it, or its house to make it home.",
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.Gap),
+            modifier = Modifier
+                .padding(vertical = Spacing.Top)
+                // Watched ahead of the cards, which take the touches they drag with, and before the scroll, so in
+                // the strip's own place on screen.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) finger = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed }?.position?.x ?: Float.NaN
                     }
                 }
-                if (!layout.isFull) AddTile(atStart = false, onClick = { addingAtStart = false })
+                .sidewaysScroll(scroll, bleed = LIFT_ROOM),
+        ) {
+            if (!layout.isFull) AddTile(atStart = true, onClick = { addingAtStart = true })
+            layout.pages.forEachIndexed { index, page ->
+                key(page.id) {
+                    val held = contents.getValue(page)
+                    PageCard(
+                        page = page,
+                        label = layout.label(page),
+                        home = page == layout.home,
+                        contents = held,
+                        lifted = reorder.dragging == index,
+                        // A long press let go without moving reaches the card's tap first, and opens nothing.
+                        onOpen = { if (reorder.dragging == null) onOpen(page) },
+                        onDelete = { if (held.isEmpty) onLayoutChange(layout.remove(page)) else deleting = page },
+                        onMakeHome = { onLayoutChange(layout.withHome(page)) },
+                        modifier = Modifier
+                            .reorderItem(reorder, index)
+                            .pointerInput(index) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { reorder.dragging = index },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        reorder.moveBy(amount.x)
+                                    },
+                                    onDragEnd = {
+                                        reorder.end()?.let { (from, to) ->
+                                            if (from != to) latestOnLayoutChange(latestLayout.move(from, to))
+                                        }
+                                    },
+                                    onDragCancel = { reorder.end() },
+                                )
+                            },
+                    )
+                }
             }
+            if (!layout.isFull) AddTile(atStart = false, onClick = { addingAtStart = false })
         }
     }
 
@@ -232,7 +230,7 @@ private fun PageCard(
     val marked = home || lifted
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.testTag(PageEditorTags.page(page))) {
-        Box(
+        Pane(
             Modifier
                 .size(CARD_WIDTH, CARD_HEIGHT)
                 .graphicsLayer {
@@ -240,38 +238,39 @@ private fun PageCard(
                         translationY = -8.dp.toPx()
                         rotationZ = -3f
                     }
-                }
-                .clip(CARD_SHAPE)
-                .background(colours.surfaceContainer)
-                .border(if (marked) 2.dp else 1.dp, if (marked) colours.primary else colours.outlineVariant, CARD_SHAPE)
-                .clickable(onClick = onOpen),
+                },
+            shape = MaterialTheme.shapes.medium,
+            marked = marked,
+            onClick = onOpen,
         ) {
-            PagePreview(contents, isClockRing, Modifier.matchParentSize())
-            IconButton(
-                onClick = onMakeHome,
-                enabled = !home,
-                modifier = Modifier.size(32.dp).testTag(PageEditorTags.home(page)),
-            ) {
-                Icon(
-                    Icons.Default.Home,
-                    contentDescription = if (home) "Home page" else "Make $label the home page",
-                    tint = if (home) colours.onPrimary else colours.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(if (home) colours.primary else colours.surfaceContainerHighest, CircleShape)
-                        .padding(3.dp),
-                )
-            }
-            if (!isClockRing) {
+            Box(Modifier.fillMaxSize()) {
+                PagePreview(contents, isClockRing, Modifier.matchParentSize())
                 IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag(PageEditorTags.delete(page)),
+                    onClick = onMakeHome,
+                    enabled = !home,
+                    modifier = Modifier.size(32.dp).testTag(PageEditorTags.home(page)),
                 ) {
                     Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Delete $label",
-                        modifier = Modifier.size(20.dp).background(colours.surfaceContainerHighest, CircleShape).padding(3.dp),
+                        Icons.Default.Home,
+                        contentDescription = if (home) "Home page" else "Make $label the home page",
+                        tint = if (home) colours.onPrimary else colours.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(if (home) colours.primary else LocalBoxColors.current.floating, CircleShape)
+                            .padding(3.dp),
                     )
+                }
+                if (!isClockRing) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag(PageEditorTags.delete(page)),
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Delete $label",
+                            modifier = Modifier.size(20.dp).background(LocalBoxColors.current.floating, CircleShape).padding(3.dp),
+                        )
+                    }
                 }
             }
         }
@@ -346,6 +345,8 @@ private fun PagePreview(contents: PageContents, isClockRing: Boolean, modifier: 
 @Composable
 private fun AddTile(atStart: Boolean, onClick: () -> Unit) {
     val edge = MaterialTheme.colorScheme.outline
+    // The page cards' corners, so it reads as a page yet to be.
+    val shape = MaterialTheme.shapes.medium
 
     Box(
         contentAlignment = Alignment.Center,
@@ -353,15 +354,15 @@ private fun AddTile(atStart: Boolean, onClick: () -> Unit) {
             .size(44.dp, CARD_HEIGHT)
             .drawBehind {
                 val stroke = 1.dp.toPx()
-                drawRoundRect(
-                    edge,
-                    Offset(stroke / 2, stroke / 2),
-                    Size(size.width - stroke, size.height - stroke),
-                    CornerRadius(CARD_RADIUS.toPx()),
-                    style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),
-                )
+                inset(stroke / 2) {
+                    drawOutline(
+                        shape.createOutline(size, layoutDirection, this),
+                        edge,
+                        style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),
+                    )
+                }
             }
-            .clip(CARD_SHAPE)
+            .clip(shape)
             .clickable(onClick = onClick)
             .testTag(PageEditorTags.add(atStart)),
     ) {
@@ -374,21 +375,18 @@ private fun AddTile(atStart: Boolean, onClick: () -> Unit) {
 private fun DeletePageDialog(label: String, contents: PageContents, onDelete: () -> Unit, onDismiss: () -> Unit) {
     val what = contents.summary().orEmpty()
 
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onDelete, destructive = true) { Text("Delete") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
-        title = { Text("Delete $label?") },
-        text = {
-            Text(
-                when (contents) {
-                    is PageContents.Ring -> "This takes $what off the home screen. The apps stay installed and in the drawer."
-                    is PageContents.Cards -> "This deletes $what. The apps stay installed."
-                    is PageContents.Widgets -> "This removes $what."
-                    is PageContents.Grid -> "This takes $what off the home screen. The apps stay installed and in the drawer."
-                },
-            )
+    ConfirmDialog(
+        title = "Delete $label?",
+        text = when (contents) {
+            is PageContents.Ring -> "This takes $what off the home screen. The apps stay installed and in the drawer."
+            is PageContents.Cards -> "This deletes $what. The apps stay installed."
+            is PageContents.Widgets -> "This removes $what."
+            is PageContents.Grid -> "This takes $what off the home screen. The apps stay installed and in the drawer."
         },
+        verb = "Delete",
+        onConfirm = onDelete,
+        onDismiss = onDismiss,
+        destructive = true,
         modifier = Modifier.testTag(PageEditorTags.DELETE_DIALOG),
     )
 }

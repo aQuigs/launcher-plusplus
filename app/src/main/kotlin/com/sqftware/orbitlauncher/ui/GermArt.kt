@@ -46,8 +46,8 @@ import com.sqftware.orbitlauncher.ui.theme.VirusLight
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.floor
-import kotlin.random.Random
 import kotlin.math.sin
+import kotlin.random.Random
 
 // How many times a bacillus's flagella wave, a virus turns and a cell wobbles in the hour the folders' sky takes to turn
 // once: whole, so none jumps as the hour starts over.

@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,9 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.ui.theme.legible
 
 object HomeClockTags {
     const val TIME = "clock_time"
@@ -41,11 +42,11 @@ object HomeClockTags {
 @Composable
 fun HomeClock(face: ClockFace, onTimeClick: () -> Unit, onDateClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        LocalThemeArt.current.ClockTime(face.time, Modifier.target("Open the clock", onTimeClick).testTag(HomeClockTags.TIME))
+        LocalThemeArt.current.ClockTime(face.time, Modifier.target("Open the clock", onTimeClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.TIME))
         Text(
             text = face.date,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.target("Open the calendar", onDateClick).testTag(HomeClockTags.DATE),
+            style = MaterialTheme.typography.titleMedium.legible(),
+            modifier = Modifier.target("Open the calendar", onDateClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.DATE),
         )
     }
 }
@@ -56,7 +57,7 @@ internal fun PlainClockTime(time: String, modifier: Modifier) {
     val display = MaterialTheme.typography.displayLarge
     Text(
         text = time,
-        style = display,
+        style = display.legible(),
         fontWeight = FontWeight.Light,
         maxLines = 1,
         // A large font scale would otherwise wrap the time onto a second line and push the ring down.
@@ -72,7 +73,7 @@ fun RingerSwitch(mode: RingerMode, onClick: () -> Unit, modifier: Modifier = Mod
         glyph = R.drawable.ic_ringer,
         label = mode.name,
         modifier = modifier
-            .target("Switch the ringer", onClick)
+            .target("Switch the ringer", onClick, MaterialTheme.shapes.medium)
             .testTag(HomeClockTags.RINGER)
             // The word as a state, not text, so a screen reader says it once, and again when a tap changes it.
             .clearAndSetSemantics {
@@ -88,7 +89,7 @@ fun UpdateButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     GlyphLabel(
         glyph = R.drawable.ic_update,
         label = "Update",
-        modifier = modifier.target("Open the update", onClick).testTag(HomeClockTags.UPDATE),
+        modifier = modifier.target("Open the update", onClick, MaterialTheme.shapes.medium).testTag(HomeClockTags.UPDATE),
     )
 }
 
@@ -99,13 +100,13 @@ private fun GlyphLabel(@DrawableRes glyph: Int, label: String, modifier: Modifie
     val size = with(LocalDensity.current) { style.lineHeight.toDp() }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
         Icon(painterResource(glyph), contentDescription = null, modifier = Modifier.padding(end = 6.dp).size(size))
-        Text(text = label, style = style)
+        Text(text = label, style = style.legible())
     }
 }
 
 // At least a finger tall and a little wider than the glyphs, so each target is easy to hit and they are easy to tell apart.
-private fun Modifier.target(onClickLabel: String, onClick: () -> Unit) =
-    clip(RoundedCornerShape(12.dp))
+private fun Modifier.target(onClickLabel: String, onClick: () -> Unit, shape: Shape) =
+    clip(shape)
         .clickable(onClickLabel = onClickLabel, onClick = onClick)
         .defaultMinSize(minHeight = 48.dp)
         .wrapContentHeight()

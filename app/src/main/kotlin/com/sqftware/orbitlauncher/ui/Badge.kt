@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
 
 object BadgeTags {
     const val BUBBLE = "badge"
@@ -59,7 +62,7 @@ internal fun BubbleBadge(unread: Unread, modifier: Modifier) {
         textAlign = TextAlign.Center,
         modifier = modifier
             // Over the corner rather than inside it: a round icon has no room there.
-            .cornerBubble(top = true, fill = if (unread.dismissed) colors.error else colors.surfaceContainerHigh, edge = colors.error)
+            .cornerBubble(top = true, fill = if (unread.dismissed) colors.error else LocalBoxColors.current.floating, edge = colors.error)
             .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
             .padding(horizontal = 5.dp)
             .wrapContentHeight()
@@ -81,9 +84,24 @@ fun WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
         contentDescription = "Work",
         tint = colors.primary,
         modifier = modifier
-            .cornerBubble(top = false, fill = colors.surfaceContainerHigh, edge = colors.primary)
+            .cornerBubble(top = false, fill = LocalBoxColors.current.floating, edge = colors.primary)
             .size(18.dp)
             .padding(4.dp),
+    )
+}
+
+/** The tick on whatever is chosen: a tile picked in a picker, an app picked in the drawer. */
+@Composable
+fun PickedMark(modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Icon(
+        Icons.Default.Check,
+        contentDescription = null,
+        tint = colors.onPrimary,
+        modifier = modifier
+            .background(colors.primary, CircleShape)
+            .size(18.dp)
+            .padding(2.dp),
     )
 }
 

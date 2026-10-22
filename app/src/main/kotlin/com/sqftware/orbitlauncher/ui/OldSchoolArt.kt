@@ -82,7 +82,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -92,11 +91,6 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.imageResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.sqftware.orbitlauncher.R
@@ -106,6 +100,7 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
 import com.sqftware.orbitlauncher.ui.theme.GameShadow
+import com.sqftware.orbitlauncher.ui.theme.gameTypography
 import com.sqftware.orbitlauncher.ui.theme.MinimapGrass
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelf
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelfEdge
@@ -174,13 +169,6 @@ private const val STONE_PITCH = 33
 private const val STONE_HEIGHT = 36
 private const val END_STONE = 38
 
-/** The game's own type: its plain, bold and small fonts, drawn whole game pixels high. */
-private val GameFont = FontFamily(Font(R.font.osrs_plain), Font(R.font.osrs_bold, FontWeight.Bold))
-private val GameSmallFont = FontFamily(Font(R.font.osrs_small))
-
-/** The size the game's fonts are drawn at, in its pixels. */
-private const val GAME_FONT_SIZE = 16
-
 /** The quill digits of the game's clock, '0' to '9' and ':', each a sprite of the cache's quill font. */
 private val QUILL = listOf(
     R.drawable.osrs_497_48, R.drawable.osrs_497_49, R.drawable.osrs_497_50, R.drawable.osrs_497_51, R.drawable.osrs_497_52,
@@ -199,9 +187,6 @@ private const val CLOCK_SCALE = 2
 object OldSchoolArt : ThemeArt {
     override val hintInk: Color
         @Composable get() = StackCount
-
-    override val hintShade: Color
-        @Composable get() = GameShadow
 
     /**
      * The minimap in its frame: the map of where the user is, or the game's grass until there is one, turned with the
@@ -373,7 +358,7 @@ object OldSchoolArt : ThemeArt {
                     Box(
                         Modifier
                             .selectable(choice.selected, role = Role.Tab, onClick = choice.onSelect)
-                            .testTag(choice.tag)
+                            .then(choice.modifier)
                             .size((face.width * px).toDp(), (face.height * px).toDp())
                             .drawBehind { drawSprite(face, Offset.Zero, px) },
                         contentAlignment = Alignment.Center,
@@ -544,11 +529,6 @@ object OldSchoolArt : ThemeArt {
 
     @Composable
     override fun BinFace(highlighted: Boolean, modifier: Modifier) = StoneBin(highlighted, modifier)
-
-    /** A card's settings are boxed in the menu's brown rim. */
-    @Composable
-    override fun settingBox(): Modifier =
-        Modifier.border(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim).background(MaterialTheme.colorScheme.surfaceContainerHighest)
 
     /** The game's stone-framed interface box, rimmed in black outside the menu's brown, a game pixel each. */
     @Composable
@@ -737,36 +717,4 @@ private fun inkColumns(glyph: ImageBitmap): IntRange {
     glyph.readPixels(argb)
     val inked = (0 until glyph.width).filter { x -> (0 until glyph.height).any { y -> argb[y * glyph.width + x] ushr 24 != 0 } }
     return if (inked.isEmpty()) 0..2 else inked.first()..inked.last()
-}
-
-/**
- * Every style in the game's fonts, each a whole number of screen pixels to one of the font's, with the font's one pixel
- * shadow. Half the game's scale for most text, as a phone's type is smaller than the game's, and up to twice it for
- * display type.
- */
-private fun gameTypography(px: Int, density: Density): Typography {
-    fun style(fontPixel: Int, family: FontFamily = GameFont, weight: FontWeight = FontWeight.Normal): TextStyle {
-        val size = with(density) { (GAME_FONT_SIZE * fontPixel).toSp() }
-        val shadow = Shadow(GameShadow, Offset(fontPixel.toFloat(), fontPixel.toFloat()), 0f)
-        return TextStyle(fontFamily = family, fontWeight = weight, fontSize = size, lineHeight = size * 1.15f, shadow = shadow)
-    }
-    val small = max(1, px / 2)
-    val mid = max(small + 1, px * 3 / 4)
-    return Typography(
-        displayLarge = style(px * 2, weight = FontWeight.Bold),
-        displayMedium = style(px * 2, weight = FontWeight.Bold),
-        displaySmall = style(px * 3 / 2, weight = FontWeight.Bold),
-        headlineLarge = style(px * 3 / 2, weight = FontWeight.Bold),
-        headlineMedium = style(px, weight = FontWeight.Bold),
-        headlineSmall = style(px, weight = FontWeight.Bold),
-        titleLarge = style(px, weight = FontWeight.Bold),
-        titleMedium = style(mid, weight = FontWeight.Bold),
-        titleSmall = style(mid),
-        bodyLarge = style(mid),
-        bodyMedium = style(mid),
-        bodySmall = style(small),
-        labelLarge = style(mid, weight = FontWeight.Bold),
-        labelMedium = style(small),
-        labelSmall = style(small, GameSmallFont),
-    )
 }

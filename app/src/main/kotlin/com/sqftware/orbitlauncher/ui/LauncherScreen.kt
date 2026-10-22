@@ -3,9 +3,10 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -45,19 +46,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -69,9 +68,10 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -79,9 +79,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
-import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppShortcut
-import com.sqftware.orbitlauncher.domain.canPair
+import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppsByKey
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.Cell
@@ -95,7 +94,6 @@ import com.sqftware.orbitlauncher.domain.DrawerStyle
 import com.sqftware.orbitlauncher.domain.DropZones
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.EntryKind
-import com.sqftware.orbitlauncher.domain.Favourites
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.FolderLooks
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -107,40 +105,42 @@ import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.Landing
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
-import com.sqftware.orbitlauncher.domain.RING_ID
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.PlanetPick
+import com.sqftware.orbitlauncher.domain.RING_ID
+import com.sqftware.orbitlauncher.domain.ReorderMode
 import com.sqftware.orbitlauncher.domain.RingItem
-import com.sqftware.orbitlauncher.domain.RingerMode
+import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.RingSlot
+import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.Spin
 import com.sqftware.orbitlauncher.domain.SpinStats
 import com.sqftware.orbitlauncher.domain.Theme
-import com.sqftware.orbitlauncher.domain.ReorderMode
-import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPages
-import com.sqftware.orbitlauncher.domain.edgePull
-import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.appOptions
+import com.sqftware.orbitlauncher.domain.canPair
 import com.sqftware.orbitlauncher.domain.contentsOf
+import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.flipped
+import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
-import java.io.Serializable
-import kotlin.math.sign
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.Serializable
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
@@ -157,14 +157,8 @@ const val PICK_TIP = "Long-press the centre to choose the ring's apps"
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
 @Composable
 private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        Text(
-            text = "$AUTO_SET_UP fills your home with the apps you use most",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        TonalButton(onClick = onPickApps, modifier = Modifier.padding(top = 8.dp).testTag(LauncherTags.PICK_APPS)) {
-            Text("Pick apps myself")
-        }
+    EmptyNote("$AUTO_SET_UP fills your home with the apps you use most", modifier) {
+        LauncherButton(onClick = onPickApps, modifier = Modifier.testTag(LauncherTags.PICK_APPS)) { Text("Pick apps myself") }
     }
 }
 
@@ -188,7 +182,7 @@ data class HomePress(val launcherInFront: Boolean)
  * what [ringPages], [collectionPages] or [widgetPages] hold for its id. The home page shows the [clock] over its ring,
  * with the dock at its foot; another ring page shows its ring alone: the time and the date open the clock app
  * and the calendar, and a tap on the emblem opens the drawer to search, a long press to pick the apps on the ring or in the dock; while
- * [pickTip], the tap also toasts ([onToast]) that a long press picks, until a long press does ([onPickTipLearned]). Under the date, a tap on
+ * [pickTip], the tap also notes that a long press picks, until a long press does ([onPickTipLearned]). Under the date, a tap on
  * the [ringerMode] calls [onRingerTap], which steps the ringer on or asks for the access that needs; beside it, while
  * [updateAvailable], a button calls [onOpenUpdate]. While the ring and the dock are both empty, the emblem offers to
  * fill them with a guess ([onSetUpHome]), and a link under the ring to pick them by hand. Until [isHomeApp],
@@ -256,6 +250,7 @@ fun LauncherScreen(
     onLayoutChange: (PageLayout) -> Unit,
     homePresses: Flow<HomePress>,
     pinRequests: Flow<PinRequest>,
+    notices: Flow<String>,
     apps: List<AppEntry>?,
     pinnedShortcuts: List<AppEntry>?,
     ringPages: RingPages,
@@ -286,7 +281,6 @@ fun LauncherScreen(
     onHomeOnReturnChange: (Boolean) -> Unit,
     pickTip: Boolean,
     onPickTipLearned: () -> Unit,
-    onToast: (String) -> Unit,
     drawerStyle: DrawerStyle,
     onDrawerStyleChange: (DrawerStyle) -> Unit,
     onOpenClock: () -> Unit,
@@ -494,6 +488,8 @@ fun LauncherScreen(
     // Only an app from the drawer or a built-in card, which only adds, has no switch.
     val switchShown by remember { derivedStateOf { dragged.let { it != null && it !is Drag.Copy && it !is Drag.OnGrid } } }
     var switchHalves by remember { mutableStateOf(emptyMap<ReorderMode, Bounds>()) }
+    // The switch takes the clock's place at the top while it shows, rather than covering half its digits.
+    val clockShade by animateFloatAsState(if (switchShown) 0f else 1f, label = "clock")
     val overSwitch by remember {
         derivedStateOf {
             if (switchShown) switchHalves.entries.find { it.value.contains(finger.x, finger.y) }?.key else null
@@ -565,6 +561,7 @@ fun LauncherScreen(
     // through, as it does through the drawer; the pages and the drawer's chevron must not, so they go while it is up. Not
     // animated: it comes and goes in a frame, and pages fading back in would be tappable before they could be seen.
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
+    val shownNotices = remember { Notices() }
     // The page editor covers the whole screen the same way, until Back, HOME or a tap on a page.
     var editingPages by rememberSaveable { mutableStateOf(false) }
     // The system bars go with the launcher while the wallpaper shows alone.
@@ -1149,7 +1146,7 @@ fun LauncherScreen(
         val rows = gridCells[page.id]?.pageRows ?: return
         val grid = gridOf(page.id)
         val added = grid.addClock(rows)
-        if (added == grid) onToast("No room for the clock here") else saveGrids(mapOf(page.id to added))
+        if (added == grid) shownNotices.show("No room for the clock here") else saveGrids(mapOf(page.id to added))
     }
 
     val launcherMenu = remember {
@@ -1162,65 +1159,42 @@ fun LauncherScreen(
                     LauncherOptionsMenu(
                         expanded = shown.expanded,
                         at = { shown.at - origin() },
-                        rows = listOfNotNull(
-                            (widgetsPage ?: gridPage)?.let { LauncherMenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
-                            gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { LauncherMenuRow("Add clock") { addClock(it) } },
-                            widgetsPage?.let { LauncherMenuRow("Move ring") { editingWidget = RING_ID } },
-                            LauncherMenuRow("Edit pages", value = counted(latestLayout.pages.size, "page")) { editingPages = true },
-                            LauncherMenuRow("Showcase wallpaper") { showingWallpaper = true },
-                            LocalThemeArt.current.scene?.let { LauncherMenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
-                            LauncherMenuRow("Unread badges", on = latestBadgesEnabled, onClick = { latestOnOpenBadgeSettings() }),
-                            LauncherMenuRow(
-                                "24-hour clock",
-                                on = latestTwentyFourHour,
-                                flips = true,
-                                onClick = { latestOnTwentyFourHourChange(!latestTwentyFourHour) },
+                        // What this page holds, how the launcher looks, the ring, the rest, then the launcher itself.
+                        groups = listOf(
+                            listOfNotNull(
+                                (widgetsPage ?: gridPage)?.let { MenuRow("Add widget") { widgetAdds.tryEmit(it.id) } },
+                                gridPage?.takeIf { !gridOf(it.id).hasClock }?.let { MenuRow("Add clock") { addClock(it) } },
+                                widgetsPage?.let { MenuRow("Move ring") { editingWidget = RING_ID } },
                             ),
-                            LauncherMenuRow("Theme", value = latestTheme.label) {
-                                // Its bar takes the clock's place, which may be on another page than the menu's.
-                                showClockRing()
-                                latestOnPreviewThemeChange(latestTheme)
-                            },
-                            LauncherMenuRow("Folder look", value = latestFolderLook.label) { choosingLook = true },
-                            LauncherMenuRow(
-                                "Names on the ring",
-                                on = latestAppNames,
-                                flips = true,
-                                onClick = { latestOnAppNamesChange(!latestAppNames) },
+                            listOfNotNull(
+                                MenuRow("Edit pages", end = RowEnd.Value(counted(latestLayout.pages.size, "page"))) { editingPages = true },
+                                MenuRow("Theme", end = RowEnd.Value(latestTheme.label)) {
+                                    // Its bar takes the clock's place, which may be on another page than the menu's.
+                                    showClockRing()
+                                    latestOnPreviewThemeChange(latestTheme)
+                                },
+                                MenuRow("Folder look", end = RowEnd.Value(latestFolderLook.label)) { choosingLook = true },
+                                MenuRow("Showcase wallpaper") { showingWallpaper = true },
+                                LocalThemeArt.current.scene?.let { MenuRow("Use the ${it.name} as wallpaper") { confirmingScene = true } },
                             ),
-                            LauncherMenuRow(
-                                "Spin the ring",
-                                on = latestRingSpin,
-                                flips = true,
-                                onClick = { latestOnRingSpinChange(!latestRingSpin) },
+                            listOf(
+                                toggleRow("Names on the ring", latestAppNames) { latestOnAppNamesChange(it) },
+                                toggleRow("Spin the ring", latestRingSpin) { latestOnRingSpinChange(it) },
+                                MenuRow("Spin stats", end = RowEnd.Value(counted(latestSpinStats.spins, "spin"))) { showingSpinStats = true },
                             ),
-                            LauncherMenuRow("Spin stats", value = counted(latestSpinStats.spins, "spin")) { showingSpinStats = true },
-                            LauncherMenuRow(
-                                "Open on home page",
-                                on = latestHomeOnReturn,
-                                flips = true,
-                                onClick = { latestOnHomeOnReturnChange(!latestHomeOnReturn) },
+                            listOfNotNull(
+                                toggleRow("24-hour clock", latestTwentyFourHour) { latestOnTwentyFourHourChange(it) },
+                                MenuRow("Unread badges", end = RowEnd.Toggle(latestBadgesEnabled, flips = false)) { latestOnOpenBadgeSettings() },
+                                toggleRow("Open on home page", latestHomeOnReturn) { latestOnHomeOnReturnChange(it) },
+                                toggleRow("Ambient motion", latestAmbientMotion) { latestOnAmbientMotionChange(it) },
+                                toggleRow("Show where I am", latestShowWhereIAm) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
+                                toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
-                            LauncherMenuRow(
-                                "Ambient motion",
-                                on = latestAmbientMotion,
-                                flips = true,
-                                onClick = { latestOnAmbientMotionChange(!latestAmbientMotion) },
+                            listOf(
+                                MenuRow("Restart launcher") { latestOnRestart() },
+                                MenuRow("Reset launcher", destructive = true) { confirmingReset = true },
                             ),
-                            LauncherMenuRow(
-                                "Show where I am",
-                                on = latestShowWhereIAm,
-                                flips = true,
-                                onClick = { latestOnShowWhereIAmChange(!latestShowWhereIAm) },
-                            ).takeIf { latestTheme.mapsWhereIAm },
-                            LauncherMenuRow(
-                                "Check for updates",
-                                on = latestCheckForUpdates,
-                                flips = true,
-                                onClick = { latestOnCheckForUpdatesChange(!latestCheckForUpdates) },
-                            ),
-                            LauncherMenuRow("Restart launcher") { latestOnRestart() },
-                            LauncherMenuRow("Reset launcher") { confirmingReset = true },
+
                         ),
                         onDismiss = ::closeMenu,
                     )
@@ -1261,6 +1235,7 @@ fun LauncherScreen(
         }
     }
 
+    LaunchedEffect(notices) { notices.collect(shownNotices::show) }
     LaunchedEffect(homePresses, pagerState, drawerState) {
         homePresses.collect { press ->
             closeAll()
@@ -1330,591 +1305,599 @@ fun LauncherScreen(
     // the drawer rises, so the open drawer reaches the bottom edge instead of stopping short of it, and fills in under the
     // drawer's bottom edge whenever that rises above the box's.
     val navigationBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
-    // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back.
-    val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
-    WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .windowInsetsPadding(insets)
-                .onGloballyPositioned { origin = it.positionInRoot() }
-                .drawBehind {
-                    val top = size.height - (drawerPeek + BOTTOM_SHADE_FADE).toPx()
-                    val bottom = size.height + navigationBar.toPx()
-                    val shade = Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.45f to scrim.copy(alpha = 0.06f),
-                        1f to scrim.copy(alpha = 0.22f),
-                        startY = top,
-                        endY = bottom,
-                    )
-                    drawRect(shade, Offset(0f, top), Size(size.width, bottom - top))
+    // Held whether or not the bars show, so the launcher does not move as they hide for the wallpaper and come back. The
+    // keyboard is left to the drawer, the one place here that types: a dialog's keyboard must not reflow the pages behind it.
+    val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
+    CompositionLocalProvider(LocalNotices provides shownNotices) {
+        WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .windowInsetsPadding(insets)
+                    .onGloballyPositioned { origin = it.positionInRoot() }
+                    .drawBehind {
+                        val top = size.height - (drawerPeek + BOTTOM_SHADE_FADE).toPx()
+                        val bottom = size.height + navigationBar.toPx()
+                        val shade = Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.45f to scrim.copy(alpha = 0.06f),
+                            1f to scrim.copy(alpha = 0.22f),
+                            startY = top,
+                            endY = bottom,
+                        )
+                        drawRect(shade, Offset(0f, top), Size(size.width, bottom - top))
 
-                    val offset = drawerState.requireOffset()
-                    val travel = size.height - drawerPeek.toPx()
-                    val open = if (travel > 0f) 1f - (offset / travel).coerceIn(0f, 1f) else 1f
-                    // A fling into the end of the list settles the open sheet with a bounce past the top. The sheet is placed
-                    // at its rounded offset, so the gap is rounded too, or the join shows a seam.
-                    val lifted = (-offset.roundToInt()).coerceAtLeast(0)
-                    with(ground) { drawVeil(open, Offset(0f, size.height - lifted), Size(size.width, bottom - size.height + lifted)) }
-                },
-        ) {
-            BottomSheetScaffold(
-                scaffoldState = rememberBottomSheetScaffoldState(drawerState),
-                sheetPeekHeight = drawerPeek,
-                sheetShape = BottomSheetDefaults.ExpandedShape,
-                // The handle is the drawer's own, not the sheet's, so the panel can fill in the strip behind it: clear while the
-                // drawer is down, so only the chevron shows over the wallpaper, and solid once it is open, so the open drawer
-                // reaches the top as Arc's does. The panel is translucent so the wallpaper still shows through.
-                sheetDragHandle = null,
-                sheetContainerColor = Color.Transparent,
-                sheetShadowElevation = 0.dp,
-                containerColor = Color.Transparent,
-                sheetContent = {
-                    Column(
-                        Modifier.drawBehind {
-                            val strip = drawerPeek.toPx()
-                            // The drawer under the strip is as tall as it travels, like the pages.
-                            val travel = size.height - strip
-                            val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
-                            with(ground) {
-                                drawVeil(open, size = Size(size.width, strip))
-                                drawVeil(topLeft = Offset(0f, strip), size = Size(size.width, size.height - strip))
-                                // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
-                                drawMarks(open, drawerScrolled.floatValue)
-                            }
-                        }.nestedScroll(drawerScroll),
-                    ) {
-                        DrawerHandle(
-                            open = drawerOpen,
-                            onClick = { if (drawerOpen) closeDrawer() else openDrawer() },
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        )
-                        AppDrawer(
-                            apps = apps.orEmpty(),
-                            icon = actions.icon,
-                            onLaunch = actions.launch,
-                            menu = drawerMenu,
-                            mostUsedMenu = mostUsedMenu,
-                            drag = dragFromDrawer,
-                            query = query,
-                            onQueryChange = { query = it },
-                            searchFocus = searchFocus,
-                            unread = unread,
-                            onClearBadge = actions.clearBadge,
-                            controls = DrawerControls(
-                                style = drawerStyle,
-                                onStyleChange = onDrawerStyleChange,
-                                sorting = (openMenu as? OpenMenu.DrawerSort)?.expanded == true,
-                                onSortingChange = { open ->
-                                    if (open) openMenuUnlessDragging { openMenu = OpenMenu.DrawerSort() } else closeMenu()
-                                },
-                            ),
-                            foregroundTime = foregroundTime,
-                            onOpenUsageSettings = openUsageSettings,
-                            picking = when (val pick = picking) {
-                                is DrawerPick.Apps -> {
-                                    val place = pick.place
-                                    val picked = homeApps[place]
-                                    Picking(
-                                        header = {
-                                            when (place) {
-                                                is HomePlace.Folder -> AddingPicker("folder")
-                                                HomePlace.Ring, HomePlace.Dock ->
-                                                    PlacePicker(place = place, onPlaceChange = { picking = DrawerPick.Apps(it) })
-                                            }
-                                        },
-                                        isPicked = { it in picked },
-                                        onToggle = { app -> changeHomeApps { toggle(place, app) } },
-                                    )
+                        val offset = drawerState.requireOffset()
+                        val travel = size.height - drawerPeek.toPx()
+                        val open = if (travel > 0f) 1f - (offset / travel).coerceIn(0f, 1f) else 1f
+                        // A fling into the end of the list settles the open sheet with a bounce past the top. The sheet is placed
+                        // at its rounded offset, so the gap is rounded too, or the join shows a seam.
+                        val lifted = (-offset.roundToInt()).coerceAtLeast(0)
+                        with(ground) { drawVeil(open, Offset(0f, size.height - lifted), Size(size.width, bottom - size.height + lifted)) }
+                    },
+            ) {
+                BottomSheetScaffold(
+                    scaffoldState = rememberBottomSheetScaffoldState(drawerState),
+                    sheetPeekHeight = drawerPeek,
+                    sheetShape = BottomSheetDefaults.ExpandedShape,
+                    // The handle is the drawer's own, not the sheet's, so the panel can fill in the strip behind it: clear while the
+                    // drawer is down, so only the chevron shows over the wallpaper, and solid once it is open, so the open drawer
+                    // reaches the top as Arc's does. The panel is translucent so the wallpaper still shows through.
+                    sheetDragHandle = null,
+                    sheetContainerColor = Color.Transparent,
+                    sheetShadowElevation = 0.dp,
+                    containerColor = Color.Transparent,
+                    sheetContent = {
+                        Column(
+                            Modifier.drawBehind {
+                                val strip = drawerPeek.toPx()
+                                // The drawer under the strip is as tall as it travels, like the pages.
+                                val travel = size.height - strip
+                                val open = if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 1f
+                                with(ground) {
+                                    drawVeil(open, size = Size(size.width, strip))
+                                    drawVeil(topLeft = Offset(0f, strip), size = Size(size.width, size.height - strip))
+                                    // Faded in with the drawer, so none are left over the wallpaper behind the peeking handle.
+                                    drawMarks(open, drawerScrolled.floatValue)
                                 }
-                                is DrawerPick.Card -> collections.card(pick.kind)?.let { card ->
-                                    Picking(
-                                        header = { AddingPicker(pick.kind.title) },
-                                        isPicked = { it in card.apps },
-                                        onToggle = { changeCollections { toggleApp(pick.kind, it) } },
-                                    )
-                                }
-                                // Only an app it makes a pair with can be its partner.
-                                is DrawerPick.Partner -> splitting?.let { first ->
-                                    Picking(
-                                        header = { PartnerPicker(first) },
-                                        isPicked = { it.key == first.key },
-                                        onToggle = { makePair(first, it, pick.spot) },
-                                        mark = PickMark.Dot,
-                                        isPickable = { canPair(first, it) },
-                                    )
-                                }
-                                null -> null
-                            },
-                        )
-                    }
-                },
-                // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
-                // navigation-bar inset.
-                // Hidden from TalkBack and key focus too, which alpha alone leaves reaching the launcher under the picker or
-                // the page editor.
-                modifier = Modifier
-                    .clipToBounds()
-                    .then(if (pickingCollection || editingPages) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
-            ) { padding ->
-                HorizontalPager(
-                    state = pagerState,
-                    key = { layout.pages[it].id },
-                    // Every page stays composed, so swiping back does not rebuild the ring and reload its icons.
-                    beyondViewportPageCount = if (firstFrameDrawn) layout.pages.size - 1 else 0,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        // The pages fade as the drawer rises, so only the wallpaper shows through the translucent drawer. They
-                        // are exactly as tall as the drawer travels.
-                        .graphicsLayer {
-                            if (size.height > 0f) alpha = (drawerState.requireOffset() / size.height).coerceIn(0f, 1f)
-                        }
-                        .onGloballyPositioned {
-                            pagerOrigin = it.positionInRoot()
-                            pagerWidth = it.size.width
-                        }
-                        .testTag(LauncherTags.PAGER),
-                ) { index ->
-                    val page = layout.pages[index]
-                    Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
-                        when (page.kind) {
-                            PageKind.Ring -> {
-                                val active = page == ringPage
-                                val isHome = page == LauncherPage.Home
-                                val pageApps = remember(ringPages, page) { ringPages.on(page.id) }
-                                val pageRing = remember(pageApps.ring, onHome) { pageApps.ring.resolve(onHome.orEmpty(), HomePlace.Ring) }
-                                val pageDock = if (isHome) dock else emptyList()
-                                val pageStyle = remember(folderLook, pageRing, pageDock) {
-                                    FolderStyle(folderLook, planetsOf(pageRing, pageDock)) { sky.value.value / 360f * 60f }
-                                }
-                                val spin = rememberRingSpin(onSpin)
-                                CompositionLocalProvider(LocalFolderStyle provides pageStyle) {
-                                    Column(
-                                        Modifier
-                                            .fillMaxSize()
-                                            .onPlaced { ringPageCoordinates[page.id] = it }
-                                            .verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() }),
-                                    ) {
-                                        Box(Modifier.weight(1f).then(if (ringSpin) Modifier.spinsRing(spin) else Modifier)) {
-                                            // First, so it lies behind the clock, the ring and the card and gets only the touches they
-                                            // leave. A tap anywhere there closes an open folder, not only one on the ring's centre.
-                                            EmptySpace(
-                                                // Only on the page in view, which the menu was opened on: home is active behind another kind of page too.
-                                                menu = launcherMenu.takeIf { active && page == settled },
-                                                onTap = {
-                                                    if (active) openFolder = null
-                                                    editingWidget = null
-                                                },
-                                            )
-                                            val pageRingView: @Composable (Modifier) -> Unit = { ringModifier ->
-                                                // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
-                                                // theirs is there, so neither the hint nor the mark flashes while they load.
-                                                // A home with nothing stored is known before the first frame, so its offer never flashes.
-                                                val hint = when {
-                                                    isHome && pageApps.isEmpty -> AUTO_SET_UP
-                                                    pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
-                                                    else -> null
+                            }.nestedScroll(drawerScroll),
+                        ) {
+                            DrawerHandle(
+                                open = drawerOpen,
+                                onClick = { if (drawerOpen) closeDrawer() else openDrawer() },
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                            )
+                            AppDrawer(
+                                apps = apps.orEmpty(),
+                                icon = actions.icon,
+                                onLaunch = actions.launch,
+                                menu = drawerMenu,
+                                mostUsedMenu = mostUsedMenu,
+                                drag = dragFromDrawer,
+                                query = query,
+                                onQueryChange = { query = it },
+                                searchFocus = searchFocus,
+                                unread = unread,
+                                onClearBadge = actions.clearBadge,
+                                controls = DrawerControls(
+                                    style = drawerStyle,
+                                    onStyleChange = onDrawerStyleChange,
+                                    sorting = (openMenu as? OpenMenu.DrawerSort)?.expanded == true,
+                                    onSortingChange = { open ->
+                                        if (open) openMenuUnlessDragging { openMenu = OpenMenu.DrawerSort() } else closeMenu()
+                                    },
+                                ),
+                                foregroundTime = foregroundTime,
+                                onOpenUsageSettings = openUsageSettings,
+                                picking = when (val pick = picking) {
+                                    is DrawerPick.Apps -> {
+                                        val place = pick.place
+                                        val picked = homeApps[place]
+                                        Picking(
+                                            header = {
+                                                when (place) {
+                                                    is HomePlace.Folder -> AddingPicker("folder")
+                                                    HomePlace.Ring, HomePlace.Dock ->
+                                                        PlacePicker(place = place, onPlaceChange = { picking = DrawerPick.Apps(it) })
                                                 }
-                                                HomeRing(
-                                                    ring = pageRing,
-                                                    hint = hint,
-                                                    icon = actions.icon,
-                                                    onLaunch = actions.launch,
-                                                    onOpenFolder = { if (active) tapFolder(page.id, it.at) },
-                                                    onCloseFolder = { if (active) openFolder = null },
-                                                    onEdit = {
-                                                        when {
-                                                            !active -> Unit
-                                                            isHome && pageApps.isEmpty -> onSetUpHome()
-                                                            else -> {
-                                                                pickFor(HomePlace.Ring)
-                                                                // Without a hint, only a long press edits; with one, the tap that picks taught nothing.
-                                                                if (hint == null && pickTip) onPickTipLearned()
-                                                            }
-                                                        }
-                                                    },
-                                                    onSearch = {
-                                                        if (active) {
-                                                            search()
-                                                            if (pickTip) onToast(PICK_TIP)
-                                                        }
-                                                    },
-                                                    modifier = ringModifier.dropZone(page) { copy(ring = it) },
-                                                    highlighted = page == inView && dropPlace == HomePlace.Ring,
-                                                    openFolder = open.takeIf { active },
-                                                    // Not mid-drag: a second finger would open the drawer over the app still held.
-                                                    onAddToFolder = if (active && dragged == null) ({ open?.let { pickFor(it.at) } }) else null,
-                                                    menu = ringMenu.takeIf { active },
-                                                    folderMenu = folderMenu.takeIf { active },
-                                                    folderAppMenu = folderAppMenu.takeIf { active },
-                                                    unread = unread,
-                                                    onClearBadge = actions.clearBadge,
-                                                    rearrange = (if (open != null) folderRearrange else ringRearrange).takeIf { active },
-                                                    foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Ring }?.index,
-                                                    held = (dragged as? Drag.OutOfFolder)?.app.takeIf { active },
-                                                    inSight = active && ringInSight,
-                                                    turns = active && ambient,
-                                                    names = appNames,
-                                                    spin = spin,
-                                                    minuteOfDay = { latestMinuteOfDay },
-                                                    dock = pageDock,
-                                                    dockSlot = { dockRearrange.boundsOf(it, dock) },
-                                                )
-                                            }
-                                            if (isHome) {
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    ClockOrThemePreview(
-                                                        bar = if (previewing) ({
-                                                            ThemePreviewBar(
-                                                                shown = theme,
-                                                                onShow = onPreviewThemeChange,
-                                                                folderLook = folderLook,
-                                                                onFolderLookChange = ::changeFolderLook,
-                                                                colourway = colourways.of(theme),
-                                                                onColourwayChange = { onColourwaysChange(colourways.with(theme, it)) },
-                                                                onUse = {
-                                                                    onPreviewThemeChange(null)
-                                                                    onThemeChange(theme)
-                                                                },
-                                                                onClose = { onPreviewThemeChange(null) },
-                                                            )
-                                                        }) else null,
-                                                    ) {
-                                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                            HomeClock(
-                                                                face = clock,
-                                                                onTimeClick = onOpenClock,
-                                                                onDateClick = onOpenCalendar,
-                                                                modifier = Modifier.padding(top = 24.dp),
-                                                            )
-                                                            Row {
-                                                                RingerSwitch(mode = ringerMode, onClick = onRingerTap)
-                                                                if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
-                                                            }
-                                                        }
-                                                    }
-                                                    pageRingView(Modifier.weight(1f))
-                                                    // The emblem offers the automatic setup, so picking by hand, which it offers otherwise, moves here.
-                                                    if (pageApps.isEmpty) {
-                                                        SetUpChoice(onPickApps = { pickFor(HomePlace.Ring) }, modifier = Modifier.padding(top = 8.dp))
-                                                    }
-                                                    // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
-                                                    // Under the ring, which sizes itself to the room left, so the two can never overlap.
-                                                    if (!isHomeApp) {
-                                                        HomeAppCard(
-                                                            onBecomeHomeApp = onBecomeHomeApp,
-                                                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                                                        )
-                                                    }
-                                                }
-                                            } else {
-                                                WidgetGrid(
-                                                    page = widgetPages[page.id],
-                                                    actions = remember(widgets, page) { widgets(page.id) },
-                                                    editing = editedWidget,
-                                                    onEditingChange = { editingWidget = it },
-                                                    ring = pageRingView,
-                                                    addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
-                                                )
-                                            }
-                                        }
-                                        // Only on the home page, as in Arc, so it slides away with the page and the others reach down
-                                        // to the drawer handle. Stored dock apps hold its row until the apps and shortcuts load, so the
-                                        // ring does not move when they arrive. An empty dock shows while an app is dragged from the
-                                        // drawer or another home place, as a place to drop it, and slides in and out so the ring above
-                                        // moves rather than jumps. A dock that ends with the drawer's tab always shows.
-                                        if (isHome) {
-                                            val dockShown = dock.isNotEmpty() || (onHome == null && !pageApps.dock.isEmpty) ||
-                                                (active || page == inView) && dragged?.app != null || dockTab != null
-                                            AnimatedVisibility(visible = dockShown) {
-                                                Dock(
-                                                    items = dock,
-                                                    icon = actions.icon,
-                                                    onLaunch = actions.launch,
-                                                    onOpenFolder = { if (active) tapFolder(page.id, it.at) },
-                                                    modifier = Modifier.dropZone(page) { copy(dock = it) },
-                                                    highlighted = page == inView && dropPlace == HomePlace.Dock,
-                                                    menu = dockMenu.takeIf { active },
-                                                    folderMenu = folderMenu.takeIf { active },
-                                                    unread = unread,
-                                                    onClearBadge = actions.clearBadge,
-                                                    rearrange = dockRearrange.takeIf { active },
-                                                    foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Dock }?.index,
-                                                    tab = dockTab?.let { tab -> { modifier -> tab(::openDrawer, modifier) } },
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            PageKind.Widgets -> {
-                                WidgetGrid(
-                                    page = widgetPages[page.id],
-                                    actions = remember(widgets, page) { errandWidgets(page) },
-                                    editing = editedWidget,
-                                    onEditingChange = { editingWidget = it },
-                                )
-                            }
-                            PageKind.Grid -> {
-                                // The page an item was picked up on stays active while the item turns the pages, so its
-                                // gesture lasts until it is let go.
-                                val active = page == working(PageKind.Grid)
-                                val grid = remember(gridPages, widgetPages, page) { gridPages.grid(page.id, widgetPages) }
-                                val items = remember(grid, onHome) { grid.resolve(onHome.orEmpty()) }
-                                val target = (over as? Over.GridCell)?.takeIf { it.page == page }
-                                val targetBlock = target?.let { grid.at(it.cell)?.id }?.takeIf { it in items }
-                                Box(Modifier.fillMaxSize().verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() })) {
-                                    EmptySpace(menu = launcherMenu.takeIf { active }, onTap = { editingWidget = null })
-                                    if (grid.cells.widgets.isEmpty()) {
-                                        Text(
-                                            "Drag apps here from the drawer.\nLong-press for widgets and the clock.",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                                            },
+                                            isPicked = { it in picked },
+                                            onToggle = { app -> changeHomeApps { toggle(place, app) } },
                                         )
                                     }
+                                    is DrawerPick.Card -> collections.card(pick.kind)?.let { card ->
+                                        Picking(
+                                            header = { AddingPicker(pick.kind.title) },
+                                            isPicked = { it in card.apps },
+                                            onToggle = { changeCollections { toggleApp(pick.kind, it) } },
+                                        )
+                                    }
+                                    // Only an app it makes a pair with can be its partner.
+                                    is DrawerPick.Partner -> splitting?.let { first ->
+                                        Picking(
+                                            header = { PartnerPicker(first) },
+                                            isPicked = { it.key == first.key },
+                                            onToggle = { makePair(first, it, pick.spot) },
+                                            mark = PickMark.Dot,
+                                            isPickable = { canPair(first, it) },
+                                        )
+                                    }
+                                    null -> null
+                                },
+                            )
+                        }
+                    },
+                    // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
+                    // navigation-bar inset.
+                    // Hidden from TalkBack and key focus too, which alpha alone leaves reaching the launcher under the picker or
+                    // the page editor.
+                    modifier = Modifier
+                        .clipToBounds()
+                        .then(if (pickingCollection || editingPages) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
+                ) { padding ->
+                    HorizontalPager(
+                        state = pagerState,
+                        key = { layout.pages[it].id },
+                        // Every page stays composed, so swiping back does not rebuild the ring and reload its icons.
+                        beyondViewportPageCount = if (firstFrameDrawn) layout.pages.size - 1 else 0,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            // The pages fade as the drawer rises, so only the wallpaper shows through the translucent drawer. They
+                            // are exactly as tall as the drawer travels.
+                            .graphicsLayer {
+                                if (size.height > 0f) alpha = (drawerState.requireOffset() / size.height).coerceIn(0f, 1f)
+                            }
+                            .onGloballyPositioned {
+                                pagerOrigin = it.positionInRoot()
+                                pagerWidth = it.size.width
+                            }
+                            .testTag(LauncherTags.PAGER),
+                    ) { index ->
+                        val page = layout.pages[index]
+                        Box(Modifier.fillMaxSize().testTag(LauncherTags.page(page))) {
+                            when (page.kind) {
+                                PageKind.Ring -> {
+                                    val active = page == ringPage
+                                    val isHome = page == LauncherPage.Home
+                                    val pageApps = remember(ringPages, page) { ringPages.on(page.id) }
+                                    val pageRing = remember(pageApps.ring, onHome) { pageApps.ring.resolve(onHome.orEmpty(), HomePlace.Ring) }
+                                    val pageDock = if (isHome) dock else emptyList()
+                                    val pageStyle = remember(folderLook, pageRing, pageDock) {
+                                        FolderStyle(folderLook, planetsOf(pageRing, pageDock)) { sky.value.value / 360f * 60f }
+                                    }
+                                    val spin = rememberRingSpin(onSpin)
+                                    CompositionLocalProvider(LocalFolderStyle provides pageStyle) {
+                                        Column(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .onPlaced { ringPageCoordinates[page.id] = it }
+                                                .verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() }),
+                                        ) {
+                                            Box(Modifier.weight(1f).then(if (ringSpin) Modifier.spinsRing(spin) else Modifier)) {
+                                                // First, so it lies behind the clock, the ring and the card and gets only the touches they
+                                                // leave. A tap anywhere there closes an open folder, not only one on the ring's centre.
+                                                EmptySpace(
+                                                    // Only on the page in view, which the menu was opened on: home is active behind another kind of page too.
+                                                    menu = launcherMenu.takeIf { active && page == settled },
+                                                    onTap = {
+                                                        if (active) openFolder = null
+                                                        editingWidget = null
+                                                    },
+                                                )
+                                                val pageRingView: @Composable (Modifier) -> Unit = { ringModifier ->
+                                                    // Slots stored for the ring hold the hint back until the apps and shortcuts can say none of
+                                                    // theirs is there, so neither the hint nor the mark flashes while they load.
+                                                    // A home with nothing stored is known before the first frame, so its offer never flashes.
+                                                    val hint = when {
+                                                        isHome && pageApps.isEmpty -> AUTO_SET_UP
+                                                        pageApps.ring.isEmpty || (onHome != null && pageRing.isEmpty()) -> "Add apps"
+                                                        else -> null
+                                                    }
+                                                    HomeRing(
+                                                        ring = pageRing,
+                                                        hint = hint,
+                                                        icon = actions.icon,
+                                                        onLaunch = actions.launch,
+                                                        onOpenFolder = { if (active) tapFolder(page.id, it.at) },
+                                                        onCloseFolder = { if (active) openFolder = null },
+                                                        onEdit = {
+                                                            when {
+                                                                !active -> Unit
+                                                                isHome && pageApps.isEmpty -> onSetUpHome()
+                                                                else -> {
+                                                                    pickFor(HomePlace.Ring)
+                                                                    // Without a hint, only a long press edits; with one, the tap that picks taught nothing.
+                                                                    if (hint == null && pickTip) onPickTipLearned()
+                                                                }
+                                                            }
+                                                        },
+                                                        onSearch = {
+                                                            if (active) {
+                                                                search()
+                                                                if (pickTip) shownNotices.show(PICK_TIP)
+                                                            }
+                                                        },
+                                                        modifier = ringModifier.dropZone(page) { copy(ring = it) },
+                                                        highlighted = page == inView && dropPlace == HomePlace.Ring,
+                                                        openFolder = open.takeIf { active },
+                                                        // Not mid-drag: a second finger would open the drawer over the app still held.
+                                                        onAddToFolder = if (active && dragged == null) ({ open?.let { pickFor(it.at) } }) else null,
+                                                        menu = ringMenu.takeIf { active },
+                                                        folderMenu = folderMenu.takeIf { active },
+                                                        folderAppMenu = folderAppMenu.takeIf { active },
+                                                        unread = unread,
+                                                        onClearBadge = actions.clearBadge,
+                                                        rearrange = (if (open != null) folderRearrange else ringRearrange).takeIf { active },
+                                                        foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Ring }?.index,
+                                                        held = (dragged as? Drag.OutOfFolder)?.app.takeIf { active },
+                                                        inSight = active && ringInSight,
+                                                        turns = active && ambient,
+                                                        names = appNames,
+                                                        spin = spin,
+                                                        minuteOfDay = { latestMinuteOfDay },
+                                                        dock = pageDock,
+                                                        dockSlot = { dockRearrange.boundsOf(it, dock) },
+                                                    )
+                                                }
+                                                if (isHome) {
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        ClockOrThemePreview(
+                                                            bar = if (previewing) ({
+                                                                ThemePreviewBar(
+                                                                    shown = theme,
+                                                                    onShow = onPreviewThemeChange,
+                                                                    folderLook = folderLook,
+                                                                    onFolderLookChange = ::changeFolderLook,
+                                                                    colourway = colourways.of(theme),
+                                                                    onColourwayChange = { onColourwaysChange(colourways.with(theme, it)) },
+                                                                    onUse = {
+                                                                        onPreviewThemeChange(null)
+                                                                        onThemeChange(theme)
+                                                                    },
+                                                                    onClose = { onPreviewThemeChange(null) },
+                                                                )
+                                                            }) else null,
+                                                        ) {
+                                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = clockShade }) {
+                                                                HomeClock(
+                                                                    face = clock,
+                                                                    onTimeClick = onOpenClock,
+                                                                    onDateClick = onOpenCalendar,
+                                                                    modifier = Modifier.padding(top = 24.dp),
+                                                                )
+                                                                Row {
+                                                                    RingerSwitch(mode = ringerMode, onClick = onRingerTap)
+                                                                    if (updateAvailable) UpdateButton(onClick = onOpenUpdate)
+                                                                }
+                                                            }
+                                                        }
+                                                        pageRingView(Modifier.weight(1f))
+                                                        // The emblem offers the automatic setup, so picking by hand, which it offers otherwise, moves here.
+                                                        if (pageApps.isEmpty) {
+                                                            SetUpChoice(onPickApps = { pickFor(HomePlace.Ring) }, modifier = Modifier.padding(top = 8.dp))
+                                                        }
+                                                        // Nothing dismisses the card: a launcher that is not the home app is not doing its job.
+                                                        // Under the ring, which sizes itself to the room left, so the two can never overlap.
+                                                        if (!isHomeApp) {
+                                                            HomeAppCard(
+                                                                onBecomeHomeApp = onBecomeHomeApp,
+                                                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                                            )
+                                                        }
+                                                    }
+                                                } else {
+                                                    WidgetGrid(
+                                                        page = widgetPages[page.id],
+                                                        actions = remember(widgets, page) { widgets(page.id) },
+                                                        editing = editedWidget,
+                                                        onEditingChange = { editingWidget = it },
+                                                        ring = pageRingView,
+                                                        addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
+                                                    )
+                                                }
+                                            }
+                                            // Only on the home page, as in Arc, so it slides away with the page and the others reach down
+                                            // to the drawer handle. Stored dock apps hold its row until the apps and shortcuts load, so the
+                                            // ring does not move when they arrive. An empty dock shows while an app is dragged from the
+                                            // drawer or another home place, as a place to drop it, and slides in and out so the ring above
+                                            // moves rather than jumps. A dock that ends with the drawer's tab always shows.
+                                            if (isHome) {
+                                                val dockShown = dock.isNotEmpty() || (onHome == null && !pageApps.dock.isEmpty) ||
+                                                    (active || page == inView) && dragged?.app != null || dockTab != null
+                                                AnimatedVisibility(visible = dockShown) {
+                                                    Dock(
+                                                        items = dock,
+                                                        icon = actions.icon,
+                                                        onLaunch = actions.launch,
+                                                        onOpenFolder = { if (active) tapFolder(page.id, it.at) },
+                                                        modifier = Modifier.dropZone(page) { copy(dock = it) },
+                                                        highlighted = page == inView && dropPlace == HomePlace.Dock,
+                                                        menu = dockMenu.takeIf { active },
+                                                        folderMenu = folderMenu.takeIf { active },
+                                                        unread = unread,
+                                                        onClearBadge = actions.clearBadge,
+                                                        rearrange = dockRearrange.takeIf { active },
+                                                        foldTarget = litSlot?.takeIf { active && it.foldInto?.holder == HomePlace.Dock }?.index,
+                                                        tab = dockTab?.let { tab -> { modifier -> tab(::openDrawer, modifier) } },
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                PageKind.Widgets -> {
                                     WidgetGrid(
-                                        page = grid.cells,
+                                        page = widgetPages[page.id],
                                         actions = remember(widgets, page) { errandWidgets(page) },
                                         editing = editedWidget,
                                         onEditingChange = { editingWidget = it },
-                                        addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
-                                        fixed = true,
-                                        clock = { clockModifier ->
-                                            HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier)
-                                        },
-                                        item = { block, itemModifier ->
-                                            items[block]?.let { item ->
-                                                val spot = AppSpot.Grid(page.id, block)
-                                                GridBlock(
-                                                    block = block,
-                                                    item = item,
-                                                    icon = actions.icon,
-                                                    onLaunch = actions.launch,
-                                                    onOpen = { openGridFolder = spot },
-                                                    menu = gridMenu(spot).takeIf { active },
-                                                    folderMenu = gridFolderMenu(spot).takeIf { active },
-                                                    unread = unread,
-                                                    onClearBadge = actions.clearBadge,
-                                                    drag = gridDrag(page, block).takeIf { active },
-                                                    lifted = (dragged as? Drag.OnGrid)?.let { it.page == page && it.block == block } == true,
-                                                    foldTarget = targetBlock == block,
-                                                    modifier = itemModifier,
-                                                )
-                                            }
-                                        },
-                                        cells = remember(page) { gridCells.getOrPut(page.id) { GridCells() } },
-                                        landing = target?.cell?.takeIf { targetBlock == null },
                                     )
                                 }
-                            }
-                            PageKind.Collections -> {
-                                val active = page == cardsPage
-                                CollectionsColumn(
-                                    page = remember(collectionPages, page) { collectionPages.on(page.id) },
-                                    apps = apps.orEmpty(),
-                                    builtInApps = builtInApps,
-                                    foregroundTime = foregroundTime,
-                                    icon = actions.icon,
-                                    onLaunch = actions.launch,
-                                    onToggleExpanded = { kind -> changeCollections(page) { toggleExpanded(kind) } },
-                                    onSettings = { settingCard = it.name },
-                                    onMove = { from, to -> changeCollections(page) { move(from, to) } },
-                                    onEdit = { pick(DrawerPick.Card(it)) },
-                                    onAdd = { pickingCollection = true },
-                                    onOpenUsageSettings = openUsageSettings,
-                                    rearrange = { kind -> cardRearrange(kind).takeIf { active } },
-                                    menu = { kind -> if (active) cardMenus.getOrPut(kind) { appMenu(AppSpot.Card(kind)) } else null },
-                                    drag = dragFromBuiltInCard.takeIf { active },
-                                    drops = cardDrops.getOrPut(page.id) { CardDrops() },
-                                    dropTarget = cardTarget?.takeIf { it.page == page }?.kind,
-                                    bin = if (active && binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
-                                    unread = unread,
-                                    onClearBadge = actions.clearBadge,
-                                )
+                                PageKind.Grid -> {
+                                    // The page an item was picked up on stays active while the item turns the pages, so its
+                                    // gesture lasts until it is let go.
+                                    val active = page == working(PageKind.Grid)
+                                    val grid = remember(gridPages, widgetPages, page) { gridPages.grid(page.id, widgetPages) }
+                                    val items = remember(grid, onHome) { grid.resolve(onHome.orEmpty()) }
+                                    val target = (over as? Over.GridCell)?.takeIf { it.page == page }
+                                    val targetBlock = target?.let { grid.at(it.cell)?.id }?.takeIf { it in items }
+                                    Box(Modifier.fillMaxSize().verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() })) {
+                                        EmptySpace(menu = launcherMenu.takeIf { active }, onTap = { editingWidget = null })
+                                        if (grid.cells.widgets.isEmpty()) {
+                                            EmptyNote("Drag apps here from the drawer.\nLong-press for widgets and the clock.", Modifier.align(Alignment.Center))
+                                        }
+                                        WidgetGrid(
+                                            page = grid.cells,
+                                            actions = remember(widgets, page) { errandWidgets(page) },
+                                            editing = editedWidget,
+                                            onEditingChange = { editingWidget = it },
+                                            addRequests = remember(page) { widgetAdds.filter { it == page.id }.map {} },
+                                            fixed = true,
+                                            clock = { clockModifier ->
+                                                HomeClock(face = clock, onTimeClick = onOpenClock, onDateClick = onOpenCalendar, modifier = clockModifier.graphicsLayer { alpha = clockShade })
+                                            },
+                                            item = { block, itemModifier ->
+                                                items[block]?.let { item ->
+                                                    val spot = AppSpot.Grid(page.id, block)
+                                                    GridBlock(
+                                                        block = block,
+                                                        item = item,
+                                                        icon = actions.icon,
+                                                        onLaunch = actions.launch,
+                                                        onOpen = { openGridFolder = spot },
+                                                        menu = gridMenu(spot).takeIf { active },
+                                                        folderMenu = gridFolderMenu(spot).takeIf { active },
+                                                        unread = unread,
+                                                        onClearBadge = actions.clearBadge,
+                                                        drag = gridDrag(page, block).takeIf { active },
+                                                        lifted = (dragged as? Drag.OnGrid)?.let { it.page == page && it.block == block } == true,
+                                                        foldTarget = targetBlock == block,
+                                                        modifier = itemModifier,
+                                                    )
+                                                }
+                                            },
+                                            cells = remember(page) { gridCells.getOrPut(page.id) { GridCells() } },
+                                            landing = target?.cell?.takeIf { targetBlock == null },
+                                        )
+                                    }
+                                }
+                                PageKind.Collections -> {
+                                    val active = page == cardsPage
+                                    CollectionsColumn(
+                                        page = remember(collectionPages, page) { collectionPages.on(page.id) },
+                                        apps = apps.orEmpty(),
+                                        builtInApps = builtInApps,
+                                        foregroundTime = foregroundTime,
+                                        icon = actions.icon,
+                                        onLaunch = actions.launch,
+                                        onToggleExpanded = { kind -> changeCollections(page) { toggleExpanded(kind) } },
+                                        onSettings = { settingCard = it.name },
+                                        onMove = { from, to -> changeCollections(page) { move(from, to) } },
+                                        onEdit = { pick(DrawerPick.Card(it)) },
+                                        onAdd = { pickingCollection = true },
+                                        onOpenUsageSettings = openUsageSettings,
+                                        rearrange = { kind -> cardRearrange(kind).takeIf { active } },
+                                        menu = { kind -> if (active) cardMenus.getOrPut(kind) { appMenu(AppSpot.Card(kind)) } else null },
+                                        drag = dragFromBuiltInCard.takeIf { active },
+                                        drops = cardDrops.getOrPut(page.id) { CardDrops() },
+                                        dropTarget = cardTarget?.takeIf { it.page == page }?.kind,
+                                        bin = if (active && binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
+                                        unread = unread,
+                                        onClearBadge = actions.clearBadge,
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-            if (layout.showsDots && !drawerOpen) {
-                PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = (drawerPeek - 8.dp).coerceAtLeast(0.dp)))
-            }
-            if (editingPages) {
-                PageEditor(
-                    layout = layout,
-                    contentsOf = { contentsOf(it, ringPages, collectionPages, gridPages, widgetPages) },
-                    onLayoutChange = onLayoutChange,
-                    onOpen = { page ->
-                        editingPages = false
-                        scope.launch { pagerState.scrollToPage(layout.pages.indexOf(page)) }
-                    },
-                )
-            }
-            // Over the hidden scaffold, drawer strip included: a screen of its own until Back or HOME.
-            if (pickingCollection) {
-                // Both last as long as this visit to the picker. The custom cards it has listed keep a tile tapped off where
-                // it was, with its apps, so a second tap cannot land on its neighbour and puts it back whole.
-                var listedCustoms by remember { mutableStateOf(emptyList<CollectionCard>()) }
-                var creatingCollection by rememberSaveable { mutableStateOf(false) }
-                val customs = collections.customTiles(listedCustoms)
-                CollectionPicker(
-                    page = collections,
-                    customs = customs.map { it.kind },
-                    onToggle = { kind ->
-                        listedCustoms = customs
-                        changeCollections {
-                            when {
-                                kind in this -> remove(kind)
-                                kind is CollectionKind.Category -> add(kind, seedCategory(kind.category, apps.orEmpty()))
-                                else -> add(customs.find { it.kind == kind } ?: CollectionCard(kind))
-                            }
-                        }
-                    },
-                    onCreate = { creatingCollection = true },
-                )
-                if (creatingCollection) {
-                    CreateCollectionDialog(
-                        page = collections,
-                        onCreate = { kind ->
-                            creatingCollection = false
-                            changeCollections { add(kind) }
+                if (layout.showsDots && !drawerOpen) {
+                    PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = (drawerPeek - 8.dp).coerceAtLeast(0.dp)))
+                }
+                if (editingPages) {
+                    PageEditor(
+                        layout = layout,
+                        contentsOf = { contentsOf(it, ringPages, collectionPages, gridPages, widgetPages) },
+                        onLayoutChange = onLayoutChange,
+                        onOpen = { page ->
+                            editingPages = false
+                            scope.launch { pagerState.scrollToPage(layout.pages.indexOf(page)) }
                         },
-                        onDismiss = { creatingCollection = false },
+                        onClose = { editingPages = false },
                     )
                 }
-            }
-            if (choosingLook) {
-                ChoiceDialog(
-                    title = "Folder look",
-                    choices = theme.folderLooks,
-                    chosen = folderLook,
-                    label = FolderLook::label,
-                    onChoose = {
-                        choosingLook = false
-                        changeFolderLook(it)
-                    },
-                    onDismiss = { choosingLook = false },
-                    modifier = Modifier.testTag(LauncherMenuTags.LOOK_DIALOG),
-                )
-            }
-            choosingPlanet?.let { folder ->
-                ChoiceDialog(
-                    title = "Planet",
-                    choices = Planet.entries.map(PlanetPick::Of) + PlanetPick.Plain,
-                    chosen = planets[folder]?.let(PlanetPick::Of) ?: PlanetPick.Plain,
-                    label = { if (it is PlanetPick.Of) it.planet.name else "Plain folder" },
-                    onChoose = { pick ->
-                        choosingPlanet = null
-                        changeHomeApps { pick(folder, pick) }
-                    },
-                    onDismiss = { choosingPlanet = null },
-                    modifier = Modifier.testTag(FolderTags.PLANET_DIALOG),
-                )
-            }
-            renamingFolder?.let { folder ->
-                FolderNameDialog(
-                    name = homeApps.folder(folder)?.name.orEmpty(),
-                    onRename = { name ->
-                        renamingFolder = null
-                        changeHomeApps { rename(folder, name) }
-                    },
-                    onDismiss = { renamingFolder = null },
-                )
-            }
-            openGridFolder?.let { spot ->
-                val folder = remember(gridPages, widgetPages, onHome, spot) {
-                    gridPages.grid(spot.page, widgetPages).resolve(onHome.orEmpty())[spot.block] as? GridItem.Folder
+                // Over the hidden scaffold, drawer strip included: a screen of its own until Back or HOME.
+                if (pickingCollection) {
+                    // Both last as long as this visit to the picker. The custom cards it has listed keep a tile tapped off where
+                    // it was, with its apps, so a second tap cannot land on its neighbour and puts it back whole.
+                    var listedCustoms by remember { mutableStateOf(emptyList<CollectionCard>()) }
+                    var creatingCollection by rememberSaveable { mutableStateOf(false) }
+                    val customs = collections.customTiles(listedCustoms)
+                    CollectionPicker(
+                        page = collections,
+                        customs = customs.map { it.kind },
+                        onToggle = { kind ->
+                            listedCustoms = customs
+                            changeCollections {
+                                when {
+                                    kind in this -> remove(kind)
+                                    kind is CollectionKind.Category -> add(kind, seedCategory(kind.category, apps.orEmpty()))
+                                    else -> add(customs.find { it.kind == kind } ?: CollectionCard(kind))
+                                }
+                            }
+                        },
+                        onCreate = { creatingCollection = true },
+                        onClose = { pickingCollection = false },
+                    )
+                    if (creatingCollection) {
+                        CreateCollectionDialog(
+                            page = collections,
+                            onCreate = { kind ->
+                                creatingCollection = false
+                                changeCollections { add(kind) }
+                            },
+                            onDismiss = { creatingCollection = false },
+                        )
+                    }
                 }
-                // One that went, as its last app left, closes; one whose apps are all uninstalled stays, as on the ring.
-                if (folder == null) {
-                    LaunchedEffect(Unit) { openGridFolder = null }
-                } else {
-                    GridFolderDialog(
-                        folder = folder,
-                        icon = actions.icon,
-                        onLaunch = actions.launch,
-                        menu = gridMenu(spot.copy(inFolder = true)),
-                        unread = unread,
-                        onClearBadge = actions.clearBadge,
-                        onDismiss = { openGridFolder = null },
+                if (choosingLook) {
+                    ChoiceDialog(
+                        title = "Folder look",
+                        choices = theme.folderLooks,
+                        chosen = folderLook,
+                        label = FolderLook::label,
+                        onChoose = {
+                            choosingLook = false
+                            changeFolderLook(it)
+                        },
+                        onDismiss = { choosingLook = false },
+                        modifier = Modifier.testTag(LauncherMenuTags.LOOK_DIALOG),
                     )
                 }
-            }
-            renamingGridFolder?.let { spot ->
-                FolderNameDialog(
-                    name = (gridPages[spot.page].slots[spot.block] as? RingSlot.Folder)?.name.orEmpty(),
-                    onRename = { name ->
-                        renamingGridFolder = null
-                        changeGrid(spot.page) { rename(spot.block, name) }
-                    },
-                    onDismiss = { renamingGridFolder = null },
-                )
-            }
-            settingCard?.let(CollectionKind::named)?.let { kind ->
-                CollectionSettingsDialog(
-                    page = collections,
-                    kind = kind,
-                    onChange = { change -> changeCollections(change = change) },
-                    onRemove = {
-                        settingCard = null
-                        changeCollections { remove(kind) }
-                    },
-                    onDismiss = { settingCard = null },
-                )
-            }
-            val scene = LocalThemeArt.current.scene
-            if (confirmingScene && scene != null) {
-                val screen = LocalWindowInfo.current.containerSize
-                val density = LocalDensity.current
-                SceneDialog(
-                    scene = scene,
-                    onSet = {
-                        confirmingScene = false
-                        onSetWallpaper { scene.image(screen, density) }
-                    },
-                    onDismiss = { confirmingScene = false },
-                )
-            }
-            if (showingSpinStats) {
-                SpinStatsDialog(spinStats, onDismiss = { showingSpinStats = false })
-            }
-            if (confirmingReset) {
-                ResetDialog(
-                    onReset = {
-                        confirmingReset = false
-                        onReset()
-                    },
-                    onDismiss = { confirmingReset = false },
-                )
-            }
-            confirmingPin?.let { request ->
-                PinDialog(
-                    request = request,
-                    onAdd = {
-                        confirmingPin = null
-                        // Only once it is pinned, and in the same handler: whatever runs next sees it pinned and on the ring.
-                        if (request.accept()) changeHomeApps(LauncherPage.Home) { add(HomePlace.Ring, request.shortcut) }
-                    },
-                    onDismiss = { confirmingPin = null },
-                )
-            }
-            // Over the pages, and reachable by a second finger while the first holds the item.
-            if (switchShown) {
-                ReorderModeSwitch(
-                    mode = reorderMode,
-                    onModeChange = onReorderModeChange,
-                    onPlaced = { mode, bounds -> if (switchHalves[mode] != bounds) switchHalves = switchHalves + (mode to bounds) },
-                    hovered = overSwitch != null,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
-                )
-            }
-            dragged?.let { drag ->
-                DragGhost(position = { finger - origin }, label = drag.label) {
-                    val app = drag.app
-                    if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
+                choosingPlanet?.let { folder ->
+                    ChoiceDialog(
+                        title = "Planet",
+                        choices = Planet.entries.map(PlanetPick::Of) + PlanetPick.Plain,
+                        chosen = planets[folder]?.let(PlanetPick::Of) ?: PlanetPick.Plain,
+                        label = { if (it is PlanetPick.Of) it.planet.name else "Plain folder" },
+                        onChoose = { pick ->
+                            choosingPlanet = null
+                            changeHomeApps { pick(folder, pick) }
+                        },
+                        onDismiss = { choosingPlanet = null },
+                        modifier = Modifier.testTag(FolderTags.PLANET_DIALOG),
+                    )
                 }
+                renamingFolder?.let { folder ->
+                    FolderNameDialog(
+                        name = homeApps.folder(folder)?.name.orEmpty(),
+                        onRename = { name ->
+                            renamingFolder = null
+                            changeHomeApps { rename(folder, name) }
+                        },
+                        onDismiss = { renamingFolder = null },
+                    )
+                }
+                openGridFolder?.let { spot ->
+                    val folder = remember(gridPages, widgetPages, onHome, spot) {
+                        gridPages.grid(spot.page, widgetPages).resolve(onHome.orEmpty())[spot.block] as? GridItem.Folder
+                    }
+                    // One that went, as its last app left, closes; one whose apps are all uninstalled stays, as on the ring.
+                    if (folder == null) {
+                        LaunchedEffect(Unit) { openGridFolder = null }
+                    } else {
+                        GridFolderDialog(
+                            folder = folder,
+                            icon = actions.icon,
+                            onLaunch = actions.launch,
+                            menu = gridMenu(spot.copy(inFolder = true)),
+                            unread = unread,
+                            onClearBadge = actions.clearBadge,
+                            onDismiss = { openGridFolder = null },
+                        )
+                    }
+                }
+                renamingGridFolder?.let { spot ->
+                    FolderNameDialog(
+                        name = (gridPages[spot.page].slots[spot.block] as? RingSlot.Folder)?.name.orEmpty(),
+                        onRename = { name ->
+                            renamingGridFolder = null
+                            changeGrid(spot.page) { rename(spot.block, name) }
+                        },
+                        onDismiss = { renamingGridFolder = null },
+                    )
+                }
+                settingCard?.let(CollectionKind::named)?.let { kind ->
+                    CollectionSettingsDialog(
+                        page = collections,
+                        kind = kind,
+                        onChange = { change -> changeCollections(change = change) },
+                        onRemove = {
+                            settingCard = null
+                            changeCollections { remove(kind) }
+                        },
+                        onDismiss = { settingCard = null },
+                    )
+                }
+                val scene = LocalThemeArt.current.scene
+                if (confirmingScene && scene != null) {
+                    val screen = LocalWindowInfo.current.containerSize
+                    val density = LocalDensity.current
+                    SceneDialog(
+                        scene = scene,
+                        onSet = {
+                            confirmingScene = false
+                            onSetWallpaper { scene.image(screen, density) }
+                        },
+                        onDismiss = { confirmingScene = false },
+                    )
+                }
+                if (showingSpinStats) {
+                    SpinStatsDialog(spinStats, onDismiss = { showingSpinStats = false })
+                }
+                if (confirmingReset) {
+                    ResetDialog(
+                        onReset = {
+                            confirmingReset = false
+                            onReset()
+                        },
+                        onDismiss = { confirmingReset = false },
+                    )
+                }
+                confirmingPin?.let { request ->
+                    PinDialog(
+                        request = request,
+                        onAdd = {
+                            confirmingPin = null
+                            // Only once it is pinned, and in the same handler: whatever runs next sees it pinned and on the ring.
+                            if (request.accept()) changeHomeApps(LauncherPage.Home) { add(HomePlace.Ring, request.shortcut) }
+                        },
+                        onDismiss = { confirmingPin = null },
+                    )
+                }
+                // Over the pages, and reachable by a second finger while the first holds the item.
+                if (switchShown) {
+                    ReorderModeSwitch(
+                        mode = reorderMode,
+                        onModeChange = onReorderModeChange,
+                        onPlaced = { mode, bounds -> if (switchHalves[mode] != bounds) switchHalves = switchHalves + (mode to bounds) },
+                        hovered = overSwitch != null,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                    )
+                }
+                dragged?.let { drag ->
+                    DragGhost(position = { finger - origin }, label = drag.label) {
+                        val app = drag.app
+                        if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
+                    }
+                }
+                // Over everything, panels and the open drawer included, clear of the drawer's strip and of the keyboard,
+                // which the root leaves to the drawer.
+                shownNotices.Host(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.ime)
+                        .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = drawerPeek + Spacing.Edge),
+                )
             }
         }
     }
@@ -2068,3 +2051,5 @@ private fun LayoutCoordinates.boundsIn(ancestor: LayoutCoordinates): Bounds {
 }
 
 private const val FOLDER_SKY_TURN_MILLIS = 3_600_000
+
+/** A menu row that flips a setting [on] in place, handing the new value to [onChange]. */

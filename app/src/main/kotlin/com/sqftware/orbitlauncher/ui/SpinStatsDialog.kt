@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.SpinStats
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 /** Where the two directions meet on the dial, in degrees, so each reads as its own arc. */
 private const val DIAL_GAP = 8f
@@ -44,47 +43,37 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
     val locale = LocalLocale.current.platformLocale
     fun decimal(n: Double, places: Int) = String.format(locale, "%,.${places}f", n)
 
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onDismiss) { Text("Done") } },
-        title = { Text("Spin stats") },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                SpinDial(stats, count = String.format(locale, "%,d", stats.spins))
-                if (stats.spins == 0) {
-                    Text(
-                        "Drag up or down round the ring's side and let go to start counting.",
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    InfoDialog(title = "Spin stats", onDone = onDismiss, modifier = Modifier.testTag(LauncherMenuTags.SPIN_STATS_DIALOG)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            SpinDial(stats, count = String.format(locale, "%,d", stats.spins))
+            if (stats.spins == 0) {
+                SupportingText("Drag up or down round the ring's side and let go to start counting.", textAlign = TextAlign.Center)
+            } else {
+                // As tall as each other, though one label wraps.
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.Gap)) {
+                    DirectionTile(
+                        MaterialTheme.colorScheme.primary,
+                        decimal(stats.clockwise, 1),
+                        "turns clockwise",
+                        Modifier.weight(1f),
                     )
-                } else {
-                    // As tall as each other, though one label wraps.
-                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        DirectionTile(
-                            MaterialTheme.colorScheme.primary,
-                            decimal(stats.clockwise, 1),
-                            "turns clockwise",
-                            Modifier.weight(1f),
-                        )
-                        DirectionTile(
-                            MaterialTheme.colorScheme.tertiary,
-                            decimal(stats.anticlockwise, 1),
-                            "turns counterclockwise",
-                            Modifier.weight(1f),
-                            mirrored = true,
-                        )
-                    }
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("Records", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        RecordRow(LoopGlyph, "Most in one spin", "${decimal(stats.mostTurns, 1)} turns")
-                        RecordRow(SpeedGlyph, "Top speed", "${decimal(stats.topRpm, 0)} rpm")
-                        RecordRow(TimerGlyph, "Longest coast", "${decimal(stats.longestCoast, 1)} s")
-                    }
+                    DirectionTile(
+                        MaterialTheme.colorScheme.tertiary,
+                        decimal(stats.anticlockwise, 1),
+                        "turns counterclockwise",
+                        Modifier.weight(1f),
+                        mirrored = true,
+                    )
+                }
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SectionLabel("Records")
+                    RecordRow(LoopGlyph, "Most in one spin", "${decimal(stats.mostTurns, 1)} turns")
+                    RecordRow(SpeedGlyph, "Top speed", "${decimal(stats.topRpm, 0)} rpm")
+                    RecordRow(TimerGlyph, "Longest coast", "${decimal(stats.longestCoast, 1)} s")
                 }
             }
-        },
-        modifier = Modifier.testTag(LauncherMenuTags.SPIN_STATS_DIALOG),
-    )
+        }
+    }
 }
 
 /** A ring split by how much of all the turning went each way, round the [count] of spins. */
@@ -131,22 +120,18 @@ private fun SpinDial(stats: SpinStats, count: String) {
 
 @Composable
 private fun DirectionTile(tint: Color, value: String, label: String, modifier: Modifier, mirrored: Boolean = false) {
-    Column(
-        modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp))
-            .padding(12.dp)
-            .semantics(mergeDescendants = true) {},
-    ) {
-        Icon(
-            RotateRightGlyph,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(20.dp).graphicsLayer { if (mirrored) scaleX = -1f },
-        )
-        Spacer(Modifier.size(6.dp))
-        Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Pane(modifier.fillMaxHeight().semantics(mergeDescendants = true) {}) {
+        Column(Modifier.padding(12.dp)) {
+            Icon(
+                RotateRightGlyph,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(20.dp).graphicsLayer { if (mirrored) scaleX = -1f },
+            )
+            Spacer(Modifier.size(6.dp))
+            Text(value, style = MaterialTheme.typography.titleLarge, color = tint)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

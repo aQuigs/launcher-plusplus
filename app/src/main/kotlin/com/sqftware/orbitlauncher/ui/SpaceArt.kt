@@ -30,7 +30,6 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.RingInk
-import com.sqftware.orbitlauncher.ui.theme.RingShade
 import com.sqftware.orbitlauncher.ui.theme.RingSpark
 
 /** The launcher icon's sky, 108 wide, at 2.475 times the emblem's radius, which puts its dust between spark and edge. */
@@ -46,7 +45,6 @@ private const val MIN_CONSTELLATION = 4
  */
 object SpaceArt : ThemeArt {
     override val hintInk @Composable get() = RingInk
-    override val hintShade @Composable get() = RingShade
 
     /** The icon's night sky, half see-through so it darkens a bright wallpaper without hiding it, with its spark on top. */
     @Composable

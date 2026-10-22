@@ -10,14 +10,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -33,11 +36,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,8 +50,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +85,8 @@ import com.sqftware.orbitlauncher.domain.keysWithSharedLabels
 import com.sqftware.orbitlauncher.domain.matching
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.sectionsByInitial
+import com.sqftware.orbitlauncher.ui.theme.Ground
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
 object AppDrawerTags {
@@ -252,74 +254,77 @@ fun AppDrawer(
         onClearBadge = onClearBadge,
     )
 
-    Column(modifier.fillMaxSize()) {
-        picking?.header?.invoke()
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SearchField(
-                query = query,
-                onQueryChange = onQueryChange,
-                onSearch = {
-                    if (picking == null) matches.firstOrNull()?.let(onLaunch) else matches.firstOrNull(picking.isPickable)?.let(picking.onToggle)
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 24.dp, top = 8.dp, end = if (controls == null) 24.dp else 4.dp, bottom = 8.dp)
-                    .focusRequester(searchFocus),
-            )
-            controls?.let { StyleButtons(it) }
-        }
-        if (hasWork && !searching) {
-            ChoiceRow(
-                profileTabs,
-                selected = work,
-                onSelect = { workTab = it },
-                tag = { if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL },
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-            )
-        }
-        Box(Modifier.weight(1f)) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(if (style.layout == DrawerLayout.Grid) GRID_COLUMNS else 1),
-                state = if (searching) matchesState else gridState,
-                contentPadding = PaddingValues(end = if (showsRail) RAIL_WIDTH else 0.dp),
-                modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
-            ) {
-                when {
-                    searching && matches.isEmpty() -> fullWidth(contentType = "empty") { NoMatches() }
-                    searching -> apps(matches, entry, detail)
-                    else -> {
-                        if (askForUsage) {
-                            fullWidth(key = "usage", contentType = "usage") {
-                                PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = 24.dp).testTag(AppDrawerTags.USAGE_ACCESS))
+    // The drawer is a panel over the launcher, as each Panel is.
+    OnGround(Ground.Panel) {
+        Column(modifier.fillMaxSize()) {
+            picking?.header?.invoke()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SearchField(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    onSearch = {
+                        if (picking == null) matches.firstOrNull()?.let(onLaunch) else matches.firstOrNull(picking.isPickable)?.let(picking.onToggle)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = Spacing.Edge, top = Spacing.Tight, end = if (controls == null) Spacing.Edge else 4.dp, bottom = Spacing.Tight)
+                        .focusRequester(searchFocus),
+                )
+                controls?.let { StyleButtons(it) }
+            }
+            if (hasWork && !searching) {
+                ChoiceRow(
+                    profileTabs,
+                    selected = work,
+                    onSelect = { workTab = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.Edge, vertical = 4.dp),
+                    item = { Modifier.testTag(if (it) AppDrawerTags.WORK else AppDrawerTags.PERSONAL) },
+                )
+            }
+            Box(Modifier.weight(1f).windowInsetsPadding(WindowInsets.ime)) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (style.layout == DrawerLayout.Grid) GRID_COLUMNS else 1),
+                    state = if (searching) matchesState else gridState,
+                    contentPadding = PaddingValues(end = if (showsRail) RAIL_WIDTH else 0.dp),
+                    modifier = Modifier.fillMaxSize().testTag(AppDrawerTags.LIST),
+                ) {
+                    when {
+                        searching && matches.isEmpty() -> fullWidth(contentType = "empty") { EmptyNote("No apps match") }
+                        searching -> apps(matches, entry, detail)
+                        else -> {
+                            if (askForUsage) {
+                                fullWidth(key = "usage", contentType = "usage") {
+                                    PermissionRequired(onOpenUsageSettings, Modifier.padding(horizontal = Spacing.Edge).testTag(AppDrawerTags.USAGE_ACCESS))
+                                }
                             }
-                        }
-                        if (mostUsedApps.isNotEmpty()) {
-                            fullWidth(key = "most_used", contentType = "most_used") {
-                                // A letter's header follows it in the A to Z list; elsewhere the rest needs a heading of its own.
-                                MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail, headsTheRest = !(alphabetical && headed))
+                            if (mostUsedApps.isNotEmpty()) {
+                                fullWidth(key = "most_used", contentType = "most_used") {
+                                    // A letter's header follows it in the A to Z list; elsewhere the rest needs a heading of its own.
+                                    MostUsedRow(mostUsedApps, entry.copy(menu = mostUsedMenu), detail, headsTheRest = !(alphabetical && headed))
+                                }
                             }
-                        }
-                        if (alphabetical) {
-                            sections.forEach { section ->
-                                if (headed) fullWidth(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
-                                apps(section.apps, entry, detail)
+                            if (alphabetical) {
+                                sections.forEach { section ->
+                                    if (headed) fullWidth(key = section.initial, contentType = "header") { SectionHeader(section.initial) }
+                                    apps(section.apps, entry, detail)
+                                }
+                            } else {
+                                apps(ordered, entry, detail)
                             }
-                        } else {
-                            apps(ordered, entry, detail)
                         }
                     }
                 }
-            }
-            if (showsRail) {
-                LetterRail(
-                    initials = initials,
-                    highlighted = highlighted,
-                    onSelect = { section ->
-                        lastSelected = section
-                        scope.launch { gridState.scrollToItem(headerIndices[section]) }
-                    },
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                )
+                if (showsRail) {
+                    LetterRail(
+                        initials = initials,
+                        highlighted = highlighted,
+                        onSelect = { section ->
+                            lastSelected = section
+                            scope.launch { gridState.scrollToItem(headerIndices[section]) }
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    )
+                }
             }
         }
     }
@@ -377,7 +382,7 @@ private fun StyleButtons(controls: DrawerControls) {
     }
     Box(Modifier.padding(end = 8.dp)) {
         IconButton(onClick = { controls.onSortingChange(true) }) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Sort apps")
+            Icon(SortGlyph, contentDescription = "Sort apps")
         }
         SortMenu(controls)
     }
@@ -388,40 +393,18 @@ private fun StyleButtons(controls: DrawerControls) {
 private fun SortMenu(controls: DrawerControls) {
     val style = controls.style
     val close = { controls.onSortingChange(false) }
-    fun choose(changed: DrawerStyle) = chooseFrom(controls.sorting, close) { controls.onStyleChange(changed) }
-
-    GroundMenu(expanded = controls.sorting, onDismissRequest = close, modifier = Modifier.testTag(AppDrawerTags.SORT_MENU)) {
-        DrawerOrder.entries.forEach { order ->
-            val chosen = order == style.order
-            DropdownMenuItem(
-                text = { Text(order.label) },
-                trailingIcon = if (chosen) {
-                    { Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-                } else {
-                    null
-                },
-                onClick = { choose(style.copy(order = order)) },
-                modifier = Modifier.semantics { selected = chosen },
-            )
-        }
-        HorizontalDivider()
-        LauncherMenuItem(
-            LauncherMenuRow("Most used row", on = style.mostUsedRow, flips = true) {
-                controls.onStyleChange(style.copy(mostUsedRow = !style.mostUsedRow))
+    GroundMenu(
+        expanded = controls.sorting,
+        onDismissRequest = close,
+        groups = listOf(
+            DrawerOrder.entries.map { order ->
+                MenuRow(order.label, end = RowEnd.Choice(order == style.order)) { controls.onStyleChange(style.copy(order = order)) }
             },
-            controls.sorting,
-            close,
-        )
-    }
-}
-
-@Composable
-private fun NoMatches() {
-    Text(
-        text = "No apps match",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+            listOf(
+                toggleRow("Most used row", style.mostUsedRow) { controls.onStyleChange(style.copy(mostUsedRow = it)) },
+            ),
+        ),
+        modifier = Modifier.testTag(AppDrawerTags.SORT_MENU),
     )
 }
 
@@ -492,14 +475,7 @@ private fun SectionHeader(initial: Char) = Heading(initial.toString(), Modifier.
 
 @Composable
 private fun Heading(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp),
-    )
+    SectionLabel(text, modifier.fillMaxWidth().padding(horizontal = Spacing.Edge, vertical = 6.dp))
 }
 
 @Composable
@@ -513,7 +489,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
         modifier = Modifier
             .fillMaxWidth()
             .then(entry.action(app))
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = Spacing.Edge, vertical = Spacing.Tight),
     ) {
         AppFace(app, entry.icon, Modifier.size(ROW_ICON_SIZE))
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
@@ -541,7 +517,7 @@ private fun AppRow(app: AppEntry, detail: String?, entry: DrawerEntry) {
         if (picked) {
             when (picking?.mark) {
                 PickMark.Dot -> Dot(Modifier.padding(start = 12.dp))
-                else -> Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                else -> PickedMark()
             }
         }
         entry.menu?.content?.invoke(app)
@@ -569,16 +545,8 @@ private fun AppCell(app: AppEntry, detail: String?, entry: DrawerEntry, modifier
             if (picking?.isPicked(app) == true) {
                 when (picking.mark) {
                     PickMark.Dot -> Dot(Modifier.align(Alignment.BottomEnd))
-                    PickMark.Check -> Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                            .size(18.dp)
-                            .padding(2.dp),
-                    )
+                    // Clear of the work mark, which takes the bottom-end corner.
+                    PickMark.Check -> PickedMark(Modifier.align(Alignment.BottomStart))
                 }
             }
             entry.menu?.content?.invoke(app)

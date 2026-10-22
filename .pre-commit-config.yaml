@@ -38,11 +38,35 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Panel\.kt$|Popups\.kt$|\w+Art\.kt$)
       - id: launcher-buttons
-        name: Text buttons are a TonalButton on the wallpaper and a PopupButton on a pop-up
+        name: Text buttons are a LauncherButton, which takes its look from the ground it is on
         language: pygrep
-        entry: '(?<!\w)(Text|FilledTonal|Outlined|Elevated)?Button\s*\('
+        entry: '(?<!\w)(Text|FilledTonal|Filled|Outlined|Elevated)?Button\s*\('
         files: ^app/src/main/kotlin/.*\.kt$
-        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(TonalButton|Popups)\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/Grounds\.kt$
+      - id: launcher-surfaces
+        name: Boxes are a Pane, choices a ChoiceRow, fills from BoxColors and corners from the theme's shapes
+        language: pygrep
+        entry: '\.surface\w*\b|(RoundedCorner|CutCorner)Shape\s*\(|(?<![\w.])(?<!class )(Surface|Card|ElevatedCard|OutlinedCard|SegmentedButton|FilterChip|InputChip)\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|ChoiceRow\.kt$|Panel\.kt$|\w+Art\.kt$)
+      - id: launcher-pop-up-kinds
+        name: Dialogs are an InfoDialog, ConfirmDialog, NameDialog or ChoiceDialog, menus a GroundMenu of MenuRows, notes a Notice
+        language: pygrep
+        entry: '(?<![\w.])(DropdownMenuItem|BasicAlertDialog|Dialog|Popup|ModalBottomSheet|Snackbar)\s*\(|\bToast\b'
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/Popups\.kt$
+      - id: sideways-scroll
+        name: A row that scrolls sideways is a sidewaysScroll, which shows there is more
+        language: pygrep
+        entry: '\.horizontalScroll\(|\bLazyRow\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/Fades\.kt$
+      - id: legible-text
+        name: Text on the wallpaper takes its halo from legible(), never a shadow of its own
+        language: pygrep
+        entry: '(?<![\w.])Shadow\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/
       - id: check-markdown
         name: check-markdown
         entry: markdownlint -c ./.markdownlintrc --ignore .claude

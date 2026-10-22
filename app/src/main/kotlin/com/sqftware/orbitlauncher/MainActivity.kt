@@ -8,7 +8,6 @@ import com.sqftware.orbitlauncher.apps.SensorHeadingSource
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -46,9 +45,9 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesSpinStatsStore
-import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWhereIAmStore
@@ -103,6 +102,9 @@ private const val HEADING_STEP = 0.5f
 
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
+    // A channel, so a widget's answer that reaches a recreated activity before the screen collects is kept until it does.
+    private val noticeChannel = Channel<String>(Channel.BUFFERED)
+    private val notices = noticeChannel.receiveAsFlow()
 
     // A channel, unlike the presses, keeps a request that starts the activity until the screen is there to collect it.
     private val pinRequestChannel = Channel<PinRequest>(Channel.CONFLATED)
@@ -149,7 +151,7 @@ class MainActivity : ComponentActivity() {
         val location = PlatformLocationSource(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this)
         val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this))
-        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this))
+        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
                 view = widgetHost::view,
@@ -271,7 +273,7 @@ class MainActivity : ComponentActivity() {
                         if (granted) {
                             changeShowWhereIAm(true)
                         } else {
-                            Toast.makeText(this@MainActivity, "The map needs location access, which Settings can allow", Toast.LENGTH_SHORT).show()
+                            noticeChannel.trySend("The map needs location access, which Settings can allow")
                         }
                     }
                 }
@@ -368,6 +370,7 @@ class MainActivity : ComponentActivity() {
                         onLayoutChange = ::changeLayout,
                         homePresses = homePresses,
                         pinRequests = pinRequests,
+                        notices = notices,
                         apps = apps,
                         pinnedShortcuts = pinnedShortcuts,
                         ringPages = ringPages,
@@ -438,7 +441,6 @@ class MainActivity : ComponentActivity() {
                             pickTip = false
                             pickTipStore.save(false)
                         },
-                        onToast = { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() },
                         drawerStyle = drawerStyle,
                         onDrawerStyleChange = {
                             drawerStyle = it

@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -9,9 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 
 object PlacePickerTags {
     const val PICKER = "place_picker"
@@ -25,7 +26,7 @@ private val switchablePlaces = listOf(HomePlace.Ring to "Ring", HomePlace.Dock t
 @Composable
 fun PlacePicker(place: HomePlace, onPlaceChange: (HomePlace) -> Unit, modifier: Modifier = Modifier) {
     PickingHeader(modifier) {
-        ChoiceRow(switchablePlaces, selected = place, onSelect = onPlaceChange, tag = PlacePickerTags::place)
+        ChoiceRow(switchablePlaces, selected = place, onSelect = onPlaceChange, Modifier.fillMaxWidth(), item = { Modifier.testTag(PlacePickerTags.place(it)) })
     }
 }
 
@@ -57,14 +58,10 @@ private fun PickingHeader(
     content: @Composable () -> Unit,
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag(PlacePickerTags.PICKER),
+        verticalArrangement = Arrangement.spacedBy(Spacing.Tight),
+        modifier = modifier.padding(horizontal = Spacing.Edge, vertical = Spacing.Tight).testTag(PlacePickerTags.PICKER),
     ) {
         content()
-        Text(
-            text = hint,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        SupportingText(hint)
     }
 }

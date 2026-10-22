@@ -34,16 +34,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.GraphicsLayerScope
-import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
@@ -66,16 +68,17 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.EMBLEM_FRACTION
 import com.sqftware.orbitlauncher.domain.HangingNames
-import com.sqftware.orbitlauncher.domain.NameRoom
-import com.sqftware.orbitlauncher.domain.rooms
 import com.sqftware.orbitlauncher.domain.HomePlace
 import com.sqftware.orbitlauncher.domain.IconPlace
+import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.folderSlotOffset
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
+import com.sqftware.orbitlauncher.domain.rooms
 import com.sqftware.orbitlauncher.ui.theme.LocalRingColors
+import com.sqftware.orbitlauncher.ui.theme.legible
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -92,6 +95,12 @@ internal val RING_ICON_SIZE = 56.dp
 
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
+
+/** How far the ring's marks stop short of a name hanging across them. */
+private val NAME_HOLE_AIR = 4.dp
+
+/** The gap cut in the ring's marks under the name of slot [index]: [width] across and [depth] down from its icon's middle. */
+private class NameHole(val index: Int, val width: Float, val depth: Float)
 
 /** Air a ring icon's name keeps from its neighbours and their names, more than from its own icon so it reads as that one's. */
 private val RING_NAME_AIR = 6.dp
@@ -318,14 +327,50 @@ fun HomeRing(
                     return with(art) { ringMarks(size.center, slots, radius, iconSize, marks) }
                 }
 
+                // The marks between icons run under the names that hang below them, so they stop short of each name,
+                // wherever the ring's spin has carried it.
+                fun nameHoles(items: List<RingItem>): ((Float) -> Path)? {
+                    val (radius, iconSize) = layoutOn(size.width, size.height, items)
+                    val air = NAME_HOLE_AIR.toPx()
+                    // From the icon's middle, which covers the marks anyway, so none show in the gap above the name.
+                    val below = iconSize / 2 + APP_LABEL_GAP.toPx() + air
+                    val line = nameLine.toPx()
+                    val holes = items.mapIndexedNotNull { index, item ->
+                        val room = rooms[item.tag]?.takeIf { it.width > 0 } ?: return@mapIndexedNotNull null
+                        val name = item.hangingName?.let(nameWidths) ?: return@mapIndexedNotNull null
+                        NameHole(index, width = minOf(if (room.lines > 1) name.twoLines else name.oneLine, room.width) + 2 * air, depth = below + room.lines * line)
+                    }
+                    if (holes.isEmpty()) return null
+                    // One path, redrawn each frame of a spin rather than made anew.
+                    val path = Path()
+                    return { turn ->
+                        path.apply {
+                            rewind()
+                            holes.forEach { hole ->
+                                val (dx, dy) = ringSlotOffset(hole.index, items.size, turn.toDouble())
+                                val slot = size.center + Offset(dx, dy) * radius
+                                addRoundRect(RoundRect(slot.x - hole.width / 2, slot.y, slot.x + hole.width / 2, slot.y + hole.depth, CornerRadius(air)))
+                            }
+                        }
+                    }
+                }
+
                 // An app on its way in from another place makes way for itself among the ring's.
                 val ringMarks = marksFor(making ?: ring) { index, count -> ringSlotOffset(index, count) }
                 val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> folderSlotOffset(index, count) } }
+                // In the order shown, which a drag rearranges, as the names are.
+                val nameHoles = if (names && centred == null) nameHoles(making ?: moving.shown(ring)) else null
                 onDrawBehind {
                     val out = spread.value
                     if (glow > 0f) drawCircle(marks.mark.copy(alpha = 0.08f * glow), radius = size.minDimension / 2)
                     if (centred == null) {
-                        rotate(Math.toDegrees(spin.turn.toDouble()).toFloat()) { ringMarks(glow, 1f) }
+                        val turn = spin.turn
+                        val degrees = Math.toDegrees(turn.toDouble()).toFloat()
+                        if (nameHoles == null) {
+                            rotate(degrees) { ringMarks(glow, 1f) }
+                        } else {
+                            clipPath(nameHoles(turn), ClipOp.Difference) { rotate(degrees) { ringMarks(glow, 1f) } }
+                        }
                     } else {
                         val drift = 1f + DRIFT * out
                         scale(drift, drift) { ringMarks(glow, 1f - out) }
@@ -501,7 +546,7 @@ private fun Emblem(
             Text(
                 text = hint,
                 // Shadowed so it still reads where a light wallpaper shows through the disc.
-                style = MaterialTheme.typography.labelLarge.copy(shadow = Shadow(art.hintShade, blurRadius = 6f)),
+                style = MaterialTheme.typography.labelLarge.legible(art.hintInk),
                 color = art.hintInk,
                 textAlign = TextAlign.Center,
                 maxLines = 2,

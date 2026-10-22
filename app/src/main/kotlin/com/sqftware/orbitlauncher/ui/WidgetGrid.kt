@@ -22,17 +22,12 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -40,7 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -68,8 +63,8 @@ import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
@@ -105,6 +100,8 @@ import com.sqftware.orbitlauncher.domain.nearestCells
 import com.sqftware.orbitlauncher.domain.roomFor
 import com.sqftware.orbitlauncher.domain.widgetCells
 import com.sqftware.orbitlauncher.domain.widgetRowsWithin
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
+import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlin.math.abs
@@ -170,12 +167,11 @@ private data class Fixed(override val count: Int) : PageRows {
 }
 
 private val GAP = WIDGET_GAP_DP.dp
-private val PAGE_PADDING = 16.dp
 private val CONTROL_SIZE = 40.dp
 
 // How far the edit controls reach past the outline's corners. Any reach keeps the bin and the handle apart on a widget
 // one row tall, since each is half a row; half the page's padding keeps them clear of the screen's edge.
-private val CONTROL_REACH = PAGE_PADDING / 2
+private val CONTROL_REACH = Spacing.Edge / 2
 
 // A finger this near the page's top or bottom edge, dragging a widget or its handle, scrolls the page, and at the edge
 // itself this fast, a second.
@@ -306,19 +302,17 @@ fun WidgetGrid(
     landing: Cell? = null,
 ) {
     val density = LocalDensity.current
-    val keyboard = WindowInsets.ime
-    val bars = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     var area by remember { mutableStateOf(DpSize.Zero) }
     var buttonHeight by remember { mutableStateOf(0.dp) }
     // The rows the page shows fill the screen but for the button below them and a gap, so a page no taller than the
     // screen does not scroll.
     val rows = remember(area.height, buttonHeight, fixed) {
         val button = if (fixed) 0.dp else buttonHeight + GAP
-        widgetRowsWithin((area.height - PAGE_PADDING * 2 - button).value)
+        widgetRowsWithin((area.height - Spacing.Edge * 2 - button).value)
     }
     val pageRows = rows.count
     val fit = remember(pageRows, fixed) { if (fixed) Fixed(pageRows) else Lengthening(pageRows) }
-    val cell = DpSize(maxOf((area.width - PAGE_PADDING * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS, 0.dp), rows.heightDp.dp)
+    val cell = DpSize(maxOf((area.width - Spacing.Edge * 2 - GAP * (WIDGET_COLUMNS - 1)) / WIDGET_COLUMNS, 0.dp), rows.heightDp.dp)
     // As tall as the page is wide, so the ring is the size it has on a page of its own.
     val ringRows = widgetCells(span(WIDGET_COLUMNS, cell.width).value.roundToInt(), cell.height.value, pageRows)
     // Placed only once the page is measured, and stored as placed, so the widgets the host moves are where they show.
@@ -416,16 +410,9 @@ fun WidgetGrid(
         Column(
             Modifier
                 .fillMaxSize()
-                .onSizeChanged { size ->
-                    with(density) {
-                        // The keyboard, raised for the drawer's search, squeezes this page too. Measured as if it were
-                        // down, the rows keep their height, so no widget is resized and redrawn by its provider meanwhile.
-                        val squeeze = (keyboard.getBottom(this) - bars.getBottom(this)).coerceAtLeast(0)
-                        area = DpSize(size.width.toDp(), (size.height + squeeze).toDp())
-                    }
-                }
+                .onSizeChanged { size -> with(density) { area = DpSize(size.width.toDp(), size.height.toDp()) } }
                 .then(if (fixed) Modifier else Modifier.verticalPageScroll(scroll))
-                .padding(PAGE_PADDING),
+                .padding(Spacing.Edge),
             verticalArrangement = Arrangement.spacedBy(GAP),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -440,11 +427,7 @@ fun WidgetGrid(
                     .zIndex(if (held.id != null) 1f else 0f),
             ) {
                 if (!fixed && laid.isEmpty) {
-                    Text(
-                        "No widgets yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.align(Alignment.Center).padding(8.dp),
-                    )
+                    EmptyNote("No widgets yet", Modifier.align(Alignment.Center))
                 }
                 (places[held.id] ?: landing?.let { HostedWidget(0, it.row, it.column, 1, 1) })?.let { landing ->
                     Box(
@@ -489,7 +472,7 @@ fun WidgetGrid(
                         .onSizeChanged { buttonHeight = with(density) { it.height.toDp() } }
                         .testTag(WidgetTags.ADD),
                 ) {
-                    TonalButton(onClick = add) {
+                    LauncherButton(onClick = add) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                         Text("Add widget")
                     }
@@ -546,7 +529,7 @@ private fun LauncherBlock(
             ) {
                 onRemove?.let {
                     EditButton(
-                        Icons.Default.Delete,
+                        Icons.Default.Close,
                         remove,
                         Modifier.align(Alignment.TopEnd).offset(CONTROL_REACH, -CONTROL_REACH).testTag(WidgetTags.REMOVE),
                         Modifier.clickable {
@@ -659,7 +642,7 @@ private fun Widget(
                     .testTag(WidgetTags.EDIT),
             ) {
                 EditButton(
-                    Icons.Default.Delete,
+                    Icons.Default.Close,
                     "Remove widget",
                     Modifier.align(Alignment.TopEnd).offset(CONTROL_REACH, -CONTROL_REACH).testTag(WidgetTags.REMOVE),
                     Modifier.clickable {
@@ -714,7 +697,7 @@ private fun EditButton(icon: ImageVector, description: String, modifier: Modifie
             .size(CONTROL_SIZE)
             .clip(CircleShape)
             .then(input)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            .background(LocalBoxColors.current.floating),
     ) {
         Icon(icon, contentDescription = description, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }

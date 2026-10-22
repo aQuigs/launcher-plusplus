@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.RingItem
-import com.sqftware.orbitlauncher.ui.theme.CitySky
 import com.sqftware.orbitlauncher.ui.theme.CityGround
+import com.sqftware.orbitlauncher.ui.theme.CitySky
 import com.sqftware.orbitlauncher.ui.theme.CityStreet
 import com.sqftware.orbitlauncher.ui.theme.CityTrail
 import com.sqftware.orbitlauncher.ui.theme.CityTrailGlow

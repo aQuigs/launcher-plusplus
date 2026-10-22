@@ -4,7 +4,6 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
@@ -23,15 +22,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -57,14 +56,11 @@ import com.sqftware.orbitlauncher.ui.theme.RingColors
  */
 interface ThemeArt {
     /**
-     * What the emblem's hint is written in, and the shadow that keeps it legible, over the emblem's own face: by default
-     * the content colour on its inverse, for a face drawn in the scheme's roles.
+     * What the emblem's hint is written in over the emblem's own face: by default the content colour, for a face drawn in
+     * the scheme's roles.
      */
     val hintInk: Color
         @Composable get() = MaterialTheme.colorScheme.onSurface
-
-    val hintShade: Color
-        @Composable get() = MaterialTheme.colorScheme.inverseOnSurface
 
     /**
      * The emblem's face, filling the item: its ground, and its mark unless [marked] is false because a hint is shown
@@ -171,7 +167,7 @@ interface ThemeArt {
     fun menuBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, MenuDefaults.shape)
 
     val menuRim: BorderStroke?
-        @Composable get() = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        @Composable get() = popupRim()
 
     /**
      * A collection card round its [header] and its [body], on the ground of the [colour] the user chose, solid while
@@ -199,10 +195,6 @@ interface ThemeArt {
     /** The bin an app is dropped on to take it out of a collection, filling its target, lit while [highlighted]: by default a disc. */
     @Composable
     fun BinFace(highlighted: Boolean, modifier: Modifier) = PlainBinFace(highlighted, modifier)
-
-    /** What a card setting's title and choices are boxed in, in a collection's settings: by default a raised box. */
-    @Composable
-    fun settingBox(): Modifier = Modifier.clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerHighest)
 
     /** A dialog's box on [ground]: by default the solid ground in Material's dialog shape. */
     @Composable

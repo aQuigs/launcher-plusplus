@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.LocalPanelMark
 
 /**
@@ -58,12 +61,19 @@ fun panelGround(): PanelGround {
 }
 
 /**
- * A full-screen view over the launcher on the [PanelGround]. The launcher is laid out clear of the system bars, so the
- * veil carries on through the navigation bar, as the open drawer's does.
+ * A full-screen view over the launcher on the [PanelGround], headed by its [title] and [subtitle] with a close button that
+ * calls [onClose], over its [content]. The launcher is laid out clear of the system bars, so the veil carries on through
+ * the navigation bar, as the open drawer's does.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun Panel(
+    title: String,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val ground = panelGround()
     // As the launcher's, held whether or not the bars show.
     val navigationBar = WindowInsets.navigationBarsIgnoringVisibility
@@ -79,6 +89,12 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
             },
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        content = content,
-    )
+    ) {
+        OnGround(Ground.Panel) {
+            Column {
+                PanelHeader(title, onClose, subtitle = subtitle)
+                content()
+            }
+        }
+    }
 }

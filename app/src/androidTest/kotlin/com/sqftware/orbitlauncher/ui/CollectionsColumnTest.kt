@@ -82,7 +82,7 @@ class CollectionsColumnTest {
         compose.collectionApp(NewApps, recent[6]).assertDoesNotExist()
         compose.onNodeWithText("R12").assertDoesNotExist()
         compose.collectionEditButton(NewApps).assertDoesNotExist()
-        compose.onNodeWithText("Permission Required").assertIsDisplayed()
+        compose.onNodeWithText("Permission required").assertIsDisplayed()
     }
 
     @Test
@@ -150,13 +150,13 @@ class CollectionsColumnTest {
     fun mostUsedAsksForUsageAccessUntilGrantedThenListsTheMostUsedFirst() {
         show()
 
-        compose.onNodeWithText("Permission Required").performClick()
+        compose.onNodeWithText("Permission required").performClick()
         compose.onNodeWithText("Allow usage access").performClick()
         compose.runOnIdle { assertEquals(2, usageSettingsOpened) }
 
         foregroundTime = ForegroundTime(mapOf(mail.packageName to 5_000L, clock.packageName to 100L))
 
-        compose.onNodeWithText("Permission Required").assertDoesNotExist()
+        compose.onNodeWithText("Permission required").assertDoesNotExist()
         val mailIcon = compose.collectionApp(MostUsed, mail).assertIsDisplayed().getUnclippedBoundsInRoot()
         val clockIcon = compose.collectionApp(MostUsed, clock).assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue("Mail comes first", mailIcon.left < clockIcon.left)

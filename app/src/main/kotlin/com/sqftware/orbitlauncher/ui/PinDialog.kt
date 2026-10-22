@@ -2,7 +2,6 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -26,13 +25,13 @@ class PinRequest(val shortcut: AppEntry, val appLabel: String, val icon: suspend
  */
 @Composable
 fun PinDialog(request: PinRequest, onAdd: () -> Unit, onDismiss: () -> Unit) {
-    GroundDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { PopupButton(onClick = onAdd) { Text("Add") } },
-        dismissButton = { PopupButton(onClick = onDismiss) { Text("Cancel") } },
+    ConfirmDialog(
+        title = request.shortcut.label,
+        text = "Shortcut from ${request.appLabel}",
+        verb = "Add",
+        onConfirm = onAdd,
+        onDismiss = onDismiss,
         icon = { IconDisc(modifier = Modifier.size(48.dp)) { AppImage(request.shortcut, { _, _ -> request.icon() }, Modifier.fillMaxSize()) } },
-        title = { Text(request.shortcut.label) },
-        text = { Text("Shortcut from ${request.appLabel}") },
         modifier = Modifier.testTag(PinDialogTags.DIALOG),
     )
 }
