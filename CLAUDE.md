@@ -74,7 +74,7 @@ The launcher's look is a theme, picked in the launcher's menu: Space (the ring's
 - Widget page and the controls on every page (`LauncherButton`, `Pane`, badges, the page dots)
 - Popups and panels: the launcher menu, an app's menu, the pin dialog, the place picker, the page editor and its dialogs, the dialog that sets a theme's scene as the wallpaper
 
-A feature that adds one of these surfaces, or changes how one looks, draws it from `ui/theme`, or from `LocalThemeArt` where its shape differs by theme, so each theme can give it its own look, and checks it under every theme. A new surface goes on this list.
+A theme shapes what a folder wears, never where its apps sit: those are laid out by the shared `FolderDisc` (the `folder-previews-shared` hook). A feature that adds one of these surfaces, or changes how one looks, draws it from `ui/theme`, or from `LocalThemeArt` where its shape differs by theme, so each theme can give it its own look, and checks it under every theme. A new surface goes on this list.
 
 ## Don't
 

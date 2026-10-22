@@ -16,7 +16,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.PathOperation
-import androidx.compose.material3.ripple
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.annotation.DrawableRes
@@ -51,6 +50,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -64,9 +64,9 @@ import androidx.compose.ui.unit.IntRect
 import com.sqftware.orbitlauncher.ui.theme.ChatTypedDay
 import com.sqftware.orbitlauncher.ui.theme.ChatTypedNight
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
-import com.sqftware.orbitlauncher.ui.theme.MenuTarget
 import com.sqftware.orbitlauncher.ui.theme.MenuVerb
 import com.sqftware.orbitlauncher.ui.theme.MenuLine
+import com.sqftware.orbitlauncher.ui.theme.MenuRoles
 import com.sqftware.orbitlauncher.ui.theme.MenuGround
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.dp
@@ -112,7 +112,6 @@ import com.sqftware.orbitlauncher.ui.theme.MinimapSelf
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelfEdge
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.StackCount
-import com.sqftware.orbitlauncher.ui.theme.bankSwatch
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
@@ -179,7 +178,6 @@ private const val ORB_RADIUS = 17
  */
 private const val STONE_FACE = 31
 private const val STONE_PITCH = 33
-private const val STONE_HEIGHT = 36
 private const val END_STONE = 38
 
 /** The quill digits of the game's clock, '0' to '9' and ':', each a sprite of the cache's quill font. */
@@ -195,7 +193,7 @@ private const val CLOCK_SCALE = 2
 /**
  * Old School: an homage to the old game's interface, drawn from its own sprites at whole game pixels. The emblem is the
  * minimap in its frame with the compass, the ring's apps sit in its round orbs, every app is one of its items, a
- * folder shows its first four items at half size and opens round the minimap, badges are hitsplats, and text is in its fonts.
+ * folder shows its previews in an orb and opens round the minimap, badges are hitsplats, and text is in its fonts.
  */
 object OldSchoolArt : ThemeArt {
     override val hintInk: Color
@@ -240,17 +238,18 @@ object OldSchoolArt : ThemeArt {
                         map()?.let { drawSpriteCentred(it.disc, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
                     },
             )
-            // Each icon goes round with the map but stays upright, as the game keeps them.
+            // Each icon goes round with the map but stays upright, as the game keeps them: placed by hand rather than
+            // turned back on a turned canvas, so its pixels land whole on the screen's, in a layer of its own, so a turn
+            // draws only the icons again.
             Spacer(
-                Modifier.matchParentSize().drawBehind {
-                    val minimap = map() ?: return@drawBehind
+                Modifier.matchParentSize().graphicsLayer().drawBehind {
+                    val minimap = map()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
                     val scale = mapScale(size, px)
                     val turn = Math.toRadians(-(heading() ?: 0f).toDouble())
                     val (cos, sin) = cos(turn).toFloat() to sin(turn).toFloat()
-                    val half = minimap.disc.width / 2f
                     minimap.icons.forEach { icon ->
-                        val dx = (icon.centreX - half) * scale
-                        val dy = (icon.centreY - half) * scale
+                        val dx = (icon.x - MAP_RADIUS) * scale
+                        val dy = (icon.y - MAP_RADIUS) * scale
                         drawSpriteCentred(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos), scale)
                     }
                 },
@@ -368,7 +367,7 @@ object OldSchoolArt : ThemeArt {
                             Text(SEARCH_PLACEHOLDER, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
                     }
-                    ClearSearchButton(query, onQueryChange) { SpriteImage(clear, px, Modifier.semantics { contentDescription = it }) }
+                    ClearSearchButton(query, onQueryChange) { SpriteImage(clear, px) }
                 }
             },
         )
@@ -470,16 +469,17 @@ object OldSchoolArt : ThemeArt {
         return { slots ->
             val count = slots.starts.size
             val scale = fitScale(slots.iconSize, STONE_FACE.toFloat(), px)
-            val top = size.height / 2 - STONE_HEIGHT * scale / 2f
+            val middle = size.height / 2
+            val top = middle - stone.height * scale / 2f
             slots.starts.forEachIndexed { index, start ->
                 val centre = start + slots.iconSize / 2
                 val half = STONE_PITCH * scale / 2f
                 when {
-                    count == 1 || index in 1 until count - 1 -> drawSprite(stone, Offset(centre - stone.width * scale / 2f, top), scale)
+                    count == 1 || index in 1 until count - 1 -> drawSpriteCentred(stone, Offset(centre, middle), scale)
                     index == 0 -> drawSpritePart(row, IntRect(0, 0, END_STONE, row.height), Offset(centre + half - END_STONE * scale, top), scale)
                     else -> drawSpritePart(row, IntRect(row.width - END_STONE, 0, row.width, row.height), Offset(centre - half, top), scale)
                 }
-                if (slots.glow > 0f) drawSprite(lit, Offset(centre - lit.width * scale / 2f, top), scale, alpha = slots.glow * 0.7f)
+                if (slots.glow > 0f) drawSpriteCentred(lit, Offset(centre, middle), scale, alpha = slots.glow * 0.7f)
             }
         }
     }
@@ -509,9 +509,6 @@ object OldSchoolArt : ThemeArt {
         header: @Composable () -> Unit,
         body: @Composable () -> Unit,
     ) = BankCard(colour, dropTarget, modifier, header, body)
-
-    @Composable
-    override fun cardSwatch(colour: CardColour): Color = bankSwatch(colour)
 
     @Composable
     override fun CardTitle(glyph: ImageVector, title: String, modifier: Modifier) = BankTab(glyph, title, modifier)
@@ -545,9 +542,7 @@ object OldSchoolArt : ThemeArt {
                     .semantics { hideFromAccessibility() },
             )
             Column(Modifier.border(gamePixel.asDp(), MenuLine)) {
-                GameNight {
-                    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
-                }
+                GameNight(MenuRoles) { content() }
             }
         }
     }
@@ -615,7 +610,7 @@ private val PARCHMENT = IntRect(left = 20, top = 17, right = 513, bottom = 136)
  */
 internal fun DrawScope.drawTiled(
     image: ImageBitmap,
-    part: IntRect,
+    part: IntRect = IntRect(0, 0, image.width, image.height),
     px: Int,
     alpha: Float = 1f,
     topLeft: Offset = Offset.Zero,
@@ -630,16 +625,23 @@ internal fun DrawScope.drawTiled(
                 val at = IntOffset(column * tile.width, row * tile.height)
                 val centre = Offset(at.x + tile.width / 2f, at.y + tile.height / 2f)
                 withTransform({ scale(if (!mirror || column.mod(2) == 0) 1f else -1f, if (!mirror || row.mod(2) == 0) 1f else -1f, centre) }) {
-                    drawImage(image, part.topLeft, part.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
+                    drawSpritePart(image, part, at.toOffset(), px, alpha = alpha)
                 }
             }
         }
     }
 }
 
-/** [content] in Old School's night look whatever the wallpaper, as the game's menu and bank are dark by day too. */
+/**
+ * [content] in Old School's night look whatever the wallpaper, as the game's menu and bank are dark by day too, with
+ * its [roles] changed.
+ */
 @Composable
-internal fun GameNight(content: @Composable () -> Unit) = Themed(Theme.OldSchool, Colourway.Classic, lightWallpaper = false, content)
+internal fun GameNight(roles: ColorScheme.() -> ColorScheme = { this }, content: @Composable () -> Unit) =
+    Themed(Theme.OldSchool, Colourway.Classic, lightWallpaper = false) {
+        val night = MaterialTheme.colorScheme
+        MaterialTheme(colorScheme = remember(night, roles) { night.roles() }, content = content)
+    }
 
 /** The largest whole scale, from one to [most], at which [units] of the game's pixels fit in [room] screen pixels. */
 internal fun fitScale(room: Float, units: Float, most: Int) = max(1, min(most, floor(room / units).toInt()))
@@ -649,10 +651,10 @@ internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: In
     drawSpritePart(image, IntRect(0, 0, image.width, image.height), topLeft, scale, tint, alpha)
 
 /** [image] as [drawSprite] draws it, centred on [centre]. */
-internal fun DrawScope.drawSpriteCentred(image: ImageBitmap, centre: Offset, scale: Int, tint: Color? = null) =
-    drawSprite(image, centre - Offset(image.width.toFloat(), image.height.toFloat()) * (scale / 2f), scale, tint)
+internal fun DrawScope.drawSpriteCentred(image: ImageBitmap, centre: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
+    drawSprite(image, centre - Offset(image.width.toFloat(), image.height.toFloat()) * (scale / 2f), scale, tint, alpha)
 
-/** The part [from] of [image], drawn as [drawSprite] draws the whole. */
+/** The part [from] of [image], drawn as [drawSprite] draws the whole, or stretched to [dstSize]. */
 internal fun DrawScope.drawSpritePart(
     image: ImageBitmap,
     from: IntRect,
@@ -660,18 +662,17 @@ internal fun DrawScope.drawSpritePart(
     scale: Int,
     tint: Color? = null,
     alpha: Float = 1f,
+    dstSize: IntSize = IntSize(from.width * scale, from.height * scale),
 ) = drawImage(
     image,
     srcOffset = from.topLeft,
     srcSize = from.size,
     dstOffset = IntOffset(topLeft.x.toInt(), topLeft.y.toInt()),
-    dstSize = IntSize(from.width * scale, from.height * scale),
+    dstSize = dstSize,
     alpha = alpha,
     colorFilter = tint?.let { ColorFilter.tint(it) },
     filterQuality = FilterQuality.None,
 )
-
-private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)
 
 /**
  * The game's round orb behind what is drawn here, filled with the brown of its right-click menu rather than the orb's
@@ -731,3 +732,6 @@ private fun inkColumns(glyph: ImageBitmap): IntRange {
     val inked = (0 until glyph.width).filter { x -> (0 until glyph.height).any { y -> argb[y * glyph.width + x] ushr 24 != 0 } }
     return if (inked.isEmpty()) 0..2 else inked.first()..inked.last()
 }
+
+/** Each whole game pixel of a sprite offset as [scale] screen pixels. */
+private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)

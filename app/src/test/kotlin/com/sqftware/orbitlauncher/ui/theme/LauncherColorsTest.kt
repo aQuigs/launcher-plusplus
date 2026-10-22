@@ -52,7 +52,7 @@ class LauncherColorsTest {
     fun `a card's text reads on every card colour over the wallpaper its scheme is for`() {
         listOf(false, true).flatMap { light -> Colourway.entries.map { lookOf(it, light) } }.forEach { look ->
             CardColour.entries.forEach { colour ->
-                listOf(look.colors.onSurface, look.colors.onSurfaceVariant).forEach { text ->
+                look.cardTints.text.forEach { text ->
                     assertTrue("$text on $colour", contrast(text, look.cardTints.swatch(colour)) >= 4.5f)
                 }
             }
@@ -98,17 +98,6 @@ class LauncherColorsTest {
             }
         }
         assertEquals(emptyList<String>(), failures)
-    }
-
-    @Test
-    fun `the bank's text reads on its ground in every card colour`() {
-        val night = lookOf(Colourway.Classic, lightWallpaper = false).colors
-        CardColour.entries.forEach { colour ->
-            val ground = bankSwatch(colour)
-            listOf(night.onSurface, BankDimText).forEach { text ->
-                assertTrue("$text on $colour", contrast(text, ground) >= 4.5f)
-            }
-        }
     }
 
     @Test

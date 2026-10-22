@@ -102,8 +102,8 @@ class MinimapPainterTest {
         val map = painter.paint(MapScene(centre, pois = listOf(Poi(local(40, 60), MapIcon.Bank))))
         assertTrue(map.disc.argb.none { it == ICON or MapIcon.Bank.ordinal })
         val bank = map.icons.single()
-        assertEquals(40.0, bank.centreX.toDouble(), 1.0)
-        assertEquals(60.0, bank.centreY.toDouble(), 1.0)
+        assertEquals(40.0, bank.x.toDouble(), 1.0)
+        assertEquals(60.0, bank.y.toDouble(), 1.0)
     }
 
     @Test

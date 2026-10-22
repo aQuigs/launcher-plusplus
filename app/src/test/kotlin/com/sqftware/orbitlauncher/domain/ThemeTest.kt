@@ -16,12 +16,6 @@ class ThemeTest {
     }
 
     @Test
-    fun `a theme with one folder look offers no choice of it`() {
-        assertTrue(Theme.Space.choosesFolderLook)
-        assertTrue(!Theme.OldSchool.choosesFolderLook)
-    }
-
-    @Test
     fun `each theme keeps its own pick and shows its first until one is picked`() {
         val looks = FolderLooks().with(Theme.Space, FolderLook.SolarSystem)
 

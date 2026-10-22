@@ -859,7 +859,7 @@ private fun <T : Any> Segments(setting: CardSetting<T>, value: T, onChoose: (T) 
  */
 @Composable
 private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) -> Unit) {
-    val art = LocalThemeArt.current
+    val tints = LocalCardTints.current
     val colours = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.extraLarge
 
@@ -875,7 +875,7 @@ private fun <T : Any> Swatches(setting: CardSetting<T>, value: T, onChoose: (T) 
                     .border(2.dp, if (selected) colours.primary else Color.Transparent, shape)
                     .padding(5.dp)
                     .border(1.dp, colours.outline, shape)
-                    .background(art.cardSwatch(choice as CardColour), shape)
+                    .background(tints.swatch(choice as CardColour), shape)
                     .semantics { contentDescription = choice.name }
                     .testTag(CollectionTags.choice(setting, choice)),
             )

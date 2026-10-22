@@ -31,7 +31,7 @@ private const val N = MINIMAP_SIZE
 private const val WALL = 0xFFEEEEEE.toInt()
 private const val DOOR = 0xFFEE0000.toInt()
 private const val RAIL = 0xFF3A3024.toInt()
-/** The grass's darker shade, as RGB: what shows before there is a map. */
+/** The grass's darker shade, as RGB. */
 const val GRASS_DARK = 0x698F24
 private const val GRASS_LIGHT = 0x718F24
 private const val WATER_BASE = 0xFF2E5596.toInt()
@@ -405,9 +405,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             icons += cand
             perKind[cand.icon] = (perKind[cand.icon] ?: 0) + 1
         }
-        return icons.map {
-            MapMark(it.sprite, it.at.x.toInt() - it.sprite.width / 2, it.at.y.toInt() - it.sprite.height / 2, it.sprite.width, it.sprite.height)
-        }
+        return icons.map { MapMark(it.sprite, it.at.x.toFloat(), it.at.y.toFloat()) }
     }
 
     /** Yellow dots where the map has someone to meet; the white self marker stays the only white mark. */
@@ -422,7 +420,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             val d = hypot(x - C, y - C)
             if (d > RADIUS - 4 || d < 5) continue
             if (dots.size >= MAX_NPCS || dots.any { (a, b) -> abs(x - a) < 5 && abs(y - b) < 5 }) continue
-            if (icons.any { hypot(x - it.centreX.toDouble(), y - it.centreY.toDouble()) < 9 }) continue
+            if (icons.any { hypot(x - it.x.toDouble(), y - it.y.toDouble()) < 9 }) continue
             dots += x to y
         }
         dots.forEach { (x, y) -> blit(sprite, x - sprite.width / 2, y - sprite.height / 2) }

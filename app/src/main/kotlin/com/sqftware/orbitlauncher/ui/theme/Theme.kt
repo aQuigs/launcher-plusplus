@@ -32,6 +32,8 @@ internal class Palette(
     val alarm: Color,
     val frost: Color = Color.White,
     val ringMark: Color = frost,
+    // Cards on a ground of the theme's own, the same whatever the wallpaper, rather than the scheme's tinted glass.
+    val cards: CardTints? = null,
 ) {
     val glass = frost.copy(alpha = 0.1f)
     val dayGlass = frost.copy(alpha = 0.35f)
@@ -54,17 +56,29 @@ class RingColors(val mark: Color, val starLine: Color, val lit: Color)
 class DiscEdge(val outer: Color, val inner: Color)
 
 /**
- * The background of a collection card of each [CardColour]: the scheme's glass for [CardColour.Plain], and for the rest
- * their hue drawn into the glass, deep by night and frosted by day, so the card's text reads as it does on plain glass.
+ * The background of a collection card of each [CardColour], over the [ground] it is seen on, and the [text] colours a
+ * card's text comes in.
  */
-class CardTints internal constructor(glass: Color, wallpaper: Color, alpha: Float) {
-    private val tints = CardColour.entries.map { colour -> colour.hue?.let { lerp(wallpaper, it, 0.35f).copy(alpha = alpha) } ?: glass }
-    private val swatches = tints.map { it.compositeOver(wallpaper) }
+class CardTints private constructor(private val tints: List<Color>, ground: Color, val text: List<Color>) {
+    private val swatches = tints.map { it.compositeOver(ground) }
 
     fun of(colour: CardColour): Color = tints[colour.ordinal]
 
     /** [colour] made opaque as a card shows it on the wallpaper its scheme is for, so a swatch on any ground looks like the card. */
     fun swatch(colour: CardColour): Color = swatches[colour.ordinal]
+
+    companion object {
+        /**
+         * Cards of the scheme's [glass] for [CardColour.Plain], and for the rest their hue drawn into the glass at [alpha],
+         * deep by night and frosted by day as the [wallpaper] the scheme is for, so the text reads as it does on glass.
+         */
+        internal fun glass(glass: Color, wallpaper: Color, alpha: Float, text: List<Color>) =
+            CardTints(CardColour.entries.map { colour -> colour.hue?.let { lerp(wallpaper, it, 0.35f).copy(alpha = alpha) } ?: glass }, wallpaper, text)
+
+        /** Cards on an opaque [ground] of the theme's own, whatever the wallpaper: each hue washed over it at [alpha], a plain card bare. */
+        internal fun ground(ground: Color, alpha: Float, text: List<Color>) =
+            CardTints(CardColour.entries.map { it.hue?.copy(alpha = alpha) ?: Color.Transparent }, ground, text)
+    }
 }
 
 // Every colour named here, so a new one does not compile until it has its hue.
@@ -93,9 +107,10 @@ internal class LauncherLook(
     // Picked from the finished scheme's roles, so a box follows a role's tweak.
     boxes: ColorScheme.() -> BoxColors,
     cardAlpha: Float,
+    cards: CardTints?,
 ) {
     val boxes = colors.boxes()
-    val cardTints = CardTints(colors.surfaceVariant, colors.scrim, cardAlpha)
+    val cardTints = cards ?: CardTints.glass(colors.surfaceVariant, colors.scrim, cardAlpha, listOf(colors.onSurface, colors.onSurfaceVariant))
 }
 
 internal fun lookOf(colourway: Colourway, lightWallpaper: Boolean): LauncherLook {
@@ -218,6 +233,7 @@ private fun Palette.nightLook() = LauncherLook(
         BoxColors(surfaceVariant, surfaceContainer, floating = surfaceContainerHigh, lit = primaryContainer, onLit = onPrimaryContainer)
     },
     cardAlpha = 0.7f,
+    cards = cards,
 )
 
 /**
@@ -274,6 +290,7 @@ private fun Palette.dayLook() = nightLook().let { night ->
             BoxColors(surfaceVariant, inked, floating = inked, lit = primaryContainer, onLit = onPrimaryContainer)
         },
         cardAlpha = 0.75f,
+        cards = cards,
     )
 }
 

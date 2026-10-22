@@ -48,7 +48,6 @@ import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
-import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 
 /**
@@ -183,10 +182,6 @@ interface ThemeArt {
         header: @Composable () -> Unit,
         body: @Composable () -> Unit,
     ) = PlainCardBox(colour, dragged, dropTarget, modifier, header, body)
-
-    /** [colour] made opaque as [CollectionCardBox] shows it, so a swatch looks as the card will: by default the tint's swatch. */
-    @Composable
-    fun cardSwatch(colour: CardColour): Color = LocalCardTints.current.swatch(colour)
 
     /** A collection's [glyph] and [title] at the start of its card's header: by default the glyph beside the title. */
     @Composable

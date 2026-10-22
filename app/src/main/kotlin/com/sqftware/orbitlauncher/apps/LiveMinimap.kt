@@ -30,28 +30,28 @@ class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: Mi
     private var shown: Pair<LatLon, Minimap<ImageBitmap>>? = null
 
     /**
-     * A new [MINIMAP_SIZE] px disc each time the user moves far enough for a new fix, once the tiles it needs are to
-     * be had. Collect it only while the launcher is visible: it keeps location updates running while collected.
+     * A new map, its [MINIMAP_SIZE] px disc and its icons, each time the user moves far enough for a new fix, once the
+     * tiles it needs are to be had. Collect it only while the launcher is visible: it keeps location updates running while collected.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun images(): Flow<Minimap<ImageBitmap>> = location.locations()
+    fun maps(): Flow<Minimap<ImageBitmap>> = location.locations()
         .mapLatest { centre ->
             // Nothing else comes until the user moves on, so a tile not to be had yet is asked for again; a new fix
             // cancels the wait.
             var retry = 0
-            var image = paint(centre)
-            while (image == null) {
+            var map = paint(centre)
+            while (map == null) {
                 delay(paintRetryDelay(retry++))
-                image = paint(centre)
+                map = paint(centre)
             }
-            image
+            map
         }
         .flowOn(Dispatchers.Default)
 
     // A fix within the update distance of the last map's centre, such as the first fix on a return home, keeps that map.
     private suspend fun paint(centre: LatLon): Minimap<ImageBitmap>? = painting.withLock {
-        shown?.let { (at, image) -> if (WebMercator.groundDistance(at, centre) < UPDATE_METRES) return@withLock image }
-        val disc = maker.paint(centre) ?: return@withLock null
-        disc.map { it.toImageBitmap() }.also { shown = centre to it }
+        shown?.let { (at, map) -> if (WebMercator.groundDistance(at, centre) < UPDATE_METRES) return@withLock map }
+        val map = maker.paint(centre) ?: return@withLock null
+        map.map { it.toImageBitmap() }.also { shown = centre to it }
     }
 }

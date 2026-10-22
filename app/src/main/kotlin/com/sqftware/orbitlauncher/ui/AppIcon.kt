@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
@@ -84,7 +83,7 @@ fun AppIcon(
     ) {
         AppFace(app, icon, Modifier.fillMaxSize(), presses)
         menu?.content?.invoke(app)
-        UnreadBadge(unread, Modifier.align(Alignment.TopEnd))
+        UnreadBadge(unread)
         nameRoom?.let { HangingName(app.label, it) }
     }
 }
@@ -182,7 +181,7 @@ internal fun Modifier.ripples(presses: InteractionSource?, bounded: Boolean = tr
 fun AppFace(app: AppEntry, icon: IconLoader, modifier: Modifier = Modifier, presses: InteractionSource? = null) {
     Box(modifier) {
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
-        WorkMark(app, Modifier.align(Alignment.BottomEnd))
+        WorkMark(app)
     }
 }
 

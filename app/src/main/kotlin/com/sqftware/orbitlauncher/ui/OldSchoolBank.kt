@@ -20,11 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -33,10 +31,10 @@ import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.CardColour
 import com.sqftware.orbitlauncher.ui.theme.BankGround
+import com.sqftware.orbitlauncher.ui.theme.BankRoles
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
-import com.sqftware.orbitlauncher.ui.theme.BankDimText
+import com.sqftware.orbitlauncher.ui.theme.LocalCardTints
 import com.sqftware.orbitlauncher.ui.theme.StackCount
-import com.sqftware.orbitlauncher.ui.theme.bankTint
 import kotlin.math.min
 
 /** How many of the game's pixels thick its interface frame is, and how far a card's content keeps inside it. */
@@ -67,7 +65,6 @@ private const val TAB_MIDDLE = 20
 private const val TAB_HEIGHT = 32
 
 /** The game's small stone button, in its pixels. */
-private const val STONE_BUTTON = 25
 
 /** The bank's sprites a card is drawn from, loaded once for every card. */
 private class BankSprites(
@@ -110,33 +107,29 @@ internal fun BankCard(
 ) {
     val sprites = bankSprites()
     val px = gamePixel
-    val tint = bankTint(colour)
     val inset = ((FRAME + FRAME_GAP) * px).asDp()
     val frame = (FRAME * px).asDp()
 
-    GameNight {
-        MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurfaceVariant = BankDimText)) {
-            Column(
-                modifier
-                    .drawBehind {
-                        clipRect {
-                            drawRect(BankGround)
-                            drawTiled(sprites.texture, IntRect(IntOffset.Zero, IntSize(sprites.texture.width, sprites.texture.height)), px, mirror = false)
-                            drawRect(tint)
-                        }
-                        drawFrame(sprites, px)
-                        if (dropTarget) {
-                            val rim = (FRAME * px).toFloat()
-                            drawRect(StackCount, Offset(rim + px / 2f, rim + px / 2f), Size(size.width - 2 * rim - px, size.height - 2 * rim - px), style = Stroke(px.toFloat()))
-                        }
-                    },
-            ) {
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                    // The buttons' own padding keeps them off the frame's right edge.
-                    Box(Modifier.padding(start = inset, end = frame, top = inset)) { header() }
-                    Spacer(Modifier.fillMaxWidth().height(inset).drawBehind { drawDivider(sprites, px) })
-                    Column(Modifier.padding(start = inset, end = frame, bottom = frame)) { body() }
-                }
+    GameNight(BankRoles) {
+        val tint = LocalCardTints.current.of(colour)
+        Column(
+            modifier
+                .drawBehind {
+                    drawRect(BankGround)
+                    drawTiled(sprites.texture, px = px, mirror = false)
+                    drawRect(tint)
+                    drawFrame(sprites, px)
+                    if (dropTarget) {
+                        val rim = (FRAME * px).toFloat()
+                        drawRect(StackCount, Offset(rim + px / 2f, rim + px / 2f), Size(size.width - 2 * rim - px, size.height - 2 * rim - px), style = Stroke(px.toFloat()))
+                    }
+                },
+        ) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                // The buttons' own padding keeps them off the frame's right edge.
+                Box(Modifier.padding(start = inset, end = frame, top = inset)) { header() }
+                Spacer(Modifier.fillMaxWidth().height(inset).drawBehind { drawDivider(sprites, px) })
+                Column(Modifier.padding(start = inset, end = frame, bottom = frame)) { body() }
             }
         }
     }
@@ -220,14 +213,8 @@ private fun DrawScope.drawStretched(image: ImageBitmap, scale: Int) {
     rows.zip(ys).forEach { (row, y) ->
         columns.zip(xs).forEach { (column, x) ->
             if (x.second > 0 && y.second > 0) {
-                drawImage(
-                    image,
-                    IntOffset(column.first, row.first),
-                    IntSize(column.second, row.second),
-                    IntOffset(x.first, y.first),
-                    IntSize(x.second, y.second),
-                    filterQuality = FilterQuality.None,
-                )
+                val part = IntRect(IntOffset(column.first, row.first), IntSize(column.second, row.second))
+                drawSpritePart(image, part, Offset(x.first.toFloat(), y.first.toFloat()), scale, dstSize = IntSize(x.second, y.second))
             }
         }
     }
@@ -253,7 +240,7 @@ internal fun StoneBin(highlighted: Boolean, modifier: Modifier) {
         contentAlignment = Alignment.Center,
         modifier = modifier.drawBehind {
             // Twice the game's pixels, as its largest type is drawn, unless the bin is smaller.
-            drawSpriteCentred(stone, center, fitScale(size.minDimension, STONE_BUTTON.toFloat(), 2 * px))
+            drawSpriteCentred(stone, center, fitScale(size.minDimension, stone.width.toFloat(), 2 * px))
         },
     ) {
         Icon(Icons.Default.Delete, contentDescription = null, tint = if (highlighted) StackCount else GameOrange)

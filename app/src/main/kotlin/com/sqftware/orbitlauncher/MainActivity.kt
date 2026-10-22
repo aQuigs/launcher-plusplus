@@ -293,7 +293,7 @@ class MainActivity : ComponentActivity() {
                     value = null
                     if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            if (location.isGranted()) liveMinimap.images().collect { value = it }
+                            if (location.isGranted()) liveMinimap.maps().collect { value = it }
                         }
                     }
                 }

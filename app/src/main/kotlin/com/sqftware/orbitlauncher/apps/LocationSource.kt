@@ -37,6 +37,9 @@ interface LocationSource {
      * collected. Collect it only while the launcher is visible. Without the grant it ends at once, empty.
      */
     fun locations(): Flow<LatLon>
+
+    /** Where the phone last had a fix, from whatever asked for one, without asking for a new one; none without the grant. */
+    fun lastFix(): LatLon?
 }
 
 private const val TAG = "PlatformLocationSource"
@@ -71,6 +74,16 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
     override fun request() = dialog.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
 
     override fun answers(): Flow<Boolean> = granted.receiveAsFlow()
+
+    override fun lastFix(): LatLon? {
+        if (!isGranted()) return null
+        return try {
+            manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)?.let { LatLon(it.latitude, it.longitude) }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Location access was revoked", e)
+            null
+        }
+    }
 
     override fun locations(): Flow<LatLon> = callbackFlow {
         val provider = provider()
