@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
+import com.sqftware.orbitlauncher.domain.Colourway
+import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
 import com.sqftware.orbitlauncher.domain.ITEM_HEIGHT
 import com.sqftware.orbitlauncher.domain.ITEM_WIDTH
 import androidx.compose.foundation.Image
@@ -9,6 +11,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.center
 import com.sqftware.orbitlauncher.ui.theme.HitsplatCount
+import com.sqftware.orbitlauncher.ui.theme.legible
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
@@ -26,6 +29,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -68,10 +72,11 @@ import com.sqftware.orbitlauncher.ui.theme.ChatTypedNight
 import com.sqftware.orbitlauncher.ui.theme.GameOrange
 import com.sqftware.orbitlauncher.ui.theme.MenuTarget
 import com.sqftware.orbitlauncher.ui.theme.MenuVerb
-import com.sqftware.orbitlauncher.ui.theme.MenuRim
+import com.sqftware.orbitlauncher.ui.theme.MenuLine
 import com.sqftware.orbitlauncher.ui.theme.MenuGround
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -298,14 +303,14 @@ object OldSchoolArt : ThemeArt {
         presses: InteractionSource?,
         inner: () -> Float,
     ) {
-        // On the ring, an orb left open, so a folder is told from an app, its cells in the room one item takes, so even
-        // a folder of one shows a quarter-size item; elsewhere, all the folder's room.
+        // On the ring, its cells in the room one item takes, so even a folder of one shows a quarter-size item and is told
+        // from an app; elsewhere, all the folder's room.
         val room = if (LocalIconPlace.current == IconPlace.Ring) {
             with(LocalDensity.current) { Modifier.size((ITEM_FIT * gamePixel).toDp()) }
         } else {
             Modifier.fillMaxSize()
         }
-        ItemGround(presses, modifier, filled = false) {
+        ItemGround(presses, modifier) {
             Column(room.graphicsLayer { alpha = inner() }) {
                 repeat(FOLDER_SIDE) { row ->
                     Row(Modifier.weight(1f)) {
@@ -322,20 +327,17 @@ object OldSchoolArt : ThemeArt {
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = Unit
 
     /**
-     * By night the stone of the game's side panel, as the inventory has it, and by day the flat parchment of its
-     * chatbox, which the day's dark text is read on.
+     * By night the stone of the game's side panel, as the inventory has it, and by day the parchment of its chatbox,
+     * which the day's dark text is read on.
      */
     @Composable
     override fun panelVeil(veil: Color): DrawScope.(alpha: Float, topLeft: Offset, size: Size) -> Unit {
-        val stone = sprite(R.drawable.osrs_1031_0)
-        val px = gamePixel
         val night = onStone
-        return remember(veil, stone, px, night) {
-            if (night) {
-                { alpha, topLeft, size -> drawStone(stone, px, veil.alpha * alpha, topLeft, size) }
-            } else {
-                flatVeil(veil)
-            }
+        val ground = sprite(if (night) R.drawable.osrs_1031_0 else R.drawable.osrs_1017_0)
+        val part = if (night) STONE else PARCHMENT
+        val px = gamePixel
+        return remember(veil, ground, part, px) {
+            { alpha, topLeft, size -> drawTiled(ground, part, px, veil.alpha * alpha, topLeft, size) }
         }
     }
 
@@ -421,7 +423,7 @@ object OldSchoolArt : ThemeArt {
         contentAlignment: Alignment,
         content: @Composable BoxScope.() -> Unit,
     ) {
-        ItemGround(presses, modifier, filled = true, contentAlignment, content)
+        ItemGround(presses, modifier, contentAlignment, content)
     }
 
     /**
@@ -435,18 +437,16 @@ object OldSchoolArt : ThemeArt {
         Spacer(modifier.drawBehind { drawSpriteCentred(bitmap, center, fitScale(size.minDimension, ITEM_FIT, px)) })
     }
 
-    override val badgeCorner: Alignment
-        get() = Alignment.TopStart
-
     /**
      * A hitsplat with the count on it, as the game marks a hit: blue, the game's splat for a hit that did no harm, while
-     * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread.
+     * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread. Half the
+     * game's size and over the corner, as the other themes' bubbles are, so the item stays in sight.
      */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
         val splat = sprite(if (unread.dismissed) R.drawable.osrs_1359_0 else R.drawable.osrs_1358_0)
-        Box(modifier.testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
-            SpriteImage(splat, gamePixel)
+        Box(modifier.offset(x = BADGE_OVERHANG, y = -BADGE_OVERHANG).testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
+            SpriteImage(splat, max(1, gamePixel / 2))
             Text(badgeText(unread.count), color = HitsplatCount, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
     }
@@ -460,13 +460,13 @@ object OldSchoolArt : ThemeArt {
         val rest = time.drop(quill.length).trim()
         Row(modifier.clearAndSetSemantics { text = AnnotatedString(time) }, verticalAlignment = Alignment.CenterVertically) {
             QuillLine(quill, digits, px)
-            if (rest.isNotEmpty()) Text(" $rest", color = StackCount, style = MaterialTheme.typography.titleLarge)
+            if (rest.isNotEmpty()) Text(" $rest", color = StackCount, style = MaterialTheme.typography.titleLarge.legible(StackCount))
         }
     }
 
     /** A dock icon is as wide as a tab stone's face, so the stones meet as the game's row does. */
     override val dockIconSize: Dp
-        @Composable get() = with(LocalDensity.current) { (STONE_FACE * gamePixel).toDp() }
+        @Composable get() = (STONE_FACE * gamePixel).dp()
 
     override val dockIconFill: Float
         get() = STONE_FACE.toFloat() / STONE_PITCH
@@ -502,12 +502,16 @@ object OldSchoolArt : ThemeArt {
     override val drawerHandleOnHome: Boolean
         get() = false
 
-    /** The game's right-click menu: a black box in a one pixel brown rim. */
+    /** The game's right-click menu: a brown box, its edge a game pixel of the same brown outside the black inside it. */
     @Composable
     override fun menuBox(ground: PanelGround): Modifier = Modifier.background(MenuGround)
 
     override val menuRim: BorderStroke
-        @Composable get() = BorderStroke(with(LocalDensity.current) { gamePixel.toDp() }, MenuRim)
+        @Composable get() = BorderStroke(gamePixel.dp(), MenuGround)
+
+    /** The "Choose Option" bar tops the box, as the game's does. */
+    override val menuPadding: Dp
+        get() = 0.dp
 
     /** A collection is the game's bank, its title on the bank's tab and its header's buttons the game's stone ones. */
     @Composable
@@ -534,24 +538,37 @@ object OldSchoolArt : ThemeArt {
     @Composable
     override fun dialogBox(ground: PanelGround): Modifier = Modifier.gameRim(gamePixel).solidGround(ground, RectangleShape)
 
-    /** "Choose Option" in the rim's brown over the items, which are in white with any secondary text in the target's orange. */
+    /**
+     * "Choose Option" in the box's brown on a black bar, over the items in a black line, which are in white with any
+     * secondary text in the target's orange. The game's menu is the same by day, so the items keep the night's look.
+     */
     @Composable
     override fun MenuBody(content: @Composable () -> Unit) {
-        Text(
-            "Choose Option",
-            color = MenuRim,
-            style = MaterialTheme.typography.labelLarge.copy(shadow = null),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp).semantics { hideFromAccessibility() },
-        )
-        MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
+        Column(Modifier.padding(gamePixel.dp())) {
+            Text(
+                "Choose Option",
+                color = MenuGround,
+                style = MaterialTheme.typography.labelLarge.copy(shadow = null),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MenuLine)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .semantics { hideFromAccessibility() },
+            )
+            Column(Modifier.border(gamePixel.dp(), MenuLine)) {
+                LauncherTheme(Colourway.Classic, lightWallpaper = false, typography(day = false), MaterialTheme.shapes) {
+                    MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(onSurface = MenuVerb, onSurfaceVariant = MenuTarget)) { content() }
+                }
+            }
+        }
     }
 
-    override val typography: Typography
-        @Composable get() {
-            val px = gamePixel
-            val density = LocalDensity.current
-            return remember(px, density) { gameTypography(px, density) }
-        }
+    @Composable
+    override fun typography(day: Boolean): Typography {
+        val px = gamePixel
+        val density = LocalDensity.current
+        return remember(px, density, day) { gameTypography(px, density, shadowed = !day) }
+    }
 
     /** Every corner square, as the game's interface has them. */
     override val shapes: Shapes
@@ -587,22 +604,28 @@ private fun SpriteImage(image: ImageBitmap, scale: Int, modifier: Modifier = Mod
 private val onStone: Boolean
     @Composable get() = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
 
+@Composable
+private fun Int.dp() = with(LocalDensity.current) { toDp() }
+
 /** The rim of the game's interface boxes: black outside the menu's brown, [px] screen pixels each. */
 @Composable
 private fun Modifier.gameRim(px: Int): Modifier {
-    val rim = with(LocalDensity.current) { px.toDp() }
-    return border(rim, GameShadow).padding(rim).border(rim, MenuRim)
+    val rim = px.dp()
+    return border(rim, GameShadow).padding(rim).border(rim, MenuGround)
 }
 
 /** The stone in the side panel's sprite, less the shadow its frame casts along the top and left and the marks at its corners. */
 private val STONE = IntRect(left = 10, top = 8, right = 185, bottom = 255)
 
+/** The parchment in the chatbox's sprite, inside its frame and past the shadow it casts along the top and left. */
+private val PARCHMENT = IntRect(left = 20, top = 17, right = 513, bottom = 136)
+
 /**
- * The side panel's [stone] over [size] from [topLeft] at [alpha], each of its pixels [px] screen pixels, in tiles from
+ * The [part] of [image] over [size] from [topLeft] at [alpha], each of its pixels [px] screen pixels, in tiles from
  * the drawing's origin so the parts of one panel line up, each mirroring the one before so they meet without a seam.
  */
-private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLeft: Offset, size: Size) {
-    val tile = IntSize(STONE.width * px, STONE.height * px)
+private fun DrawScope.drawTiled(image: ImageBitmap, part: IntRect, px: Int, alpha: Float, topLeft: Offset, size: Size) {
+    val tile = IntSize(part.width * px, part.height * px)
     val bottomRight = topLeft + Offset(size.width, size.height)
     clipRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y) {
         for (row in floor(topLeft.y / tile.height).toInt()..floor(bottomRight.y / tile.height).toInt()) {
@@ -610,7 +633,7 @@ private fun DrawScope.drawStone(stone: ImageBitmap, px: Int, alpha: Float, topLe
                 val at = IntOffset(column * tile.width, row * tile.height)
                 val centre = Offset(at.x + tile.width / 2f, at.y + tile.height / 2f)
                 withTransform({ scale(if (column.mod(2) == 0) 1f else -1f, if (row.mod(2) == 0) 1f else -1f, centre) }) {
-                    drawImage(stone, STONE.topLeft, STONE.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
+                    drawImage(image, part.topLeft, part.size, at, tile, alpha = alpha, filterQuality = FilterQuality.None)
                 }
             }
         }
@@ -652,30 +675,33 @@ internal fun DrawScope.drawSpritePart(
 
 private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)
 
-/** What an item sits on: on the ring, the game's round orb, [filled] with its black or left open, and elsewhere nothing. */
+/** What an item sits on: on the ring, the game's round orb, and elsewhere nothing. */
 @Composable
 private fun ItemGround(
     presses: InteractionSource?,
     modifier: Modifier,
-    filled: Boolean,
     contentAlignment: Alignment = Alignment.Center,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb(filled) else Modifier
+    val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
     Box(modifier.then(ground).pressed(presses), contentAlignment = contentAlignment, content = content)
 }
 
-/** The game's round orb behind what is drawn here, [filled] with its black or left open. */
+/**
+ * The game's round orb behind what is drawn here, filled with the brown of its right-click menu rather than the orb's
+ * own black, which hid dark items.
+ */
 @Composable
-private fun Modifier.orb(filled: Boolean): Modifier {
+private fun Modifier.orb(): Modifier {
     val frame = sprite(R.drawable.osrs_1071_0)
     val fill = sprite(R.drawable.osrs_1059_0)
     val px = gamePixel
     return drawWithCache {
         val orb = circle(size.center, ORB_RADIUS * px)
+        val fillAt = size.center - Offset(fill.width.toFloat(), fill.height.toFloat()) * (px / 2f)
         onDrawBehind {
             clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
-            if (filled) drawSpriteCentred(fill, center, px)
+            drawSprite(fill, fillAt, px, tint = MenuGround)
         }
     }
 }

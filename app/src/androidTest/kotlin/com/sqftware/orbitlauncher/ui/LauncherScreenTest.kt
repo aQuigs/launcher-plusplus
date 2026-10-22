@@ -2311,6 +2311,15 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aThemeWithOneFolderLookOffersNoChoiceOfIt() {
+        theme = Theme.OldSchool
+        show()
+        compose.longPressEmptyHomeSpace()
+
+        compose.onNodeWithText("Folder look").assertDoesNotExist()
+    }
+
+    @Test
     fun onlyAThemeThatMapsWhereTheUserIsOffersTheRow() {
         show()
         compose.longPressEmptyHomeSpace()

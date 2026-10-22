@@ -47,6 +47,8 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -117,6 +119,16 @@ fun glyph(glyph: ImageVector): @Composable () -> Unit = { Icon(glyph, contentDes
  * Material's dropdown menu in the theme's box on the solid [PanelGround], rimmed so it holds its edge over the launcher's own ground, with
  * its [groups] of rows divided from each other. Choosing a row dismisses the menu, then hands on the choice.
  */
+/** The padding Material's menu puts above and below its items. */
+internal val MATERIAL_MENU_PADDING = 8.dp
+
+/** What follows laid out [by] shorter at each end and drawn that far up, so the padding it starts with falls outside. */
+private fun Modifier.bleedVertically(by: Dp) = layout { measurable, constraints ->
+    val bleed = by.roundToPx()
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, placeable.height - 2 * bleed) { placeable.place(0, -bleed) }
+}
+
 @Composable
 fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, groups: List<List<MenuRow>>, modifier: Modifier = Modifier) {
     val art = LocalThemeArt.current
@@ -124,14 +136,17 @@ fun GroundMenu(expanded: Boolean, onDismissRequest: () -> Unit, groups: List<Lis
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = onDismissRequest,
-            modifier = modifier.then(art.menuBox(panelGround())),
+            // Material pads the items by a measure of its own, which the theme's stands in for.
+            modifier = modifier.then(art.menuBox(panelGround())).bleedVertically(MATERIAL_MENU_PADDING),
             containerColor = Color.Transparent,
             border = art.menuRim,
         ) {
-            art.MenuBody {
-                groups.filter { it.isNotEmpty() }.forEachIndexed { index, group ->
-                    if (index > 0) HorizontalDivider()
-                    group.forEach { MenuItem(it, expanded, onDismissRequest) }
+            Column(Modifier.padding(vertical = art.menuPadding)) {
+                art.MenuBody {
+                    groups.filter { it.isNotEmpty() }.forEachIndexed { index, group ->
+                        if (index > 0) HorizontalDivider()
+                        group.forEach { MenuItem(it, expanded, onDismissRequest) }
+                    }
                 }
             }
         }
