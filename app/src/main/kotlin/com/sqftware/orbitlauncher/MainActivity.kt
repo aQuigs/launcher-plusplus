@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
+import com.sqftware.orbitlauncher.apps.TiledWorldMap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
@@ -75,7 +76,7 @@ import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.suggestSetup
-import com.sqftware.orbitlauncher.domain.minimap.Minimap
+import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
 import com.sqftware.orbitlauncher.ui.LauncherScreen
@@ -152,7 +153,9 @@ class MainActivity : ComponentActivity() {
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this, location)
-        val liveMinimap = LiveMinimap(location, OpenFreeMapTiles(this), ResourceMinimapArt(this))
+        val mapTiles = OpenFreeMapTiles(this)
+        val minimapArt = ResourceMinimapArt(this)
+        val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
@@ -289,7 +292,7 @@ class MainActivity : ComponentActivity() {
                 // The map follows the user only while the launcher is visible, like the clock. The state outlives a change
                 // of key, so turning it off must drop the last map.
                 val mapping = whereIAm == WhereIAm.Shown && shownTheme.mapsWhereIAm
-                val minimap = produceState<Minimap<ImageBitmap>?>(null, mapping) {
+                val minimap = produceState<PaintedMap<ImageBitmap>?>(null, mapping) {
                     value = null
                     if (mapping) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -471,6 +474,7 @@ class MainActivity : ComponentActivity() {
                     onOpenMapLicence = mapLicence::open,
                     minimap = readMinimap,
                     heading = readHeading,
+                    worldMaps = { TiledWorldMap(mapTiles, minimapArt) },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPages = widgetPages,

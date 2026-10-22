@@ -12,6 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.sqftware.orbitlauncher.apps.WorldMap
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
+import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import com.sqftware.orbitlauncher.domain.minimap.WORLD_MAP_SIZE
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
@@ -173,6 +178,14 @@ class LauncherScreenTest {
     private var updatesOpened = 0
     private var checkForUpdates by mutableStateOf(true)
     private var whereIAm by mutableStateOf(WhereIAm.Hidden)
+    private var shownMinimap by mutableStateOf<PaintedMap<ImageBitmap>?>(null)
+    private val worldMapPaints = mutableListOf<LatLon>()
+    private val worldMap = object : WorldMap {
+        override suspend fun paint(centre: LatLon): PaintedMap<ImageBitmap> {
+            worldMapPaints += centre
+            return PaintedMap(centre, ImageBitmap(WORLD_MAP_SIZE, WORLD_MAP_SIZE), emptyList())
+        }
+    }
     private var isHomeApp by mutableStateOf(true)
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
@@ -309,8 +322,9 @@ class LauncherScreenTest {
             whereIAm = whereIAm,
             onShowWhereIAmChange = { whereIAm = if (it) WhereIAm.Shown else WhereIAm.Hidden },
             onOpenMapLicence = {},
-            minimap = { null },
+            minimap = { shownMinimap },
             heading = { null },
+            worldMaps = { worldMap },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPages = widgetPages,
@@ -2285,6 +2299,41 @@ class LauncherScreenTest {
         }
 
         compose.runOnIdle { assertEquals(1, spinStats.spins) }
+    }
+
+    @Test
+    fun theWorldMapOrbOpensTheMapRoundWhereTheUserIsOverTheWholeScreenWhichADragPansAndTheCrossOrBackCloses() {
+        val bryantPark = LatLon(40.7536, -73.9832)
+        theme = Theme.OldSchool
+        art = OldSchoolArt
+        homeApps = HomeApps(ring = ringOf(clock))
+        whereIAm = WhereIAm.Shown
+        shownMinimap = PaintedMap(bryantPark, ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList())
+        show()
+
+        compose.onNodeWithContentDescription("World map").performClick()
+
+        compose.onNodeWithTag(WorldMapTags.MAP).assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(listOf(bryantPark), worldMapPaints)
+            assertEquals(false, barsShown.last())
+        }
+
+        // The ground follows the finger up, so the view moves south, past the room the first painting left round it.
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { swipe(Offset(centerX, bottom - 10f), Offset(centerX, top + 10f), 400) }
+
+        compose.runOnIdle {
+            assertTrue(worldMapPaints.size >= 2)
+            assertTrue(worldMapPaints.last().lat < bryantPark.lat)
+        }
+        compose.onNodeWithContentDescription("Close").performClick()
+        compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
+        compose.ringSlot(clock).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(true, barsShown.last()) }
+
+        compose.onNodeWithContentDescription("World map").performClick()
+        Espresso.pressBack()
+        compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
     }
 
     @Test

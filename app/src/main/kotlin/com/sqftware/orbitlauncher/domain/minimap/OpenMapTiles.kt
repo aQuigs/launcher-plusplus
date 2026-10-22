@@ -16,17 +16,16 @@ object OpenMapTiles {
     /** The tags the rules read. */
     val KEYS = setOf("class", "subclass", "brunnel", "service", "layer", "level", "indoor", "ramp", "render_min_height", "name")
 
-    /** How far around the centre the map gathers features: the disc's radius, plus room for what reaches into it. */
-    const val REACH_M = MINIMAP_SIZE / 2 * METRES_PER_PIXEL + 40
-
-    /** The tiles a minimap centred on [centre] needs. */
-    fun tilesFor(centre: LatLon): List<TileId> = WebMercator.tilesAround(centre, REACH_M, ZOOM)
+    /** The tiles a map in [frame] centred on [centre] needs. */
+    fun tilesFor(centre: LatLon, frame: MapFrame): List<TileId> = WebMercator.tilesAround(centre, frame.reachM, ZOOM)
 
     fun decode(bytes: ByteArray) = VectorTile.decode(bytes, LAYERS, KEYS)
 
-    fun scene(centre: LatLon, tiles: Map<TileId, VectorTile>): MapScene {
+    fun scene(centre: LatLon, tiles: Map<TileId, VectorTile>, frame: MapFrame): MapScene {
+        val reach = frame.reachM
         val origin = WebMercator.toMercator(centre)
-        val scale = WebMercator.groundScale(centre.lat)
+        val scale = frame.groundScale(centre.lat)
+        fun placed(id: TileId, layer: VectorLayer) = PlacedLayer(id, layer.extent, origin, scale, reach)
         val areas = mutableListOf<Area>()
         val ways = mutableListOf<Way>()
         val buildings = mutableListOf<Building>()
@@ -36,52 +35,55 @@ object OpenMapTiles {
         for ((id, tile) in tiles.entries.sortedWith(compareBy({ it.key.y }, { it.key.x }))) {
             for (name in AREA_LAYERS) {
                 val layer = tile[name] ?: continue
-                val frame = Frame(id, layer.extent, origin, scale)
+                val placed = placed(id, layer)
                 for (feature in layer.features.filter { it.type == GeometryType.Polygon }) {
                     val rule = areaRule(name, feature) ?: continue
-                    val polygons = frame.polygons(feature)
+                    val polygons = placed.polygons(feature)
                     if (polygons.isNotEmpty()) areas += Area(rule.ground, polygons, rule.order, rule.woodland, rule.builtUpOnly)
                 }
             }
             tile["transportation"]?.let { layer ->
-                val frame = Frame(id, layer.extent, origin, scale)
+                val placed = placed(id, layer)
                 for (feature in layer.features.filter { it.type == GeometryType.Line && !belowGround(it) }) {
                     val (kind, width) = wayOf(feature) ?: continue
-                    feature.parts.filter(frame::near).forEach { line -> ways += Way(kind, width, line.map(frame::local)) }
+                    feature.parts.filter(placed::near).forEach { line -> ways += Way(kind, width, line.map(placed::local)) }
                 }
             }
             tile["building"]?.let { layer ->
-                val frame = Frame(id, layer.extent, origin, scale)
+                val placed = placed(id, layer)
                 // A part lifted off the ground, a skybridge or an overhang, has no footprint of its own.
                 for (feature in layer.features.filter { it.type == GeometryType.Polygon && (it.number("render_min_height") ?: 0.0) <= 0.0 }) {
                     // The tiles merge every building alike into one feature, so each polygon is a building, known by its
                     // first corner's place on Earth.
-                    for (polygon in feature.polygons().filter { frame.near(it[0]) }) {
-                        buildings += Building(frame.local(polygon), seedOf(frame.mercator(polygon[0][0])))
+                    for (polygon in feature.polygons().filter { placed.near(it[0]) }) {
+                        buildings += Building(placed.local(polygon), seedOf(placed.mercator(polygon[0][0])))
                     }
                 }
             }
             tile["poi"]?.let { layer ->
-                val frame = Frame(id, layer.extent, origin, scale)
+                val placed = placed(id, layer)
                 for (feature in layer.features.filter { it.type == GeometryType.Point }) {
                     val point = feature.parts.firstOrNull()?.firstOrNull() ?: continue
                     // A point in the tile's buffer belongs to its neighbour, which brings it too.
                     if (point.x !in 0 until layer.extent || point.y !in 0 until layer.extent) continue
-                    val at = frame.local(point)
-                    if (abs(at.east) <= REACH_M && abs(at.north) <= REACH_M) poiOf(feature, at)?.let { pois += it }
+                    val at = placed.local(point)
+                    if (abs(at.east) <= reach && abs(at.north) <= reach) poiOf(feature, at)?.let { pois += it }
                 }
             }
         }
         return MapScene(centre, areas, ways, buildings, pois)
     }
 
-    /** One layer of one tile placed around the map's centre at [origin], [scale] ground metres to the mercator metre. */
-    private class Frame(private val tile: TileId, private val extent: Int, private val origin: Mercator, private val scale: Double) {
+    /**
+     * One layer of one tile placed around the map's centre at [origin], [scale] ground metres to the mercator metre, for a
+     * map that gathers features [reachM] metres round it.
+     */
+    private class PlacedLayer(private val tile: TileId, private val extent: Int, private val origin: Mercator, private val scale: Double, reachM: Double) {
         private val box = WebMercator.bounds(tile)
         private val unit = (box.maxX - box.minX) / extent
         private val centreX = (origin.x - box.minX) / unit
         private val centreY = (box.maxY - origin.y) / unit
-        private val reach = REACH_M / scale / unit
+        private val reach = reachM / scale / unit
 
         fun mercator(p: TilePoint) = WebMercator.fromTile(tile, extent, p)
 

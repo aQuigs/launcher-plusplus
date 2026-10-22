@@ -1,0 +1,165 @@
+package com.sqftware.orbitlauncher.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.round
+import androidx.compose.ui.unit.toOffset
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.sqftware.orbitlauncher.R
+import com.sqftware.orbitlauncher.apps.WorldMap
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.MapShift
+import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import com.sqftware.orbitlauncher.domain.minimap.needsRepaint
+import com.sqftware.orbitlauncher.domain.minimap.paintRetryDelay
+import com.sqftware.orbitlauncher.domain.minimap.shiftTo
+import com.sqftware.orbitlauncher.domain.minimap.shifted
+import com.sqftware.orbitlauncher.ui.theme.Spacing
+import com.sqftware.orbitlauncher.ui.theme.WorldMapInk
+import com.sqftware.orbitlauncher.ui.theme.WorldMapVoid
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+
+object WorldMapTags {
+    const val MAP = "world_map"
+}
+
+/**
+ * The world map over the whole screen, as the game opens it from its globe: the ground round [here], where the minimap
+ * last placed the user, painted by [map] at whole game pixels, north up, which a drag pans across. A new stretch is
+ * painted round the view as it nears the edge of the last, which stays until it comes. The game's red cross, or
+ * [onClose] otherwise, closes it, as it closes itself when there is nowhere to open it round, as on a return to a
+ * launcher the system had ended.
+ */
+@Composable
+fun WorldMapScreen(here: () -> LatLon?, map: WorldMap, onClose: () -> Unit) {
+    val start = remember { here() }
+    if (start == null) {
+        LaunchedEffect(Unit) { onClose() }
+        return
+    }
+    val px = gamePixel
+    // A fold changes the game's pixel without starting the activity again, so the paint loop reads it afresh.
+    val latestPx by rememberUpdatedState(px)
+    val youAreHere = sprite(R.drawable.osrs_1539_0)
+    var view by remember { mutableStateOf(start) }
+    var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
+    var unreachable by remember { mutableStateOf(false) }
+    var viewSize by remember { mutableStateOf(IntSize.Zero) }
+
+    fun stale(): Boolean = painted?.let {
+        needsRepaint(it.centre, view, viewSize.width.toDouble() / latestPx, viewSize.height.toDouble() / latestPx)
+    } ?: true
+
+    // Each paint shows, however long the drag goes on, and the next starts from wherever the view has got to by then.
+    // Only while the launcher is in sight, as a paint waiting on the network would otherwise ask on in the background.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(map, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            snapshotFlow { stale() }.filter { it }.collect {
+                var retry = 0
+                while (stale()) {
+                    val next = map.paint(view)
+                    unreachable = next == null
+                    if (next != null) painted = next else delay(paintRetryDelay(retry++))
+                }
+            }
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .background(WorldMapVoid)
+            .onSizeChanged { viewSize = it }
+            .pointerInput(px) {
+                detectDragGestures { change, drag ->
+                    change.consume()
+                    view = view.shifted(MapShift(-drag.x.toDouble() / px, -drag.y.toDouble() / px))
+                }
+            }
+            .drawBehind {
+                fun onScreen(at: LatLon) = view.shiftTo(at).let { center + Offset(it.x.toFloat(), it.y.toFloat()) * px.toFloat() }
+                painted?.let { painting ->
+                    // On whole screen pixels, so every map pixel stays crisp. A painting's centre is the middle of its
+                    // middle pixel, and its icons are in its ground.
+                    val middle = Offset(painting.ground.width / 2 + 0.5f, painting.ground.height / 2 + 0.5f)
+                    drawSprite(painting.ground, (onScreen(painting.centre) - middle * px.toFloat()).round().toOffset(), px)
+                }
+                here()?.let { drawSpriteCentred(youAreHere, onScreen(it), maxOf(1, px / 2)) }
+            }
+            .semantics { contentDescription = "Map of where you are" }
+            .testTag(WorldMapTags.MAP),
+    ) {
+        // The bars are hidden while the map is up, so only a cutout takes room from it.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout)) {
+            if (painted == null) {
+                val status = if (unreachable) "The map needs a connection." else "Loading - please wait."
+                Text(status, color = WorldMapInk, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.align(Alignment.Center))
+            }
+            Text(
+                MAP_CREDIT,
+                color = WorldMapInk,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = Spacing.Tight),
+            )
+            CloseCross(px, onClose)
+        }
+    }
+}
+
+/** The game's red cross that closes its world map, in its top right corner, lit while held. */
+@Composable
+private fun BoxScope.CloseCross(px: Int, onClose: () -> Unit) {
+    val press = remember { MutableInteractionSource() }
+    val pressed by press.collectIsPressedAsState()
+    val cross = sprite(if (pressed) R.drawable.osrs_540_0 else R.drawable.osrs_539_0)
+    Spacer(
+        Modifier
+            .align(Alignment.TopEnd)
+            .padding(Spacing.Tight)
+            .clickable(press, indication = null, role = Role.Button, onClick = onClose)
+            .semantics { contentDescription = "Close" }
+            .spriteSized(cross, px),
+    )
+}
