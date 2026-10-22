@@ -36,7 +36,7 @@ class DockTest {
         docked = apps
         compose.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                Dock(items = docked.map(RingItem::App), icon = { _, _ -> null }, onLaunch = onLaunch, onOpenFolder = {}, unread = unread)
+                Dock(items = docked.map(RingItem::App), icon = { null }, onLaunch = onLaunch, onOpenFolder = {}, unread = unread)
             }
         }
     }

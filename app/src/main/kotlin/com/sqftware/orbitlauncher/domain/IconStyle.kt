@@ -7,6 +7,5 @@ enum class IconPlace { Ring, Elsewhere }
 sealed interface IconStyle {
     data object Plain : IconStyle
 
-    /** An item with the app's mark at most [size] pixels across. */
-    data class Item(val size: Int) : IconStyle
+    data object Item : IconStyle
 }

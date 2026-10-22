@@ -2,14 +2,14 @@ package com.sqftware.orbitlauncher.domain
 
 /**
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
- * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
- * [iconStyle] it gives each place, and, if it [mapsWhereIAm], a map of where the user is once they turn it on.
+ * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in its
+ * [iconStyle], and, if it [mapsWhereIAm], a map of where the user is once they turn it on.
  */
 enum class Theme(
     val label: String,
     val folderLooks: List<FolderLook>,
     val colourways: List<Colourway>,
-    private val iconStyles: (IconPlace) -> IconStyle = { IconStyle.Plain },
+    val iconStyle: IconStyle = IconStyle.Plain,
     val mapsWhereIAm: Boolean = false,
 ) {
     Space(
@@ -41,14 +41,10 @@ enum class Theme(
         "Old School",
         listOf(FolderLook.Items),
         listOf(Colourway.Classic),
-        // The ring's icons sit in the game's round orbs, a smaller frame than an inventory slot, so an item there is a
-        // size down: as large as fits inside the orb's black with its outline.
-        iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Ring) 22 else 26) },
+        iconStyle = IconStyle.Item,
         mapsWhereIAm = true,
     ),
     ;
-
-    fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)
 
     /** Whether the user has a folder look to choose, which a theme with one has not. */
     val choosesFolderLook: Boolean get() = folderLooks.size > 1

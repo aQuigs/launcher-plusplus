@@ -3,7 +3,6 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
@@ -12,11 +11,9 @@ import com.sqftware.orbitlauncher.domain.CardColour
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.ui.Alignment
 import com.sqftware.orbitlauncher.domain.Unread
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,14 +26,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.CornerRadius
-import com.sqftware.orbitlauncher.domain.DOCK_ICON_FILL
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.toSize
@@ -48,6 +46,8 @@ import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.ui.theme.LauncherTheme
+import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
+import com.sqftware.orbitlauncher.ui.theme.LocalGround
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 
 /**
@@ -85,19 +85,11 @@ interface ThemeArt {
     ): DrawScope.(glow: Float, alpha: Float) -> Unit
 
     /**
-     * [folder] in the look of [LocalFolderStyle], filling the item: a disc of its previews the size of an app's, with
-     * whatever the look wears reaching past it. [inner] fades the previews, as when the folder takes the ring's centre and
-     * its apps are round it instead; [presses] ripple its disc. It is given a layer of its own, so what turns with the
-     * sky redraws only the folder, not the page round it.
+     * What [folder] wears in the look of [LocalFolderStyle] round the previews [FolderFace] lays out, which are the same
+     * in every look: by default nothing, on an app's ground.
      */
     @Composable
-    fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    )
+    fun folderWear(folder: RingItem.Folder): FolderWear = FolderWear()
 
     /** The faint pattern over a panel's veil, in [colour] at its brightest, drifting by a share of how far the list has [scrolled]. */
     fun DrawScope.drawBackdrop(colour: Color, scrolled: Float)
@@ -114,21 +106,19 @@ interface ThemeArt {
         get() = null
 
     /**
-     * What an app's icon sits on, filling the item, with [content] over it and rippling for [presses]: by default a
-     * disc. [LocalIconPlace] says whether the icon is on the home ring or elsewhere, where a theme may frame it
-     * differently.
+     * What an app's icon sits on, drawn under it on a layer the size of its disc, which it may reach past: by default
+     * the disc. Only drawn, never round the icon, so it cannot move or size it. [LocalIconPlace] says whether the icon is
+     * on the home ring or elsewhere, where a theme may frame it differently.
      */
     @Composable
-    fun IconGround(
-        presses: InteractionSource?,
-        modifier: Modifier,
-        contentAlignment: Alignment,
-        content: @Composable BoxScope.() -> Unit,
-    ) = PlainIconGround(presses, modifier, contentAlignment, content)
+    fun iconGround(): Modifier = Modifier.background(LocalBoxColors.current.on(LocalGround.current), CircleShape)
 
-    /** An icon's [bitmap] filling its square: by default scaled smoothly. */
-    @Composable
-    fun IconImage(bitmap: ImageBitmap, modifier: Modifier) = Image(bitmap, contentDescription = null, modifier = modifier)
+    /** The shape an icon is clipped to and its press ripples within, or none for an icon that keeps its own outline. */
+    val iconShape: Shape?
+        get() = CircleShape
+
+    /** How an icon's [bitmap] is scaled to fill its square, which every theme's icons fill alike: by default smoothly. */
+    fun iconFilter(bitmap: ImageBitmap): FilterQuality = DrawScope.DefaultFilterQuality
 
     /** The badge for [unread] notifications, placed over an icon's corner by [modifier]: by default a bubble. */
     @Composable
@@ -137,13 +127,6 @@ interface ThemeArt {
     /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
     @Composable
     fun ClockTime(time: String, modifier: Modifier) = PlainClockTime(time, modifier)
-
-    /** How large a dock's icons are while they all fit, and what share of its slot each fills. */
-    val dockIconSize: Dp
-        @Composable get() = 56.dp
-
-    val dockIconFill: Float
-        get() = DOCK_ICON_FILL
 
     /**
      * Builds what draws under the dock's [slots][DockSlots], glowing by how much the dock is lit as a drop target: by

@@ -90,7 +90,7 @@ class HomeRingTest {
                         HomeRing(
                             ring = ring,
                             hint = shownHint?.let { RingHint(it, onEdit) },
-                            icon = { _, _ -> null },
+                            icon = { null },
                             onLaunch = onLaunch,
                             onOpenFolder = onOpenFolder,
                             onCloseFolder = onCloseFolder,

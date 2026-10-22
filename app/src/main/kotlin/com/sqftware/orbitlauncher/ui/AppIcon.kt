@@ -1,11 +1,12 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -48,8 +49,6 @@ import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.NameWidths
 import com.sqftware.orbitlauncher.domain.Unread
-import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
-import com.sqftware.orbitlauncher.ui.theme.LocalGround
 import com.sqftware.orbitlauncher.ui.theme.legible
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -141,35 +140,28 @@ internal fun HangingName(label: String, room: () -> NameRoom?) {
 }
 
 /**
- * The round face of an icon: [content] on a tinted disc, clipped to it, rippling for the presses in [presses] when it
- * has any. The press handling, the badge and the name stay on the icon's own node outside, so the badge can overhang the
- * disc while a screen reader still meets one icon, and the ripple keeps to the disc all the same. The whole square is
- * the target, badge included, as on other launchers.
+ * The face of an icon: [content] filling it over the theme's [ground][ThemeArt.iconGround], [disc] of it across, and
+ * rippling for the presses in [presses] when it has any. The theme only draws the ground, so an icon is the same size
+ * and in the same place in every theme. The press handling, the badge and the name stay on the icon's own node outside,
+ * so the badge can overhang the disc while a screen reader still meets one icon, and the ripple keeps to the disc all
+ * the same. The whole square is the target, badge included, as on other launchers.
  */
 @Composable
 fun IconDisc(
     presses: InteractionSource? = null,
     modifier: Modifier = Modifier,
-    contentAlignment: Alignment = Alignment.TopStart,
-    content: @Composable BoxScope.() -> Unit,
-) = LocalThemeArt.current.IconGround(presses, modifier, contentAlignment, content)
-
-/** [IconDisc] as most themes draw it: a disc of the scheme's variant surface, the icon clipped to it. */
-@Composable
-internal fun PlainIconGround(
-    presses: InteractionSource?,
-    modifier: Modifier,
-    contentAlignment: Alignment,
+    disc: Float = 1f,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box(
-        modifier
-            .clip(CircleShape)
-            .background(LocalBoxColors.current.on(LocalGround.current))
-            .ripples(presses),
-        contentAlignment = contentAlignment,
-        content = content,
-    )
+    val art = LocalThemeArt.current
+    val shape = art.iconShape
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Spacer(Modifier.fillMaxSize(disc).then(art.iconGround()))
+        content()
+        // Over the content, so a press shows on the icon; an icon of no shape keeps its own outline, which a ripple
+        // bounded to its square would cut across.
+        Spacer(Modifier.fillMaxSize(disc).then(shape?.let { Modifier.clip(it) } ?: Modifier).ripples(presses, bounded = shape != null))
+    }
 }
 
 /** A ripple for [presses] on an icon's ground, kept inside its bounds unless not [bounded]; none without presses. */
@@ -204,7 +196,8 @@ fun AppLabel(label: String, modifier: Modifier = Modifier, maxLines: Int = 1) {
 @Composable
 fun AppImage(app: AppEntry, icon: IconLoader, modifier: Modifier = Modifier) {
     val kind = app.kind
-    if (kind is EntryKind.AppPair) PairImage(kind, icon, modifier) else OwnImage(app, icon, modifier)
+    val shaped = LocalThemeArt.current.iconShape?.let { modifier.clip(it) } ?: modifier
+    if (kind is EntryKind.AppPair) PairImage(kind, icon, shaped) else OwnImage(app, icon, shaped)
 }
 
 /** How much of a pair's square each of its apps' icons takes. */
@@ -256,12 +249,11 @@ private fun Modifier.cutAroundSecond() = drawWithCache {
 private fun OwnImage(app: AppEntry, icon: IconLoader, modifier: Modifier) {
     // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one; asked
     // again for the same app, it keeps showing the icon it has until the new one is drawn.
-    val place = LocalIconPlace.current
     val bitmap by key(app.key) {
-        produceState<ImageBitmap?>(null, icon, place) { value = icon(app, place) ?: value }
+        produceState<ImageBitmap?>(null, icon) { value = icon(app) ?: value }
     }
 
     Box(modifier) {
-        bitmap?.let { LocalThemeArt.current.IconImage(it, Modifier.fillMaxSize()) }
+        bitmap?.let { Image(it, contentDescription = null, Modifier.fillMaxSize(), filterQuality = LocalThemeArt.current.iconFilter(it)) }
     }
 }

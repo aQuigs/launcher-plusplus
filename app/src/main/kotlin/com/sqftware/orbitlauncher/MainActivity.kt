@@ -66,7 +66,6 @@ import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.GridPages
-import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.LauncherPage
 import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
@@ -188,10 +187,10 @@ class MainActivity : ComponentActivity() {
                 // shown is handed a new way to ask, a new lambda rather than a reference equal to the last, and asks again.
                 // Counted, not compared: an update leaves the app's entry as it was.
                 // By value, so a theme that draws icons as another does keeps the icons shown.
-                val iconStyles = IconPlace.entries.associateWith(shownTheme::iconStyle)
-                val actions = remember(appLists?.index ?: 0, iconStyles) {
+                val iconStyle = shownTheme.iconStyle
+                val actions = remember(appLists?.index ?: 0, iconStyle) {
                     AppActions(
-                        icon = { app, place -> repository.icon(app, iconStyles.getValue(place)) },
+                        icon = { app -> repository.icon(app, iconStyle) },
                         launch = {
                             clearBadge(it)
                             repository.launch(it)

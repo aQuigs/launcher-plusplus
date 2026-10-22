@@ -1,11 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -27,7 +23,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.Planet
 import com.sqftware.orbitlauncher.domain.RingItem
@@ -46,55 +41,39 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/**
- * [folder] drawn as a planet in the look of [LocalFolderStyle], filling the item: a disc of its previews the size of an
- * app's, with whatever it wears (moons, a ring, a planet's touch) reaching past it. [inner] fades what shows the folder's
- * apps, as when the planet takes the ring's centre and its apps are round it instead; [presses] ripple its disc.
- */
+/** What [folder] wears as a planet in the look of [LocalFolderStyle]: moons, a ring or a planet's touch, round its glass. */
 @Composable
-fun PlanetFace(
-    folder: RingItem.Folder,
-    icon: IconLoader,
-    modifier: Modifier = Modifier,
-    presses: InteractionSource? = null,
-    inner: () -> Float = { 1f },
-) {
+fun planetWear(folder: RingItem.Folder): FolderWear {
     val style = LocalFolderStyle.current
-    if (style.look == FolderLook.Orbit) {
-        OrbitFace(folder, icon, style.minutes, inner, modifier)
-        return
-    }
-
     val planet = if (style.look == FolderLook.SolarSystem) style.planets[folder.at] else null
     val disc = planet.discFraction()
-    val worn = when {
-        planet != null -> Modifier.drawWithCache {
-            val radius = size.minDimension / 2 * disc
-            val heart = heartPath(radius * 0.2f)
-            onDrawWithContent {
-                drawPlanetTouch(planet, radius, style.minutes, heart, behind = true)
-                drawContent()
-                drawPlanetTouch(planet, radius, style.minutes, heart, behind = false)
-            }
-        }
-        style.look == FolderLook.Ringed -> Modifier.tiltedRing()
-        else -> Modifier
-    }
-    val glass = if (planet == null) {
-        Modifier
-    } else {
-        Modifier.drawWithCache {
-            val radius = size.minDimension / 2
-            val disc = Path().apply { addOval(Rect(size.center, radius)) }
-            val outline = Path()
-            onDrawBehind { drawPlanetGlass(planet, radius, style.minutes, disc, outline) }
-        }
-    }
     val moons = if (style.look == FolderLook.Rim) Modifier.moons(folder.apps.size) else Modifier
-
-    Box(modifier.then(worn), contentAlignment = Alignment.Center) {
+    val over = Modifier.edge(FolderEdge).then(moons)
+    return when {
         // An app's icon fills its disc, but a folder's disc is mostly glass, which fades into the wallpaper.
-        FolderDisc(folder, icon, presses, inner, Modifier.fillMaxSize(disc).then(glass).edge(FolderEdge).then(moons))
+        planet != null -> FolderWear(
+            disc,
+            Modifier.planetTouch(planet, style.minutes, disc, near = false).drawWithCache {
+                val radius = size.minDimension / 2 * disc
+                val glass = Path().apply { addOval(Rect(size.center, radius)) }
+                val outline = Path()
+                onDrawBehind { drawPlanetGlass(planet, radius, style.minutes, glass, outline) }
+            },
+            Modifier.planetTouch(planet, style.minutes, 1f, near = true).then(over),
+        )
+        style.look == FolderLook.Ringed -> FolderWear(disc, Modifier.tiltedRing(near = false), Modifier.tiltedRing(near = true).then(over))
+        else -> FolderWear(disc, over = over)
+    }
+}
+
+/** The half of [planet]'s touch behind its disc, [share] of the item across, or the half in front if [near]. */
+private fun Modifier.planetTouch(planet: Planet, minutes: () -> Float, share: Float, near: Boolean): Modifier = drawWithCache {
+    val radius = size.minDimension / 2 * share
+    val heart = heartPath(radius * 0.2f)
+    onDrawWithContent {
+        if (!near) drawPlanetTouch(planet, radius, minutes, heart, behind = true)
+        drawContent()
+        if (near) drawPlanetTouch(planet, radius, minutes, heart, behind = false)
     }
 }
 
@@ -129,17 +108,17 @@ private const val MOON_FRACTION = 0.06f
 private const val MOON_CROWDING = 0.34f
 private const val MOONS_START = 3 * PI / 4
 
-/** A gold ring tilted across the item's disc: its far half behind the disc, its near half in front. */
-private fun Modifier.tiltedRing(): Modifier = drawWithContent {
+/** A gold ring tilted across the item's disc: its far half, which goes behind the disc, or its near half, in front. */
+private fun Modifier.tiltedRing(near: Boolean): Modifier = drawWithContent {
     val r = size.minDimension / 2
     val ring = Size(r * 3f, r * 0.84f)
-    fun half(behind: Boolean) = rotate(RING_TILT, center) {
-        halfRing(ring, r * 0.13f + 2.dp.toPx(), PlanetRing.outer, behind)
-        halfRing(ring, r * 0.13f, PlanetRing.inner, behind)
+    fun half() = rotate(RING_TILT, center) {
+        halfRing(ring, r * 0.13f + 2.dp.toPx(), PlanetRing.outer, !near)
+        halfRing(ring, r * 0.13f, PlanetRing.inner, !near)
     }
-    half(behind = true)
+    if (!near) half()
     drawContent()
-    half(behind = false)
+    if (near) half()
 }
 
 /** The far half of an [oval] ring round the centre if [behind], else the near half, in a line [width] wide. */
@@ -155,7 +134,7 @@ private const val RING_TILT = -22f
  * track and moons reach past the item; [inner] fades them.
  */
 @Composable
-private fun OrbitFace(
+internal fun OrbitFace(
     folder: RingItem.Folder,
     icon: IconLoader,
     minutes: () -> Float,

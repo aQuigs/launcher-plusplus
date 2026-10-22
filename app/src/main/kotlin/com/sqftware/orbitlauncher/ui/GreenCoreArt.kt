@@ -1,12 +1,8 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.drawWithCache
@@ -25,7 +21,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.ui.theme.CellWell
@@ -143,21 +138,14 @@ object GreenCoreArt : ThemeArt {
     }
 
     @Composable
-    override fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    ) {
+    override fun folderWear(folder: RingItem.Folder): FolderWear {
         val style = LocalFolderStyle.current
-        val (worn, disc) = when (style.look) {
-            FolderLook.Orb -> Modifier.orb { style.minutes() } to Modifier.fillMaxSize(ORB_DISC)
-            FolderLook.HexCell -> Modifier.hexCell() to Modifier.fillMaxSize(HEX_DISC)
+        return when (style.look) {
+            FolderLook.Orb -> FolderWear(ORB_DISC, Modifier.orb { style.minutes() })
+            FolderLook.HexCell -> FolderWear(HEX_DISC, Modifier.hexCell())
             // Wire spheres, and a look of another theme's met before the theme's own is picked.
-            else -> Modifier.wireSphere { style.minutes() } to Modifier.fillMaxSize(SPHERE_DISC)
+            else -> FolderWear(SPHERE_DISC, Modifier.wireSphere { style.minutes() })
         }
-        Box(modifier.then(worn), contentAlignment = Alignment.Center) { FolderDisc(folder, icon, presses, inner, disc) }
     }
 
     private val waves = DrawerTileArt { Waves(this, it) }

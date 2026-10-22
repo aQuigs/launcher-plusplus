@@ -3,10 +3,9 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
-import com.sqftware.orbitlauncher.domain.IconPlace
 
-/** Draws an app's icon as the theme shows it in a place, off the main thread; null while it has none. */
-typealias IconLoader = suspend (AppEntry, IconPlace) -> ImageBitmap?
+/** Draws an app's icon as the theme shows it, off the main thread; null while it has none. */
+typealias IconLoader = suspend (AppEntry) -> ImageBitmap?
 
 /** What the screen asks of the system for an app. The suspending calls do their blocking work off the main thread. */
 class AppActions(

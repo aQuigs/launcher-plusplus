@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +25,6 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.R
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.RingInk
@@ -112,13 +110,7 @@ object SpaceArt : ThemeArt {
     }
 
     @Composable
-    override fun FolderFace(
-        folder: RingItem.Folder,
-        icon: IconLoader,
-        modifier: Modifier,
-        presses: InteractionSource?,
-        inner: () -> Float,
-    ) = PlanetFace(folder, icon, modifier, presses, inner)
+    override fun folderWear(folder: RingItem.Folder): FolderWear = planetWear(folder)
 
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = drawStarField(colour, scrolled)
 }
