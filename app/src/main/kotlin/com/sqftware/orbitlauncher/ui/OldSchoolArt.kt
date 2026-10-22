@@ -76,6 +76,7 @@ import com.sqftware.orbitlauncher.ui.theme.MenuLine
 import com.sqftware.orbitlauncher.ui.theme.MenuGround
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -302,14 +303,14 @@ object OldSchoolArt : ThemeArt {
         presses: InteractionSource?,
         inner: () -> Float,
     ) {
-        // On the ring, an orb left open, so a folder is told from an app, its cells in the room one item takes, so even
-        // a folder of one shows a quarter-size item; elsewhere, all the folder's room.
+        // On the ring, its cells in the room one item takes, so even a folder of one shows a quarter-size item and is told
+        // from an app; elsewhere, all the folder's room.
         val room = if (LocalIconPlace.current == IconPlace.Ring) {
             with(LocalDensity.current) { Modifier.size((ITEM_FIT * gamePixel).toDp()) }
         } else {
             Modifier.fillMaxSize()
         }
-        ItemGround(presses, modifier, filled = false) {
+        ItemGround(presses, modifier) {
             Column(room.graphicsLayer { alpha = inner() }) {
                 repeat(FOLDER_SIDE) { row ->
                     Row(Modifier.weight(1f)) {
@@ -422,7 +423,7 @@ object OldSchoolArt : ThemeArt {
         contentAlignment: Alignment,
         content: @Composable BoxScope.() -> Unit,
     ) {
-        ItemGround(presses, modifier, filled = true, contentAlignment, content)
+        ItemGround(presses, modifier, contentAlignment, content)
     }
 
     /**
@@ -436,18 +437,16 @@ object OldSchoolArt : ThemeArt {
         Spacer(modifier.drawBehind { drawSpriteCentred(bitmap, center, fitScale(size.minDimension, ITEM_FIT, px)) })
     }
 
-    override val badgeCorner: Alignment
-        get() = Alignment.TopStart
-
     /**
      * A hitsplat with the count on it, as the game marks a hit: blue, the game's splat for a hit that did no harm, while
-     * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread.
+     * all its notifications are in the shade, and red, its splat for damage, once some are dismissed unread. Half the
+     * game's size and over the corner, as the other themes' bubbles are, so the item stays in sight.
      */
     @Composable
     override fun BadgeFace(unread: Unread, modifier: Modifier) {
         val splat = sprite(if (unread.dismissed) R.drawable.osrs_1359_0 else R.drawable.osrs_1358_0)
-        Box(modifier.testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
-            SpriteImage(splat, gamePixel)
+        Box(modifier.offset(x = BADGE_OVERHANG, y = -BADGE_OVERHANG).testTag(BadgeTags.BUBBLE), contentAlignment = Alignment.Center) {
+            SpriteImage(splat, max(1, gamePixel / 2))
             Text(badgeText(unread.count), color = HitsplatCount, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
     }
@@ -676,30 +675,33 @@ internal fun DrawScope.drawSpritePart(
 
 private operator fun IntOffset.times(scale: Int) = IntOffset(x * scale, y * scale)
 
-/** What an item sits on: on the ring, the game's round orb, [filled] with its black or left open, and elsewhere nothing. */
+/** What an item sits on: on the ring, the game's round orb, and elsewhere nothing. */
 @Composable
 private fun ItemGround(
     presses: InteractionSource?,
     modifier: Modifier,
-    filled: Boolean,
     contentAlignment: Alignment = Alignment.Center,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb(filled) else Modifier
+    val ground = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
     Box(modifier.then(ground).pressed(presses), contentAlignment = contentAlignment, content = content)
 }
 
-/** The game's round orb behind what is drawn here, [filled] with its black or left open. */
+/**
+ * The game's round orb behind what is drawn here, filled with the brown of its right-click menu rather than the orb's
+ * own black, which hid dark items.
+ */
 @Composable
-private fun Modifier.orb(filled: Boolean): Modifier {
+private fun Modifier.orb(): Modifier {
     val frame = sprite(R.drawable.osrs_1071_0)
     val fill = sprite(R.drawable.osrs_1059_0)
     val px = gamePixel
     return drawWithCache {
         val orb = circle(size.center, ORB_RADIUS * px)
+        val fillAt = size.center - Offset(fill.width.toFloat(), fill.height.toFloat()) * (px / 2f)
         onDrawBehind {
             clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
-            if (filled) drawSpriteCentred(fill, center, px)
+            drawSprite(fill, fillAt, px, tint = MenuGround)
         }
     }
 }
