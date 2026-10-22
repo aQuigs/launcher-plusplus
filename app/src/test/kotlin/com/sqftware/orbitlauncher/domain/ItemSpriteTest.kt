@@ -21,14 +21,14 @@ class ItemSpriteTest {
 
     @Test
     fun anItemFillsTheGameItemCanvas() {
-        val item = itemSprite(IconLayers(disc(96, red)), size = 26)
+        val item = itemSprite(disc(96, red), size = 26)
         assertEquals(ITEM_WIDTH, item.width)
         assertEquals(ITEM_HEIGHT, item.height)
     }
 
     @Test
     fun theMarkKeepsWithinItsSizeAndIsOutlinedInBlack() {
-        val item = itemSprite(IconLayers(disc(96, red)), size = 17)
+        val item = itemSprite(disc(96, red), size = 17)
         val solid = item.argb.indices.filter { item.argb[it] != 0 && item.argb[it] != black && item.argb[it] != 0xFF302020.toInt() }
         val xs = solid.map { it % ITEM_WIDTH }
         assertTrue(xs.max() - xs.min() + 1 <= 17)
@@ -38,14 +38,14 @@ class ItemSpriteTest {
     @Test
     fun everyPixelIsOpaqueOrClear() {
         val soft = square(96) { x, _ -> (x * 255 / 95) shl 24 or 0x2050A0 }
-        val item = itemSprite(IconLayers(soft), size = 26)
+        val item = itemSprite(soft, size = 26)
         assertTrue(item.argb.all { it == 0 || it ushr 24 == 255 })
     }
 
     @Test
     fun aGradientIsCutToTheGivenNumberOfColours() {
         val gradient = square(96) { x, y -> 0xFF000000.toInt() or (x * 2 shl 16) or (y * 2 shl 8) or 0x40 }
-        val item = itemSprite(IconLayers(gradient), size = 26, colours = 6)
+        val item = itemSprite(gradient, size = 26, colours = 6)
         // The mark's colours, plus the outline and the shadow.
         assertTrue(item.colours().size <= 6 + 2)
     }
@@ -53,7 +53,7 @@ class ItemSpriteTest {
     @Test
     fun aDarkTileUnderAMarkIsDropped() {
         val netflix = square(96) { x, _ -> if (x in 36..59) red else black }
-        val item = itemSprite(IconLayers(netflix), size = 26)
+        val item = itemSprite(netflix, size = 26)
         val reddish = item.colours().filter { (it shr 16 and 0xFF) > 120 }
         assertTrue(reddish.isNotEmpty())
         val solid = item.argb.count { it != 0 && it != black && it != 0xFF302020.toInt() }
@@ -62,28 +62,28 @@ class ItemSpriteTest {
 
     @Test
     fun aDarkMarkWithNoTileIsKept() {
-        val item = itemSprite(IconLayers(disc(96, 0xFF202020.toInt())), size = 26)
+        val item = itemSprite(disc(96, 0xFF202020.toInt()), size = 26)
         assertTrue(item.argb.count { it != 0 } > 26 * 26 / 2)
     }
 
     @Test
     fun anAdaptiveIconOnAPlainLightGroundShowsItsForegroundAlone() {
         val logo = square(108) { x, y -> if (x in 44..63 && y in 44..63) red else 0 }
-        val mark = mark(IconLayers(logo, square(108) { _, _ -> white }))
+        val mark = itemMark(IconLayers(logo, square(108) { _, _ -> white }))
         assertTrue(white !in mark.colours())
     }
 
     @Test
     fun anAdaptiveIconWithItsLogoOnALightGroundShowsTheGround() {
         val ground = square(108) { x, y -> if (x in 44..63 && y in 44..63) red else white }
-        val mark = mark(IconLayers(square(108) { _, _ -> 0 }, ground))
+        val mark = itemMark(IconLayers(square(108) { _, _ -> 0 }, ground))
         assertTrue(red in mark.colours())
     }
 
     @Test
     fun anAdaptiveIconOnAColouredGroundKeepsItsGroundInADisc() {
         val logo = square(108) { x, y -> if (x in 44..63 && y in 44..63) white else 0 }
-        val mark = mark(IconLayers(logo, square(108) { _, _ -> blue }))
+        val mark = itemMark(IconLayers(logo, square(108) { _, _ -> blue }))
         assertEquals(blue, mark[mark.width / 2, 2])
         assertEquals(0, mark[0, 0])
     }

@@ -23,16 +23,23 @@ const val ITEM_WIDTH = 36
 const val ITEM_HEIGHT = 32
 
 /**
- * [icon] drawn as one of the game's inventory items: the app's mark at most [size] pixels across on the 36 by 32 item
- * canvas, in a few flat colours with a hard edge, a black outline and the dark shadow every item sprite carries.
+ * How many pixels across to draw an icon's layers for its [itemMark]: one to each of an adaptive icon's 108 units, which
+ * leaves a mark of 72, a few pixels to each of the largest item's. Fixed, so an item looks the same on every phone.
  */
-fun itemSprite(icon: IconLayers, size: Int, colours: Int = 14): Pixels {
-    val mark = downscale(mark(icon), size)
+const val ITEM_LAYER_SIZE = 108
+
+/**
+ * An app's [mark], as [itemMark] takes it from its icon, drawn as one of the game's inventory items: at most [size]
+ * pixels across on the 36 by 32 item canvas, in a few flat colours with a hard edge, a black outline and the dark shadow
+ * every item sprite carries.
+ */
+fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
+    val small = downscale(mark, size)
     val item = Pixels(ITEM_WIDTH, ITEM_HEIGHT)
-    val left = (ITEM_WIDTH - mark.width) / 2
-    val top = (ITEM_HEIGHT - mark.height) / 2 - 1
-    for (y in 0 until mark.height) for (x in 0 until mark.width) {
-        val c = mark[x, y]
+    val left = (ITEM_WIDTH - small.width) / 2
+    val top = (ITEM_HEIGHT - small.height) / 2 - 1
+    for (y in 0 until small.height) for (x in 0 until small.width) {
+        val c = small[x, y]
         item.argb[(top + y) * ITEM_WIDTH + left + x] = if (alpha(c) >= 128) c or OPAQUE else 0
     }
     dropBackingTile(item)
@@ -45,9 +52,9 @@ fun itemSprite(icon: IconLayers, size: Int, colours: Int = 14): Pixels {
  * What of [icon] the item shows. An adaptive icon on a plain light ground is its foreground alone, the way the brand
  * draws its logo; on a coloured ground the colour is part of the mark (a blue bubble, a green phone), so both layers
  * go into a disc, as they do when the logo is drawn on the ground and the foreground is all but empty. Either way only
- * the middle of the canvas, where the system keeps the mark, is taken.
+ * the middle of the canvas, where the system keeps the mark, is taken. The same for every size of item, so made once.
  */
-internal fun mark(icon: IconLayers): Pixels {
+fun itemMark(icon: IconLayers): Pixels {
     val background = icon.background ?: return icon.foreground
     val fore = safeZone(icon.foreground)
     val back = safeZone(background)
