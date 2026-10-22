@@ -150,7 +150,7 @@ fun IconDisc(
     modifier: Modifier = Modifier,
     contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable BoxScope.() -> Unit,
-) = LocalThemeArt.current.IconGround(LocalIconPlace.current, presses, modifier, contentAlignment, content)
+) = LocalThemeArt.current.IconGround(presses, modifier, contentAlignment, content)
 
 /** [IconDisc] as most themes draw it: a disc of the scheme's variant surface, the icon clipped to it. */
 @Composable

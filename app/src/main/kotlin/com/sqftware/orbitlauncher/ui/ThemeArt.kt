@@ -41,7 +41,6 @@ import com.sqftware.orbitlauncher.domain.DOCK_ICON_FILL
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.toSize
-import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.Colourway
 import com.sqftware.orbitlauncher.domain.FolderLook
 import com.sqftware.orbitlauncher.domain.HomePlace
@@ -120,11 +119,11 @@ interface ThemeArt {
 
     /**
      * What an app's icon sits on, filling the item, with [content] over it and rippling for [presses]: by default a
-     * disc. [place] says whether the icon is on the home ring or elsewhere, where a theme may frame it differently.
+     * disc. [LocalIconPlace] says whether the icon is on the home ring or elsewhere, where a theme may frame it
+     * differently.
      */
     @Composable
     fun IconGround(
-        place: IconPlace,
         presses: InteractionSource?,
         modifier: Modifier,
         contentAlignment: Alignment,

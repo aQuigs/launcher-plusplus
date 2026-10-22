@@ -289,7 +289,7 @@ object OldSchoolArt : ThemeArt {
         inner: () -> Float,
     ) {
         val px = gamePixel
-        IconGround(LocalIconPlace.current, presses, modifier, Alignment.Center) {
+        IconGround(presses, modifier, Alignment.Center) {
             folder.apps.getOrNull(1)?.let { PileItem(it, icon, PILE_BEHIND, px, inner) }
             folder.apps.firstOrNull()?.let { PileItem(it, icon, PILE_FRONT, px, inner) }
         }
@@ -392,13 +392,12 @@ object OldSchoolArt : ThemeArt {
 
     @Composable
     override fun IconGround(
-        place: IconPlace,
         presses: InteractionSource?,
         modifier: Modifier,
         contentAlignment: Alignment,
         content: @Composable BoxScope.() -> Unit,
     ) {
-        if (place == IconPlace.Ring) {
+        if (LocalIconPlace.current == IconPlace.Ring) {
             val frame = sprite(R.drawable.osrs_1071_0)
             val fill = sprite(R.drawable.osrs_1059_0)
             val px = gamePixel
