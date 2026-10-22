@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -2292,6 +2293,21 @@ class LauncherScreenTest {
         show()
 
         compose.onNodeWithText(SHOW_WHERE_I_AM).assertDoesNotExist()
+    }
+
+    @Test
+    fun aFolderOpenRoundTheEmblemClosesAtATapOnIt() {
+        theme = Theme.OldSchool
+        art = OldSchoolArt
+        homeApps = HomeApps(ring = Ring(listOf(RingSlot.App(mail.key), folderOf(clock))))
+        show()
+
+        compose.onNodeWithTag(HomeRingTags.folder(1)).performClick()
+        compose.ringSlot(clock).assertExists()
+        compose.onNodeWithTag(HomeRingTags.EMBLEM).assertHasClickAction().performClick()
+
+        compose.ringSlot(clock).assertDoesNotExist()
+        compose.ringSlot(mail).assertExists()
     }
 
     @Test

@@ -39,7 +39,7 @@ enum class Theme(
     GreenCore("Green core", listOf(FolderLook.WireSphere, FolderLook.Orb, FolderLook.HexCell), listOf(Colourway.Green)),
     OldSchool(
         "Old School",
-        listOf(FolderLook.Pile),
+        listOf(FolderLook.Items),
         listOf(Colourway.Classic),
         // The ring's icons sit in the game's round orbs, a smaller frame than an inventory slot, so an item there is a
         // size down: as large as fits inside the orb's black with its outline.

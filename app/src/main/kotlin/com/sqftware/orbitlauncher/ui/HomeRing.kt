@@ -250,6 +250,8 @@ fun HomeRing(
         }
     }
     val centred = openFolder ?: folding
+    // The folder drawn in the centre, unless the theme opens its folders round the emblem.
+    val centrePlanet = centred?.takeUnless { art.foldersOpenRoundEmblem }
     // The ring stays until the folder's apps are all out, and they are only a tap away once they are, so a second tap on
     // the planet cannot launch one still bunched there.
     val spreadingOut by remember(openFolder != null) { derivedStateOf { openFolder != null && spread.value < 1f } }
@@ -272,10 +274,19 @@ fun HomeRing(
 
     Layout(
         content = { CompositionLocalProvider(LocalIconPlace provides IconPlace.Ring) {
-            if (openFolder == null || spreadingOut) {
-                Emblem(hint, { slowTurn.value }, { fastTurn.value }, minuteOfDay, onSearch, onEdit, Modifier.layoutId(Part.Emblem))
+            // A folder that opens round the emblem leaves it there to close it; any other takes its place.
+            val emblemCloses = openFolder != null && centrePlanet == null
+            if (emblemCloses || openFolder == null || spreadingOut) {
+                Emblem(
+                    hint.takeUnless { emblemCloses },
+                    { slowTurn.value },
+                    { fastTurn.value },
+                    minuteOfDay,
+                    if (emblemCloses) Modifier.closesFolder(onCloseFolder, onAddToFolder) else Modifier.searches(hint, onSearch, onEdit),
+                    Modifier.layoutId(Part.Emblem),
+                )
             }
-            centred?.let { folder ->
+            centrePlanet?.let { folder ->
                 key(Part.Planet) {
                     CentrePlanet(
                         folder,
@@ -460,12 +471,12 @@ fun HomeRing(
 
             // The ring's item in [index], drifted outward and faded as far as the planet has come.
             fun Placeable.placeDrifting(index: Int) = placeAt(middle + (slotAt(index, ring.size, ringRadius) - middle) * (1f + DRIFT * out)) {
-                alpha = if (index == planetIndex) 0f else 1f - out
+                alpha = if (index == planetIndex && centrePlanet != null) 0f else 1f - out
             }
 
             placeables.forEach { (part, placeable) ->
                 when (part) {
-                    Part.Emblem -> if (centred == null) {
+                    Part.Emblem -> if (centrePlanet == null) {
                         placeable.placeAt(middle)
                     } else {
                         placeable.placeAt(middle) {
@@ -515,7 +526,7 @@ private fun Modifier.inert(): Modifier = clearAndSetSemantics {}.pointerInput(Un
 
 /**
  * The ring's centre: the theme's emblem in a disc edged by a hairline, or the [hint] over it. Quiet, so the icons stay
- * the eye's first stop. A tap calls [onSearch], or does what the hint says, and a long press [onEdit].
+ * the eye's first stop. Touches do what [gestures] say.
  */
 @Composable
 private fun Emblem(
@@ -523,8 +534,7 @@ private fun Emblem(
     slowTurn: () -> Float,
     fastTurn: () -> Float,
     minuteOfDay: () -> Int,
-    onSearch: () -> Unit,
-    onEdit: () -> Unit,
+    gestures: Modifier,
     modifier: Modifier = Modifier,
 ) {
     val art = LocalThemeArt.current
@@ -534,14 +544,8 @@ private fun Emblem(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .then(art.emblemBox(edgeMark))
-            .combinedClickable(
-                onClickLabel = hint?.label ?: "Search apps",
-                onLongClickLabel = "Choose the apps on the home screen",
-                onLongClick = onEdit,
-                onClick = hint?.onTap ?: onSearch,
-            )
-            .testTag(HomeRingTags.EMBLEM)
-            .semantics { if (hint == null) contentDescription = "Favourites" },
+            .then(gestures)
+            .testTag(HomeRingTags.EMBLEM),
     ) {
         art.EmblemFace(hint == null, slowTurn, fastTurn, minuteOfDay, Modifier.fillMaxSize())
         if (hint != null) {
@@ -559,6 +563,20 @@ private fun Emblem(
         }
     }
 }
+
+/** A tap that searches the apps, or does what the [hint] says, and a long press that edits the ring with [onEdit]. */
+private fun Modifier.searches(hint: RingHint?, onSearch: () -> Unit, onEdit: () -> Unit) =
+    combinedClickable(
+        onClickLabel = hint?.label ?: "Search apps",
+        onLongClickLabel = "Choose the apps on the home screen",
+        onLongClick = onEdit,
+        onClick = hint?.onTap ?: onSearch,
+    ).semantics { if (hint == null) contentDescription = "Favourites" }
+
+/** A tap that closes the open folder and, given [onAddApps], a long press that adds apps to it. */
+private fun Modifier.closesFolder(onClose: () -> Unit, onAddApps: (() -> Unit)?) =
+    combinedClickable(onLongClickLabel = onAddApps?.let { "Add apps" }, onLongClick = onAddApps, onClick = onClose)
+        .semantics { contentDescription = "Close folder" }
 
 internal val Size.emblemRadius get() = minDimension / 2 * 0.96f
 
@@ -603,9 +621,7 @@ private fun CentrePlanet(
             .clip(CircleShape)
             .then(
                 if (onClose != null) {
-                    Modifier
-                        .combinedClickable(onLongClickLabel = onAddApps?.let { "Add apps" }, onLongClick = onAddApps, onClick = onClose)
-                        .semantics { contentDescription = "Close folder" }
+                    Modifier.closesFolder(onClose, onAddApps)
                 } else {
                     Modifier.clearAndSetSemantics {}
                 },
