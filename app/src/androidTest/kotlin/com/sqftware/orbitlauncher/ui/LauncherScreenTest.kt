@@ -114,6 +114,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -2308,6 +2309,24 @@ class LauncherScreenTest {
 
         compose.ringSlot(clock).assertDoesNotExist()
         compose.ringSlot(mail).assertExists()
+    }
+
+    @Test
+    fun aThemeWithoutTheHandleOnHomeKeepsTheDockAndRingInPlaceAsHomeIsSwipedAway() {
+        theme = Theme.OldSchool
+        art = OldSchoolArt
+        homeApps = HomeApps(ring = ringOf(clock), dock = ringOf(mail))
+        show()
+        val dock = compose.dock().getUnclippedBoundsInRoot()
+        val slot = compose.ringSlot(clock).getUnclippedBoundsInRoot()
+
+        // Past halfway, where the page nearest to view turns over.
+        compose.swipePager { down(center); moveBy(Offset(-width * 0.6f, 0f)) }
+
+        compose.runOnIdle { assertNotEquals(pager.settledPage, pager.currentPage) }
+        assertEquals(dock.top, compose.dock().getUnclippedBoundsInRoot().top)
+        assertEquals(slot.top, compose.ringSlot(clock).getUnclippedBoundsInRoot().top)
+        compose.swipePager { up() }
     }
 
     @Test
