@@ -14,11 +14,10 @@ internal const val ITEM_WIDTH = 36
 internal const val ITEM_HEIGHT = 32
 
 /**
- * How many pixels across to draw an icon's layers for its [itemMark]: two to each of an adaptive icon's 108 units, which
- * leaves a mark of 144, so even a logo drawn at a third of its canvas has a few pixels to each of the largest item's.
- * Fixed, so an item looks the same on every phone.
+ * How many pixels across to draw an icon's layers for its [itemMark]: one to each of an adaptive icon's 108 units, which
+ * leaves a mark of 72, a few pixels to each of the largest item's. Fixed, so an item looks the same on every phone.
  */
-const val ITEM_LAYER_SIZE = 216
+const val ITEM_LAYER_SIZE = 108
 
 /**
  * An app's [mark], as [itemMark] takes it from its icon, drawn as one of the game's inventory items: [size] pixels
@@ -27,16 +26,24 @@ const val ITEM_LAYER_SIZE = 216
  * into the black of an orb or a panel.
  */
 fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
-    var whole = mark
-    var small = hardEdged(scaled(whole, size))
+    var small = hardEdged(scaled(mark, size))
     val tile = dropBackingTile(small)
     // What the item keeps of a mark (all but its tile, or a logo drawn small on its canvas) is cut out of the whole mark
-    // and drawn again, so it fills the item as a whole icon does. Each cut can leave a sliver of tile or edge to drop.
+    // and drawn again, so it fills the item as a whole icon does: the same shape, larger. Only what the item keeps is
+    // cut, since the whole mark would bring back tile the item dropped, such as the ground inside a ring.
+    var whole = mark.drawnFrom(small) { small.argb[it] != 0 }
+    // Drawn larger, the tile that shared an edge pixel with the mark shows as a pixel of its own and is dropped, but
+    // only along that edge: ground the item kept, sealed inside a ring, stays. An edge pixel can also fall below half
+    // cover and clear, so the mark is cut again until it fills the item.
+    val edge = edge(small).toSet()
+    var band = mark.drawnFrom(small) { it in edge }
     for (pass in 1..3) {
         val kept = keptArea(small) ?: break
-        whole = whole.crop(kept.scaledTo(small, whole))
+        val area = kept.scaledTo(small, whole)
+        whole = whole.crop(area)
+        band = band.crop(area)
         small = hardEdged(scaled(whole, size))
-        if (tile != null) dropEdgeColour(small, tile)
+        if (tile != null) dropEdgeColour(small, tile, band.drawnOver(small))
     }
     posterize(small, colours)
     val item = placed(small)
@@ -90,15 +97,13 @@ internal fun scaled(pixels: Pixels, size: Int): Pixels {
     val h = (pixels.height * scale).roundToInt().coerceAtLeast(1)
     val out = Pixels(w, h)
     for (y in 0 until h) for (x in 0 until w) {
-        val x0 = x * pixels.width / w
-        val x1 = maxOf(x0 + 1, (x + 1) * pixels.width / w)
-        val y0 = y * pixels.height / h
-        val y1 = maxOf(y0 + 1, (y + 1) * pixels.height / h)
+        val xs = block(x, w, pixels.width)
+        val ys = block(y, h, pixels.height)
         var a = 0L
         var r = 0L
         var g = 0L
         var b = 0L
-        for (sy in y0 until y1) for (sx in x0 until x1) {
+        for (sy in ys) for (sx in xs) {
             val c = pixels[sx, sy]
             val ca = alpha(c)
             a += ca
@@ -106,19 +111,41 @@ internal fun scaled(pixels: Pixels, size: Int): Pixels {
             g += green(c) * ca
             b += blue(c) * ca
         }
-        val n = (x1 - x0) * (y1 - y0)
+        val n = (xs.last - xs.first + 1) * (ys.last - ys.first + 1)
         out.argb[y * w + x] = if (a == 0L) 0 else argb((a / n).toInt(), (r / a).toInt(), (g / a).toInt(), (b / a).toInt())
     }
     return out
 }
 
+/** The pixels of a side [whole] long that [scaled] draws pixel [i] of [n] from. */
+private fun block(i: Int, n: Int, whole: Int): IntRange {
+    val from = i * whole / n
+    return from until maxOf(from + 1, (i + 1) * whole / n)
+}
+
+/** This mark with only the pixels that [small], [scaled] from it, draws into the pixels [picked] picks. */
+private fun Pixels.drawnFrom(small: Pixels, picked: (Int) -> Boolean): Pixels {
+    val shown = BooleanArray(argb.size)
+    for (sy in 0 until small.height) for (sx in 0 until small.width) {
+        if (!picked(sy * small.width + sx)) continue
+        for (y in block(sy, small.height, height)) for (x in block(sx, small.width, width)) shown[y * width + x] = true
+    }
+    return Pixels(width, height, IntArray(argb.size) { if (shown[it]) argb[it] else 0 })
+}
+
+/** Which pixels of [small], [scaled] from this, are drawn from any of its pixels. */
+private fun Pixels.drawnOver(small: Pixels) = BooleanArray(small.argb.size) { i ->
+    val xs = block(i % small.width, small.width, width)
+    block(i / small.width, small.height, height).any { y -> xs.any { x -> this[x, y] != 0 } }
+}
+
 private class Area(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     /** This area of [small], drawn from [whole], as the area of [whole] it was drawn from. */
     fun scaledTo(small: Pixels, whole: Pixels) = Area(
-        left * whole.width / small.width,
-        top * whole.height / small.height,
-        (right * whole.width + small.width - 1) / small.width,
-        (bottom * whole.height + small.height - 1) / small.height,
+        block(left, small.width, whole.width).first,
+        block(top, small.height, whole.height).first,
+        block(right - 1, small.width, whole.width).last + 1,
+        block(bottom - 1, small.height, whole.height).last + 1,
     )
 }
 
@@ -173,17 +200,18 @@ private fun dropBackingTile(small: Pixels): Int? {
     return colour
 }
 
-private fun dropEdgeColour(pixels: Pixels, colour: Int) = reachedFromEdge(pixels, edge(pixels), colour).forEach { pixels.argb[it] = 0 }
+private fun dropEdgeColour(pixels: Pixels, colour: Int, within: BooleanArray) =
+    reachedFromEdge(pixels, edge(pixels), colour, within).forEach { pixels.argb[it] = 0 }
 
 private fun edge(pixels: Pixels) =
     pixels.argb.indices.filter { i -> pixels.argb[i] != 0 && neighbours(pixels, i).any { it == null || pixels.argb[it] == 0 } }
 
-private fun reachedFromEdge(pixels: Pixels, edge: List<Int>, colour: Int): Set<Int> {
+private fun reachedFromEdge(pixels: Pixels, edge: List<Int>, colour: Int, within: BooleanArray? = null): Set<Int> {
     val reached = HashSet<Int>()
     val stack = ArrayDeque(edge)
     while (stack.isNotEmpty()) {
         val i = stack.removeLast()
-        if (i in reached || pixels.argb[i] == 0 || distance(pixels.argb[i], colour) >= 60) continue
+        if (i in reached || pixels.argb[i] == 0 || within?.get(i) == false || distance(pixels.argb[i], colour) >= 60) continue
         reached += i
         neighbours(pixels, i).filterNotNull().forEach(stack::addLast)
     }

@@ -3,6 +3,8 @@ package com.sqftware.orbitlauncher.domain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
+import kotlin.math.hypot
 
 class ItemSpriteTest {
     private val red = 0xFFE01010.toInt()
@@ -122,6 +124,35 @@ class ItemSpriteTest {
         val item = itemSprite(rimmed, size = 26)
         assertTrue(item.argb.count { it != 0 && luma(it) > 190 } < 26 * 2)
         assertEquals(26 to 26, markSize(item))
+    }
+
+    @Test
+    fun theGroundInsideAFaintRingStaysDroppedWhenTheRingIsDrawnLarger() {
+        val navy = 0xFF101830.toInt()
+        val stars = listOf(16 to 36, 56 to 36, 36 to 16, 36 to 56)
+        val orbit = square(72) { x, y ->
+            val d = hypot(x + 0.5 - 36, y + 0.5 - 36)
+            when {
+                stars.any { (sx, sy) -> x in sx - 2..sx + 1 && y in sy - 2..sy + 1 } -> white
+                x in 30..41 && y in 30..41 -> white
+                abs(d - 20) < 0.5 -> 0xFF707890.toInt()
+                else -> navy
+            }
+        }
+        val item = itemSprite(orbit, size = 26)
+        assertTrue(item.argb.count { it != 0 && it != black && luma(it) < 32 } < 100)
+        assertTrue(white !in item.colours())
+    }
+
+    @Test
+    fun theGroundSealedInsideARingStaysWhenTheRingIsDrawnLarger() {
+        val navy = 0xFF101830.toInt()
+        val ring = square(72) { x, y ->
+            val d = hypot(x + 0.5 - 36, y + 0.5 - 36)
+            if (d in 14.0..17.0 && !(x > 48 && y in 35..36)) white else navy
+        }
+        val item = itemSprite(ring, size = 26)
+        assertTrue(item.argb.count { it != 0 && it != black && luma(it) < 32 } > 150)
     }
 
     @Test
