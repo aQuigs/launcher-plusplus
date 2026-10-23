@@ -7,20 +7,30 @@ import kotlin.math.roundToLong
 /** Something [metres] long that a distance spun is put next to, named [one] and, for more than one, [many]. */
 private class Yardstick(val metres: Double, val one: String, val many: String)
 
+private val PITCH = Yardstick(105.0, "football pitch", "football pitches")
+private val EARTH = Yardstick(40_075_000.0, "trip round the Earth", "trips round the Earth")
+
 private val YARDSTICKS = listOf(
     Yardstick(0.18, "banana", "bananas"),
     Yardstick(5.5, "giraffe", "giraffes"),
     Yardstick(30.0, "blue whale", "blue whales"),
-    Yardstick(105.0, "football pitch", "football pitches"),
+    PITCH,
     Yardstick(330.0, "Eiffel Tower", "Eiffel Towers"),
     Yardstick(8_849.0, "Everest", "Everests"),
     Yardstick(42_195.0, "marathon", "marathons"),
-    Yardstick(40_075_000.0, "trip round the Earth", "trips round the Earth"),
+    EARTH,
+)
+
+/** The yardsticks an American reader knows by other names, football there being the 100-yard gridiron game. */
+private val AMERICAN = mapOf(
+    PITCH to Yardstick(91.44, "football field", "football fields"),
+    EARTH to Yardstick(EARTH.metres, "trip around the Earth", "trips around the Earth"),
 )
 
 /** [metres] as so many of the longest yardstick it reaches, such as "That's 7.6 bananas", or null short of the first. */
 fun yardstickText(metres: Double, locale: Locale): String? {
-    val stick = YARDSTICKS.lastOrNull { metres >= it.metres } ?: return null
+    val yardsticks = if (locale.country == "US") YARDSTICKS.map { AMERICAN[it] ?: it } else YARDSTICKS
+    val stick = yardsticks.lastOrNull { metres >= it.metres } ?: return null
     val count = (metres / stick.metres * 10).roundToLong() / 10.0
     return "That's ${String.format(locale, "%,.1f", count)} ${if (count == 1.0) stick.one else stick.many}"
 }
