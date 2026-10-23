@@ -73,7 +73,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -451,7 +450,7 @@ object OldSchoolArt : ThemeArt {
 
     /** On the ring, the game's orb; elsewhere nothing. */
     @Composable
-    override fun iconGround(folder: Boolean): Modifier = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb(folder) else Modifier
+    override fun iconGround(): Modifier = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
 
     /** An item keeps its own outline, so neither its pixels nor its ripple are cut to a disc. */
     override val iconShape: Shape?
@@ -459,15 +458,11 @@ object OldSchoolArt : ThemeArt {
 
     /**
      * An item drawn as the game draws it, at whole game pixels, as large as its square takes and no larger than the
-     * game's; one cut to fill a folder's preview fills it, in hard pixels. An image larger than an item's canvas is no
-     * item, such as a pinned shortcut's icon, and is fitted whole.
+     * game's. An image larger than an item's canvas is no item, such as a pinned shortcut's icon, and is fitted whole.
      */
     @Composable
     override fun IconImage(bitmap: ImageBitmap, modifier: Modifier) {
         if (bitmap.width > ITEM_WIDTH || bitmap.height > ITEM_HEIGHT) return super.IconImage(bitmap, modifier)
-        if (LocalIconPlace.current == IconPlace.Preview) {
-            return Image(bitmap, contentDescription = null, modifier, filterQuality = FilterQuality.None)
-        }
         val px = gamePixel
         Spacer(modifier.drawBehind { drawSpriteCentred(bitmap, center, fitScale(size.minDimension, ITEM_FIT, px)) })
     }
@@ -738,30 +733,18 @@ internal fun DrawScope.drawSpritePart(
  * own black, which hid dark items.
  */
 @Composable
-private fun Modifier.orb(folder: Boolean): Modifier {
+private fun Modifier.orb(): Modifier {
     val frame = sprite(R.drawable.osrs_1071_0)
     val fill = sprite(R.drawable.osrs_1059_0)
     val px = gamePixel
     return drawWithCache {
-        // At the game's size round an item; round a folder's previews, which spread wider than an item, the well, the
-        // fill inside the frame's rim, takes the whole square and the rim reaches past.
-        val scale = if (folder) size.minDimension / fill.width else px.toFloat()
-        val orb = circle(size.center, ORB_RADIUS * scale)
+        val orb = circle(size.center, ORB_RADIUS * px.toFloat())
         onDrawBehind {
-            clipPath(orb) { inGamePixels(center - ORB_CENTRE.toOffset() * scale, scale) { drawSprite(frame, Offset.Zero, 1) } }
-            inGamePixels(center - Offset(fill.width.toFloat(), fill.height.toFloat()) * (scale / 2), scale) {
-                drawSprite(fill, Offset.Zero, 1, tint = MenuGround)
-            }
+            clipPath(orb) { drawSprite(frame, center - (ORB_CENTRE * px).toOffset(), px) }
+            drawSpriteCentred(fill, center, px, tint = MenuGround)
         }
     }
 }
-
-/**
- * Draws [draw] in the game's own pixels from [origin], each [scale] screen pixels square, however many that makes, for
- * art sized by the shared layout rather than in whole game pixels.
- */
-private inline fun DrawScope.inGamePixels(origin: Offset, scale: Float, draw: DrawScope.() -> Unit) =
-    withTransform({ translate(origin.x, origin.y); scale(scale, scale, Offset.Zero) }, draw)
 
 /** The player's own square in the minimap's middle, three game pixels wide in a ring of black so it shows on a white wall. */
 private fun DrawScope.selfMarker(centre: Offset, scale: Int) {

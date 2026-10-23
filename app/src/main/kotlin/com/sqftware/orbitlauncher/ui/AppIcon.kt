@@ -150,13 +150,12 @@ fun IconDisc(
     presses: InteractionSource? = null,
     modifier: Modifier = Modifier,
     disc: Float = 1f,
-    folder: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val art = LocalThemeArt.current
     val shape = art.iconShape
     Box(modifier, contentAlignment = Alignment.Center) {
-        Spacer(Modifier.fillMaxSize(disc).then(art.iconGround(folder)))
+        Spacer(Modifier.fillMaxSize(disc).then(art.iconGround()))
         content()
         // Over the content, so a press shows on the icon; an icon of no shape keeps its own outline, which a ripple
         // bounded to its square would cut across.
