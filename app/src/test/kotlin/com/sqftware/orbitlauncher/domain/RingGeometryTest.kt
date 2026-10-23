@@ -307,8 +307,41 @@ class RingGeometryTest {
 
     @Test
     fun `the free arc is the whole ring when nothing is in the way`() {
-        assertEquals(RingArc.Whole, freeArc(emptyList(), 150f, 60f, 4f))
-        assertEquals(RingArc.Whole, freeArc(listOf(Bounds(-200f, 200f, 200f, 300f)), 150f, 60f, 4f))
+        assertEquals(RingArc.Whole, freeArc(emptyList(), 150f..150f, 60f, 4f))
+        assertEquals(RingArc.Whole, freeArc(listOf(Bounds(-200f, 200f, 200f, 300f)), 150f..150f, 60f, 4f))
+    }
+
+    private fun RingArc.holds(angle: Double): Boolean {
+        val turns = ((angle - from) % (2 * PI) + 2 * PI) % (2 * PI)
+        return turns <= sweep
+    }
+
+    @Test
+    fun `the free arc keeps clear at every radius the ring may take`() {
+        val box = Bounds(-170f, -20f, -110f, 40f)
+        val near = freeArc(listOf(box), 120f..120f, 60f, 4f)
+        val far = freeArc(listOf(box), 180f..180f, 60f, 4f)
+        val both = freeArc(listOf(box), 120f..180f, 60f, 4f)
+        assertTrue(both.sweep <= minOf(near.sweep, far.sweep))
+    }
+
+    @Test
+    fun `room for a name keeps the arc off a box just below an icon`() {
+        val box = Bounds(-170f, 40f, -130f, 70f)
+        val left = 1.5 * PI
+        assertTrue(freeArc(listOf(box), 150f..150f, 60f, 4f).holds(left))
+        assertFalse(freeArc(listOf(box), 150f..150f, 60f, 4f, drop = 30f).holds(left))
+    }
+
+    @Test
+    fun `a name stops short of a box beside it`() {
+        val wide = NameWidths(300f)
+        val open = HangingNames(4f, 16f, 4f, listOf(wide, null, null, null))
+        val boxed = open.copy(blocked = listOf(Bounds(50f, -240f, 80f, -200f)))
+        val alone = open.rooms(40f, 250f, 600f).first()
+        val beside = boxed.rooms(40f, 250f, 600f).first()
+        assertEquals(2 * (50f - 4f), beside.width, 1e-3f)
+        assertTrue(beside.width < alone.width)
     }
 
     @Test
@@ -316,7 +349,7 @@ class RingGeometryTest {
         val radius = 150f
         val reach = 34f
         val box = Bounds(-170f, -20f, -110f, 40f)
-        val arc = freeArc(listOf(box), radius, 60f, 4f)
+        val arc = freeArc(listOf(box), radius..radius, 60f, 4f)
         assertFalse(arc.whole)
         fun clear(angle: Double): Boolean {
             val x = radius * sin(angle).toFloat()

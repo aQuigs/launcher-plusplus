@@ -5,12 +5,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpRect
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Steps
 import com.sqftware.orbitlauncher.domain.Theme
@@ -30,6 +34,7 @@ class StatusOrbsTest {
     private var ring by mutableStateOf(emptyList<RingItem>())
     private var vitals by mutableStateOf(Vitals(battery = 87, storageFree = 64, steps = Steps.Today(4_200)))
     private var spins by mutableStateOf(true)
+    private var names by mutableStateOf(false)
     private val opened = mutableListOf<Any>()
 
     private fun show() = compose.setContent {
@@ -45,6 +50,7 @@ class StatusOrbsTest {
                     onCloseFolder = {},
                     onEdit = {},
                     onSearch = {},
+                    names = names,
                 )
             }
         }
@@ -76,19 +82,29 @@ class StatusOrbsTest {
     }
 
     @Test
-    fun ringsOfAnySizeKeepTheirAppsOffTheOrbs() {
+    fun ringsOfAnySizeKeepTheirAppsAndNamesOffTheOrbs() {
         show()
-        (1..14).forEach { count ->
-            ring = alphabet.take(count).asRingItems()
-            compose.waitForIdle()
+        listOf(false, true).forEach { named ->
+            names = named
+            (1..14).forEach { count ->
+                ring = alphabet.take(count).asRingItems()
+                compose.waitForIdle()
 
-            val orbBounds = orbs.map { compose.onNodeWithContentDescription(it).getUnclippedBoundsInRoot() }
-            alphabet.take(count).forEach { app ->
-                val slot = compose.ringSlot(app).getUnclippedBoundsInRoot()
-                orbBounds.forEachIndexed { i, orb -> assertFalse("${app.label} of $count on ${orbs[i]}", slot.overlaps(orb)) }
+                val orbBounds = orbs.map { compose.onNodeWithContentDescription(it).getUnclippedBoundsInRoot() }
+                alphabet.take(count).forEach { app ->
+                    val slot = compose.ringSlot(app).getUnclippedBoundsInRoot()
+                    val shown = listOf(slot) + if (named) nameOf(app) else emptyList()
+                    shown.forEach { box ->
+                        orbBounds.forEachIndexed { i, orb -> assertFalse("${app.label} of $count, names $named, on ${orbs[i]}", box.overlaps(orb)) }
+                    }
+                }
             }
         }
     }
+
+    private fun nameOf(app: AppEntry) =
+        compose.onAllNodes(hasText(app.label) and hasAnyAncestor(hasTestTag(HomeRingTags.slot(app))), useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot.let { b -> with(compose.density) { DpRect(b.left.toDp(), b.top.toDp(), b.right.toDp(), b.bottom.toDp()) } } }
 
     private fun DpRect.overlaps(other: DpRect) = left < other.right && other.left < right && top < other.bottom && other.top < bottom
 }
