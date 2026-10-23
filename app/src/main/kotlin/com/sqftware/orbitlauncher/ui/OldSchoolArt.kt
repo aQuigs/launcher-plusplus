@@ -382,7 +382,7 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
-    /** The status orbs down the frame's left, each a node of its own with its own tap, as the world map's orb is. */
+    /** The status orbs down the frame's left, each a button of its own, as the world map's orb is. */
     @Composable
     private fun BoxScope.StatusOrbs(shown: VitalsShown, px: Int) {
         val vitals by remember(shown) { derivedStateOf(shown.read) }
@@ -395,15 +395,11 @@ object OldSchoolArt : ThemeArt {
                 val fill = sprite(orb.fill)
                 val icon = sprite(orb.icon)
                 val tap by rememberUpdatedState(orb.onTap)
+                val onTap = remember { { tap() } }
                 Spacer(
                     Modifier
                         .matchParentSize()
-                        .layout { measurable, constraints ->
-                            val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
-                            val box = orb.orb.boxIn(size, mapScale(size, px))
-                            val placeable = measurable.measure(Constraints.fixed(box.width.roundToInt(), box.height.roundToInt()))
-                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(box.left.roundToInt(), box.top.roundToInt()) }
-                        }
+                        .emblemButton(px, orb.label, onTap) { size, scale -> orb.orb.boxIn(size, scale) }
                         .drawWithCache {
                             val scale = (size.width / STATUS_ORB_SIZE.width).roundToInt()
                             val number = orb.value?.let { measurer.measure(it.toString(), gameSmallType(scale, density).copy(color = orbNumber(it))) }
@@ -420,19 +416,16 @@ object OldSchoolArt : ThemeArt {
                                     drawText(it, topLeft = Offset((middle.x - it.size.width / 2f).roundToInt().toFloat(), (middle.y - it.size.height / 2f).roundToInt().toFloat()))
                                 }
                             }
-                        }
-                        .pointerInput(Unit) { detectTapGestures(onLongPress = {}) { tap() } }
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = orb.label
-                            role = Role.Button
-                            onClick { tap(); true }
                         },
                 )
             }
         }
     }
 
-    /** The orbs hang among the ring's icons, which keep clear of them. */
+    /**
+     * The orbs hang among the ring's icons, which keep clear of them. The compass socket and the world map's orb reach
+     * past the frame too, but only a little, and keeping clear of them as well would leave the ring a short arc.
+     */
     @Composable
     override fun emblemReach(): (Size) -> List<Bounds> {
         val px = gamePixel
@@ -454,31 +447,33 @@ object OldSchoolArt : ThemeArt {
         Spacer(
             Modifier
                 .matchParentSize()
-                .layout { measurable, constraints ->
-                    val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
-                    val scale = mapScale(size, px)
-                    val side = 2 * WORLD_MAP_ORB_RADIUS * scale
-                    val placeable = measurable.measure(Constraints.fixed(side, side))
-                    val at = worldMapOrbAt(size, scale)
-                    layout(constraints.maxWidth, constraints.maxHeight) {
-                        placeable.place((at.x - side / 2f).roundToInt(), (at.y - side / 2f).roundToInt())
-                    }
-                }
+                .emblemButton(px, "World map", open) { size, scale -> Rect(worldMapOrbAt(size, scale), WORLD_MAP_ORB_RADIUS * scale.toFloat()) }
                 .drawBehind {
                     val scale = (size.width / (2 * WORLD_MAP_ORB_RADIUS)).roundToInt()
                     drawSpriteCentred(orb, center, scale)
                     drawSpriteCentred(globe, center, scale)
-                }
-                // Its own tap, taken before the emblem's, which would search or, held, edit the ring.
-                .pointerInput(open) { detectTapGestures(onLongPress = {}) { open() } }
-                // A node of its own, or it would merge into the emblem's and lose its tap to the emblem's search.
-                .semantics(mergeDescendants = true) {
-                    contentDescription = "World map"
-                    role = Role.Button
-                    onClick { open(); true }
                 },
         )
     }
+
+    /**
+     * A button hung on the emblem, laid at the [box] it takes on an emblem of a size whose minimap is drawn at a scale:
+     * its own tap, taken before the emblem's, which would search or, held, edit the ring, on a node of its own, or it
+     * would merge into the emblem's and lose its tap to the emblem's search.
+     */
+    private fun Modifier.emblemButton(px: Int, label: String, onTap: () -> Unit, box: (Size, Int) -> Rect) = this
+        .layout { measurable, constraints ->
+            val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+            val at = box(size, mapScale(size, px))
+            val placeable = measurable.measure(Constraints.fixed(at.width.roundToInt(), at.height.roundToInt()))
+            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(at.left.roundToInt(), at.top.roundToInt()) }
+        }
+        .pointerInput(onTap) { detectTapGestures(onLongPress = {}) { onTap() } }
+        .semantics(mergeDescendants = true) {
+            contentDescription = label
+            role = Role.Button
+            onClick { onTap(); true }
+        }
 
     /**
      * The emblem clips to the frame and its compass socket, which reach past its cell, so both show whole, to the world

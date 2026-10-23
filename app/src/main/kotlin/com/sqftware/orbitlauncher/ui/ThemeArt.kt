@@ -219,7 +219,7 @@ interface ThemeArt {
      * spreads its icons round rather than over. By default nothing.
      */
     @Composable
-    fun emblemReach(): (Size) -> List<Bounds> = { emptyList() }
+    fun emblemReach(): (Size) -> List<Bounds> = NoReach
 
     /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
     val foldersOpenRoundEmblem: Boolean
@@ -299,3 +299,5 @@ class FolderStyle(
 )
 
 val LocalFolderStyle = compositionLocalOf { FolderStyle(Theme.Space.folderLooks.first()) }
+
+private val NoReach: (Size) -> List<Bounds> = { emptyList() }

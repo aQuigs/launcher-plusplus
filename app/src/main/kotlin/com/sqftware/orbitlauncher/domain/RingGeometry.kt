@@ -4,7 +4,6 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -76,15 +75,18 @@ private const val RADIUS_SAMPLES = 8
  */
 fun freeArc(blocked: List<Bounds>, radii: ClosedFloatingPointRange<Float>, iconSize: Float, air: Float, drop: Float = 0f): RingArc {
     val half = iconSize / 2
+    fun near(dx: Float, dy: Float, reach: Float) = dx * dx + dy * dy < reach * reach
     fun clear(x: Float, y: Float) = blocked.none {
-        hypot(maxOf(it.left - x, 0f, x - it.right), maxOf(it.top - y, 0f, y - it.bottom)) < half + air ||
-            drop > 0 && hypot(maxOf(it.left - x - half, 0f, x - half - it.right), maxOf(it.top - y - half - drop, 0f, y - it.bottom)) < air
+        near(maxOf(it.left - x, 0f, x - it.right), maxOf(it.top - y, 0f, y - it.bottom), half + air) ||
+            drop > 0 && near(maxOf(it.left - x - half, 0f, x - half - it.right), maxOf(it.top - y - half - drop, 0f, y - it.bottom), air)
     }
     val free = List(ARC_SAMPLES) { sample ->
         val angle = 2 * PI * sample / ARC_SAMPLES
+        val across = sin(angle).toFloat()
+        val down = -cos(angle).toFloat()
         (0..RADIUS_SAMPLES).all {
             val radius = radii.start + (radii.endInclusive - radii.start) * it / RADIUS_SAMPLES
-            clear(radius * sin(angle).toFloat(), -radius * cos(angle).toFloat())
+            clear(radius * across, radius * down)
         }
     }
     if (free.all { it } || free.none { it }) return RingArc.Whole
@@ -242,8 +244,8 @@ private fun HangingNames.room(index: Int, places: List<Pair<Float, Float>>, size
 
     clear(0f, 0f, side * EMBLEM_FRACTION / 2)
     // A box beside the name's lines keeps it off; one across its middle leaves it no room.
-    blocked.filter { it.top < bottom + air && it.bottom > top - air }.forEach {
-        half = minOf(half, maxOf(it.left - x, x - it.right) - air)
+    blocked.forEach {
+        if (it.top < bottom + air && it.bottom > top - air) half = minOf(half, maxOf(it.left - x, x - it.right) - air)
     }
     places.forEachIndexed { other, (ox, oy) ->
         if (other == index) return@forEachIndexed

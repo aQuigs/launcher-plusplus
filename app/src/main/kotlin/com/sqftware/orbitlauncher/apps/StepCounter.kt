@@ -15,14 +15,13 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.core.content.edit
 import com.sqftware.orbitlauncher.domain.StepTally
 import com.sqftware.orbitlauncher.domain.Steps
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import java.time.Instant
@@ -42,14 +41,11 @@ interface StepCounter {
     /** Today's [Steps] as they stand. */
     fun stepsNow(): Steps
 
-    /**
-     * Today's [Steps], now and as they change, for as long as it is collected. Collecting it with the grant starts the
-     * count, which goes on out of sight until [stop].
-     */
+    /** Today's [Steps], now and as they change. */
     fun steps(): Flow<Steps>
 
-    /** Stops counting. */
-    fun stop()
+    /** Counts the steps, in sight or not, whenever the user lets it, until cancelled. */
+    suspend fun count()
 
     /** Opens the user's fitness app, if they have one. */
     fun openFitness()
@@ -66,12 +62,10 @@ private const val BATCH_MICROS = 60_000_000
 private const val SAVE_MILLIS = 30_000L
 
 /**
- * The phone's step counter, which counts from each boot, and only while some app listens: so the launcher listens from
- * the first time its steps are collected with the grant until [stop], in sight or not, and keeps its tally of the day in
- * its own preferences. The permission is asked through the activity's [registry]; the adapter lives as long as the
- * activity.
+ * The phone's step counter, which counts from each boot, and only while some app listens: so the launcher listens for as
+ * long as it [count]s, in sight or not, and keeps its tally of the day in its own preferences. The permission is asked
+ * through the activity's [registry]; the adapter lives as long as the activity.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class SensorStepCounter(private val context: Context, registry: ActivityResultRegistry) : StepCounter {
     private val sensors = context.getSystemService(SensorManager::class.java)
     private val sensor = sensors.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
@@ -110,39 +104,35 @@ class SensorStepCounter(private val context: Context, registry: ActivityResultRe
 
     override fun answers(): Flow<Boolean> = answered.receiveAsFlow()
 
-    override fun stepsNow(): Steps = when {
-        sensor == null -> Steps.Unavailable
-        !isGranted() -> Steps.NotAllowed
-        else -> Steps.Today(todayOf(tally.value))
-    }
+    override fun stepsNow() = stepsOf(isGranted(), tally.value)
 
-    // The grant is read again each time, since it can be given or taken away in Settings.
+    // The grant is read again each time the steps come into sight, since it can be given in Settings, which starts the
+    // count; and what the counter has batched is asked for, so they show the steps up to now.
     override fun steps(): Flow<Steps> =
-        if (sensor == null) {
-            flowOf(Steps.Unavailable)
-        } else {
-            allowed.onStart { allowed.value = isGranted() }.flatMapLatest { granted -> if (granted) counted() else flowOf(Steps.NotAllowed) }
-        }
+        combine(allowed.onStart { allowed.value = isGranted() }, tally, ::stepsOf)
+            .onStart { if (listening) sensors.flush(listener) }
+            .distinctUntilChanged()
 
-    // Asks for what the counter has batched, so the launcher coming into sight shows the steps up to now.
-    private fun counted(): Flow<Steps> = tally
-        .onStart { if (start()) sensors.flush(listener) }
-        .map { Steps.Today(todayOf(it)) }
-        .distinctUntilChanged()
-
-    /** Starts listening if it is not already, and says whether it is. */
-    private fun start(): Boolean {
-        if (!listening && sensor != null && isGranted()) {
+    override suspend fun count() {
+        if (sensor == null) return
+        allowed.collectLatest { granted ->
+            if (!granted) return@collectLatest
             listening = sensors.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL, BATCH_MICROS)
+            try {
+                if (listening) sensors.flush(listener)
+                awaitCancellation()
+            } finally {
+                sensors.unregisterListener(listener)
+                listening = false
+                tally.value?.let(::save)
+            }
         }
-        return listening
     }
 
-    override fun stop() {
-        if (!listening) return
-        sensors.unregisterListener(listener)
-        listening = false
-        tally.value?.let(::save)
+    private fun stepsOf(granted: Boolean, tally: StepTally?) = when {
+        sensor == null -> Steps.Unavailable
+        !granted -> Steps.NotAllowed
+        else -> Steps.Today(todayOf(tally))
     }
 
     override fun openFitness() = startOrLog(STEPS_TAG, "a fitness app") {
