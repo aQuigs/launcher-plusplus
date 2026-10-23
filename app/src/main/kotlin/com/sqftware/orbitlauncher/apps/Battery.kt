@@ -1,16 +1,13 @@
 package com.sqftware.orbitlauncher.apps
 
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
-import androidx.core.content.ContextCompat
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 interface Battery {
     /** How charged the battery is, out of 100, now and as it changes, for as long as it is collected. */
@@ -22,19 +19,14 @@ interface Battery {
 
 private const val BATTERY_TAG = "SystemBattery"
 
-/** The battery as the system broadcasts it, which it does at once to a new receiver and again on every change. */
+/** The battery's charge, read again on every change the system broadcasts. */
 class SystemBattery(private val context: Context) : Battery {
-    override fun charge(): Flow<Int> = callbackFlow {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                if (level >= 0 && scale > 0) trySend(level * 100 / scale)
-            }
-        }
-        ContextCompat.registerReceiver(context, receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
-        awaitClose { context.unregisterReceiver(receiver) }
-    }.conflate().distinctUntilChanged()
+    private val battery = context.getSystemService(BatteryManager::class.java)
+
+    override fun charge(): Flow<Int> = context.broadcasts(IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        .map { battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) }
+        .filter { it in 0..100 }
+        .distinctUntilChanged()
 
     override fun open() = startOrLog(BATTERY_TAG, "battery usage") {
         context.startActivity(Intent(Intent.ACTION_POWER_USAGE_SUMMARY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
