@@ -168,10 +168,10 @@ private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_
 private fun compassAt(size: Size, scale: Int) = size.center + ((COMPASS_CENTRE - FRAME_HOLE_CENTRE) * scale).toOffset()
 
 /**
- * The world map's orb, where the game's resizable interface hangs it off the minimap's frame, by its lower right edge:
- * where it is centred from the map's centre, and its radius.
+ * The world map's orb, where the game's modern resizable interface sets it on the minimap's frame, its centre on the
+ * frame's lower right edge: where it is centred from the map's centre, and its radius.
  */
-private val WORLD_MAP_ORB = IntOffset(63, 78)
+private val WORLD_MAP_ORB = IntOffset(64, 53)
 private const val WORLD_MAP_ORB_RADIUS = 15
 
 private fun worldMapOrbAt(size: Size, scale: Int) = size.center + (WORLD_MAP_ORB * scale).toOffset()
