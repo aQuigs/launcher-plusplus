@@ -78,12 +78,12 @@ val WorldMapVoid = Color.Black
 val WorldMapInk = Color.White
 
 /**
- * The number beside a status orb, [value] out of [top], in the colour the game gives it: green when full, through
- * yellow at half, to red when empty.
+ * The number beside a status orb, [value] out of 100, in the colour the game gives it: green when full, through yellow
+ * at half, to red when empty.
  */
-fun orbNumber(value: Int, top: Int = 100): Color {
-    val half = top / 2
-    val shown = value.coerceIn(0, top)
+fun orbNumber(value: Int): Color {
+    val half = 50
+    val shown = value.coerceIn(0, 100)
     return if (shown > half) {
         Color(255 - 255 * (shown - half) / half, 255, 0)
     } else {

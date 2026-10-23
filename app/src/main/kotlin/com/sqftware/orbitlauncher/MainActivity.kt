@@ -124,7 +124,6 @@ class MainActivity : ComponentActivity() {
     private val pinRequests = pinRequestChannel.receiveAsFlow()
     private lateinit var repository: LauncherAppsRepository
     private lateinit var widgetHost: SystemWidgetHost
-    private lateinit var stepCounter: SensorStepCounter
     private var barsLight: Boolean? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -169,8 +168,7 @@ class MainActivity : ComponentActivity() {
         val headingSource = SensorHeadingSource(this, location)
         val battery = SystemBattery(this)
         val storage = SystemStorage(this)
-        stepCounter = SensorStepCounter(this, activityResultRegistry)
-        val steps = stepCounter
+        val steps = SensorStepCounter(this, activityResultRegistry)
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)
         val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
@@ -349,12 +347,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                // Like the clock, only while the launcher is visible and a theme shows them; the step counter counts on
-                // while it is out of sight, until a theme no longer shows it. Which orbs show is known from the first
-                // frame, so the ring does not move when the readings come.
+                // Like the clock, only while the launcher is visible and a theme shows them, but the steps are counted
+                // out of sight too, for as long as a theme shows them. Which orbs show is known from the first frame, so
+                // the ring does not move when the readings come.
                 val showsVitals = shownTheme.showsVitals
-                val vitals = produceState(Vitals(steps = steps.stepsNow()), showsVitals) {
-                    if (!showsVitals) steps.stop()
+                LaunchedEffect(showsVitals) { if (showsVitals) steps.count() }
+                val vitals = produceState(remember(showsVitals) { Vitals(steps = steps.stepsNow()) }, showsVitals) {
                     if (showsVitals) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             combine(battery.charge(), storage.free(), steps.steps()) { charge, free, counted -> Vitals(charge, free, counted) }
@@ -571,11 +569,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    override fun onDestroy() {
-        stepCounter.stop()
-        super.onDestroy()
     }
 
     // The widget host's configuration step is an activity API that answers here, not through the result registry, which
