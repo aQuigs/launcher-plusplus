@@ -2291,13 +2291,16 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aSpinThatPassesAMilestoneSaysSo() {
-        spinStats = SpinStats(spins = 9)
+    fun aSpinSaysEachRecordItBeatAndMilestoneItPassedInTurn() {
+        spinStats = SpinStats(spins = 19)
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         spinDownTheRingsSide()
 
-        compose.onNodeWithText("Milestone: 10 spins", substring = true).assertIsDisplayed()
+        fun shows(text: String) = compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+        compose.waitUntil(10_000) { shows("New record: top speed") }
+        compose.waitUntil(10_000) { shows("Milestone: 20 spins") }
+        compose.onNodeWithText("New record: top speed", substring = true).assertDoesNotExist()
     }
 
     @Test

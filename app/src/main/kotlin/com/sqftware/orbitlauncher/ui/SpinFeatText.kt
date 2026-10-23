@@ -24,19 +24,13 @@ fun SpinRecord.bestText(best: Double, locale: Locale): String = when (this) {
     SpinRecord.BusiestDay -> counted(best.toInt(), "spin")
 }
 
-/**
- * [feats] as a notice, a line for the records and one for each milestone, or null if there are none. A record is
- * news only when it shows higher: 120.4 rpm over 120.2 still shows as 120. Several records at once are only named, as
- * one fling often sets three and a notice is up for a moment.
- */
-fun spinFeatsText(feats: SpinFeats, locale: Locale): String? {
-    val records = feats.records.filter { it.record.bestText(it.now, locale) != it.record.bestText(it.was, locale) }
-    val recordLine = when (records.size) {
-        0 -> null
-        1 -> records.single().let { "New record: ${it.record.label.lowercase()}, ${it.record.bestText(it.now, locale)}" }
-        else -> records.map { it.record.label.lowercase() }.let { "New records: ${it.dropLast(1).joinToString(", ")} and ${it.last()}" }
+/** A notice for each of [feats]. A record is news only when it shows higher: 120.4 rpm over 120.2 still shows as 120. */
+fun spinFeatTexts(feats: SpinFeats, locale: Locale): List<String> {
+    val records = feats.records.mapNotNull { (record, was, now) ->
+        val best = record.bestText(now, locale)
+        "New record: ${record.label.lowercase()}, $best".takeIf { best != record.bestText(was, locale) }
     }
-    val milestoneLines = feats.milestones.map {
+    val milestones = feats.milestones.map {
         when (it) {
             is Milestone.Spins -> "Milestone: ${String.format(locale, "%,d", it.spins)} spins"
             is Milestone.Distance -> with(it.mark) {
@@ -45,5 +39,5 @@ fun spinFeatsText(feats: SpinFeats, locale: Locale): String? {
             }
         }
     }
-    return (listOfNotNull(recordLine) + milestoneLines).takeIf { it.isNotEmpty() }?.joinToString("\n")
+    return records + milestones
 }

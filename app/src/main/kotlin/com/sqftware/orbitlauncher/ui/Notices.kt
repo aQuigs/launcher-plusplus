@@ -31,20 +31,23 @@ const val NOTICE_MILLIS = 2_000L
 class Notices {
     private class Shown(val text: String)
 
-    private var shown by mutableStateOf<Shown?>(null)
+    private var queue by mutableStateOf<List<Shown>>(emptyList())
 
     /** Puts up [text]; again while it shows starts its moment over. */
-    fun show(text: String) {
-        shown = Shown(text)
+    fun show(text: String) = showEach(listOf(text))
+
+    /** Puts up each of [texts] in turn for a moment each, in place of any showing or still to come; none changes nothing. */
+    fun showEach(texts: List<String>) {
+        if (texts.isNotEmpty()) queue = texts.map(::Shown)
     }
 
-    /** Draws the note showing, if any, until its moment is up. */
+    /** Draws the note showing, if any, until its moment is up, then the next. */
     @Composable
     fun Host(modifier: Modifier = Modifier) {
-        val note = shown ?: return
+        val note = queue.firstOrNull() ?: return
         LaunchedEffect(note) {
             delay(NOTICE_MILLIS)
-            if (shown === note) shown = null
+            if (queue.firstOrNull() === note) queue = queue.drop(1)
         }
         NoticeLabel(note.text, modifier)
     }

@@ -1261,7 +1261,7 @@ fun LauncherScreen(
 
     LaunchedEffect(notices) { notices.collect(shownNotices::show) }
     val locale = LocalLocale.current.platformLocale
-    val spun: (Spin) -> Unit = { spin -> spinFeatsText(onSpin(spin), locale)?.let(shownNotices::show) }
+    val spun: (Spin) -> Unit = { spin -> shownNotices.showEach(spinFeatTexts(onSpin(spin), locale)) }
     LaunchedEffect(homePresses, pagerState, drawerState) {
         homePresses.collect { press ->
             closeAll()
