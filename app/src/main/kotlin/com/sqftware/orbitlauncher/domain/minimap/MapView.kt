@@ -4,11 +4,17 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.min
 
-/** How far the world map's view comes to the edge of its painting before the next is painted, in map pixels. */
-private const val REPAINT_MARGIN = 96.0
+/**
+ * The ground the world map paints round its view on every side, in map pixels: at the minimap's scale, enough that a
+ * quick swipe across most of a phone's screen ends on painted ground before the next painting lands.
+ */
+private const val PAN_ROOM = 512
 
-/** The ground the world map paints round its view on every side, so the view pans a while before the next painting. */
-private const val PAN_ROOM = 256
+/**
+ * How far the world map's view comes to the edge of its painting before the next is painted: soon after a pan starts,
+ * as a painting takes time in step with its area, most of a second for one this roomy.
+ */
+private const val REPAINT_MARGIN = PAN_ROOM - 64.0
 
 /**
  * The ground painted round a view that has run past its painting: little, so the gap is soon covered, and less than the
