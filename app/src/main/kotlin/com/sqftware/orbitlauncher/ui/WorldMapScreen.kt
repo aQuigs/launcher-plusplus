@@ -1,6 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
@@ -71,13 +71,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * The game's "you are here" star turns anticlockwise a quarter turn at a time, in two eased eighths: it rests as a
- * cross, swings to upright, pauses there a moment and swings on to a cross again.
+ * The game's "you are here" star turns counterclockwise a quarter turn at a time: it rests as a cross, then sweeps
+ * steadily around to the next cross without stopping upright, easing only at the ends. Timed frame by frame from a
+ * recording of the game.
  */
-private const val YOU_ARE_HERE_REST_MS = 300
-private const val YOU_ARE_HERE_SWING_MS = 200
-private const val YOU_ARE_HERE_PAUSE_MS = 100
-private const val YOU_ARE_HERE_QUARTER_MS = YOU_ARE_HERE_REST_MS + 2 * YOU_ARE_HERE_SWING_MS + YOU_ARE_HERE_PAUSE_MS
+private const val YOU_ARE_HERE_REST_MS = 270
+private const val YOU_ARE_HERE_SWING_MS = 530
+private const val YOU_ARE_HERE_QUARTER_MS = YOU_ARE_HERE_REST_MS + YOU_ARE_HERE_SWING_MS
+private val YouAreHereSwing = CubicBezierEasing(0.3f, 0.1f, 0.7f, 0.9f)
 
 object WorldMapTags {
     const val MAP = "world_map"
@@ -226,9 +227,7 @@ private fun youAreHereTurn(): State<Float> = rememberInfiniteTransition(label = 
                 val from = quarter * YOU_ARE_HERE_QUARTER_MS
                 val cross = -90f * quarter
                 cross at from using LinearEasing
-                cross at from + YOU_ARE_HERE_REST_MS using FastOutSlowInEasing
-                cross - 45f at from + YOU_ARE_HERE_REST_MS + YOU_ARE_HERE_SWING_MS using LinearEasing
-                cross - 45f at from + YOU_ARE_HERE_REST_MS + YOU_ARE_HERE_SWING_MS + YOU_ARE_HERE_PAUSE_MS using FastOutSlowInEasing
+                cross at from + YOU_ARE_HERE_REST_MS using YouAreHereSwing
             }
         },
     ),
