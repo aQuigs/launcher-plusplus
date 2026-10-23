@@ -114,6 +114,7 @@ import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.WidgetSizing
+import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.pairOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -305,7 +306,11 @@ class LauncherScreenTest {
             ringSpin = ringSpin,
             onRingSpinChange = { ringSpin = it },
             spinStats = spinStats,
-            onSpin = { spinStats = spinStats.add(it, on = LocalDate.of(2026, 10, 21)) },
+            onSpin = {
+                val before = spinStats
+                spinStats = before.add(it, on = LocalDate.of(2026, 10, 21))
+                spinStats.feats(before)
+            },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
@@ -2139,17 +2144,23 @@ class LauncherScreenTest {
         nameOn(clock).assertExists()
     }
 
-    @Test
-    fun aSpinOfTheRingCountsInTheSpinStatsTheMenuShows() {
-        homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
-        show()
+    /** A quick drag down the right side of a ring holding [clock] at the top and [mail] at the bottom. */
+    private fun spinDownTheRingsSide() {
         val top = centreOf(compose.ringSlot(clock))
+        // Two apps sit at the top and the bottom, so the ring's right side is half their gap out from its centre.
         val bottom = centreOf(compose.ringSlot(mail))
         val side = (top + bottom) / 2f + Offset((bottom.y - top.y) / 2, 0f)
         compose.onRoot().performTouchInput {
             val along = Offset(0f, 60.dp.toPx())
             swipe(side - along, side + along, 80)
         }
+    }
+
+    @Test
+    fun aSpinOfTheRingCountsInTheSpinStatsTheMenuShows() {
+        homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
+        show()
+        spinDownTheRingsSide()
 
         compose.runOnIdle {
             assertEquals(1, spinStats.spins)
@@ -2167,19 +2178,12 @@ class LauncherScreenTest {
     fun aDragDownTheRingsSideSpinsItUntilTheMenusSpinRowTurnsSpinningOffWhileASwipeAcrossTheTopTurnsThePage() {
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
-        val top = centreOf(compose.ringSlot(clock))
-        // Two apps sit at the top and the bottom, so the ring's right side is half their gap out from its centre.
-        val bottom = centreOf(compose.ringSlot(mail))
-        val side = (top + bottom) / 2f + Offset((bottom.y - top.y) / 2, 0f)
-        fun dragDownTheSide() = compose.onRoot().performTouchInput {
-            val along = Offset(0f, 60.dp.toPx())
-            swipe(side - along, side + along, 80)
-        }
 
-        dragDownTheSide()
+        spinDownTheRingsSide()
         assertSettledOn(LauncherPage.Home)
         compose.runOnIdle { assertEquals(0, notificationsOpened) }
 
+        val top = centreOf(compose.ringSlot(clock))
         compose.onRoot().performTouchInput {
             val across = Offset(60.dp.toPx(), 0f)
             swipe(top + across, top - across, 80)
@@ -2193,7 +2197,7 @@ class LauncherScreenTest {
         compose.runOnIdle { assertFalse(ringSpin) }
         Espresso.pressBack()
 
-        dragDownTheSide()
+        spinDownTheRingsSide()
         compose.runOnIdle { assertEquals(1, notificationsOpened) }
     }
 
@@ -2287,19 +2291,26 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun aSpinSaysEachRecordItBeatAndMilestoneItPassedInTurn() {
+        spinStats = SpinStats(spins = 19)
+        homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
+        show()
+        spinDownTheRingsSide()
+
+        fun shows(text: String) = compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+        compose.waitUntil(10_000) { shows("New record: top speed") }
+        compose.waitUntil(10_000) { shows("Milestone: 20 spins") }
+        compose.onNodeWithText("New record: top speed", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun theRingSpinsWhileTheEmblemOffersTheMap() {
         theme = Theme.OldSchool
         whereIAm = WhereIAm.Refused
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         compose.onNodeWithText(SHOW_WHERE_I_AM).assertExists()
-        val top = centreOf(compose.ringSlot(clock))
-        val bottom = centreOf(compose.ringSlot(mail))
-        val side = (top + bottom) / 2f + Offset((bottom.y - top.y) / 2, 0f)
-        compose.onRoot().performTouchInput {
-            val along = Offset(0f, 60.dp.toPx())
-            swipe(side - along, side + along, 80)
-        }
+        spinDownTheRingsSide()
 
         compose.runOnIdle { assertEquals(1, spinStats.spins) }
     }

@@ -33,7 +33,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.sqftware.orbitlauncher.domain.SpinRecord
 import com.sqftware.orbitlauncher.domain.SpinStats
+import com.sqftware.orbitlauncher.domain.best
 import com.sqftware.orbitlauncher.domain.distanceText
 import com.sqftware.orbitlauncher.domain.durationText
 import com.sqftware.orbitlauncher.domain.yardstickText
@@ -85,11 +87,7 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
                     note = yardstickText(stats.distance, locale),
                 )
                 RecordSection("Records") {
-                    RecordRow(LoopGlyph, "Most in one spin", "${decimal(stats.mostTurns, 1)} turns")
-                    RecordRow(SpeedGlyph, "Top speed", "${decimal(stats.topRpm, 0)} rpm")
-                    RecordRow(TimerGlyph, "Longest coast", durationText(stats.longestCoast, locale))
-                    RecordRow(StreakGlyph, "Longest streak", counted(stats.longestStreak, "day"))
-                    RecordRow(DayGlyph, "Busiest day", counted(stats.busiestDay, "spin"))
+                    SpinRecord.entries.forEach { RecordRow(it.glyph, it.label, it.bestText(stats.best(it), locale)) }
                 }
                 RecordSection("All time") {
                     RecordRow(HourglassGlyph, "Time coasting", durationText(stats.coasting, locale))
@@ -189,6 +187,15 @@ private fun RecordRow(glyph: ImageVector, label: String, value: String) {
         Text(value, style = MaterialTheme.typography.titleSmall)
     }
 }
+
+private val SpinRecord.glyph
+    get() = when (this) {
+        SpinRecord.MostTurns -> LoopGlyph
+        SpinRecord.TopRpm -> SpeedGlyph
+        SpinRecord.LongestCoast -> TimerGlyph
+        SpinRecord.LongestStreak -> StreakGlyph
+        SpinRecord.BusiestDay -> DayGlyph
+    }
 
 private val RotateRightGlyph = materialGlyph(
     "RotateRight",

@@ -21,7 +21,7 @@ data class Spin(val clockwise: Double, val anticlockwise: Double, val letGo: Dou
  * Every spin so far: how many there were, how many whole turns they made each way, how far the icons on the rim
  * travelled, in metres, and how long they coasted, in seconds, with the records: the most turns in one spin, the
  * fastest let go, in turns a minute, the longest coast, in seconds, the most days running with a spin, and the most
- * spins in a day. [lastDay], the epoch day of the latest spin or 0 before any, with its [lastDaySpins] and the [streak] of days
+ * spins in a day, with the most on any day before the last, [busiestEarlierDay]. [lastDay], the epoch day of the latest spin or 0 before any, with its [lastDaySpins] and the [streak] of days
  * running up to it, are what the next day's spin carries on from.
  */
 data class SpinStats(
@@ -36,6 +36,7 @@ data class SpinStats(
     val daysSpun: Int = 0,
     val longestStreak: Int = 0,
     val busiestDay: Int = 0,
+    val busiestEarlierDay: Int = 0,
     val lastDay: Long = 0,
     val lastDaySpins: Int = 0,
     val streak: Int = 0,
@@ -67,6 +68,7 @@ data class SpinStats(
             daysSpun = if (sameDay) daysSpun else daysSpun + 1,
             longestStreak = max(longestStreak, streak),
             busiestDay = max(busiestDay, daySpins),
+            busiestEarlierDay = if (sameDay) busiestEarlierDay else busiestDay,
             lastDay = day,
             lastDaySpins = daySpins,
             streak = streak,

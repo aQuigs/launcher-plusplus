@@ -38,6 +38,23 @@ class UnitsTest {
     }
 
     @Test
+    fun `a round number steps up through 1, 2 and 5 times a power of ten`() {
+        assertEquals(listOf(0L, 1, 2, 2, 5, 5, 10, 20, 50, 100, 1_000), listOf(0L, 1, 2, 4, 5, 9, 19, 49, 99, 100, 1_999).map(::oneTwoFive))
+    }
+
+    @Test
+    fun `a distance marks the round count of the longest yardstick a meter or more long it reaches`() {
+        fun mark(metres: Double, locale: Locale = Locale.UK) = yardstickMark(metres)?.let { yardstickMarkText(it, locale) }
+
+        assertNull(mark(5.0))
+        assertEquals("a giraffe", mark(5.5))
+        assertEquals("2 giraffes", mark(16.0))
+        assertEquals("an Eiffel Tower", mark(330.0))
+        assertEquals("2 football pitches", mark(210.0))
+        assertEquals("2 football fields", mark(210.0, Locale.US))
+    }
+
+    @Test
     fun `a duration reads in seconds, then minutes, then hours`() {
         assertEquals("12.5 s", durationText(12.5, Locale.UK))
         assertEquals("1 min 0 s", durationText(59.96, Locale.UK))
