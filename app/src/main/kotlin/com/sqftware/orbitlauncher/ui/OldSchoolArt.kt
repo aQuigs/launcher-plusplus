@@ -533,10 +533,6 @@ object OldSchoolArt : ThemeArt {
         }
     }
 
-    /** The home page keeps only its dock, as the game's bottom bar does; a swipe up opens the drawer. */
-    override val drawerHandleOnHome: Boolean
-        get() = false
-
     /** The game's right-click menu: a brown box, its edge a game pixel of the same brown outside the black inside it. */
     @Composable
     override fun menuBox(ground: PanelGround): Modifier = Modifier.background(MenuGround)

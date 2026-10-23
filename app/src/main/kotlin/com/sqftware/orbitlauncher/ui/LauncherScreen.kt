@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
@@ -74,8 +73,6 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -146,8 +143,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.Serializable
-import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sign
 
@@ -175,9 +170,6 @@ private fun SetUpChoice(onPickApps: () -> Unit, modifier: Modifier = Modifier) {
 /** How far above the drawer's strip the shade along the bottom edge starts. */
 private val BOTTOM_SHADE_FADE = 32.dp
 private val DRAWER_PEEK = 48.dp
-
-/** How near a page without the drawer's strip, as a share of the width, the pager counts as at rest there. */
-private const val STRIP_REST = 0.1f
 
 /**
  * How near either side of the screen what is dragged turns the pages, how long it rests there before the first turn, and
@@ -1313,29 +1305,9 @@ fun LauncherScreen(
     // the system bars, so it is the padded content's, where the ghost is placed.
     var origin by remember { mutableStateOf(Offset.Zero) }
     val ground = panelGround()
-    val art = LocalThemeArt.current
-    // How much of the drawer's strip a page shows: none on the dock's page under a theme that hides it there.
-    fun strip(page: LauncherPage) = if (!art.drawerHandleOnHome && page == LauncherPage.Home) 0f else 1f
-    // As the pages are swiped, so the strip fades in rather than appearing halfway. Read only while drawing, so a swipe
-    // does not recompose the screen every frame.
-    val stripShown = remember(art, layout, pagerState) {
-        derivedStateOf {
-            val from = pagerState.currentPage
-            val fraction = pagerState.currentPageOffsetFraction
-            val shown = { index: Int -> layout.pages.getOrNull(index)?.let(::strip) ?: 1f }
-            val between = shown(from) + (shown(from + sign(fraction).toInt()) - shown(from)) * abs(fraction)
-            ((between - STRIP_REST) / (1f - STRIP_REST)).coerceIn(0f, 1f)
-        }
-    }
-    // The sheet takes its strip back only once it would be clear, so the change never shows, and each page keeps its own
-    // bottom edge, so nothing moves when it does. Near rest rather than at it, or the clear strip would take taps meant
-    // for the dock while the snap eases out.
-    val stripless by remember(stripShown) { derivedStateOf { stripShown.value == 0f } }
-    val drawerPeek = if (stripless) 0.dp else DRAWER_PEEK
-    fun Modifier.aboveStrip(into: Dp = 0.dp) = offset { IntOffset(0, -((DRAWER_PEEK - into).toPx() * stripShown.value).roundToInt()) }
     var screenHeight by remember { mutableIntStateOf(0) }
     fun Density.drawerRaised(): Float {
-        val travel = screenHeight - drawerPeek.toPx()
+        val travel = screenHeight - DRAWER_PEEK.toPx()
         // Down until the screen is measured, as the drawer starts.
         return if (travel > 0f) 1f - (drawerState.requireOffset() / travel).coerceIn(0f, 1f) else 0f
     }
@@ -1377,7 +1349,7 @@ fun LauncherScreen(
                         screenHeight = it.size.height
                     }
                     .drawBehind {
-                        val top = size.height - (DRAWER_PEEK * stripShown.value + BOTTOM_SHADE_FADE).toPx()
+                        val top = size.height - (DRAWER_PEEK + BOTTOM_SHADE_FADE).toPx()
                         val bottom = size.height + navigationBar.toPx()
                         val shade = Brush.verticalGradient(
                             0f to Color.Transparent,
@@ -1398,7 +1370,7 @@ fun LauncherScreen(
             ) {
                 BottomSheetScaffold(
                     scaffoldState = rememberBottomSheetScaffoldState(drawerState),
-                    sheetPeekHeight = drawerPeek,
+                    sheetPeekHeight = DRAWER_PEEK,
                     sheetShape = BottomSheetDefaults.ExpandedShape,
                     // The handle is the drawer's own, not the sheet's, so the panel can fill in the strip behind it: clear while the
                     // drawer is down, so only the chevron shows over the wallpaper, and solid once it is open, so the open drawer
@@ -1410,7 +1382,7 @@ fun LauncherScreen(
                     sheetContent = {
                         Column(
                             Modifier.drawBehind {
-                                val strip = drawerPeek.toPx()
+                                val strip = DRAWER_PEEK.toPx()
                                 val open = drawerRaised()
                                 with(ground) {
                                     drawVeil(open, size = Size(size.width, strip))
@@ -1423,10 +1395,7 @@ fun LauncherScreen(
                             DrawerHandle(
                                 open = drawerOpen,
                                 onClick = { if (drawerOpen) closeDrawer() else openDrawer() },
-                                // At rest on the dock's page the handle is below the screen, and rises with the drawer.
-                                modifier = Modifier.align(Alignment.CenterHorizontally).graphicsLayer {
-                                    if (!stripless) alpha = max(stripShown.value, drawerRaised())
-                                },
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
                             )
                             AppDrawer(
                                 apps = apps.orEmpty(),
@@ -1515,7 +1484,7 @@ fun LauncherScreen(
                             .testTag(LauncherTags.PAGER),
                     ) { index ->
                         val page = layout.pages[index]
-                        Box(Modifier.fillMaxSize().padding(bottom = DRAWER_PEEK * strip(page)).testTag(LauncherTags.page(page))) {
+                        Box(Modifier.fillMaxSize().padding(bottom = DRAWER_PEEK).testTag(LauncherTags.page(page))) {
                             when (page.kind) {
                                 PageKind.Ring -> {
                                     val active = page == ringPage
@@ -1770,7 +1739,7 @@ fun LauncherScreen(
                     }
                 }
                 if (layout.showsDots && !drawerOpen) {
-                    PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).aboveStrip(into = 8.dp))
+                    PageDots(layout, pagerState, Modifier.align(Alignment.BottomCenter).padding(bottom = DRAWER_PEEK - 8.dp))
                 }
                 if (editingPages) {
                     PageEditor(
@@ -1955,8 +1924,7 @@ fun LauncherScreen(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.ime)
-                        .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = Spacing.Edge)
-                        .aboveStrip(),
+                        .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = DRAWER_PEEK + Spacing.Edge),
                 )
             }
             // The whole window, through the bars, which hide while it is up.

@@ -213,13 +213,6 @@ interface ThemeArt {
     fun emblemBox(edge: Color): Modifier =
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
-    /**
-     * Whether the drawer's [DrawerHandle] peeks below the home page, or the drawer opens there by a swipe up alone. The
-     * pages without the dock, which have no swipe up, always show it.
-     */
-    val drawerHandleOnHome: Boolean
-        get() = true
-
     /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
     val foldersOpenRoundEmblem: Boolean
         get() = false
