@@ -31,14 +31,19 @@ fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
     // What the item keeps of a mark (all but its tile, or a logo drawn small on its canvas) is cut out of the whole mark
     // and drawn again, so it fills the item as a whole icon does: the same shape, larger. Only what the item keeps is
     // cut, since the whole mark would bring back tile the item dropped, such as the ground inside a ring.
-    var whole = mark.keeping(small)
-    // Drawn larger, the tile that shared an edge pixel with the mark shows as a pixel of its own and is dropped, and an
-    // edge pixel can fall below half cover and clear, so the mark is cut again until it fills the item.
+    var whole = mark.drawnFrom(small) { small.argb[it] != 0 }
+    // Drawn larger, the tile that shared an edge pixel with the mark shows as a pixel of its own and is dropped, but
+    // only along that edge: ground the item kept, sealed inside a ring, stays. An edge pixel can also fall below half
+    // cover and clear, so the mark is cut again until it fills the item.
+    val edge = edge(small).toSet()
+    var band = mark.drawnFrom(small) { it in edge }
     for (pass in 1..3) {
         val kept = keptArea(small) ?: break
-        whole = whole.crop(kept.scaledTo(small, whole))
+        val area = kept.scaledTo(small, whole)
+        whole = whole.crop(area)
+        band = band.crop(area)
         small = hardEdged(scaled(whole, size))
-        if (tile != null) dropEdgeColour(small, tile)
+        if (tile != null) dropEdgeColour(small, tile, band.drawnOver(small))
     }
     posterize(small, colours)
     val item = placed(small)
@@ -118,14 +123,20 @@ private fun block(i: Int, n: Int, whole: Int): IntRange {
     return from until maxOf(from + 1, (i + 1) * whole / n)
 }
 
-/** This mark with only what [small], [scaled] from it, still shows. */
-private fun Pixels.keeping(small: Pixels): Pixels {
+/** This mark with only the pixels that [small], [scaled] from it, draws into the pixels [picked] picks. */
+private fun Pixels.drawnFrom(small: Pixels, picked: (Int) -> Boolean): Pixels {
     val shown = BooleanArray(argb.size)
     for (sy in 0 until small.height) for (sx in 0 until small.width) {
-        if (small[sx, sy] == 0) continue
+        if (!picked(sy * small.width + sx)) continue
         for (y in block(sy, small.height, height)) for (x in block(sx, small.width, width)) shown[y * width + x] = true
     }
     return Pixels(width, height, IntArray(argb.size) { if (shown[it]) argb[it] else 0 })
+}
+
+/** Which pixels of [small], [scaled] from this, are drawn from any of its pixels. */
+private fun Pixels.drawnOver(small: Pixels) = BooleanArray(small.argb.size) { i ->
+    val xs = block(i % small.width, small.width, width)
+    block(i / small.width, small.height, height).any { y -> xs.any { x -> this[x, y] != 0 } }
 }
 
 private class Area(val left: Int, val top: Int, val right: Int, val bottom: Int) {
@@ -189,17 +200,18 @@ private fun dropBackingTile(small: Pixels): Int? {
     return colour
 }
 
-private fun dropEdgeColour(pixels: Pixels, colour: Int) = reachedFromEdge(pixels, edge(pixels), colour).forEach { pixels.argb[it] = 0 }
+private fun dropEdgeColour(pixels: Pixels, colour: Int, within: BooleanArray) =
+    reachedFromEdge(pixels, edge(pixels), colour, within).forEach { pixels.argb[it] = 0 }
 
 private fun edge(pixels: Pixels) =
     pixels.argb.indices.filter { i -> pixels.argb[i] != 0 && neighbours(pixels, i).any { it == null || pixels.argb[it] == 0 } }
 
-private fun reachedFromEdge(pixels: Pixels, edge: List<Int>, colour: Int): Set<Int> {
+private fun reachedFromEdge(pixels: Pixels, edge: List<Int>, colour: Int, within: BooleanArray? = null): Set<Int> {
     val reached = HashSet<Int>()
     val stack = ArrayDeque(edge)
     while (stack.isNotEmpty()) {
         val i = stack.removeLast()
-        if (i in reached || pixels.argb[i] == 0 || distance(pixels.argb[i], colour) >= 60) continue
+        if (i in reached || pixels.argb[i] == 0 || within?.get(i) == false || distance(pixels.argb[i], colour) >= 60) continue
         reached += i
         neighbours(pixels, i).filterNotNull().forEach(stack::addLast)
     }

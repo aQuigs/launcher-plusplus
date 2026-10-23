@@ -145,6 +145,17 @@ class ItemSpriteTest {
     }
 
     @Test
+    fun theGroundSealedInsideARingStaysWhenTheRingIsDrawnLarger() {
+        val navy = 0xFF101830.toInt()
+        val ring = square(72) { x, y ->
+            val d = hypot(x + 0.5 - 36, y + 0.5 - 36)
+            if (d in 14.0..17.0 && !(x > 48 && y in 35..36)) white else navy
+        }
+        val item = itemSprite(ring, size = 26)
+        assertTrue(item.argb.count { it != 0 && it != black && luma(it) < 32 } > 150)
+    }
+
+    @Test
     fun aSpeckTooSmallToShowDoesNotShrinkTheMark() {
         val specked = square(144) { x, y -> if (x in 100..123 && y in 100..123 || x == 4 && y == 4) red else 0 }
         assertEquals(26 to 26, markSize(itemSprite(specked, size = 26)))
