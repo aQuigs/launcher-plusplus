@@ -111,6 +111,7 @@ import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.ui.theme.GameShadow
+import com.sqftware.orbitlauncher.ui.theme.gameMenu
 import com.sqftware.orbitlauncher.ui.theme.gameTypography
 import com.sqftware.orbitlauncher.ui.theme.MinimapGrass
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelf
@@ -579,7 +580,7 @@ object OldSchoolArt : ThemeArt {
             Text(
                 "Choose Option",
                 color = MenuGround,
-                style = MaterialTheme.typography.labelLarge.copy(shadow = null),
+                style = MaterialTheme.typography.gameMenu().labelLarge.copy(shadow = null),
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MenuLine)
@@ -587,7 +588,10 @@ object OldSchoolArt : ThemeArt {
                     .semantics { hideFromAccessibility() },
             )
             Column(Modifier.border(gamePixel.asDp(), MenuLine)) {
-                GameNight(MenuRoles) { content() }
+                GameNight(MenuRoles) {
+                    val type = MaterialTheme.typography
+                    MaterialTheme(typography = remember(type) { type.gameMenu() }, content = content)
+                }
             }
         }
     }
