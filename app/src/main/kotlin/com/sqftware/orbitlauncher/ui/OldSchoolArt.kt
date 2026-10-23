@@ -32,6 +32,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.unit.toSize
+import com.sqftware.orbitlauncher.domain.Bounds
+import com.sqftware.orbitlauncher.domain.Steps
+import com.sqftware.orbitlauncher.domain.Vital
+import com.sqftware.orbitlauncher.domain.Vitals
+import com.sqftware.orbitlauncher.ui.theme.gameSmallType
+import com.sqftware.orbitlauncher.ui.theme.orbNumber
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -165,6 +175,67 @@ private const val WORLD_MAP_ORB_RADIUS = 15
 
 private fun worldMapOrbAt(size: Size, scale: Int) = size.center + (WORLD_MAP_ORB * scale).toOffset()
 
+/**
+ * The game's status orbs, which its resizable interface hangs down the minimap frame's left: where each one's top left
+ * is from the map's centre.
+ */
+private enum class StatusOrb(val at: IntOffset) {
+    Hitpoints(IntOffset(-129, -37)),
+    Prayer(IntOffset(-129, -3)),
+    Run(IntOffset(-119, 29)),
+    Special(IntOffset(-97, 54)),
+    ;
+
+    /** Where it sits on an emblem of [size] whose minimap is drawn at [scale]. */
+    fun boxIn(size: Size, scale: Int) = Rect(size.center + (at * scale).toOffset(), (STATUS_ORB_SIZE * scale).toSize())
+}
+
+/**
+ * A status orb's frame, a box for its number on the left and the orb on the right; where the orb's fill and icon sit in
+ * it, and how wide; the box its number is centred in; and how opaque the game draws the fill.
+ */
+private val STATUS_ORB_SIZE = IntSize(57, 34)
+private val ORB_FILL_AT = IntOffset(27, 4)
+private const val ORB_FILL_SIDE = 26
+private val ORB_NUMBER_BOX = IntRect(4, 16, 27, 29)
+private const val ORB_FILL_ALPHA = 230f / 255
+
+/**
+ * A status orb as it shows: its [fill] and [icon], how full it is out of 100 and the number beside it, or neither while
+ * there is no reading, what it says to a screen reader, and what a tap on it does.
+ */
+private class OrbShown(val orb: StatusOrb, @DrawableRes val fill: Int, @DrawableRes val icon: Int, val value: Int?, val label: String, val onTap: () -> Unit)
+
+/**
+ * The orbs that show [vitals]: hitpoints the battery's charge, prayer the storage free, run energy the steps toward the
+ * day's goal, running once it is reached, but only on a phone that counts steps, and the special attack, always full,
+ * the spin stats while the ring spins.
+ */
+private fun orbsOf(shown: VitalsShown, vitals: Vitals): List<OrbShown> = buildList {
+    val open = shown.onOpen
+    add(OrbShown(StatusOrb.Hitpoints, R.drawable.osrs_1060_0, R.drawable.osrs_1067_0, vitals.battery, vitals.battery?.let { "Battery $it%" } ?: "Battery") { open(Vital.Battery) })
+    add(OrbShown(StatusOrb.Prayer, R.drawable.osrs_1063_0, R.drawable.osrs_1068_0, vitals.storageFree, vitals.storageFree?.let { "Storage $it% free" } ?: "Storage") { open(Vital.Storage) })
+    when (val steps = vitals.steps) {
+        Steps.Unavailable -> Unit
+        Steps.NotAllowed -> add(OrbShown(StatusOrb.Run, R.drawable.osrs_1064_0, R.drawable.osrs_1069_0, null, "Count steps") { open(Vital.Steps) })
+        is Steps.Today -> {
+            val running = steps.percent == 100
+            val fill = if (running) R.drawable.osrs_1065_0 else R.drawable.osrs_1064_0
+            val icon = if (running) R.drawable.osrs_1070_0 else R.drawable.osrs_1069_0
+            add(OrbShown(StatusOrb.Run, fill, icon, steps.percent, "${steps.count} steps today") { open(Vital.Steps) })
+        }
+    }
+    shown.onSpinStats?.let { add(OrbShown(StatusOrb.Special, R.drawable.osrs_1607_0, R.drawable.osrs_1610_0, 100, "Spin stats", it)) }
+}
+
+/** Which status orbs the emblem shows, which changes only as steps become countable or the ring starts or stops spinning. */
+@Composable
+private fun shownOrbs(): List<StatusOrb> {
+    val shown = LocalVitals.current ?: return emptyList()
+    val orbs by remember(shown) { derivedStateOf { orbsOf(shown, shown.read()).map(OrbShown::orb) } }
+    return orbs
+}
+
 /** The frame's ring, its compass socket and, [withOrb], the world map's orb: all the emblem draws or takes touches in. */
 private fun frameOutline(size: Size, scale: Int, withOrb: Boolean): Path {
     val frame = Path.combine(PathOperation.Union, circle(size.center, FRAME_RADIUS * scale.toFloat()), circle(compassAt(size, scale), SOCKET_RADIUS * scale.toFloat()))
@@ -283,6 +354,70 @@ object OldSchoolArt : ThemeArt {
             )
             // Only once there is a map, as the world map opens round where the minimap last placed the user.
             if (mapShown) WorldMapOrb(px)
+            LocalVitals.current?.let { StatusOrbs(it, px) }
+        }
+    }
+
+    /** The status orbs down the frame's left, each a node of its own with its own tap, as the world map's orb is. */
+    @Composable
+    private fun BoxScope.StatusOrbs(shown: VitalsShown, px: Int) {
+        val vitals by remember(shown) { derivedStateOf(shown.read) }
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val frame = sprite(R.drawable.osrs_1071_0)
+        val empty = sprite(R.drawable.osrs_1059_0)
+        orbsOf(shown, vitals).forEach { orb ->
+            key(orb.orb) {
+                val fill = sprite(orb.fill)
+                val icon = sprite(orb.icon)
+                val tap by rememberUpdatedState(orb.onTap)
+                Spacer(
+                    Modifier
+                        .matchParentSize()
+                        .layout { measurable, constraints ->
+                            val size = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+                            val box = orb.orb.boxIn(size, mapScale(size, px))
+                            val placeable = measurable.measure(Constraints.fixed(box.width.roundToInt(), box.height.roundToInt()))
+                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(box.left.roundToInt(), box.top.roundToInt()) }
+                        }
+                        .drawWithCache {
+                            val scale = (size.width / STATUS_ORB_SIZE.width).roundToInt()
+                            val number = orb.value?.let { measurer.measure(it.toString(), gameSmallType(scale, density).copy(color = orbNumber(it))) }
+                            val fillAt = (ORB_FILL_AT * scale).toOffset()
+                            // The game covers the top of the fill with the empty orb, as far down as the reading is short of full.
+                            val emptyRows = ORB_FILL_SIDE * (100 - (orb.value ?: 0)) / 100
+                            onDrawBehind {
+                                drawSprite(frame, Offset.Zero, scale)
+                                drawSprite(fill, fillAt, scale, alpha = ORB_FILL_ALPHA)
+                                if (emptyRows > 0) drawSpritePart(empty, IntRect(0, 0, ORB_FILL_SIDE, emptyRows), fillAt, scale)
+                                drawSprite(icon, fillAt, scale)
+                                number?.let {
+                                    val middle = (ORB_NUMBER_BOX.center * scale).toOffset()
+                                    drawText(it, topLeft = Offset((middle.x - it.size.width / 2f).roundToInt().toFloat(), (middle.y - it.size.height / 2f).roundToInt().toFloat()))
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) { detectTapGestures(onLongPress = {}) { tap() } }
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = orb.label
+                            role = Role.Button
+                            onClick { tap(); true }
+                        },
+                )
+            }
+        }
+    }
+
+    /** The orbs hang among the ring's icons, which keep clear of them. */
+    @Composable
+    override fun emblemReach(): (Size) -> List<Bounds> {
+        val px = gamePixel
+        val orbs = shownOrbs()
+        return remember(px, orbs) {
+            { size ->
+                val scale = mapScale(size, px)
+                orbs.map { orb -> orb.boxIn(size, scale).translate(-size.center).let { Bounds(it.left, it.top, it.right, it.bottom) } }
+            }
         }
     }
 
@@ -322,15 +457,22 @@ object OldSchoolArt : ThemeArt {
     }
 
     /**
-     * The emblem clips to the frame and its compass socket, which reach past its cell, so both show whole, and to the
-     * world map's orb while there is a map, so without one the emblem takes no touch beside its frame.
+     * The emblem clips to the frame and its compass socket, which reach past its cell, so both show whole, to the world
+     * map's orb while there is a map, so without one the emblem takes no touch beside its frame, and to the status orbs
+     * it shows.
      */
     @Composable
     override fun emblemBox(edge: Color): Modifier {
         val px = gamePixel
         val map = LocalMinimap.current
         val mapShown by remember { derivedStateOf { map() != null } }
-        val shape = remember(px, mapShown) { GenericShape { size, _ -> addPath(frameOutline(size, mapScale(size, px), mapShown)) } }
+        val orbs = shownOrbs()
+        val shape = remember(px, mapShown, orbs) {
+            GenericShape { size, _ ->
+                val scale = mapScale(size, px)
+                addPath(orbs.fold(frameOutline(size, scale, mapShown)) { outline, orb -> Path.combine(PathOperation.Union, outline, Path().apply { addRect(orb.boxIn(size, scale)) }) })
+            }
+        }
         return Modifier.clip(shape)
     }
 

@@ -120,6 +120,8 @@ import com.sqftware.orbitlauncher.domain.Spin
 import com.sqftware.orbitlauncher.domain.SpinFeats
 import com.sqftware.orbitlauncher.domain.SpinStats
 import com.sqftware.orbitlauncher.domain.Theme
+import com.sqftware.orbitlauncher.domain.Vital
+import com.sqftware.orbitlauncher.domain.Vitals
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.WidgetPages
@@ -244,7 +246,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears, the weather) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed, each told in a toast, [onToast]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn, keep the [journal] of the user's travels ([onJournalChange]),
+ * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed, each told in a toast, [onToast]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn, show the phone's [vitals], read where they are drawn, if the theme shows them, opening what a touch on one opens ([onOpenVital]), keep the [journal] of the user's travels ([onJournalChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -314,6 +316,8 @@ fun LauncherScreen(
     journal: Journal,
     onJournalChange: (Journal) -> Unit,
     worldMaps: (MapStyle) -> WorldMap,
+    vitals: () -> Vitals,
+    onOpenVital: (Vital) -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
@@ -1372,12 +1376,17 @@ fun LauncherScreen(
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val openWorldMap = remember { { showingWorldMap = true } }
     val markQuest = remember { { at: LatLon -> latestOnJournalChange(latestJournal.copy(quest = at)) } }
+    val latestOnOpenVital by rememberUpdatedState(onOpenVital)
+    val vitalsShown = remember(theme.showsVitals, ringSpin, vitals) {
+        VitalsShown(vitals, { latestOnOpenVital(it) }, { showingSpinStats = true }.takeIf { ringSpin }).takeIf { theme.showsVitals }
+    }
     CompositionLocalProvider(
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
         LocalQuest provides journal.quest,
         LocalOpenWorldMap provides openWorldMap,
+        LocalVitals provides vitalsShown,
     ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
