@@ -571,7 +571,7 @@ private fun Modifier.searches(hint: RingHint?, onSearch: () -> Unit, onEdit: () 
         onLongClickLabel = "Choose the apps on the home screen",
         onLongClick = onEdit,
         onClick = hint?.onTap ?: onSearch,
-    ).semantics { if (hint == null) contentDescription = "Favourites" }
+    ).semantics { if (hint == null) contentDescription = "Favorites" }
 
 /** A tap that closes the open folder and, given [onAddApps], a long press that adds apps to it. */
 private fun Modifier.closesFolder(onClose: () -> Unit, onAddApps: (() -> Unit)?) =

@@ -157,7 +157,7 @@ object LauncherTags {
 const val AUTO_SET_UP = "Auto set up"
 const val SHOW_WHERE_I_AM = "Show where I am"
 const val MAP_DATA_CREDIT = "Map data © OpenStreetMap"
-const val PICK_TIP = "Long-press the centre to choose the ring's apps"
+const val PICK_TIP = "Long-press the center to choose the ring's apps"
 
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
 @Composable

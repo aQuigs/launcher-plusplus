@@ -153,7 +153,7 @@ class HomeRingTest {
         var searches = 0
         show(listOf(clock), onEdit = { edits++ }, onSearch = { searches++ })
 
-        compose.emblem().assertContentDescriptionEquals("Favourites").performClick()
+        compose.emblem().assertContentDescriptionEquals("Favorites").performClick()
         assertEquals(1 to 0, searches to edits)
         compose.emblem().performTouchInput { longClick() }
         assertEquals(1 to 1, searches to edits)
