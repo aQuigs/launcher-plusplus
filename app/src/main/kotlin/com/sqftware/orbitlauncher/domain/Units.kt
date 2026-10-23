@@ -35,6 +35,26 @@ fun yardstickText(metres: Double, locale: Locale): String? {
     return "That's ${String.format(locale, "%,.1f", count)} ${if (count == 1.0) stick.one else stick.many}"
 }
 
+/** [n] rounded down to 1, 2 or 5 times a power of ten, the steps a round number goes up in, or 0 below 1. */
+fun oneTwoFive(n: Long): Long {
+    if (n < 1) return 0
+    var step = 1L
+    while (step <= n / 10) step *= 10
+    return listOf(5 * step, 2 * step, step).first { it <= n }
+}
+
+/** [count] of a yardstick named [one] and, for more than one, [many]. */
+data class YardstickMark(val count: Long, val one: String, val many: String)
+
+/**
+ * The longest yardstick [metres] reaches and how many of it, rounded down by [oneTwoFive], or null short of the first a
+ * metre or more long: a banana comes round within the first spin or two, too soon to be a milestone.
+ */
+fun yardstickMark(metres: Double): YardstickMark? {
+    val stick = YARDSTICKS.lastOrNull { it.metres >= 1 && metres >= it.metres } ?: return null
+    return YardstickMark(oneTwoFive((metres / stick.metres).toLong()), stick.one, stick.many)
+}
+
 private const val METRES_PER_FOOT = 0.3048
 
 /** The countries that measure in feet and miles, in the regions [Locale.getCountry] names. */

@@ -77,6 +77,7 @@ import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
+import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.domain.minimap.MADE_UP_TOUR
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
@@ -458,8 +459,10 @@ class MainActivity : ComponentActivity() {
                     },
                     spinStats = spinStats,
                     onSpin = {
-                        spinStats = spinStats.add(it, on = LocalDate.now())
+                        val before = spinStats
+                        spinStats = before.add(it, on = LocalDate.now())
                         spinStatsStore.save(spinStats)
+                        spinStats.feats(before)
                     },
                     homeOnReturn = homeOnReturn,
                     onHomeOnReturnChange = {

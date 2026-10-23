@@ -26,6 +26,8 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         daysSpun = prefs.getInt(DAYS_SPUN, 0),
         longestStreak = prefs.getInt(LONGEST_STREAK, 0),
         busiestDay = prefs.getInt(BUSIEST_DAY, 0),
+        // Stats saved before this was kept more likely had their busiest day before the last than on it.
+        busiestEarlierDay = prefs.getInt(BUSIEST_EARLIER_DAY, prefs.getInt(BUSIEST_DAY, 0)),
         lastDay = prefs.getLong(LAST_DAY, 0),
         lastDaySpins = prefs.getInt(LAST_DAY_SPINS, 0),
         streak = prefs.getInt(STREAK, 0),
@@ -43,6 +45,7 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         putInt(DAYS_SPUN, stats.daysSpun)
         putInt(LONGEST_STREAK, stats.longestStreak)
         putInt(BUSIEST_DAY, stats.busiestDay)
+        putInt(BUSIEST_EARLIER_DAY, stats.busiestEarlierDay)
         putLong(LAST_DAY, stats.lastDay)
         putInt(LAST_DAY_SPINS, stats.lastDaySpins)
         putInt(STREAK, stats.streak)
@@ -65,6 +68,7 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         const val DAYS_SPUN = "days_spun"
         const val LONGEST_STREAK = "longest_streak"
         const val BUSIEST_DAY = "busiest_day"
+        const val BUSIEST_EARLIER_DAY = "busiest_earlier_day"
         const val LAST_DAY = "last_day"
         const val LAST_DAY_SPINS = "last_day_spins"
         const val STREAK = "streak"
