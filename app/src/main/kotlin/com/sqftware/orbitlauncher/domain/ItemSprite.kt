@@ -14,10 +14,11 @@ internal const val ITEM_WIDTH = 36
 internal const val ITEM_HEIGHT = 32
 
 /**
- * How many pixels across to draw an icon's layers for its [itemMark]: one to each of an adaptive icon's 108 units, which
- * leaves a mark of 72, a few pixels to each of the largest item's. Fixed, so an item looks the same on every phone.
+ * How many pixels across to draw an icon's layers for its [itemMark]: two to each of an adaptive icon's 108 units, which
+ * leaves a mark of 144, so even a logo drawn at a third of its canvas has a few pixels to each of the largest item's.
+ * Fixed, so an item looks the same on every phone.
  */
-const val ITEM_LAYER_SIZE = 108
+const val ITEM_LAYER_SIZE = 216
 
 /**
  * An app's [mark], as [itemMark] takes it from its icon, drawn as one of the game's inventory items: [size] pixels
@@ -26,14 +27,16 @@ const val ITEM_LAYER_SIZE = 108
  * into the black of an orb or a panel.
  */
 fun itemSprite(mark: Pixels, size: Int, colours: Int = 14): Pixels {
-    val whole = trimmed(mark)
+    var whole = mark
     var small = hardEdged(scaled(whole, size))
     val tile = dropBackingTile(small)
-    if (tile != null) {
-        // What the tile leaves is smaller than the item, so it is cut out of the whole mark and drawn again at full size.
-        val cut = hardEdged(whole)
-        dropEdgeColour(cut, tile)
-        small = hardEdged(scaled(trimmed(cut), size))
+    // What the item keeps of a mark (all but its tile, or a logo drawn small on its canvas) is cut out of the whole mark
+    // and drawn again, so it fills the item as a whole icon does. Each cut can leave a sliver of tile or edge to drop.
+    for (pass in 1..3) {
+        val kept = keptArea(small) ?: break
+        whole = whole.crop(kept.scaledTo(small, whole))
+        small = hardEdged(scaled(whole, size))
+        if (tile != null) dropEdgeColour(small, tile)
     }
     posterize(small, colours)
     val item = placed(small)
@@ -109,14 +112,27 @@ internal fun scaled(pixels: Pixels, size: Int): Pixels {
     return out
 }
 
-private class Area(val left: Int, val top: Int, val right: Int, val bottom: Int)
+private class Area(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    /** This area of [small], drawn from [whole], as the area of [whole] it was drawn from. */
+    fun scaledTo(small: Pixels, whole: Pixels) = Area(
+        left * whole.width / small.width,
+        top * whole.height / small.height,
+        (right * whole.width + small.width - 1) / small.width,
+        (bottom * whole.height + small.height - 1) / small.height,
+    )
+}
 
-private fun opaqueArea(pixels: Pixels): Area? {
-    val solid = pixels.argb.indices.filter { alpha(pixels.argb[it]) >= 128 }
+/** The part of [small] its mark takes up, or null when that is all of it or there is no mark. */
+private fun keptArea(small: Pixels): Area? {
+    val solid = small.argb.indices.filter { small.argb[it] != 0 }
     if (solid.isEmpty()) return null
-    val xs = solid.map { it % pixels.width }
-    val ys = solid.map { it / pixels.width }
-    return Area(xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
+    val area = Area(
+        solid.minOf { it % small.width },
+        solid.minOf { it / small.width },
+        solid.maxOf { it % small.width } + 1,
+        solid.maxOf { it / small.width } + 1,
+    )
+    return area.takeUnless { it.left == 0 && it.top == 0 && it.right == small.width && it.bottom == small.height }
 }
 
 private fun Pixels.crop(area: Area): Pixels {
@@ -124,9 +140,6 @@ private fun Pixels.crop(area: Area): Pixels {
     val h = area.bottom - area.top
     return Pixels(w, h, IntArray(w * h) { this[area.left + it % w, area.top + it / w] })
 }
-
-/** [pixels] cut to its mark, so a mark drawn small on its canvas fills the item as a full one does. */
-private fun trimmed(pixels: Pixels) = opaqueArea(pixels)?.let { pixels.crop(it) } ?: pixels
 
 private fun hardEdged(pixels: Pixels) = Pixels(pixels.width, pixels.height, IntArray(pixels.argb.size) {
     val c = pixels.argb[it]
