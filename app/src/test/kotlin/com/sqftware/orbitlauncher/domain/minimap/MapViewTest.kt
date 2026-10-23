@@ -33,15 +33,15 @@ class MapViewTest {
 
     @Test
     fun paintsRoomToPanRoundTheViewAndJustTheViewWhileItReachesPastThePainting() {
-        val roomy = view.nextPainting(PaintedSpan(bryantPark, 782, 1112), steps)
-        assertEquals(782, roomy.width)
-        assertEquals(1112, roomy.height)
+        val roomy = view.nextPainting(PaintedSpan(bryantPark, 1294, 1624), steps)
+        assertEquals(1294, roomy.width)
+        assertEquals(1624, roomy.height)
 
         val first = view.nextPainting(null, steps)
         assertEquals(334, first.width)
         assertEquals(664, first.height)
 
-        // Zoomed out towards 2, the 1112 px painting no longer reaches the 1200 px view's ends.
+        // Zoomed out towards 2, a 1112 px painting no longer reaches the 1200 px view's ends.
         val tight = view.copy(scale = 2.4).nextPainting(PaintedSpan(bryantPark, 782, 1112), steps)
         assertEquals(604, tight.width)
         assertEquals(1264, tight.height)
@@ -49,17 +49,17 @@ class MapViewTest {
 
     @Test
     fun repaintsAsTheViewNearsThePaintingsEdgeOrZoomsOutPastIt() {
-        // The 782 by 1112 painting round the 270 by 600 view leaves 160 px to pan each way before the repaint margin.
-        val painted = PaintedSpan(bryantPark, 782, 1112)
+        // The 1294 by 1624 painting round the 270 by 600 view leaves 64 px to pan each way before the repaint margin.
+        val painted = PaintedSpan(bryantPark, 1294, 1624)
         fun after(dx: Double, dy: Double, scale: Double = 4.0) =
             view.copy(centre = bryantPark.shifted(MapShift(dx, dy)), scale = scale).needsRepaint(painted, steps)
         assertFalse(after(0.0, 0.0))
-        assertFalse(after(150.0, -150.0))
-        assertTrue(after(0.0, -170.0))
-        assertTrue(after(170.0, 0.0))
+        assertFalse(after(60.0, -60.0))
+        assertTrue(after(0.0, -70.0))
+        assertTrue(after(70.0, 0.0))
 
         assertFalse(after(0.0, 0.0, scale = 8.0))
-        assertFalse(after(0.0, 0.0, scale = 3.5))
+        assertTrue(after(0.0, 0.0, scale = 3.5))
         assertTrue(after(0.0, 0.0, scale = 2.0))
         assertTrue(view.needsRepaint(null, steps))
     }
