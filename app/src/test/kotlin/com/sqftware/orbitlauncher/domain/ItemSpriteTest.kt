@@ -99,8 +99,47 @@ class ItemSpriteTest {
     }
 
     @Test
-    fun downscalingIgnoresTheColourOfClearPixels() {
+    fun aSmallLogoIsDrawnAsLargeAsAFullMark() {
+        val logo = square(144) { x, y -> if (x in 52..91 && y in 52..91) red else 0 }
+        assertEquals(26 to 26, markSize(itemSprite(logo, size = 26)))
+    }
+
+    @Test
+    fun theMarkLeftByATileIsDrawnAsLargeAsTheTileWas() {
+        val play = square(96) { x, y -> if (x in 30..65 && y in 30..65) blue else white }
+        assertEquals(26 to 26, markSize(itemSprite(play, size = 26)))
+    }
+
+    @Test
+    fun aTileWithAThinRimIsDroppedRimAndAll() {
+        val rimmed = square(144) { x, y ->
+            when {
+                x == 0 || y == 0 || x == 143 || y == 143 -> 0xFFD7D7D7.toInt()
+                x in 52..91 && y in 52..91 -> blue
+                else -> white
+            }
+        }
+        val item = itemSprite(rimmed, size = 26)
+        assertTrue(item.argb.count { it != 0 && luma(it) > 190 } < 26 * 2)
+        assertEquals(26 to 26, markSize(item))
+    }
+
+    @Test
+    fun aSpeckTooSmallToShowDoesNotShrinkTheMark() {
+        val specked = square(144) { x, y -> if (x in 100..123 && y in 100..123 || x == 4 && y == 4) red else 0 }
+        assertEquals(26 to 26, markSize(itemSprite(specked, size = 26)))
+    }
+
+    private fun markSize(item: Pixels): Pair<Int, Int> {
+        val mark = item.argb.indices.filter { item.argb[it] != 0 && item.argb[it] != black && item.argb[it] != 0xFF302020.toInt() }
+        val xs = mark.map { it % ITEM_WIDTH }
+        val ys = mark.map { it / ITEM_WIDTH }
+        return xs.max() - xs.min() + 1 to ys.max() - ys.min() + 1
+    }
+
+    @Test
+    fun scalingIgnoresTheColourOfClearPixels() {
         val half = square(4) { x, _ -> if (x < 2) red else 0x00FFFFFF }
-        assertEquals(red and 0xFFFFFF, downscale(half, 1)[0, 0] and 0xFFFFFF)
+        assertEquals(red and 0xFFFFFF, scaled(half, 1)[0, 0] and 0xFFFFFF)
     }
 }
