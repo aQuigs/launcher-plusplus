@@ -81,7 +81,6 @@ import com.sqftware.orbitlauncher.domain.Vitals
 import com.sqftware.orbitlauncher.apps.SensorStepCounter
 import com.sqftware.orbitlauncher.apps.SystemBattery
 import com.sqftware.orbitlauncher.apps.SystemStorage
-import com.sqftware.orbitlauncher.apps.steps
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.feats
@@ -168,7 +167,7 @@ class MainActivity : ComponentActivity() {
         val headingSource = SensorHeadingSource(this, location)
         val battery = SystemBattery(this)
         val storage = SystemStorage(this)
-        stepCounter = SensorStepCounter(this, activityResultRegistry).apply { start() }
+        stepCounter = SensorStepCounter(this, activityResultRegistry)
         val steps = stepCounter
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)
@@ -347,9 +346,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 // Like the clock, only while the launcher is visible and a theme shows them; the step counter counts on
-                // while it is out of sight.
+                // while it is out of sight, until a theme no longer shows it. Which orbs show is known from the first
+                // frame, so the ring does not move when the readings come.
                 val showsVitals = shownTheme.showsVitals
-                val vitals = produceState(Vitals(), showsVitals) {
+                val vitals = produceState(Vitals(steps = steps.stepsNow()), showsVitals) {
+                    if (!showsVitals) steps.stop()
                     if (showsVitals) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
                             combine(battery.charge(), storage.free(), steps.steps()) { charge, free, counted -> Vitals(charge, free, counted) }
@@ -564,7 +565,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        stepCounter.close()
+        stepCounter.stop()
         super.onDestroy()
     }
 

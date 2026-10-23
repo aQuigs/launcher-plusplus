@@ -29,27 +29,35 @@ sealed interface Steps {
 data class Vitals(val battery: Int? = null, val storageFree: Int? = null, val steps: Steps = Steps.Unavailable)
 
 /**
- * Today's steps from a step counter that counts from each boot: [today] is [before] the last boot plus what the counter
- * has gone up since [start], the reading the count began from today, to [last], the latest reading.
+ * The most steps between two readings of a counter listened to all along. A new day's first reading further on than this
+ * was not listened for, and may hold days of steps, so the day counts from it rather than claim them.
  */
-data class StepTally(val day: LocalDate, val start: Long, val last: Long, val before: Long = 0) {
+const val STEP_JUMP = 500
+
+/**
+ * Today's steps from a step counter that counts from each [boot]: [today] is [before] the last boot plus what the
+ * counter has gone up since [start], the reading the count began from today, to [last], the latest reading.
+ */
+data class StepTally(val day: LocalDate, val boot: Int, val start: Long, val last: Long, val before: Long = 0) {
     val today: Int get() = (before + last - start).toInt()
 
     /**
-     * The tally after the counter reads [counter] on [on]. A new day starts from the last reading, so steps since then
-     * count toward it; a reading below the last means the phone restarted, and the count goes on from zero.
+     * The tally after the counter reads [counter] on [on] in [boot]. A new day counts on from the last reading, or from
+     * zero after a restart, unless the counter has jumped past [STEP_JUMP] since, when it counts from this reading. A
+     * restart during the day keeps the steps so far and counts on from zero.
      */
-    fun read(counter: Long, on: LocalDate): StepTally {
-        val restarted = counter < last
+    fun read(counter: Long, on: LocalDate, boot: Int): StepTally {
+        val restarted = boot != this.boot || counter < last
+        val from = if (restarted) 0 else last
         return when {
-            on != day -> StepTally(on, start = if (restarted) 0 else last, last = counter)
-            restarted -> StepTally(day, start = 0, last = counter, before = today.toLong())
+            on != day -> StepTally(on, boot, start = if (counter - from > STEP_JUMP) counter else from, last = counter)
+            restarted -> StepTally(day, boot, start = 0, last = counter, before = today.toLong())
             else -> copy(last = counter)
         }
     }
 
     companion object {
         /** The first reading ever: no steps yet today. */
-        fun first(counter: Long, on: LocalDate) = StepTally(on, start = counter, last = counter)
+        fun first(counter: Long, on: LocalDate, boot: Int) = StepTally(on, boot, start = counter, last = counter)
     }
 }

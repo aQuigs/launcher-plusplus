@@ -59,26 +59,33 @@ fun ringSlotOffset(index: Int, count: Int, turn: Double = 0.0, arc: RingArc = Ri
 /**
  * Where slot [index] of a folder of [count] apps sits, as [ringSlotOffset] gives it on [arc], round the whole circle
  * turned back half a slot, plus [turn]: the first two either side of the top, or a lone app on top, so two sit side by
- * side, three make a triangle on its point and four a square. The closed folder's previews and the open folder's ring
- * both place apps here, so each app opens where it was shown.
+ * side, three make a triangle on its point and four a square. The closed folder's previews place apps here round the
+ * whole circle, as the open folder's ring does on it, so each app opens where it was shown.
  */
 fun folderSlotOffset(index: Int, count: Int, turn: Double = 0.0, arc: RingArc = RingArc.Whole): Pair<Float, Float> =
     ringSlotOffset(index, count, if (count > 1 && arc.whole) turn - PI / count else turn, arc)
 
-/** How many points round the circle [freeArc] tries: half a degree apart. */
+/** How many points round the circle [freeArc] tries, half a degree apart, and how many radii at each. */
 private const val ARC_SAMPLES = 720
+private const val RADIUS_SAMPLES = 8
 
 /**
- * The widest arc of a ring of [radius] whose icons, [iconSize] across and kept [air] further off, clear all of
- * [blocked], boxes round the ring's centre in screen axes: the whole circle if none is in the way, or if none is clear.
+ * The widest arc of a ring whose icons clear all of [blocked], boxes round the ring's centre in screen axes, by [air],
+ * whatever radius in [radii] it takes: each icon a disc [iconSize] across, with [drop] below it for a name. The whole
+ * circle if none is in the way, or if none is clear.
  */
-fun freeArc(blocked: List<Bounds>, radius: Float, iconSize: Float, air: Float): RingArc {
-    val reach = iconSize / 2 + air
+fun freeArc(blocked: List<Bounds>, radii: ClosedFloatingPointRange<Float>, iconSize: Float, air: Float, drop: Float = 0f): RingArc {
+    val half = iconSize / 2
+    fun clear(x: Float, y: Float) = blocked.none {
+        hypot(maxOf(it.left - x, 0f, x - it.right), maxOf(it.top - y, 0f, y - it.bottom)) < half + air ||
+            drop > 0 && hypot(maxOf(it.left - x - half, 0f, x - half - it.right), maxOf(it.top - y - half - drop, 0f, y - it.bottom)) < air
+    }
     val free = List(ARC_SAMPLES) { sample ->
         val angle = 2 * PI * sample / ARC_SAMPLES
-        val x = radius * sin(angle).toFloat()
-        val y = -radius * cos(angle).toFloat()
-        blocked.none { hypot(maxOf(it.left - x, 0f, x - it.right), maxOf(it.top - y, 0f, y - it.bottom)) < reach }
+        (0..RADIUS_SAMPLES).all {
+            val radius = radii.start + (radii.endInclusive - radii.start) * it / RADIUS_SAMPLES
+            clear(radius * sin(angle).toFloat(), -radius * cos(angle).toFloat())
+        }
     }
     if (free.all { it } || free.none { it }) return RingArc.Whole
 
@@ -107,8 +114,9 @@ data class NameRoom(val width: Float, val lines: Int, val fits: Boolean = true)
 
 /**
  * Names hanging under ring icons, one per slot in [widths], null for none: [gap] under the icon, in lines [line] tall,
- * kept [air] from the other icons and names and from the emblem, and inside the page, which may reach [spare] past the
- * foot of the square the ring is laid out in. The slots sit where [at] puts them.
+ * kept [air] from the other icons and names, from the emblem and from what it hangs out among them, the [blocked] boxes
+ * round the centre, and inside the page, which may reach [spare] past the foot of the square the ring is laid out in.
+ * The slots sit where [at] puts them.
  */
 data class HangingNames(
     val gap: Float,
@@ -117,6 +125,7 @@ data class HangingNames(
     val widths: List<NameWidths?>,
     val at: (index: Int, count: Int) -> Pair<Float, Float> = ::ringSlotOffset,
     val spare: Float = 0f,
+    val blocked: List<Bounds> = emptyList(),
 )
 
 /** The least of the icons' size without names that names leave them: less than all the names need, so long ones wrap or are cut. */
@@ -158,6 +167,13 @@ fun ringLayout(fullSize: Float, side: Float, count: Int, margin: Float, names: H
     val radius = fitting(size) ?: radii(size).maxBy { radius -> names.rooms(size, radius, side).count(NameRoom::fits) }
     return RingLayout(radius, size, names.rooms(size, radius, side))
 }
+
+/**
+ * The radii a ring of icons up to [fullSize] across may take on a page whose shorter side is [side]: from icons just off
+ * the emblem, or the usual radius on a page too small for that, out to the furthest a crowded ring grows.
+ */
+fun ringRadii(fullSize: Float, side: Float): ClosedFloatingPointRange<Float> =
+    minOf((fullSize + side * EMBLEM_FRACTION) / 2, side * RING_RADIUS_FRACTION)..side * MAX_RING_RADIUS_FRACTION
 
 /** How many radii between the least and the most a named ring may take are tried for its names. */
 private const val RADIUS_STEPS = 16
@@ -225,6 +241,10 @@ private fun HangingNames.room(index: Int, places: List<Pair<Float, Float>>, size
     }
 
     clear(0f, 0f, side * EMBLEM_FRACTION / 2)
+    // A box beside the name's lines keeps it off; one across its middle leaves it no room.
+    blocked.filter { it.top < bottom + air && it.bottom > top - air }.forEach {
+        half = minOf(half, maxOf(it.left - x, x - it.right) - air)
+    }
     places.forEachIndexed { other, (ox, oy) ->
         if (other == index) return@forEachIndexed
         clear(ox, oy, size / 2)
