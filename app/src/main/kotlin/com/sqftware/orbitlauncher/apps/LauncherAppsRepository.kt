@@ -156,7 +156,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
         return icons[key] ?: icons.keep(app, key) {
             when (style) {
                 IconStyle.Plain -> draw(app.key) { density -> entryIcon(app, density) }
-                is IconStyle.Item -> marks[app]?.let { withContext(Dispatchers.IO) { itemSprite(it).toImageBitmap() } }
+                is IconStyle.Item -> marks[app]?.let { withContext(Dispatchers.IO) { itemSprite(it, style.size, cut = style.cut).toImageBitmap() } }
             }
         }
     }
