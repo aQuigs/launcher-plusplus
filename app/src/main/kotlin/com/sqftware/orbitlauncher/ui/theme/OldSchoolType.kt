@@ -50,3 +50,9 @@ internal fun gameTypography(px: Int, density: Density, shadowed: Boolean): Typog
         labelSmall = style(small, GameSmallFont),
     )
 }
+
+/**
+ * The type of a menu, whose rows take [Typography.labelLarge]: in the plain font, not the bold the game's menu has, as
+ * its broad letters would stand a size above the other themes' menus, and the next whole scale down a size below.
+ */
+internal fun Typography.gameMenu() = copy(labelLarge = bodyLarge)
