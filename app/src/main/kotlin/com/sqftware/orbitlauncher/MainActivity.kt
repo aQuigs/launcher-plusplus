@@ -77,6 +77,7 @@ import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.Vital
+import com.sqftware.orbitlauncher.domain.Steps
 import com.sqftware.orbitlauncher.domain.Vitals
 import com.sqftware.orbitlauncher.apps.SensorStepCounter
 import com.sqftware.orbitlauncher.apps.SystemBattery
@@ -529,7 +530,7 @@ class MainActivity : ComponentActivity() {
                         when (vital) {
                             Vital.Battery -> battery.open()
                             Vital.Storage -> storage.open()
-                            Vital.Steps -> if (steps.isGranted()) steps.openFitness() else steps.request()
+                            Vital.Steps -> if (steps.stepsNow() == Steps.NotAllowed) steps.request() else steps.openFitness()
                         }
                     },
                     worldMaps = { TiledWorldMap(mapTiles, minimapArt) },

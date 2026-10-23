@@ -219,15 +219,15 @@ private class OrbShown(val orb: StatusOrb, @DrawableRes val fill: Int, @Drawable
 
 /**
  * The orbs that show [vitals]: hitpoints the battery's charge, prayer the storage free, run energy the steps toward the
- * day's goal, running once it is reached, but only on a phone that counts steps, and the special attack, always full,
- * the spin stats while the ring spins.
+ * day's goal, running once it is reached, and empty on a phone that does not count them, and the special attack,
+ * always full, the spin stats while the ring spins.
  */
 private fun orbsOf(shown: VitalsShown, vitals: Vitals): List<OrbShown> = buildList {
     val open = shown.onOpen
     add(OrbShown(StatusOrb.Hitpoints, R.drawable.osrs_1060_0, R.drawable.osrs_1067_0, vitals.battery, vitals.battery?.let { "Battery $it%" } ?: "Battery") { open(Vital.Battery) })
     add(OrbShown(StatusOrb.Prayer, R.drawable.osrs_1063_0, R.drawable.osrs_1068_0, vitals.storageFree, vitals.storageFree?.let { "Storage $it% free" } ?: "Storage") { open(Vital.Storage) })
     when (val steps = vitals.steps) {
-        Steps.Unavailable -> Unit
+        Steps.Unavailable -> add(OrbShown(StatusOrb.Run, R.drawable.osrs_1064_0, R.drawable.osrs_1069_0, null, "Fitness app") { open(Vital.Steps) })
         Steps.NotAllowed -> add(OrbShown(StatusOrb.Run, R.drawable.osrs_1064_0, R.drawable.osrs_1069_0, null, "Count steps") { open(Vital.Steps) })
         is Steps.Today -> {
             val running = steps.percent == 100

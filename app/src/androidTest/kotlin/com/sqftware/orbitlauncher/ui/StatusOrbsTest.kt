@@ -68,17 +68,17 @@ class StatusOrbsTest {
     }
 
     @Test
-    fun theRunOrbWaitsForStepsAndGoesWithoutACounterAndTheSpecialAttackOnlyWhileTheRingSpins() {
+    fun theRunOrbWaitsForStepsAndStaysWithoutACounterAndTheSpecialAttackOnlyWhileTheRingSpins() {
         vitals = vitals.copy(steps = Steps.NotAllowed)
         show()
         compose.onNodeWithContentDescription("Count steps").performClick()
-        assertEquals(listOf<Any>(Vital.Steps), opened)
 
         vitals = vitals.copy(steps = Steps.Unavailable)
         spins = false
         compose.waitForIdle()
-        listOf("Count steps", "Spin stats").forEach { compose.onNodeWithContentDescription(it).assertDoesNotExist() }
-        compose.onNodeWithContentDescription("Battery 87%").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fitness app").assertIsDisplayed().performClick()
+        assertEquals(listOf<Any>(Vital.Steps, Vital.Steps), opened)
+        compose.onNodeWithContentDescription("Spin stats").assertDoesNotExist()
     }
 
     @Test
