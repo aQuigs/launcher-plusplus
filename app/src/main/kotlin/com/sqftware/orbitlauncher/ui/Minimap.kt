@@ -12,6 +12,12 @@ import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 val LocalMinimap = staticCompositionLocalOf<() -> PaintedMap<ImageBitmap>?> { { null } }
 
 /**
+ * The minimap of a place that is only on the map, drawn as [LocalMinimap] is, for while that has no map of where the user
+ * is. Null while it has, or no map has been drawn yet. It changes as the player walks, so it is read where it is drawn.
+ */
+val LocalMadeUpMap = staticCompositionLocalOf<() -> PaintedMap<ImageBitmap>?> { { null } }
+
+/**
  * Which way the phone faces, in degrees clockwise from north, or null without a compass or while the map is off. Read
  * where it is drawn, so its many small changes redraw only what turns with it.
  */

@@ -103,13 +103,16 @@ private class Spaced(private val cell: Double, width: Int, height: Int) {
     private val cells = arrayOfNulls<MutableList<Px>>(columns * rows)
 
     /** Whether no spot lies within [spacing] of [p], which must be at most the cell's side. */
-    fun clear(p: Px, spacing: Double): Boolean {
+    fun clear(p: Px, spacing: Double) = !near(p, spacing) { true }
+
+    /** Whether a spot that passes [test] lies within [spacing] of [p], which must be at most the cell's side. */
+    fun near(p: Px, spacing: Double, test: (Px) -> Boolean): Boolean {
         val i = (p.x / cell).toInt()
         val j = (p.y / cell).toInt()
         for (jj in maxOf(0, j - 1)..minOf(rows - 1, j + 1)) for (ii in maxOf(0, i - 1)..minOf(columns - 1, i + 1)) {
-            if (cells[jj * columns + ii]?.any { sq(p.x - it.x) + sq(p.y - it.y) < sq(spacing) } == true) return false
+            if (cells[jj * columns + ii]?.any { sq(p.x - it.x) + sq(p.y - it.y) < sq(spacing) && test(it) } == true) return true
         }
-        return true
+        return false
     }
 
     operator fun plusAssign(p: Px) {
@@ -276,6 +279,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         paintTrees()
         val icons = placeIcons()
         paintNpcs(icons)
+        paintFigures()
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
         if (frame.followsUser) return PaintedMap(scene.centre, Pixels(w, h, img), icons)
@@ -430,11 +434,10 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         }
         val mapped = around(BooleanArray(w * h).also { marks -> spots.forEach { marks[it.y.toInt() * w + it.x.toInt()] = true } })
         val placed = Spaced(DECOR_SPACING_PX, w, h)
-        for (s in spots) {
-            if (cls[s.y.toInt() * w + s.x.toInt()] !in NO_TREES && placed.clear(s, TREE_SPACING_PX)) placed += s
-        }
+        standing(spots.filter { cls[it.y.toInt() * w + it.x.toInt()] !in NO_TREES }, TREE_SPACING_PX).forEach { placed += it }
 
-        // Decoration where the map gives no trees: a few seeded spots per world cell, the first clear one wins.
+        // Decoration where the map gives no trees: a few seeded spots per world cell, the first clear one standing.
+        val decor = mutableListOf<Px>()
         seededSpots(DECOR_CELL_PX, DECOR_SALT, DECOR_TRIES) { x, y ->
             val xi = x.toInt()
             val yi = y.toInt()
@@ -444,9 +447,10 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
                     if (cls[yy * w + xx].let { it != Ground.Grass && it != Ground.Pitch }) return@seededSpots false
                 }
             }
-            val spot = Px(x, y)
-            placed.clear(spot, DECOR_SPACING_PX).also { if (it) placed += spot }
+            decor += Px(x, y)
+            true
         }
+        standing(decor, DECOR_SPACING_PX).filter { placed.clear(it, DECOR_SPACING_PX) }.forEach { placed += it }
 
         if (sprites.trees.isEmpty()) return
         for (t in placed.all.sortedBy { it.y }) {
@@ -454,6 +458,17 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             val sprite = sprites.trees[(pick * sprites.trees.size).toInt().coerceAtMost(sprites.trees.size - 1)]
             blit(sprite, t.x.toInt() - sprite.width / 2, t.y.toInt() - (sprite.height - 2))
         }
+    }
+
+    /**
+     * The [spots] that stand: each but those with a spot of higher seeded precedence, keyed by its place on Earth, closer
+     * than [spacing]. Whether a spot stands depends on its neighbours alone, so a step of the map that brings a spot in
+     * at the view's edge never reshuffles the trees in the middle, as placing them in turn would.
+     */
+    private fun standing(spots: List<Px>, spacing: Double): List<Px> {
+        fun precedence(p: Px) = stableRandom(PRECEDENCE_SALT, (round(p.x).toInt() + originX).toLong(), (round(p.y).toInt() + originY).toLong())
+        val all = Spaced(spacing, w, h).also { grid -> spots.forEach { grid += it } }
+        return spots.filter { s -> precedence(s).let { mine -> !all.near(s, spacing) { precedence(it) > mine } } }
     }
 
     /**
@@ -513,6 +528,21 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             dots += x to y
         }
         dots.forEach { (x, y) -> blit(sprite, x - sprite.width / 2, y - sprite.height / 2) }
+    }
+
+    /**
+     * Everyone moving about, players over NPCs as the game stacks its dots. Unlike the mapped people, none are left out
+     * to declutter, so a dot passing another never blinks out.
+     */
+    private fun paintFigures() {
+        if (frame.maxNpcs == 0) return
+        for (dot in Dot.entries) {
+            val sprite = (if (dot == Dot.Npc) sprites.npc else sprites.player) ?: continue
+            for (figure in scene.figures.filter { it.dot == dot }) {
+                val p = px(figure.at)
+                blit(sprite, floor(p.x).toInt() - sprite.width / 2, floor(p.y).toInt() - sprite.height / 2)
+            }
+        }
     }
 
     private fun blit(sprite: Pixels, ox: Int, oy: Int) {
@@ -639,6 +669,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
         const val WOOD_SALT = 2L
         const val DECOR_SALT = 3L
         const val TREE_SALT = 4L
+        const val PRECEDENCE_SALT = 5L
 
         // Three 3x3 box blurs leave uniform noise a spread of about ±0.17 over a view; this stretches it back to 0..1.
         const val NOISE_STRETCH = 3.0

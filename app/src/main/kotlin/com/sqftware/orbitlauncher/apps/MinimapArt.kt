@@ -18,6 +18,7 @@ class ResourceMinimapArt(private val context: Context) : MinimapArt {
         MinimapSprites(
             trees = listOf(R.drawable.osrs_map_tree_0, R.drawable.osrs_map_tree_1).map(::sprite),
             npc = sprite(R.drawable.osrs_300_1),
+            player = sprite(R.drawable.osrs_map_player),
             icons = MapIcon.entries.associateWith { sprite(drawableOf(it)) },
         )
     }

@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -26,6 +27,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
 import com.sqftware.orbitlauncher.apps.TiledWorldMap
+import com.sqftware.orbitlauncher.apps.WanderingMinimap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
@@ -76,6 +78,7 @@ import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.suggestSetup
+import com.sqftware.orbitlauncher.domain.minimap.MADE_UP_TOUR
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
@@ -87,6 +90,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -156,6 +160,7 @@ class MainActivity : ComponentActivity() {
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)
         val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
+        val wanderingMinimap = WanderingMinimap(MADE_UP_TOUR, minimapArt)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
@@ -300,10 +305,23 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                // Without where the user is, the map wanders made-up places instead, walking only while the screen's
+                // ambient motion moves in sight.
+                val wandering = whereIAm != WhereIAm.Shown && shownTheme.mapsWhereIAm
+                var ambientInSight by remember { mutableStateOf(false) }
+                val madeUpMap = produceState<PaintedMap<ImageBitmap>?>(null, wandering) {
+                    value = null
+                    if (wandering) {
+                        repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            snapshotFlow { ambientInSight }.collectLatest { walking -> wanderingMinimap.maps(walking).collect { value = it } }
+                        }
+                    }
+                }
                 // The map turns with the phone only while it shows, as the map follows the user. Both are read where
                 // they are drawn, so a new map or a turn redraws the emblem alone.
                 val heading = remember { mutableStateOf<Float?>(null) }
                 val readMinimap = remember { { minimap.value } }
+                val readMadeUpMap = remember { { madeUpMap.value } }
                 val readHeading = remember { { heading.value } }
                 LaunchedEffect(mapping) {
                     heading.value = null
@@ -473,6 +491,7 @@ class MainActivity : ComponentActivity() {
                     onShowWhereIAmChange = { on -> if (on) showWhereIAm() else changeWhereIAm(WhereIAm.Hidden) },
                     onOpenMapLicence = mapLicence::open,
                     minimap = readMinimap,
+                    madeUpMap = readMadeUpMap,
                     heading = readHeading,
                     worldMaps = { TiledWorldMap(mapTiles, minimapArt) },
                     isHomeApp = isHomeApp,
@@ -495,6 +514,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenNotifications = shade::open,
                     onSystemBarsShownChange = systemBars::setShown,
+                    onAmbientInSightChange = { ambientInSight = it },
                     onSetWallpaper = { draw -> scope.launch(Dispatchers.IO) { wallpaper.set(draw().asAndroidBitmap()) } },
                     onRestart = relauncher::restart,
                     onReset = relauncher::reset,

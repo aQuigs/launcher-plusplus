@@ -220,8 +220,8 @@ object OldSchoolArt : ThemeArt {
         get() = true
 
     /**
-     * The minimap in its frame: the map of where the user is, or the game's grass until there is one, turned with the
-     * phone as the game turns it with the camera, and the compass, turned with it, on the frame's edge. What turns is a
+     * The minimap in its frame: the map of where the user is, else of a made-up place, or the game's grass until there
+     * is one, turned with the phone as the game turns it with the camera, and the compass, turned with it, on the frame's edge. What turns is a
      * layer of its own, so a turn moves it without drawing the frame again.
      */
     @Composable
@@ -230,6 +230,9 @@ object OldSchoolArt : ThemeArt {
         val compass = sprite(R.drawable.osrs_169_0)
         val px = gamePixel
         val map = LocalMinimap.current
+        val madeUp = LocalMadeUpMap.current
+        // The credit and the world map's orb go with the real map alone.
+        val shown = { map() ?: madeUp() }
         val heading = LocalHeading.current
         val measurer = rememberTextMeasurer()
         val creditStyle = MaterialTheme.typography.labelSmall.copy(color = MinimapSelf, textAlign = TextAlign.Center)
@@ -251,7 +254,7 @@ object OldSchoolArt : ThemeArt {
                     .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                     .drawBehind {
                         val scale = mapScale(size, px)
-                        map()?.let { drawSpriteCentred(it.ground, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
+                        shown()?.let { drawSpriteCentred(it.ground, center, scale) } ?: drawCircle(MinimapGrass, MAP_RADIUS * scale.toFloat())
                     },
             )
             // Each icon goes round with the map but stays upright, as the game keeps them: placed by hand rather than
@@ -259,7 +262,7 @@ object OldSchoolArt : ThemeArt {
             // draws only the icons again.
             Spacer(
                 Modifier.matchParentSize().graphicsLayer().drawBehind {
-                    val minimap = map()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
+                    val minimap = shown()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
                     val scale = mapScale(size, px)
                     val turn = Math.toRadians(-(heading() ?: 0f).toDouble())
                     val (cos, sin) = cos(turn).toFloat() to sin(turn).toFloat()
