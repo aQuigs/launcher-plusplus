@@ -40,9 +40,7 @@ class SpinFeatsTest {
 
     @Test
     fun `the distance is a milestone each time it reaches a new round count of a yardstick`() {
-        val giraffe = YardstickMark(1, "giraffe", "giraffes")
-
-        assertEquals(listOf(Milestone.Distance(giraffe)), SpinStats(distance = 5.0).feats { copy(spins = 1, distance = 6.0) }.milestones)
+        assertEquals(listOf(Milestone.Distance(yardstickMark(5.5)!!)), SpinStats(distance = 5.0).feats { copy(spins = 1, distance = 6.0) }.milestones)
         assertEquals(SpinFeats(), SpinStats(distance = 6.0).feats { copy(spins = 1, distance = 10.0) })
     }
 

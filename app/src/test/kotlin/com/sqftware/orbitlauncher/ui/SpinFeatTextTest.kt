@@ -4,7 +4,7 @@ import com.sqftware.orbitlauncher.domain.Milestone
 import com.sqftware.orbitlauncher.domain.RecordBeaten
 import com.sqftware.orbitlauncher.domain.SpinFeats
 import com.sqftware.orbitlauncher.domain.SpinRecord
-import com.sqftware.orbitlauncher.domain.YardstickMark
+import com.sqftware.orbitlauncher.domain.yardstickMark
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
@@ -32,14 +32,6 @@ class SpinFeatTextTest {
 
     @Test
     fun `a distance reads as the length of so many of a yardstick`() {
-        assertEquals(
-            listOf("You've spun the length of an Eiffel Tower", "You've spun the length of 2 giraffes"),
-            texts(
-                milestones = listOf(
-                    Milestone.Distance(YardstickMark(1, "Eiffel Tower", "Eiffel Towers")),
-                    Milestone.Distance(YardstickMark(2, "giraffe", "giraffes")),
-                ),
-            ),
-        )
+        assertEquals(listOf("You've spun the length of 2 giraffes"), texts(milestones = listOf(Milestone.Distance(yardstickMark(11.0)!!))))
     }
 }

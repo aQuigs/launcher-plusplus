@@ -5,7 +5,7 @@ import kotlin.math.pow
 import kotlin.math.roundToLong
 
 /** Something [metres] long that a distance spun is put next to, named [one] and, for more than one, [many]. */
-private class Yardstick(val metres: Double, val one: String, val many: String)
+class Yardstick(val metres: Double, val one: String, val many: String)
 
 private val PITCH = Yardstick(105.0, "football pitch", "football pitches")
 private val EARTH = Yardstick(40_075_000.0, "trip round the Earth", "trips round the Earth")
@@ -29,11 +29,12 @@ private val AMERICAN = mapOf(
 
 /** [metres] as so many of the longest yardstick it reaches, such as "That's 7.6 bananas", or null short of the first. */
 fun yardstickText(metres: Double, locale: Locale): String? {
-    val yardsticks = if (locale.country == "US") YARDSTICKS.map { AMERICAN[it] ?: it } else YARDSTICKS
-    val stick = yardsticks.lastOrNull { metres >= it.metres } ?: return null
+    val stick = YARDSTICKS.map { it.namedFor(locale) }.lastOrNull { metres >= it.metres } ?: return null
     val count = (metres / stick.metres * 10).roundToLong() / 10.0
     return "That's ${String.format(locale, "%,.1f", count)} ${if (count == 1.0) stick.one else stick.many}"
 }
+
+private fun Yardstick.namedFor(locale: Locale) = if (locale.country == "US") AMERICAN[this] ?: this else this
 
 /** [n] rounded down to 1, 2 or 5 times a power of ten, the steps a round number goes up in, or 0 below 1. */
 fun oneTwoFive(n: Long): Long {
@@ -43,16 +44,25 @@ fun oneTwoFive(n: Long): Long {
     return listOf(5 * step, 2 * step, step).first { it <= n }
 }
 
-/** [count] of a yardstick named [one] and, for more than one, [many]. */
-data class YardstickMark(val count: Long, val one: String, val many: String)
+data class YardstickMark(val count: Long, val stick: Yardstick)
 
 /**
  * The longest yardstick [metres] reaches and how many of it, rounded down by [oneTwoFive], or null short of the first a
- * metre or more long: a banana comes round within the first spin or two, too soon to be a milestone.
+ * meter or more long: a banana comes around within the first spin or two, too soon to be a milestone.
  */
 fun yardstickMark(metres: Double): YardstickMark? {
     val stick = YARDSTICKS.lastOrNull { it.metres >= 1 && metres >= it.metres } ?: return null
-    return YardstickMark(oneTwoFive((metres / stick.metres).toLong()), stick.one, stick.many)
+    return YardstickMark(oneTwoFive((metres / stick.metres).toLong()), stick)
+}
+
+/**
+ * [mark] as [locale]'s reader names it, such as "an Eiffel Tower" or "2 giraffes". An American reader's football field
+ * is shorter than the pitch the mark counts, so so many pitches are always at least as many fields.
+ */
+fun yardstickMarkText(mark: YardstickMark, locale: Locale): String {
+    val stick = mark.stick.namedFor(locale)
+    if (mark.count > 1) return "${String.format(locale, "%,d", mark.count)} ${stick.many}"
+    return "${if (stick.one.first().lowercaseChar() in "aeiou") "an" else "a"} ${stick.one}"
 }
 
 private const val METRES_PER_FOOT = 0.3048

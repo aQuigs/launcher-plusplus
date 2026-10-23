@@ -43,11 +43,15 @@ class UnitsTest {
     }
 
     @Test
-    fun `a distance marks the round count of the longest yardstick a metre or more long it reaches`() {
-        assertNull(yardstickMark(5.0))
-        assertEquals(YardstickMark(1, "giraffe", "giraffes"), yardstickMark(5.5))
-        assertEquals(YardstickMark(2, "giraffe", "giraffes"), yardstickMark(16.0))
-        assertEquals(YardstickMark(1, "blue whale", "blue whales"), yardstickMark(30.0))
+    fun `a distance marks the round count of the longest yardstick a meter or more long it reaches`() {
+        fun mark(metres: Double, locale: Locale = Locale.UK) = yardstickMark(metres)?.let { yardstickMarkText(it, locale) }
+
+        assertNull(mark(5.0))
+        assertEquals("a giraffe", mark(5.5))
+        assertEquals("2 giraffes", mark(16.0))
+        assertEquals("an Eiffel Tower", mark(330.0))
+        assertEquals("2 football pitches", mark(210.0))
+        assertEquals("2 football fields", mark(210.0, Locale.US))
     }
 
     @Test

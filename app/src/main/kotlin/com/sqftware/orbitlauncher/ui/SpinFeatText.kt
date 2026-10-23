@@ -4,6 +4,7 @@ import com.sqftware.orbitlauncher.domain.Milestone
 import com.sqftware.orbitlauncher.domain.SpinFeats
 import com.sqftware.orbitlauncher.domain.SpinRecord
 import com.sqftware.orbitlauncher.domain.durationText
+import com.sqftware.orbitlauncher.domain.yardstickMarkText
 import java.util.Locale
 
 val SpinRecord.label
@@ -33,10 +34,7 @@ fun spinFeatTexts(feats: SpinFeats, locale: Locale): List<String> {
     val milestones = feats.milestones.map {
         when (it) {
             is Milestone.Spins -> "Milestone: ${String.format(locale, "%,d", it.spins)} spins"
-            is Milestone.Distance -> with(it.mark) {
-                val article = if (one.first().lowercaseChar() in "aeiou") "an" else "a"
-                "You've spun the length of ${if (count == 1L) "$article $one" else "${String.format(locale, "%,d", count)} $many"}"
-            }
+            is Milestone.Distance -> "You've spun the length of ${yardstickMarkText(it.mark, locale)}"
         }
     }
     return records + milestones
