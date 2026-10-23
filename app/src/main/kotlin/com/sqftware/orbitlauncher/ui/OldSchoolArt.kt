@@ -169,10 +169,10 @@ private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_
 private fun compassAt(size: Size, scale: Int) = size.center + ((COMPASS_CENTRE - FRAME_HOLE_CENTRE) * scale).toOffset()
 
 /**
- * The world map's orb, as the game hangs it off the minimap's frame: where it is centred from the map's centre, low on
- * the right where the game has it and inside the emblem's cell, so it takes touches, and its radius.
+ * The world map's orb, where the game's resizable interface hangs it off the minimap's frame, by its lower right edge:
+ * where it is centred from the map's centre, and its radius.
  */
-private val WORLD_MAP_ORB = IntOffset(54, 54)
+private val WORLD_MAP_ORB = IntOffset(63, 78)
 private const val WORLD_MAP_ORB_RADIUS = 15
 
 private fun worldMapOrbAt(size: Size, scale: Int) = size.center + (WORLD_MAP_ORB * scale).toOffset()
@@ -684,6 +684,14 @@ internal fun fitScale(room: Float, units: Float, most: Int) = max(1, min(most, f
 /** [image] with its top left at [topLeft], each of its pixels [scale] screen pixels square and as sharp as the game's. */
 internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =
     drawSpritePart(image, IntRect(0, 0, image.width, image.height), topLeft, scale, tint, alpha)
+
+/** [image] at [topLeft], each of its pixels [scale] screen pixels square, which is crisp on a whole scale and between them as a zoom passes. */
+internal fun DrawScope.drawSpriteScaled(image: ImageBitmap, topLeft: IntOffset, scale: Float) = drawImage(
+    image,
+    dstOffset = topLeft,
+    dstSize = IntSize((image.width * scale).roundToInt(), (image.height * scale).roundToInt()),
+    filterQuality = FilterQuality.None,
+)
 
 /** [image] as [drawSprite] draws it, centred on [centre]. */
 internal fun DrawScope.drawSpriteCentred(image: ImageBitmap, centre: Offset, scale: Int, tint: Color? = null, alpha: Float = 1f) =

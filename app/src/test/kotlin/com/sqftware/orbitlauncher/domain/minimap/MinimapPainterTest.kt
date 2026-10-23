@@ -136,9 +136,9 @@ class MinimapPainterTest {
     @Test
     fun paintsTheWorldMapAsAnOpaqueSquareWithEveryIconAndNobody() {
         val spread = MapIcon.entries.take(8).mapIndexed { i, icon -> Poi(local(30 + (i % 4) * 30, 40 + (i / 4) * 60), icon, npc = true) }
-        val map = painter.paint(MapScene(centre, pois = spread), MapFrame.WORLD_MAP)
-        assertEquals(WORLD_MAP_SIZE, map.ground.width)
-        assertEquals(WORLD_MAP_SIZE, map.ground.height)
+        val map = painter.paint(MapScene(centre, pois = spread), WORLD_MAP)
+        assertEquals(WORLD_SIZE, map.ground.width)
+        assertEquals(WORLD_SIZE, map.ground.height)
         assertTrue(map.ground.argb.all { it ushr 24 == 0xFF })
         assertTrue(map.icons.isEmpty())
         assertTrue(spread.all { poi -> (ICON or poi.icon!!.ordinal) in map.ground.argb })
@@ -148,9 +148,9 @@ class MinimapPainterTest {
     @Test
     fun theWorldMapPavesOnlyWhereBuildingsStandClose() {
         val blocks = (0 until 4).flatMap { i -> (0 until 4).map { j -> Building(rect(20 + i * 30, 20 + j * 30, 45 + i * 30, 45 + j * 30), seed = (i * 4 + j).toLong()) } }
-        val ground = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = blocks), MapFrame.WORLD_MAP).ground
+        val ground = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = blocks), WORLD_MAP).ground
         // The world map's centre pixel is the minimap's, 436 px further in.
-        val offset = WORLD_MAP_SIZE / 2 - MINIMAP_SIZE / 2
+        val offset = WORLD_SIZE / 2 - MINIMAP_SIZE / 2
         assertEquals(PLAZA, ground[77 + offset, 77 + offset])
         assertTrue(ground[10, 10] != PLAZA)
     }
@@ -158,7 +158,7 @@ class MinimapPainterTest {
     @Test
     fun twoWorldMapsOfOnePlaceAgreeWhereTheyMeet() {
         val tiles = OpenMapTiles.tilesFor(centre, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
-        fun paintRound(at: LatLon) = onSeedGrid(at).let { painter.paint(OpenMapTiles.scene(it, tiles, MapFrame.WORLD_MAP), MapFrame.WORLD_MAP) }
+        fun paintRound(at: LatLon) = onSeedGrid(at).let { painter.paint(OpenMapTiles.scene(it, tiles, WORLD_MAP), WORLD_MAP) }
         val a = paintRound(centre)
         val b = paintRound(centre.shifted(MapShift(300.0, 200.0)))
 
@@ -170,7 +170,7 @@ class MinimapPainterTest {
         val dy = row(b.centre) - row(a.centre)
         var shared = 0
         var same = 0
-        for (y in maxOf(0, dy) until minOf(WORLD_MAP_SIZE, WORLD_MAP_SIZE + dy)) for (x in maxOf(0, dx) until minOf(WORLD_MAP_SIZE, WORLD_MAP_SIZE + dx)) {
+        for (y in maxOf(0, dy) until minOf(WORLD_SIZE, WORLD_SIZE + dy)) for (x in maxOf(0, dx) until minOf(WORLD_SIZE, WORLD_SIZE + dx)) {
             shared++
             if (a.ground[x, y] == b.ground[x - dx, y - dy]) same++
         }
@@ -202,6 +202,8 @@ class MinimapPainterTest {
     private fun solid(w: Int, h: Int, colour: Int) = Pixels(w, h, IntArray(w * h) { colour })
 
     private companion object {
+        const val WORLD_SIZE = 1024
+        val WORLD_MAP = MapFrame.worldMap(WORLD_SIZE, WORLD_SIZE)
         const val TREE = 0xFFFF00FF.toInt()
         const val NPC = 0xFF00FFFF.toInt()
         const val ICON = 0xFF0000E0.toInt()

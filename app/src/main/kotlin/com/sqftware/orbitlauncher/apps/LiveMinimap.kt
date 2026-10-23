@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.mapLatest
  * the activity, so the tiles it has decoded and the last map outlast each time the launcher goes out of sight.
  */
 class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: MinimapArt) {
-    private val maker = BitmapMapMaker(tiles, MapFrame.MINIMAP, art)
+    private val maker = BitmapMapMaker(tiles, art)
     private var shown: PaintedMap<ImageBitmap>? = null
 
     /**
@@ -45,6 +45,6 @@ class LiveMinimap(private val location: LocationSource, tiles: MapTiles, art: Mi
     // A fix within the update distance of the last map's centre, such as the first fix on a return home, keeps that map.
     private suspend fun paint(centre: LatLon): PaintedMap<ImageBitmap>? {
         shown?.let { if (WebMercator.groundDistance(it.centre, centre) < UPDATE_METRES) return it }
-        return maker.paint(centre)?.also { shown = it }
+        return maker.paint(centre, MapFrame.MINIMAP)?.also { shown = it }
     }
 }

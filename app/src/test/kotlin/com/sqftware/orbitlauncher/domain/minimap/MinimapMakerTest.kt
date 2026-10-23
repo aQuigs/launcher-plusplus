@@ -27,10 +27,10 @@ class MinimapMakerTest {
     @Test
     fun decodesEachTileOnceAsTheUserMoves() = runBlocking {
         val tiles = FakeTiles(fixtures())
-        val maker = MinimapMaker(tiles, MapFrame.MINIMAP) { MinimapSprites() }
+        val maker = MinimapMaker(tiles) { MinimapSprites() }
 
-        assertNotNull(maker.paint(bryantPark))
-        assertNotNull(maker.paint(LatLon(bryantPark.lat + 0.0002, bryantPark.lon)))
+        assertNotNull(maker.paint(bryantPark, MapFrame.MINIMAP))
+        assertNotNull(maker.paint(LatLon(bryantPark.lat + 0.0002, bryantPark.lon), MapFrame.MINIMAP))
 
         assertEquals(OpenMapTiles.tilesFor(bryantPark, MapFrame.MINIMAP), tiles.asked)
     }
@@ -39,7 +39,7 @@ class MinimapMakerTest {
     fun drawsNothingWhileATileIsMissing() = runBlocking {
         val bytes = fixtures()
         bytes.remove(bytes.keys.last())
-        assertNull(MinimapMaker(FakeTiles(bytes), MapFrame.MINIMAP) { MinimapSprites() }.paint(bryantPark))
+        assertNull(MinimapMaker(FakeTiles(bytes)) { MinimapSprites() }.paint(bryantPark, MapFrame.MINIMAP))
     }
 
     @Test
@@ -48,7 +48,7 @@ class MinimapMakerTest {
         bytes[bytes.keys.first()] = ByteArray(0)
         val tiles = FakeTiles(bytes)
 
-        assertNotNull(MinimapMaker(tiles, MapFrame.MINIMAP) { MinimapSprites() }.paint(bryantPark))
+        assertNotNull(MinimapMaker(tiles) { MinimapSprites() }.paint(bryantPark, MapFrame.MINIMAP))
         assertEquals(emptyList<TileId>(), tiles.discarded)
     }
 
@@ -59,7 +59,7 @@ class MinimapMakerTest {
         bytes[bad] = "<html>captive portal</html>".toByteArray()
         val tiles = FakeTiles(bytes)
 
-        assertNull(MinimapMaker(tiles, MapFrame.MINIMAP) { MinimapSprites() }.paint(bryantPark))
+        assertNull(MinimapMaker(tiles) { MinimapSprites() }.paint(bryantPark, MapFrame.MINIMAP))
         assertEquals(listOf(bad), tiles.discarded)
     }
 
