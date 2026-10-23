@@ -9,7 +9,7 @@ import kotlin.math.roundToInt
  */
 class IconLayers(val foreground: Pixels, val background: Pixels? = null)
 
-/** The game's item canvas, which an item is drawn on. */
+/** The game's item canvas, which every item sprite fills unless it is cut. */
 internal const val ITEM_WIDTH = 36
 internal const val ITEM_HEIGHT = 32
 
@@ -26,12 +26,12 @@ const val ITEM_LAYER_SIZE = 108
  * An app's [mark], as [itemMark] takes it from its icon, drawn as one of the game's inventory items: at most [size]
  * pixels across on the 36 by 32 item canvas, in a few flat colours with a hard edge, a black outline and the dark shadow
  * every item sprite carries. A dark item is outlined in white instead, as the game marks a chosen item, since it would
- * vanish into the black of an orb or a panel. Cut to the square any mark of [size] reaches with its outline and shadow,
- * the same for every item, so each fills its square as any app's icon does and all of them show the game's pixels alike.
+ * vanish into the black of an orb or a panel. If [cut], the mark is trimmed first, so a small logo is drawn as large as a
+ * disc filling its icon, and the item cut to the square any mark of [size] reaches with its outline and shadow, the
+ * same for every item, so each fills a small square at one scale.
  */
-fun itemSprite(mark: Pixels, size: Int = ITEM_MARK, colours: Int = 14): Pixels {
-    // Trimmed first, so a small logo is drawn as large as a disc filling its icon, and every item at one scale.
-    val small = downscale(opaquePart(mark), size)
+fun itemSprite(mark: Pixels, size: Int = ITEM_MARK, colours: Int = 14, cut: Boolean = false): Pixels {
+    val small = downscale(if (cut) opaquePart(mark) else mark, size)
     val item = Pixels(ITEM_WIDTH, ITEM_HEIGHT)
     val left = (ITEM_WIDTH - small.width) / 2
     val top = (ITEM_HEIGHT - small.height) / 2 - 1
@@ -42,6 +42,7 @@ fun itemSprite(mark: Pixels, size: Int = ITEM_MARK, colours: Int = 14): Pixels {
     dropBackingTile(item)
     posterize(item, colours)
     outline(item, if (isDark(item)) WHITE else BLACK)
+    if (!cut) return item
     // A pixel of outline all round the mark, and the shadow a pixel past that below and to the right.
     return item.part((ITEM_WIDTH - size) / 2 - 1, (ITEM_HEIGHT - size) / 2 - 2, size + 3, size + 3)
 }

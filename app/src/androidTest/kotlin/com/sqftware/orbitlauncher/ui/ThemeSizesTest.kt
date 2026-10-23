@@ -25,7 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** A theme only draws round an icon and a folder's previews, so every theme shows them at one size, in one place. */
+/** A theme only draws round an icon's square and a folder's previews, so every theme lays them out at one size, in one place. */
 @RunWith(AndroidJUnit4::class)
 class ThemeSizesTest {
     @get:Rule
@@ -64,7 +64,7 @@ class ThemeSizesTest {
     @Test
     fun everyThemeAndLookLaysOutTheSamePreviews() {
         val folder = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 0), listOf(mail, clock) + alphabet.take(2))
-        show { FolderFace(folder, { null }, Modifier.fillMaxSize()) }
+        show { FolderFace(folder, { _, _ -> null }, Modifier.fillMaxSize()) }
         val reference = previews()
 
         everyThemeAndPlace { shown, shownPlace ->

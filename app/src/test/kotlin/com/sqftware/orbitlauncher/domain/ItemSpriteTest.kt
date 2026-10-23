@@ -20,9 +20,16 @@ class ItemSpriteTest {
     private fun Pixels.colours() = argb.filter { it != 0 }.toSet()
 
     @Test
-    fun everyItemIsCutToTheSameSquare() {
-        val large = itemSprite(disc(96, red))
-        val small = itemSprite(disc(12, red))
+    fun anItemFillsTheGameItemCanvas() {
+        val item = itemSprite(disc(96, red), size = 26)
+        assertEquals(ITEM_WIDTH, item.width)
+        assertEquals(ITEM_HEIGHT, item.height)
+    }
+
+    @Test
+    fun everyCutItemIsTheSameSquare() {
+        val large = itemSprite(disc(96, red), cut = true)
+        val small = itemSprite(disc(12, red), cut = true)
         assertEquals(large.width, large.height)
         assertEquals(large.width, small.width)
         assertEquals(large.height, small.height)
@@ -30,10 +37,10 @@ class ItemSpriteTest {
     }
 
     @Test
-    fun aSmallLogoIsDrawnAsLargeAsAFullMark() {
+    fun aCutItemDrawsASmallLogoAsLargeAsAFullMark() {
         val logo = square(96) { x, y -> if (x in 30..65 && y in 30..65) red else 0 }
         fun drawnWidth(item: Pixels) = item.argb.indices.filter { item.argb[it] != 0 }.map { it % item.width }.let { it.max() - it.min() }
-        assertEquals(drawnWidth(itemSprite(square(96) { _, _ -> red })), drawnWidth(itemSprite(logo)))
+        assertEquals(drawnWidth(itemSprite(square(96) { _, _ -> red }, cut = true)), drawnWidth(itemSprite(logo, cut = true)))
     }
 
     @Test

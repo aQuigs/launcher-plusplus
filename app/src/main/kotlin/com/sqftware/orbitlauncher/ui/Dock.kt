@@ -60,6 +60,7 @@ fun Dock(
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "dock_glow")
     val marks = LocalRingColors.current
     val art = LocalThemeArt.current
+    val fullSize = art.dockIconSize
     val ground = art.dockGround(MaterialTheme.colorScheme.primary)
     // Written by measure and read by draw, so a new layout of the row redraws its ground.
     var laidOut by remember { mutableStateOf<DockRow?>(null) }
@@ -85,13 +86,13 @@ fun Dock(
             .testTag(DockTags.DOCK),
     ) { measurables, constraints ->
         val width = constraints.maxWidth
-        val height = DOCK_ICON_SIZE.roundToPx()
+        val height = fullSize.roundToPx()
         if (measurables.isEmpty()) {
-            laidOut = DockRow(DOCK_ICON_SIZE.toPx(), emptyList())
+            laidOut = DockRow(fullSize.toPx(), emptyList())
             return@Layout layout(width, height) {}
         }
 
-        val row = dockRow(DOCK_ICON_SIZE.toPx(), width.toFloat(), measurables.size)
+        val row = dockRow(fullSize.toPx(), width.toFloat(), measurables.size, art.dockIconFill)
         laidOut = row
         val size = row.iconSize.roundToInt()
         val icons = measurables.map { it.measure(Constraints.fixed(size, size)) }
@@ -101,6 +102,3 @@ fun Dock(
         }
     }
 }
-
-/** How large a dock's icons are while they all fit, in every theme. */
-private val DOCK_ICON_SIZE = 56.dp

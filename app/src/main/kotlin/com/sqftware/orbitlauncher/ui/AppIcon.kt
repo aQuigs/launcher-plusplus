@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -151,12 +150,13 @@ fun IconDisc(
     presses: InteractionSource? = null,
     modifier: Modifier = Modifier,
     disc: Float = 1f,
+    folder: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val art = LocalThemeArt.current
     val shape = art.iconShape
     Box(modifier, contentAlignment = Alignment.Center) {
-        Spacer(Modifier.fillMaxSize(disc).then(art.iconGround()))
+        Spacer(Modifier.fillMaxSize(disc).then(art.iconGround(folder)))
         content()
         // Over the content, so a press shows on the icon; an icon of no shape keeps its own outline, which a ripple
         // bounded to its square would cut across.
@@ -249,11 +249,12 @@ private fun Modifier.cutAroundSecond() = drawWithCache {
 private fun OwnImage(app: AppEntry, icon: IconLoader, modifier: Modifier) {
     // Handed another app, as a folder's preview is when an app leaves it, the cell must not keep showing the old one; asked
     // again for the same app, it keeps showing the icon it has until the new one is drawn.
+    val place = LocalIconPlace.current
     val bitmap by key(app.key) {
-        produceState<ImageBitmap?>(null, icon) { value = icon(app) ?: value }
+        produceState<ImageBitmap?>(null, icon, place) { value = icon(app, place) ?: value }
     }
 
     Box(modifier) {
-        bitmap?.let { Image(it, contentDescription = null, Modifier.fillMaxSize(), filterQuality = LocalThemeArt.current.iconFilter(it)) }
+        bitmap?.let { LocalThemeArt.current.IconImage(it, Modifier.fillMaxSize()) }
     }
 }

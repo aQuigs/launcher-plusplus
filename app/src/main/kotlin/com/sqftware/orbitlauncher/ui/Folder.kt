@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.MAX_FOLDER_NAME
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
@@ -181,7 +183,7 @@ fun FolderFace(
     val wear = LocalThemeArt.current.folderWear(folder)
     Box(modifier) {
         Spacer(Modifier.matchParentSize().then(wear.behind))
-        IconDisc(presses, Modifier.matchParentSize(), wear.disc) {
+        IconDisc(presses, Modifier.matchParentSize(), wear.disc, folder = true) {
             FolderPreviews(folder.apps, icon, Modifier.graphicsLayer { alpha = inner() })
             Spacer(Modifier.fillMaxSize(wear.disc).then(wear.over))
         }
@@ -197,7 +199,11 @@ fun FolderFace(
 internal fun FolderPreviews(apps: List<AppEntry>, icon: IconLoader, modifier: Modifier = Modifier) {
     val previews = apps.take(PREVIEWS)
     Layout(
-        content = { previews.forEachIndexed { index, app -> AppImage(app, icon, Modifier.testTag(FolderTags.preview(index))) } },
+        content = {
+            CompositionLocalProvider(LocalIconPlace provides IconPlace.Preview) {
+                previews.forEachIndexed { index, app -> AppImage(app, icon, Modifier.testTag(FolderTags.preview(index))) }
+            }
+        },
         modifier = modifier.fillMaxSize(),
     ) { measurables, constraints ->
         val side = min(constraints.maxWidth, constraints.maxHeight)
