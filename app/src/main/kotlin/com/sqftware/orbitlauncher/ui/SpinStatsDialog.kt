@@ -56,7 +56,7 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
         ) {
             SpinDial(stats, count = String.format(locale, "%,d", stats.spins))
             if (stats.spins == 0) {
-                SupportingText("Drag up or down round the ring's side and let go to start counting.", textAlign = TextAlign.Center)
+                SupportingText("Drag up or down around the ring's side and let go to start counting.", textAlign = TextAlign.Center)
             } else {
                 // As tall as each other, though one label wraps.
                 Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.Gap)) {
@@ -80,7 +80,7 @@ fun SpinStatsDialog(stats: SpinStats, onDismiss: () -> Unit) {
                     RulerGlyph,
                     MaterialTheme.colorScheme.primary,
                     distanceText(stats.distance, locale),
-                    "spun round the rim",
+                    "spun around the rim",
                     Modifier.fillMaxWidth(),
                     note = yardstickText(stats.distance, locale),
                 )

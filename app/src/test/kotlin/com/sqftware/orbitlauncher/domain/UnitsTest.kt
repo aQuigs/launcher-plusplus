@@ -31,6 +31,13 @@ class UnitsTest {
     }
 
     @Test
+    fun `an American reader gets football fields and trips around the Earth`() {
+        assertEquals("That's 2.0 football pitches", yardstickText(210.0, Locale.UK))
+        assertEquals("That's 2.0 football fields", yardstickText(182.88, Locale.US))
+        assertEquals("That's 1.0 trip around the Earth", yardstickText(40_075_000.0, Locale.US))
+    }
+
+    @Test
     fun `a duration reads in seconds, then minutes, then hours`() {
         assertEquals("12.5 s", durationText(12.5, Locale.UK))
         assertEquals("1 min 0 s", durationText(59.96, Locale.UK))
