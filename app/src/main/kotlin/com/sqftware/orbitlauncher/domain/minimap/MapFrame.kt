@@ -1,8 +1,5 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
-/** The world map's side in pixels: the stretch painted at once, which the user pans across before the next is painted. */
-const val WORLD_MAP_SIZE = 1024
-
 internal const val MAX_ICONS = 4
 internal const val MAX_PER_ICON = 2
 internal const val MAX_NPCS = 10
@@ -51,7 +48,7 @@ class MapFrame(
         /** The game's minimap: a disc, sparsely marked so the player's surroundings read at a glance. */
         val MINIMAP = MapFrame(MINIMAP_SIZE, MINIMAP_SIZE, round = true, followsUser = true, MAX_ICONS, MAX_PER_ICON, MAX_NPCS)
 
-        /** The game's world map: a square stretch with every icon that has room and, as in the game, nobody on it. */
-        val WORLD_MAP = MapFrame(WORLD_MAP_SIZE, WORLD_MAP_SIZE, round = false, followsUser = false, Int.MAX_VALUE, Int.MAX_VALUE, maxNpcs = 0)
+        /** A [width] by [height] stretch of the game's world map, with every icon that has room and, as in the game, nobody on it. */
+        fun worldMap(width: Int, height: Int) = MapFrame(width, height, round = false, followsUser = false, Int.MAX_VALUE, Int.MAX_VALUE, maxNpcs = 0)
     }
 }

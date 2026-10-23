@@ -16,7 +16,7 @@ import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
-import com.sqftware.orbitlauncher.domain.minimap.WORLD_MAP_SIZE
+import com.sqftware.orbitlauncher.domain.minimap.MapFrame
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
@@ -57,6 +57,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -179,11 +180,12 @@ class LauncherScreenTest {
     private var checkForUpdates by mutableStateOf(true)
     private var whereIAm by mutableStateOf(WhereIAm.Hidden)
     private var shownMinimap by mutableStateOf<PaintedMap<ImageBitmap>?>(null)
-    private val worldMapPaints = mutableListOf<LatLon>()
+    private data class WorldMapPaint(val centre: LatLon, val frame: MapFrame)
+    private val worldMapPaints = mutableListOf<WorldMapPaint>()
     private val worldMap = object : WorldMap {
-        override suspend fun paint(centre: LatLon): PaintedMap<ImageBitmap> {
-            worldMapPaints += centre
-            return PaintedMap(centre, ImageBitmap(WORLD_MAP_SIZE, WORLD_MAP_SIZE), emptyList())
+        override suspend fun paint(centre: LatLon, frame: MapFrame): PaintedMap<ImageBitmap> {
+            worldMapPaints += WorldMapPaint(centre, frame)
+            return PaintedMap(centre, ImageBitmap(frame.width, frame.height), emptyList())
         }
     }
     private var isHomeApp by mutableStateOf(true)
@@ -2302,7 +2304,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theWorldMapOrbOpensTheMapRoundWhereTheUserIsOverTheWholeScreenWhichADragPansAndTheCrossOrBackCloses() {
+    fun theWorldMapOrbOpensTheMapRoundWhereTheUserIsOverTheWholeScreenWhichADragPansAPinchZoomsAndTheCrossOrBackCloses() {
         val bryantPark = LatLon(40.7536, -73.9832)
         theme = Theme.OldSchool
         art = OldSchoolArt
@@ -2315,7 +2317,7 @@ class LauncherScreenTest {
 
         compose.onNodeWithTag(WorldMapTags.MAP).assertIsDisplayed()
         compose.runOnIdle {
-            assertEquals(listOf(bryantPark), worldMapPaints)
+            assertTrue(worldMapPaints.isNotEmpty() && worldMapPaints.all { it.centre == bryantPark })
             assertEquals(false, barsShown.last())
         }
 
@@ -2324,9 +2326,20 @@ class LauncherScreenTest {
 
         compose.runOnIdle {
             assertTrue(worldMapPaints.size >= 2)
-            assertTrue(worldMapPaints.last().lat < bryantPark.lat)
+            assertTrue(worldMapPaints.last().centre.lat < bryantPark.lat)
         }
-        compose.onNodeWithContentDescription("Close").performClick()
+
+        // Fingers drawn together zoom out, past the farthest step, which the map settles back on and paints more ground for.
+        val before = worldMapPaints.last().frame
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput {
+            pinch(Offset(centerX - 300f, centerY), Offset(centerX - 60f, centerY), Offset(centerX + 300f, centerY), Offset(centerX + 60f, centerY))
+        }
+        compose.runOnIdle {
+            val after = worldMapPaints.last().frame
+            assertTrue(after.width > before.width && after.height > before.height)
+        }
+        // A finger wobbles a little on a tap, which must not count as a drag.
+        compose.onNodeWithContentDescription("Close").performTouchInput { down(center); moveBy(Offset(3f, 2f)); up() }
         compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
         compose.ringSlot(clock).assertIsDisplayed()
         compose.runOnIdle { assertEquals(true, barsShown.last()) }
