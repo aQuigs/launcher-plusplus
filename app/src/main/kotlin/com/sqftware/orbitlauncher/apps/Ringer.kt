@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.app.NotificationManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -9,11 +8,8 @@ import android.media.AudioManager
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
-import androidx.core.content.ContextCompat
 import com.sqftware.orbitlauncher.domain.RingerMode
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
 
@@ -49,17 +45,7 @@ class SystemRinger(private val context: Context) : Ringer {
     }
 
     override fun modes(): Flow<RingerMode> =
-        callbackFlow {
-            val changes = object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
-                    trySend(Unit)
-                }
-            }
-            val filter = IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION)
-            ContextCompat.registerReceiver(context, changes, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-            send(Unit)
-            awaitClose { context.unregisterReceiver(changes) }
-        }
+        context.broadcasts(IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION))
             .conflate()
             .map { mode() }
 

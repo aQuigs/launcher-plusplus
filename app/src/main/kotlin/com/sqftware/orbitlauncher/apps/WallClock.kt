@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.apps
 
-import android.content.BroadcastReceiver
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -13,11 +12,11 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.Settings
 import android.text.format.DateFormat.is24HourFormat
-import androidx.core.content.ContextCompat
 import com.sqftware.orbitlauncher.domain.ClockFace
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
 import java.util.Calendar
@@ -40,6 +39,12 @@ interface WallClock {
 private const val TAG = "SystemWallClock"
 
 /** The system clock, with the date in the order the locale puts it and the hours in the 12- or 24-hour style asked for. */
+private val TIME_CHANGES = IntentFilter().apply {
+    addAction(Intent.ACTION_TIME_TICK)
+    addAction(Intent.ACTION_TIME_CHANGED)
+    addAction(Intent.ACTION_TIMEZONE_CHANGED)
+}
+
 class SystemWallClock(private val context: Context) : WallClock {
     override fun face(twentyFourHour: Boolean?): ClockFace {
         val locale = context.resources.configuration.locales[0]
@@ -55,33 +60,21 @@ class SystemWallClock(private val context: Context) : WallClock {
     }
 
     override fun faces(twentyFourHour: Boolean?): Flow<ClockFace> =
-        callbackFlow {
-            val ticks = object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
-                    trySend(Unit)
-                }
-            }
-            // The hour style is a setting, not a broadcast; TextClock watches it the same way.
-            val hourStyle = object : ContentObserver(Handler(Looper.getMainLooper())) {
-                override fun onChange(selfChange: Boolean) {
-                    trySend(Unit)
-                }
-            }
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_TIME_TICK)
-                addAction(Intent.ACTION_TIME_CHANGED)
-                addAction(Intent.ACTION_TIMEZONE_CHANGED)
-            }
-            ContextCompat.registerReceiver(context, ticks, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-            context.contentResolver.registerContentObserver(Settings.System.getUriFor(Settings.System.TIME_12_24), false, hourStyle)
-            send(Unit)
-            awaitClose {
-                context.unregisterReceiver(ticks)
-                context.contentResolver.unregisterContentObserver(hourStyle)
-            }
-        }
+        combine(context.broadcasts(TIME_CHANGES), hourStyleChanges()) { _, _ -> }
             .conflate()
             .map { face(twentyFourHour) }
+
+    // The hour style is a setting, not a broadcast; TextClock watches it the same way.
+    private fun hourStyleChanges(): Flow<Unit> = callbackFlow {
+        val hourStyle = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                trySend(Unit)
+            }
+        }
+        context.contentResolver.registerContentObserver(Settings.System.getUriFor(Settings.System.TIME_12_24), false, hourStyle)
+        trySend(Unit)
+        awaitClose { context.contentResolver.unregisterContentObserver(hourStyle) }
+    }
 
     override fun openClock() = startOrLog(TAG, "the clock") {
         context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

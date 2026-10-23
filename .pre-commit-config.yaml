@@ -31,6 +31,12 @@ repos:
         entry: '\bColor\s*\(|\bColor\.(Black|White|Gray|DarkGray|LightGray|Red|Green|Blue|Yellow|Cyan|Magenta|hsv|hsl|parseColor|rgb|argb|valueOf|BLACK|WHITE|GRAY|DKGRAY|LTGRAY|RED|GREEN|BLUE|YELLOW|CYAN|MAGENTA)\b|\.(surface\w*|background)\.copy\('
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/theme/
+      - id: receivers-via-app
+        name: Broadcast receivers register through broadcasts(), on the application context
+        language: pygrep
+        entry: '\bregisterReceiver\s*\('
+        files: ^app/src/main/kotlin/.*\.kt$
+        exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/apps/Broadcasts\.kt$
       - id: panel-ground-only
         name: Full-screen views and pop-ups take their ground from PanelGround
         language: pygrep

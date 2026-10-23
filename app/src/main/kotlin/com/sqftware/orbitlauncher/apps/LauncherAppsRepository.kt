@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.app.ActivityManager
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -25,7 +24,6 @@ import android.os.UserManager
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -42,7 +40,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -98,27 +98,21 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             .flowOn(Dispatchers.IO)
 
     // Once at first, then again after each change the callback reports; changes while a load runs make one more load.
-    private fun changes(withShortcuts: Boolean, onChange: (packageNames: Collection<String>) -> Unit = {}): Flow<Unit> =
-        callbackFlow {
+    private fun changes(withShortcuts: Boolean, onChange: (packageNames: Collection<String>) -> Unit = {}): Flow<Unit> {
+        val packageChanges = callbackFlow {
             val callback = PackageChanges(withShortcuts) {
                 onChange(it)
                 trySend(Unit)
             }
             launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
-            // The callback hears of a work profile's packages, but not of the profile coming, going or pausing, which
-            // changes the apps listed but no icon. Pins are the user's own only, so they never hear of it.
-            val profileChanges = object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
-                    trySend(Unit)
-                }
-            }.takeUnless { withShortcuts }
-            profileChanges?.let { ContextCompat.registerReceiver(context, it, PROFILE_CHANGES, ContextCompat.RECEIVER_NOT_EXPORTED) }
-            send(Unit)
-            awaitClose {
-                launcherApps.unregisterCallback(callback)
-                profileChanges?.let(context::unregisterReceiver)
-            }
-        }.conflate()
+            trySend(Unit)
+            awaitClose { launcherApps.unregisterCallback(callback) }
+        }
+        // The callback hears of a work profile's packages, but not of the profile coming, going or pausing, which
+        // changes the apps listed but no icon. Pins are the user's own only, so they never hear of it.
+        val profileChanges = if (withShortcuts) flowOf(Unit) else context.broadcasts(PROFILE_CHANGES)
+        return combine(packageChanges, profileChanges) { _, _ -> }.conflate()
+    }
 
     private fun loadApps(): List<AppEntry> =
         profiles().flatMap { profile ->
