@@ -76,6 +76,12 @@ import com.sqftware.orbitlauncher.domain.PageKind
 import com.sqftware.orbitlauncher.domain.PageLayout
 import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.Theme
+import com.sqftware.orbitlauncher.domain.Vital
+import com.sqftware.orbitlauncher.domain.Vitals
+import com.sqftware.orbitlauncher.apps.SensorStepCounter
+import com.sqftware.orbitlauncher.apps.SystemBattery
+import com.sqftware.orbitlauncher.apps.SystemStorage
+import com.sqftware.orbitlauncher.apps.steps
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.feats
@@ -93,6 +99,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -117,6 +124,7 @@ class MainActivity : ComponentActivity() {
     private val pinRequests = pinRequestChannel.receiveAsFlow()
     private lateinit var repository: LauncherAppsRepository
     private lateinit var widgetHost: SystemWidgetHost
+    private lateinit var stepCounter: SensorStepCounter
     private var barsLight: Boolean? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -158,6 +166,10 @@ class MainActivity : ComponentActivity() {
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this, location)
+        val battery = SystemBattery(this)
+        val storage = SystemStorage(this)
+        stepCounter = SensorStepCounter(this, activityResultRegistry).apply { start() }
+        val steps = stepCounter
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)
         val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
@@ -334,6 +346,23 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                // Like the clock, only while the launcher is visible and a theme shows them; the step counter counts on
+                // while it is out of sight.
+                val showsVitals = shownTheme.showsVitals
+                val vitals = produceState(Vitals(), showsVitals) {
+                    if (showsVitals) {
+                        repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            combine(battery.charge(), storage.free(), steps.steps()) { charge, free, counted -> Vitals(charge, free, counted) }
+                                .collect { value = it }
+                        }
+                    }
+                }
+                val readVitals = remember { { vitals.value } }
+                LaunchedEffect(Unit) {
+                    steps.answers().collect { granted ->
+                        if (!granted) noticeChannel.trySend("Counting steps needs physical activity access, which Settings can allow")
+                    }
+                }
                 var collectionPages by remember { mutableStateOf(collectionsStore.load()) }
                 var gridPages by remember { mutableStateOf(gridPagesStore.load()) }
                 var appSettings by remember { mutableStateOf(appSettingsStore.load()) }
@@ -496,6 +525,14 @@ class MainActivity : ComponentActivity() {
                     minimap = readMinimap,
                     madeUpMap = readMadeUpMap,
                     heading = readHeading,
+                    vitals = readVitals,
+                    onOpenVital = { vital ->
+                        when (vital) {
+                            Vital.Battery -> battery.open()
+                            Vital.Storage -> storage.open()
+                            Vital.Steps -> if (steps.isGranted()) steps.openFitness() else steps.request()
+                        }
+                    },
                     worldMaps = { TiledWorldMap(mapTiles, minimapArt) },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
@@ -524,6 +561,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        stepCounter.close()
+        super.onDestroy()
     }
 
     // The widget host's configuration step is an activity API that answers here, not through the result registry, which
