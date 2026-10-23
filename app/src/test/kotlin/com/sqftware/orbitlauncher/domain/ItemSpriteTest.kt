@@ -27,27 +27,10 @@ class ItemSpriteTest {
     }
 
     @Test
-    fun everyCutItemIsTheSameSquare() {
-        val large = itemSprite(disc(96, red), cut = true)
-        val small = itemSprite(disc(12, red), cut = true)
-        assertEquals(large.width, large.height)
-        assertEquals(large.width, small.width)
-        assertEquals(large.height, small.height)
-        assertTrue((0 until large.height).any { large[0, it] != 0 } && (0 until large.width).any { large[it, large.height - 1] != 0 })
-    }
-
-    @Test
-    fun aCutItemDrawsASmallLogoAsLargeAsAFullMark() {
-        val logo = square(96) { x, y -> if (x in 30..65 && y in 30..65) red else 0 }
-        fun drawnWidth(item: Pixels) = item.argb.indices.filter { item.argb[it] != 0 }.map { it % item.width }.let { it.max() - it.min() }
-        assertEquals(drawnWidth(itemSprite(square(96) { _, _ -> red }, cut = true)), drawnWidth(itemSprite(logo, cut = true)))
-    }
-
-    @Test
     fun theMarkKeepsWithinItsSizeAndIsOutlinedInBlack() {
         val item = itemSprite(disc(96, red), size = 17)
         val solid = item.argb.indices.filter { item.argb[it] != 0 && item.argb[it] != black && item.argb[it] != 0xFF302020.toInt() }
-        val xs = solid.map { it % item.width }
+        val xs = solid.map { it % ITEM_WIDTH }
         assertTrue(xs.max() - xs.min() + 1 <= 17)
         assertTrue(black in item.colours())
     }

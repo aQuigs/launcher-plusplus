@@ -43,13 +43,7 @@ enum class Theme(
         listOf(Colourway.Classic),
         // The ring's icons sit in the game's round orbs, a smaller frame than an inventory slot, so an item there is a
         // size down: as large as fits inside the orb's black with its outline.
-        iconStyles = { place ->
-            when (place) {
-                IconPlace.Ring -> IconStyle.Item(22)
-                IconPlace.Preview -> IconStyle.Item(ITEM_MARK, cut = true)
-                IconPlace.Elsewhere -> IconStyle.Item(ITEM_MARK)
-            }
-        },
+        iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Ring) 22 else 26) },
         mapsWhereIAm = true,
     ),
     ;

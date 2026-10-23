@@ -107,12 +107,12 @@ interface ThemeArt {
         get() = null
 
     /**
-     * What an app's icon, or a [folder]'s previews, sit on, drawn under them on a layer the size of the disc, which it
+     * What an app's icon, or a folder's previews, sit on, drawn under them on a layer the size of the disc, which it
      * may reach past: by default the disc. Only drawn, never round the icon, so it cannot move or size it.
      * [LocalIconPlace] says whether the icon is on the home ring or elsewhere, where a theme may frame it differently.
      */
     @Composable
-    fun iconGround(folder: Boolean): Modifier = Modifier.background(LocalBoxColors.current.on(LocalGround.current), CircleShape)
+    fun iconGround(): Modifier = Modifier.background(LocalBoxColors.current.on(LocalGround.current), CircleShape)
 
     /** The shape an icon is clipped to and its press ripples within, or none for an icon that keeps its own outline. */
     val iconShape: Shape?
