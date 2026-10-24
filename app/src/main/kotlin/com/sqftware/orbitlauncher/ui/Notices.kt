@@ -24,30 +24,27 @@ import kotlinx.coroutines.delay
 const val NOTICE_MILLIS = 2_000L
 
 /**
- * The launcher's one way of saying that something happened or could not: a short note at the foot of the screen for a
- * moment, in its own colours, never the system's toast.
+ * The launcher's way of saying that something happened or could not: a short note at the foot of the screen for a
+ * moment, in its own colors. Only a spin's records and milestones are the system's toasts instead, through Toasts.
  */
 @Stable
 class Notices {
     private class Shown(val text: String)
 
-    private var queue by mutableStateOf<List<Shown>>(emptyList())
+    private var shown by mutableStateOf<Shown?>(null)
 
     /** Puts up [text]; again while it shows starts its moment over. */
-    fun show(text: String) = showEach(listOf(text))
-
-    /** Puts up each of [texts] in turn for a moment each, in place of any showing or still to come; none changes nothing. */
-    fun showEach(texts: List<String>) {
-        if (texts.isNotEmpty()) queue = texts.map(::Shown)
+    fun show(text: String) {
+        shown = Shown(text)
     }
 
-    /** Draws the note showing, if any, until its moment is up, then the next. */
+    /** Draws the note showing, if any, until its moment is up. */
     @Composable
     fun Host(modifier: Modifier = Modifier) {
-        val note = queue.firstOrNull() ?: return
+        val note = shown ?: return
         LaunchedEffect(note) {
             delay(NOTICE_MILLIS)
-            if (queue.firstOrNull() === note) queue = queue.drop(1)
+            if (shown === note) shown = null
         }
         NoticeLabel(note.text, modifier)
     }

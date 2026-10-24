@@ -169,6 +169,7 @@ class LauncherScreenTest {
     private var appNames by mutableStateOf(false)
     private var ringSpin by mutableStateOf(true)
     private var spinStats by mutableStateOf(SpinStats())
+    private val toasts = mutableListOf<String>()
     private var homeOnReturn by mutableStateOf(false)
     private var pickTip by mutableStateOf(false)
     private var drawerStyle by mutableStateOf(DrawerStyle())
@@ -311,6 +312,7 @@ class LauncherScreenTest {
                 spinStats = before.add(it, on = LocalDate.of(2026, 10, 21))
                 spinStats.feats(before)
             },
+            onToast = { toasts += it },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
@@ -2291,16 +2293,14 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aSpinSaysEachRecordItBeatAndMilestoneItPassedInTurn() {
+    fun aSpinToastsEachRecordItBeatAndMilestoneItPassed() {
         spinStats = SpinStats(spins = 19)
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         spinDownTheRingsSide()
 
-        fun shows(text: String) = compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
-        compose.waitUntil(10_000) { shows("New record: top speed") }
-        compose.waitUntil(10_000) { shows("Milestone: 20 spins") }
-        compose.onNodeWithText("New record: top speed", substring = true).assertDoesNotExist()
+        compose.waitUntil(10_000) { toasts.any { it.startsWith("Milestone: 20 spins") } }
+        assertTrue("a record before the milestone", toasts.first().startsWith("New record: "))
     }
 
     @Test

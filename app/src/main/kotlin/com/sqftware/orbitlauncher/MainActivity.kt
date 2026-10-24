@@ -54,6 +54,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWhereIAmStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
+import com.sqftware.orbitlauncher.apps.SystemToasts
 import com.sqftware.orbitlauncher.apps.SystemAppUsage
 import com.sqftware.orbitlauncher.apps.SystemDefaultAppFinder
 import com.sqftware.orbitlauncher.apps.SystemRelauncher
@@ -152,6 +153,7 @@ class MainActivity : ComponentActivity() {
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
+        val toasts = SystemToasts(this)
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
@@ -464,6 +466,7 @@ class MainActivity : ComponentActivity() {
                         spinStatsStore.save(spinStats)
                         spinStats.feats(before)
                     },
+                    onToast = toasts::show,
                     homeOnReturn = homeOnReturn,
                     onHomeOnReturnChange = {
                         homeOnReturn = it
