@@ -118,7 +118,6 @@ import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.pairOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -169,6 +168,7 @@ class LauncherScreenTest {
     private var appNames by mutableStateOf(false)
     private var ringSpin by mutableStateOf(true)
     private var spinStats by mutableStateOf(SpinStats())
+    private val toasts = mutableListOf<String>()
     private var homeOnReturn by mutableStateOf(false)
     private var pickTip by mutableStateOf(false)
     private var drawerStyle by mutableStateOf(DrawerStyle())
@@ -274,7 +274,6 @@ class LauncherScreenTest {
             onLayoutChange = { layout = it },
             homePresses = homePresses,
             pinRequests = pinRequests,
-            notices = emptyFlow(),
             apps = apps,
             pinnedShortcuts = pinnedShortcuts,
             ringPages = ringPages,
@@ -311,6 +310,7 @@ class LauncherScreenTest {
                 spinStats = before.add(it, on = LocalDate.of(2026, 10, 21))
                 spinStats.feats(before)
             },
+            onToast = { toasts += it },
             homeOnReturn = homeOnReturn,
             onHomeOnReturnChange = { homeOnReturn = it },
             pickTip = pickTip,
@@ -2086,9 +2086,7 @@ class LauncherScreenTest {
         show()
 
         compose.emblem().performClick()
-        compose.onNodeWithText(PICK_TIP).assertIsDisplayed()
-        compose.mainClock.advanceTimeBy(NOTICE_MILLIS)
-        compose.onNodeWithText(PICK_TIP).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
         compose.drawerHandle().performClick()
         assertDrawerOpen(false)
 
@@ -2100,7 +2098,7 @@ class LauncherScreenTest {
 
         compose.emblem().performClick()
         assertDrawerOpen(true)
-        compose.onNodeWithText(PICK_TIP).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
     }
 
     // Flipped twice, so a row that kept the style it first showed would ask for the same one again.
@@ -2291,16 +2289,14 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aSpinSaysEachRecordItBeatAndMilestoneItPassedInTurn() {
+    fun aSpinToastsEachRecordItBeatAndMilestoneItPassed() {
         spinStats = SpinStats(spins = 19)
         homeApps = HomeApps(ring = Ring(listOf(clock, mail).map { RingSlot.App(it.key) }))
         show()
         spinDownTheRingsSide()
 
-        fun shows(text: String) = compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
-        compose.waitUntil(10_000) { shows("New record: top speed") }
-        compose.waitUntil(10_000) { shows("Milestone: 20 spins") }
-        compose.onNodeWithText("New record: top speed", substring = true).assertDoesNotExist()
+        compose.waitUntil(10_000) { toasts.any { it.startsWith("Milestone: 20 spins") } }
+        assertTrue("a record before the milestone", toasts.first().startsWith("New record: "))
     }
 
     @Test
@@ -2766,7 +2762,7 @@ class LauncherScreenTest {
 
         compose.collectionTile(tools).performClick()
 
-        compose.onNodeWithText("Collection added").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(listOf("Collection added"), toasts) }
         compose.collectionTile(tools).assertIsSelected()
         // Seeded by the words in the package names: "clock" belongs in Tools, "mail" is nobody's word.
         compose.runOnIdle {
@@ -2776,7 +2772,7 @@ class LauncherScreenTest {
 
         compose.collectionTile(tools).performClick()
 
-        compose.onNodeWithText("Collection removed").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(listOf("Collection added", "Collection removed"), toasts) }
         compose.collectionTile(tools).assertIsNotSelected()
         compose.runOnIdle { assertEquals(CollectionsPage(), collections) }
 

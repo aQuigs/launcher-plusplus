@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
@@ -237,7 +236,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn,
+ * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed, each told in a toast, [onToast]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn,
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -257,7 +256,6 @@ fun LauncherScreen(
     onLayoutChange: (PageLayout) -> Unit,
     homePresses: Flow<HomePress>,
     pinRequests: Flow<PinRequest>,
-    notices: Flow<String>,
     apps: List<AppEntry>?,
     pinnedShortcuts: List<AppEntry>?,
     ringPages: RingPages,
@@ -284,6 +282,7 @@ fun LauncherScreen(
     onRingSpinChange: (Boolean) -> Unit,
     spinStats: SpinStats,
     onSpin: (Spin) -> SpinFeats,
+    onToast: (String) -> Unit,
     homeOnReturn: Boolean,
     onHomeOnReturnChange: (Boolean) -> Unit,
     pickTip: Boolean,
@@ -575,7 +574,6 @@ fun LauncherScreen(
     // through, as it does through the drawer; the pages and the drawer's chevron must not, so they go while it is up. Not
     // animated: it comes and goes in a frame, and pages fading back in would be tappable before they could be seen.
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
-    val shownNotices = remember { Notices() }
     // The page editor covers the whole screen the same way, until Back, HOME or a tap on a page.
     var editingPages by rememberSaveable { mutableStateOf(false) }
     // The world map covers the whole screen the same way, until Back or HOME.
@@ -1167,7 +1165,7 @@ fun LauncherScreen(
         val rows = gridCells[page.id]?.pageRows ?: return
         val grid = gridOf(page.id)
         val added = grid.addClock(rows)
-        if (added == grid) shownNotices.show("No room for the clock here") else saveGrids(mapOf(page.id to added))
+        if (added == grid) onToast("No room for the clock here") else saveGrids(mapOf(page.id to added))
     }
 
     val launcherMenu = remember {
@@ -1259,9 +1257,8 @@ fun LauncherScreen(
         }
     }
 
-    LaunchedEffect(notices) { notices.collect(shownNotices::show) }
     val locale = LocalLocale.current.platformLocale
-    val spun: (Spin) -> Unit = { spin -> shownNotices.showEach(spinFeatTexts(onSpin(spin), locale)) }
+    val spun: (Spin) -> Unit = { spin -> spinFeatTexts(onSpin(spin), locale).forEach(onToast) }
     LaunchedEffect(homePresses, pagerState, drawerState) {
         homePresses.collect { press ->
             closeAll()
@@ -1338,7 +1335,6 @@ fun LauncherScreen(
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val openWorldMap = remember { { showingWorldMap = true } }
     CompositionLocalProvider(
-        LocalNotices provides shownNotices,
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
@@ -1547,7 +1543,7 @@ fun LauncherScreen(
                                                         onSearch = {
                                                             if (active) {
                                                                 search()
-                                                                if (pickTip) shownNotices.show(PICK_TIP)
+                                                                if (pickTip) onToast(PICK_TIP)
                                                             }
                                                         },
                                                         modifier = ringModifier.dropZone(page) { copy(ring = it) },
@@ -1769,6 +1765,7 @@ fun LauncherScreen(
                         customs = customs.map { it.kind },
                         onToggle = { kind ->
                             listedCustoms = customs
+                            onToast(if (kind in collections) "Collection removed" else "Collection added")
                             changeCollections {
                                 when {
                                     kind in this -> remove(kind)
@@ -1922,14 +1919,6 @@ fun LauncherScreen(
                         if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
                     }
                 }
-                // Over everything, panels and the open drawer included, clear of the drawer's strip and of the keyboard,
-                // which the root leaves to the drawer.
-                shownNotices.Host(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .windowInsetsPadding(WindowInsets.ime)
-                        .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = DRAWER_PEEK + Spacing.Edge),
-                )
             }
             // The whole window, through the bars, which hide while it is up.
             if (showingWorldMap) {

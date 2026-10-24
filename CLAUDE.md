@@ -54,7 +54,7 @@ Dependencies flow down only: `ui → domain ← apps`, and `MainActivity` is the
   - A menu is a `GroundMenu` of groups of `MenuRow`s: a menu of things to do gives every row an icon, a menu of settings none, and a destructive row is red.
   - A full-screen view is a `Panel`, which carries its title and a close button. Other text outside boxes and buttons is a `SectionLabel`, `SupportingText` or an `EmptyNote`; spaces come from `Spacing`.
   - Text on the wallpaper, which can be light in one patch and dark in the next, takes its style through `legible()`, which gives it a faint halo opposite in color to the text; no text has a shadow of its own (the `legible-text` hook).
-  - A note that something happened, or could not, is a notice through `LocalNotices`, never a system toast.
+  - A note that something happened, or could not, is a short system toast through the `Toasts` adapter.
   - What scrolls fades at an edge with more beyond it (`fadingEdges`); a row that scrolls sideways is a `sidewaysScroll`, whose `bleed` is what rises out of it.
   - A glyph means one thing everywhere: the cross, the trash can and the chevron as `Glyphs.kt` says, and a choice made is a `PickedMark`.
   - UI words are in sentence case; names (of apps, collections, themes) keep their own.

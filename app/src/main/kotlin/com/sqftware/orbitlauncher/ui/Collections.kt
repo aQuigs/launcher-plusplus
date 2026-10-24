@@ -608,8 +608,7 @@ internal fun PlainBinFace(highlighted: Boolean, modifier: Modifier) {
 
 /**
  * Select Collection: every built-in kind as a tile, then the [customs], then Create Your Own, which calls [onCreate]; a
- * tile is lit when its card is on [page]. A tap on any other tile calls [onToggle] and says what it did in a label that
- * fades after a moment; the grid stays until Back.
+ * tile is lit when its card is on [page]. A tap on any other tile calls [onToggle]; the grid stays until Back.
  */
 @Composable
 fun CollectionPicker(
@@ -620,7 +619,6 @@ fun CollectionPicker(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val notices = LocalNotices.current
     Panel("Select collection", onClose, modifier.testTag(CollectionTags.PICKER)) {
         BoxWithConstraints {
             val grid = tileGrid(constraints.maxWidth)
@@ -641,10 +639,7 @@ fun CollectionPicker(
                         title = kind.title,
                         labelStyle = grid.labelStyle,
                         selected = onPage,
-                        onClick = {
-                            notices.show(if (onPage) "Collection removed" else "Collection added")
-                            onToggle(kind)
-                        },
+                        onClick = { onToggle(kind) },
                         modifier = Modifier.testTag(CollectionTags.tile(kind)),
                     )
                 }
