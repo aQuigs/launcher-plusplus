@@ -118,7 +118,6 @@ import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.pairOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -275,7 +274,6 @@ class LauncherScreenTest {
             onLayoutChange = { layout = it },
             homePresses = homePresses,
             pinRequests = pinRequests,
-            notices = emptyFlow(),
             apps = apps,
             pinnedShortcuts = pinnedShortcuts,
             ringPages = ringPages,
@@ -2088,9 +2086,7 @@ class LauncherScreenTest {
         show()
 
         compose.emblem().performClick()
-        compose.onNodeWithText(PICK_TIP).assertIsDisplayed()
-        compose.mainClock.advanceTimeBy(NOTICE_MILLIS)
-        compose.onNodeWithText(PICK_TIP).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
         compose.drawerHandle().performClick()
         assertDrawerOpen(false)
 
@@ -2102,7 +2098,7 @@ class LauncherScreenTest {
 
         compose.emblem().performClick()
         assertDrawerOpen(true)
-        compose.onNodeWithText(PICK_TIP).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(PICK_TIP), toasts) }
     }
 
     // Flipped twice, so a row that kept the style it first showed would ask for the same one again.
@@ -2766,7 +2762,7 @@ class LauncherScreenTest {
 
         compose.collectionTile(tools).performClick()
 
-        compose.onNodeWithText("Collection added").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(listOf("Collection added"), toasts) }
         compose.collectionTile(tools).assertIsSelected()
         // Seeded by the words in the package names: "clock" belongs in Tools, "mail" is nobody's word.
         compose.runOnIdle {
@@ -2776,7 +2772,7 @@ class LauncherScreenTest {
 
         compose.collectionTile(tools).performClick()
 
-        compose.onNodeWithText("Collection removed").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(listOf("Collection added", "Collection removed"), toasts) }
         compose.collectionTile(tools).assertIsNotSelected()
         compose.runOnIdle { assertEquals(CollectionsPage(), collections) }
 

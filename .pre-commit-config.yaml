@@ -56,7 +56,7 @@ repos:
         files: ^app/src/main/kotlin/.*\.kt$
         exclude: ^app/src/main/kotlin/com/sqftware/orbitlauncher/ui/(theme/|Grounds\.kt$|ChoiceRow\.kt$|Panel\.kt$|\w+Art\.kt$)
       - id: launcher-pop-up-kinds
-        name: Dialogs are an InfoDialog, ConfirmDialog, NameDialog or ChoiceDialog, menus a GroundMenu of MenuRows, notes a Notice or Toasts
+        name: Dialogs are an InfoDialog, ConfirmDialog, NameDialog or ChoiceDialog, menus a GroundMenu of MenuRows, notes a toast through Toasts
         language: pygrep
         entry: '(?<![\w.])(DropdownMenuItem|BasicAlertDialog|Dialog|Popup|ModalBottomSheet|Snackbar)\s*\(|\bToast\b'
         files: ^app/src/main/kotlin/.*\.kt$

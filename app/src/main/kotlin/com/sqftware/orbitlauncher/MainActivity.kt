@@ -111,8 +111,6 @@ private const val HEADING_STEP = 0.5f
 class MainActivity : ComponentActivity() {
     private val homePresses = MutableSharedFlow<HomePress>(extraBufferCapacity = 1)
     // A channel, so a widget's answer that reaches a recreated activity before the screen collects is kept until it does.
-    private val noticeChannel = Channel<String>(Channel.BUFFERED)
-    private val notices = noticeChannel.receiveAsFlow()
 
     // A channel, unlike the presses, keeps a request that starts the activity until the screen is there to collect it.
     private val pinRequestChannel = Channel<PinRequest>(Channel.CONFLATED)
@@ -164,7 +162,7 @@ class MainActivity : ComponentActivity() {
         val minimapArt = ResourceMinimapArt(this)
         val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
         val wanderingMinimap = WanderingMinimap(MADE_UP_TOUR, minimapArt)
-        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { noticeChannel.trySend("No room for that widget here") })
+        widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { toasts.show("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
                 view = widgetHost::view,
@@ -290,7 +288,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     location.answers().collect { granted ->
                         changeWhereIAm(WhereIAm.answered(granted))
-                        if (!granted) noticeChannel.trySend("The map needs location access, which Settings can allow")
+                        if (!granted) toasts.show("The map needs location access, which Settings can allow")
                     }
                 }
                 // Each return reads the grant again, so one given in Settings, or lost while away, shows at once.
@@ -402,7 +400,6 @@ class MainActivity : ComponentActivity() {
                     onLayoutChange = ::changeLayout,
                     homePresses = homePresses,
                     pinRequests = pinRequests,
-                    notices = notices,
                     apps = apps,
                     pinnedShortcuts = pinnedShortcuts,
                     ringPages = ringPages,

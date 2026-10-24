@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
@@ -257,7 +256,6 @@ fun LauncherScreen(
     onLayoutChange: (PageLayout) -> Unit,
     homePresses: Flow<HomePress>,
     pinRequests: Flow<PinRequest>,
-    notices: Flow<String>,
     apps: List<AppEntry>?,
     pinnedShortcuts: List<AppEntry>?,
     ringPages: RingPages,
@@ -576,7 +574,6 @@ fun LauncherScreen(
     // through, as it does through the drawer; the pages and the drawer's chevron must not, so they go while it is up. Not
     // animated: it comes and goes in a frame, and pages fading back in would be tappable before they could be seen.
     var pickingCollection by rememberSaveable { mutableStateOf(false) }
-    val shownNotices = remember { Notices() }
     // The page editor covers the whole screen the same way, until Back, HOME or a tap on a page.
     var editingPages by rememberSaveable { mutableStateOf(false) }
     // The world map covers the whole screen the same way, until Back or HOME.
@@ -1168,7 +1165,7 @@ fun LauncherScreen(
         val rows = gridCells[page.id]?.pageRows ?: return
         val grid = gridOf(page.id)
         val added = grid.addClock(rows)
-        if (added == grid) shownNotices.show("No room for the clock here") else saveGrids(mapOf(page.id to added))
+        if (added == grid) onToast("No room for the clock here") else saveGrids(mapOf(page.id to added))
     }
 
     val launcherMenu = remember {
@@ -1260,7 +1257,6 @@ fun LauncherScreen(
         }
     }
 
-    LaunchedEffect(notices) { notices.collect(shownNotices::show) }
     val locale = LocalLocale.current.platformLocale
     val spun: (Spin) -> Unit = { spin -> spinFeatTexts(onSpin(spin), locale).forEach(onToast) }
     LaunchedEffect(homePresses, pagerState, drawerState) {
@@ -1339,7 +1335,6 @@ fun LauncherScreen(
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val openWorldMap = remember { { showingWorldMap = true } }
     CompositionLocalProvider(
-        LocalNotices provides shownNotices,
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
@@ -1548,7 +1543,7 @@ fun LauncherScreen(
                                                         onSearch = {
                                                             if (active) {
                                                                 search()
-                                                                if (pickTip) shownNotices.show(PICK_TIP)
+                                                                if (pickTip) onToast(PICK_TIP)
                                                             }
                                                         },
                                                         modifier = ringModifier.dropZone(page) { copy(ring = it) },
@@ -1770,6 +1765,7 @@ fun LauncherScreen(
                         customs = customs.map { it.kind },
                         onToggle = { kind ->
                             listedCustoms = customs
+                            onToast(if (kind in collections) "Collection removed" else "Collection added")
                             changeCollections {
                                 when {
                                     kind in this -> remove(kind)
@@ -1923,14 +1919,6 @@ fun LauncherScreen(
                         if (app != null) AppImage(app, actions.icon, Modifier.fillMaxSize()) else FolderPreviews(drag.folderApps.orEmpty(), actions.icon)
                     }
                 }
-                // Over everything, panels and the open drawer included, clear of the drawer's strip and of the keyboard,
-                // which the root leaves to the drawer.
-                shownNotices.Host(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .windowInsetsPadding(WindowInsets.ime)
-                        .padding(start = Spacing.Edge, end = Spacing.Edge, bottom = DRAWER_PEEK + Spacing.Edge),
-                )
             }
             // The whole window, through the bars, which hide while it is up.
             if (showingWorldMap) {
