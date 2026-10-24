@@ -364,7 +364,7 @@ class MainActivity : ComponentActivity() {
                 val readVitals = remember { { vitals.value } }
                 LaunchedEffect(Unit) {
                     steps.answers().collect { granted ->
-                        if (!granted) noticeChannel.trySend("Counting steps needs physical activity access, which Settings can allow")
+                        if (!granted) toasts.show("Counting steps needs physical activity access, which Settings can allow")
                     }
                 }
                 var collectionPages by remember { mutableStateOf(collectionsStore.load()) }
