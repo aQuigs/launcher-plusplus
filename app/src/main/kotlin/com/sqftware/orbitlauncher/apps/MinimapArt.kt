@@ -20,7 +20,7 @@ interface MinimapArt {
  * How many pixels across Skyrim's map icons are drawn from their vectors: enough to stay sharp at the size the map
  * shows them, which scales them smoothly rather than by whole pixels.
  */
-const val SKYRIM_ICON_PX = 48
+const val SKYRIM_ICON_PX = 72
 
 /**
  * The map's sprites from the app's drawables, decoded once: Old School's at their own pixel size, as the game draws

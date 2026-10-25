@@ -3,7 +3,7 @@ package com.sqftware.orbitlauncher.domain.minimap
 import com.sqftware.orbitlauncher.domain.rgb
 import kotlin.math.roundToInt
 
-/** How bright each ground is on Skyrim's local map, from 0 to 255: a grey world, its roads and roofs the palest. */
+/** How bright each ground is on Skyrim's local map, from 0 to 255: a gray world, its roads and roofs the palest. */
 private val GROUND_LIGHT = IntArray(Ground.entries.size).also { light ->
     mapOf(
         Ground.Grass to 0, Ground.Road to 150, Ground.Walk to 134, Ground.Path to 124, Ground.Plaza to 118,
@@ -32,7 +32,7 @@ private const val CROWN_LEFT = 0.5
 private const val CROWN_LIT = 0.8
 
 /**
- * Colours [layout] as Skyrim's local map: a grey ground seen from above under a light from the upper left, a touch
+ * Colors [layout] as Skyrim's local map: a gray ground seen from above under a light from the upper left, a touch
  * cold, roofs standing off it in their shadows, trees as dark crowns, and all of it softened as the game's view from
  * high above is. Returns the pixels, opaque.
  */
@@ -89,7 +89,7 @@ private fun blurred(light: DoubleArray, w: Int, h: Int): DoubleArray {
     }
 }
 
-/** A grey of [light], tinted a touch towards blue as the game's northern light is. */
+/** A gray of [light], tinted a touch toward blue as the game's northern light is. */
 internal fun cold(light: Double): Int {
     val v = light.roundToInt().coerceIn(0, 255)
     return rgb((v - 3).coerceAtLeast(0), v, (v + 5).coerceAtMost(255))

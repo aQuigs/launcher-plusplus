@@ -22,7 +22,7 @@ internal val SkyrimPalette = Palette(
 
 /**
  * The local map's disc: the fog it shows before a map is painted, the dark its edge fades into, and its rim, a bone
- * hairline round a dark one so it holds on any wallpaper.
+ * hairline around a dark one so it holds on any wallpaper.
  */
 val LocalMapFog = Color(0xFF3A3D40)
 val LocalMapVignette = Smoke.copy(alpha = 0.7f)
@@ -32,7 +32,7 @@ val LocalMapRim = DiscEdge(outer = Smoke.copy(alpha = 0.7f), inner = Bone.copy(a
 val PlayerArrow = Snow
 val PlayerArrowEdge = Smoke.copy(alpha = 0.8f)
 
-/** What the local map's credit is written in, over its grey. */
+/** What the local map's credit is written in, over its gray. */
 val LocalMapInk = Snow
 
 /**

@@ -67,7 +67,7 @@ private const val ICON_SPACING_PX = 24.0
 
 /**
  * Paints the map of a [MapScene] in a [MapFrame], the minimap's disc or a stretch of the world map, at
- * [METRES_PER_PIXEL], laid out the way the old game builds its minimap and coloured in [style]. In the Old School style every 4 px tile gets a flat ground colour; walls are 1 px lines round each structure with a few
+ * [METRES_PER_PIXEL], laid out the way the old game builds its minimap and colored in [style]. In the Old School style every 4 px tile gets a flat ground color; walls are 1 px lines around each structure with a few
  * doors; trees and the dots of people go on top. The map icons and the self marker are left to whoever shows the map,
  * so they stay upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
  * it moves.
@@ -81,7 +81,7 @@ class MinimapPainter(private val sprites: MinimapSprites, private val style: Map
 }
 
 /**
- * The ground a painting has laid out, for a style to colour, pixel by pixel of a [width] by [height] view: what each is
+ * The ground a painting has laid out, for a style to color, pixel by pixel of a [width] by [height] view: what each is
  * made of, whether it is a structure's wall, which structure it is in (0 for none), and whether a rail runs over it;
  * the spots [trees] stand on; and the [shade] of each pixel's grass, a smooth field from 0 to 1 keyed by places on Earth.
  */

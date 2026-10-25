@@ -90,7 +90,7 @@ private val COMPASS_HEIGHT = 44.dp
 private val COMPASS_MARK = 18.dp
 private const val COMPASS_SPAN = 0.86f
 
-/** A shield's previews take its boss, its boards show round them, and so many rivets hold its rim. */
+/** A shield's previews take its boss, its boards show around them, and so many rivets hold its rim. */
 private const val SHIELD_DISC = 0.64f
 private const val SHIELD_BOARDS = 5
 private const val SHIELD_RIVETS = 10
@@ -180,7 +180,8 @@ object SkyrimArt : ThemeArt {
                     val credit = measurer.measure(
                         MAP_CREDIT.replace(" ©", "\n©"),
                         creditStyle,
-                        constraints = Constraints(maxWidth = (radius * 1.2f).roundToInt()),
+                        // Narrow enough that its lines fit inside the disc where they sit.
+                        constraints = Constraints(maxWidth = (radius * 0.9f).roundToInt()),
                     )
                     onDrawBehind {
                         drawCircle(vignette, radius)
@@ -236,7 +237,10 @@ object SkyrimArt : ThemeArt {
             slots.indices.forEach { i ->
                 val a = slots[i] - centre
                 val b = slots[(i + 1) % slots.size] - centre
-                val angle = atan2(a.y + b.y, a.x + b.x)
+                // Half the turn from one slot to the next, the short way, so two slots facing each other get a stud each side.
+                val from = atan2(a.y, a.x)
+                val turn = (atan2(b.y, b.x) - from + 3 * PI.toFloat()) % (2 * PI.toFloat()) - PI.toFloat()
+                val angle = from + turn / 2
                 val at = centre + Offset(cos(angle) * radius, sin(angle) * radius)
                 addPath(diamond(at, half, half * 0.6f, angle + PI.toFloat() / 2))
             }
@@ -302,8 +306,9 @@ private val SkyrimTypography = Typography().let { type ->
 
 /**
  * The game's compass: a bar of smoke between bone hairlines that fades out at both ends, the quarters lettered on it and
- * the map's places marked at their bearings, sliding along it as the phone turns. Without a compass in the phone it
- * stays north up.
+ * the map's places marked at their bearings, sliding along it as the phone turns. It stays north up without a heading:
+ * with no compass in the phone, or while "Show where I am" is off, as headings are read only for the map of where the
+ * user is.
  */
 @Composable
 private fun Compass(modifier: Modifier) {
@@ -316,7 +321,7 @@ private fun Compass(modifier: Modifier) {
         modifier
             .fillMaxWidth(COMPASS_SPAN)
             .height(COMPASS_HEIGHT)
-            // The marks are the map's, which a screen reader hears from the map's own credit and menu.
+            // Only decoration: the places it marks have no action, and the map's credit is in the launcher's menu.
             .clearAndSetSemantics {}
             .drawWithCache {
                 val letters = listOf("N", "E", "S", "W").map { measurer.measure(it, letterStyle) }
@@ -330,7 +335,7 @@ private fun Compass(modifier: Modifier) {
                 val fade = Brush.horizontalGradient(0f to Color.Transparent, 0.18f to CompassSmoke, 0.82f to CompassSmoke, 1f to Color.Transparent)
                 val hairline = Brush.horizontalGradient(0f to Color.Transparent, 0.12f to CompassLine, 0.88f to CompassLine, 1f to Color.Transparent)
 
-                // Where a bearing lies along the bar, and how much it fades towards the ends; null off the bar.
+                // Where a bearing lies along the bar, and how much it fades toward the ends; null off the bar.
                 fun place(bearing: Float, facing: Float): Pair<Float, Float>? {
                     val off = ((bearing - facing) % 360f + 540f) % 360f - 180f
                     val share = off / (COMPASS_FIELD / 2)
@@ -360,7 +365,7 @@ private fun Compass(modifier: Modifier) {
     )
 }
 
-/** The places on [painted] at their bearings from its middle, which the map is centred on. */
+/** The places on [painted] at their bearings from its middle, which the map is centerd on. */
 private fun DrawScope.drawPlaces(
     painted: PaintedMap<ImageBitmap>,
     facing: Float,
@@ -378,33 +383,33 @@ private fun DrawScope.drawPlaces(
     }
 }
 
-/** [image] drawn [side] pixels square round [centre], scaled smoothly. */
-private fun DrawScope.drawIcon(image: ImageBitmap, centre: Offset, side: Int, alpha: Float = 1f) = drawImage(
+/** [image] drawn [side] pixels square around [center], scaled smoothly. */
+private fun DrawScope.drawIcon(image: ImageBitmap, center: Offset, side: Int, alpha: Float = 1f) = drawImage(
     image,
-    dstOffset = IntOffset((centre.x - side / 2f).roundToInt(), (centre.y - side / 2f).roundToInt()),
+    dstOffset = IntOffset((center.x - side / 2f).roundToInt(), (center.y - side / 2f).roundToInt()),
     dstSize = IntSize(side, side),
     alpha = alpha,
     filterQuality = FilterQuality.Medium,
 )
 
 /** The player's arrow on the local map, pointing up the way they face, [half] from its middle to its tip, notched at its tail. */
-private fun playerArrow(centre: Offset, half: Float) = Path().apply {
-    moveTo(centre.x, centre.y - half)
-    lineTo(centre.x + half * 0.7f, centre.y + half * 0.8f)
-    lineTo(centre.x, centre.y + half * 0.35f)
-    lineTo(centre.x - half * 0.7f, centre.y + half * 0.8f)
+private fun playerArrow(center: Offset, half: Float) = Path().apply {
+    moveTo(center.x, center.y - half)
+    lineTo(center.x + half * 0.7f, center.y + half * 0.8f)
+    lineTo(center.x, center.y + half * 0.35f)
+    lineTo(center.x - half * 0.7f, center.y + half * 0.8f)
     close()
 }
 
-/** A diamond round [centre], [long] from it to each point along [angle] and [short] across it. */
-private fun diamond(centre: Offset, long: Float, short: Float, angle: Float = -PI.toFloat() / 2): Path {
+/** A diamond around [center], [long] from it to each point along [angle] and [short] across it. */
+private fun diamond(center: Offset, long: Float, short: Float, angle: Float = -PI.toFloat() / 2): Path {
     val along = Offset(cos(angle), sin(angle))
     val across = Offset(-along.y, along.x)
     return Path().apply {
-        (centre + along * long).let { moveTo(it.x, it.y) }
-        (centre + across * short).let { lineTo(it.x, it.y) }
-        (centre - along * long).let { lineTo(it.x, it.y) }
-        (centre - across * short).let { lineTo(it.x, it.y) }
+        (center + along * long).let { moveTo(it.x, it.y) }
+        (center + across * short).let { lineTo(it.x, it.y) }
+        (center - along * long).let { lineTo(it.x, it.y) }
+        (center - across * short).let { lineTo(it.x, it.y) }
         close()
     }
 }
