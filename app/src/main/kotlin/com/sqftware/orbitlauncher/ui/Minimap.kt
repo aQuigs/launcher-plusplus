@@ -7,9 +7,35 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import kotlinx.coroutines.delay
+import kotlin.math.cos
+import kotlin.math.sin
+
+/**
+ * Hands [draw] each of [painted]'s icons and where it lies once the map's ground is drawn [scale] times over round
+ * [center] and turned with the phone's [heading]: placed by hand rather than turned back on a turned canvas, so the
+ * icon can be drawn upright, as the games keep them.
+ */
+internal inline fun forEachUprightIcon(
+    painted: PaintedMap<ImageBitmap>,
+    center: Offset,
+    scale: Float,
+    heading: Float,
+    draw: (ImageBitmap, Offset) -> Unit,
+) {
+    val turn = Math.toRadians(-heading.toDouble())
+    val cos = cos(turn).toFloat()
+    val sin = sin(turn).toFloat()
+    val middle = painted.ground.width / 2
+    painted.icons.forEach { icon ->
+        val dx = (icon.x - middle) * scale
+        val dy = (icon.y - middle) * scale
+        draw(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos))
+    }
+}
 
 /** The credit the map data's licences ask to show with the map. */
 internal const val MAP_CREDIT = "© OpenMapTiles © OpenStreetMap"

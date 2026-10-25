@@ -114,11 +114,9 @@ import com.sqftware.orbitlauncher.ui.theme.MinimapSelf
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelfEdge
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.StackCount
-import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 
 /** How many of the game's pixels wide the screen is: the mobile client's portrait width, which sets how big one is. */
 private const val GAME_WIDTH = 270
@@ -244,15 +242,9 @@ object OldSchoolArt : ThemeArt {
             // draws only the icons again.
             Spacer(
                 Modifier.matchParentSize().graphicsLayer().drawBehind {
-                    val minimap = shown()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
+                    val minimap = shown() ?: return@drawBehind
                     val scale = mapScale(size, px)
-                    val turn = Math.toRadians(-(heading() ?: 0f).toDouble())
-                    val (cos, sin) = cos(turn).toFloat() to sin(turn).toFloat()
-                    minimap.icons.forEach { icon ->
-                        val dx = (icon.x - MAP_RADIUS) * scale
-                        val dy = (icon.y - MAP_RADIUS) * scale
-                        drawSpriteCentred(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos), scale)
-                    }
+                    forEachUprightIcon(minimap, center, scale.toFloat(), heading() ?: 0f) { image, at -> drawSpriteCentred(image, at, scale) }
                 },
             )
             // Under the frame, whose socket's own pixels edge it.

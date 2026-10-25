@@ -52,7 +52,7 @@ class MadeUpPlaceTest {
 
     @Test
     fun aStepMovesTheWholeMapOnePixelTheOtherWay() {
-        val painter = MinimapPainter(MinimapSprites(trees = listOf(Pixels(1, 1, intArrayOf(TREE)))))
+        val painter = MinimapPainter(MinimapSprites(trees = listOf(Pixels(1, 1, intArrayOf(TREE)))), MapStyle.OldSchool)
         // Along the route's first leg east, then up its second leg north.
         for (walked in listOf(40.0 * m, 110.0 * m)) {
             val here = place.at(walked)

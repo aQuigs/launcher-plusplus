@@ -72,7 +72,7 @@ private const val ICON_SPACING_PX = 24.0
  * so they stay upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
  * it moves.
  */
-class MinimapPainter(private val sprites: MinimapSprites, private val style: MapStyle = MapStyle.OldSchool) {
+class MinimapPainter(private val sprites: MinimapSprites, private val style: MapStyle) {
     /**
      * The ground in [frame], opaque, clear outside a round frame's circle, and its icons: apart, for the user's map to
      * keep upright as it turns, or in the ground of a map that never turns.
@@ -93,7 +93,7 @@ internal class GroundLayout(
     val structure: IntArray,
     val rails: BooleanArray,
     val trees: List<Px>,
-    val shade: (Int) -> Double,
+    val shade: DoubleArray,
 )
 
 /** The world-wide pixel grid seeded features and the world map keep to, in pixels to the mercator metre. */
@@ -284,18 +284,18 @@ private class Painting(
             scene.ways.filter { it.kind == WayKind.Rail }.forEach { rail -> linePixels(rail.points.map(::px)) { rails[it] = true } }
         }
         val noise = grassNoise()
+        val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), DoubleArray(w * h) { noise[tileOf(it % w, it / w)] })
 
         val icons = when (style) {
             MapStyle.OldSchool -> {
-                paintOldSchool(walls, comp, rails, noise)
+                paintOldSchool(layout)
                 placeIcons().also { icons ->
                     paintNpcs(icons)
                     paintFigures()
                 }
             }
             MapStyle.Skyrim -> {
-                val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots()) { noise[tileOf(it % w, it / w)] }
-                paintSkyrim(layout).copyInto(img)
+                paintSkyrim(layout, img)
                 placeIcons()
             }
         }
@@ -306,11 +306,11 @@ private class Painting(
         return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
     }
 
-    private fun paintOldSchool(walls: BooleanArray, comp: IntArray, rails: BooleanArray, noise: DoubleArray) {
-        // flat tiles: one colour per ground, grass shaded only by a smooth field across tiles
+    private fun paintOldSchool(layout: GroundLayout) {
+        // flat tiles: one color per ground, grass shaded only by a smooth field across tiles
         for (i in 0 until w * h) {
             img[i] = when (val g = cls[i]) {
-                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, noise[tileOf(i % w, i / w)])
+                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, layout.shade[i])
                 Ground.Water -> if (anyNeighbour(i) { cls[it] != Ground.Water }) WATER_EDGE else WATER_BASE
                 else -> GROUND_COLOUR[g.ordinal]
             }
@@ -319,12 +319,12 @@ private class Painting(
 
         // thin lines, then the walls on top
         for (i in 0 until w * h) {
-            if (rails[i]) img[i] = RAIL
-            if (walls[i]) img[i] = WALL
+            if (layout.rails[i]) img[i] = RAIL
+            if (layout.walls[i]) img[i] = WALL
         }
 
-        paintDoors(walls, comp)
-        paintTrees()
+        paintDoors(layout.walls, layout.structure)
+        paintTrees(layout.trees)
     }
 
     private fun groundOf(kind: WayKind) = when (kind) {
@@ -462,9 +462,9 @@ private class Painting(
 
     // --- trees ---------------------------------------------------------------------------------
 
-    private fun paintTrees() {
+    private fun paintTrees(trees: List<Px>) {
         if (sprites.trees.isEmpty()) return
-        for (t in treeSpots().sortedBy { it.y }) {
+        for (t in trees.sortedBy { it.y }) {
             val pick = stableRandom(TREE_SALT, (round(t.x).toInt() + originX).toLong(), (round(t.y).toInt() + originY).toLong())
             val sprite = sprites.trees[(pick * sprites.trees.size).toInt().coerceAtMost(sprites.trees.size - 1)]
             blit(sprite, t.x.toInt() - sprite.width / 2, t.y.toInt() - (sprite.height - 2))

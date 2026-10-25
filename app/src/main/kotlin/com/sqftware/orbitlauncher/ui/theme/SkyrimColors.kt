@@ -49,7 +49,3 @@ val ShieldBoardDark = Color(0xFF4A3526)
 val ShieldBoardLight = Color(0xFF5E4431)
 val ShieldIron = Color(0xFF5C5E60)
 val ShieldRivet = Color(0xFFB4B6B8)
-
-/** A menu's smoke, nearly opaque so the page under it does not show, and the bone hairlines above and below it. */
-val SkyrimMenuSmoke = Smoke.copy(alpha = 0.92f)
-val SkyrimMenuLine = Bone.copy(alpha = 0.7f)

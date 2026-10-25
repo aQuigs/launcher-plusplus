@@ -22,8 +22,7 @@ private const val ROOF_SHADED = 136
 
 private const val RAIL_LIGHT = 64
 
-/** How far a structure's shadow falls down and to the right, in pixels, and how much of the light it leaves. */
-private const val SHADOW_PX = 2
+/** How much of the light a structure's shadow leaves, which falls two pixels down and to the right. */
 private const val SHADOW_LEFT = 0.6
 
 /** A tree's crown: its radius in pixels, how much of the ground's light it leaves, and its lit edge's. */
@@ -34,9 +33,9 @@ private const val CROWN_LIT = 0.8
 /**
  * Colors [layout] as Skyrim's local map: a gray ground seen from above under a light from the upper left, a touch
  * cold, roofs standing off it in their shadows, trees as dark crowns, and all of it softened as the game's view from
- * high above is. Returns the pixels, opaque.
+ * high above is. Writes the pixels, opaque, to [into].
  */
-internal fun paintSkyrim(layout: GroundLayout): IntArray {
+internal fun paintSkyrim(layout: GroundLayout, into: IntArray) {
     val w = layout.width
     val h = layout.height
     val structure = layout.structure
@@ -44,7 +43,7 @@ internal fun paintSkyrim(layout: GroundLayout): IntArray {
 
     val light = DoubleArray(w * h) { i ->
         val ground = layout.ground[i]
-        if (ground == Ground.Grass) GRASS_FROM + (GRASS_TO - GRASS_FROM) * layout.shade(i) else GROUND_LIGHT[ground.ordinal].toDouble()
+        if (ground == Ground.Grass) GRASS_FROM + (GRASS_TO - GRASS_FROM) * layout.shade[i] else GROUND_LIGHT[ground.ordinal].toDouble()
     }
     for (i in 0 until w * h) {
         val x = i % w
@@ -52,7 +51,7 @@ internal fun paintSkyrim(layout: GroundLayout): IntArray {
         if (layout.rails[i]) light[i] = RAIL_LIGHT.toDouble()
         when {
             layout.walls[i] -> light[i] = if (!inStructure(x - 1, y) || !inStructure(x, y - 1)) ROOF_LIT.toDouble() else ROOF_SHADED.toDouble()
-            structure[i] == 0 && (1..SHADOW_PX).any { inStructure(x - it, y - it) } -> light[i] *= SHADOW_LEFT
+            structure[i] == 0 && (inStructure(x - 1, y - 1) || inStructure(x - 2, y - 2)) -> light[i] *= SHADOW_LEFT
         }
     }
     for (tree in layout.trees) {
@@ -66,26 +65,16 @@ internal fun paintSkyrim(layout: GroundLayout): IntArray {
         }
     }
 
-    val soft = blurred(light, w, h)
-    return IntArray(w * h) { i -> cold(soft[i]) }
-}
-
-/** [light] blurred once by a 3 by 3 binomial kernel, edges held. */
-private fun blurred(light: DoubleArray, w: Int, h: Int): DoubleArray {
-    val weights = doubleArrayOf(1.0, 2.0, 1.0)
-    return DoubleArray(w * h) { i ->
+    // Softened by a 3 by 3 binomial blur, its weights summing to 16, edges held.
+    val weights = intArrayOf(1, 2, 1)
+    for (i in 0 until w * h) {
         val x = i % w
         val y = i / w
         var sum = 0.0
-        var total = 0.0
         for (dy in -1..1) for (dx in -1..1) {
-            val xx = (x + dx).coerceIn(0, w - 1)
-            val yy = (y + dy).coerceIn(0, h - 1)
-            val weight = weights[dx + 1] * weights[dy + 1]
-            sum += light[yy * w + xx] * weight
-            total += weight
+            sum += light[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)] * weights[dx + 1] * weights[dy + 1]
         }
-        sum / total
+        into[i] = cold(sum / 16)
     }
 }
 

@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -33,7 +32,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
@@ -50,6 +48,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.turnBetween
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.ui.theme.CompassLetter
@@ -135,33 +134,15 @@ object SkyrimArt : ThemeArt {
                     .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                     .drawBehind {
                         val radius = size.emblemRadius
-                        val ground = shown()?.ground
-                        if (ground == null) {
-                            drawCircle(LocalMapFog, radius)
-                        } else {
-                            val side = (2 * radius).roundToInt()
-                            drawImage(
-                                ground,
-                                dstOffset = IntOffset((center.x - side / 2f).roundToInt(), (center.y - side / 2f).roundToInt()),
-                                dstSize = IntSize(side, side),
-                                filterQuality = FilterQuality.Medium,
-                            )
-                        }
+                        shown()?.let { drawIcon(it.ground, center, (2 * radius).roundToInt()) } ?: drawCircle(LocalMapFog, radius)
                     },
             )
             Spacer(
                 Modifier.matchParentSize().graphicsLayer().drawBehind {
-                    val painted = shown()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
+                    val painted = shown() ?: return@drawBehind
                     val radius = size.emblemRadius
-                    val scale = 2 * radius / MINIMAP_SIZE
                     val iconSide = (2 * radius * MAP_ICON_SHARE).roundToInt()
-                    val turn = Math.toRadians(-(heading() ?: 0f).toDouble())
-                    val (cos, sin) = cos(turn).toFloat() to sin(turn).toFloat()
-                    painted.icons.forEach { icon ->
-                        val dx = (icon.x - MINIMAP_SIZE / 2f) * scale
-                        val dy = (icon.y - MINIMAP_SIZE / 2f) * scale
-                        drawIcon(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos), iconSide)
-                    }
+                    forEachUprightIcon(painted, center, 2 * radius / MINIMAP_SIZE, heading() ?: 0f) { image, at -> drawIcon(image, at, iconSide) }
                 },
             )
             Spacer(
@@ -205,14 +186,14 @@ object SkyrimArt : ThemeArt {
                     .drawWithCache {
                         val radius = size.emblemRadius - 2.dp.toPx()
                         val stud = 4.dp.toPx()
-                        onDrawBehind {
+                        val studs = Path().apply {
                             for (quarter in 0 until 4) {
-                                rotate(quarter * 90f, center) {
-                                    val half = if (quarter == 0) stud * 1.6f else stud
-                                    drawPath(diamond(Offset(center.x, center.y - radius), half, half * 0.6f), LocalMapRim.inner)
-                                }
+                                val half = if (quarter == 0) stud * 1.6f else stud
+                                val out = direction(quarter * 90f)
+                                addPath(diamond(size.center + out * radius, half, half * 0.6f, atan2(out.y, out.x)))
                             }
                         }
+                        onDrawBehind { drawPath(studs, LocalMapRim.inner) }
                     },
             )
         }
@@ -237,10 +218,9 @@ object SkyrimArt : ThemeArt {
             slots.indices.forEach { i ->
                 val a = slots[i] - centre
                 val b = slots[(i + 1) % slots.size] - centre
-                // Half the turn from one slot to the next, the short way, so two slots facing each other get a stud each side.
-                val from = atan2(a.y, a.x)
-                val turn = (atan2(b.y, b.x) - from + 3 * PI.toFloat()) % (2 * PI.toFloat()) - PI.toFloat()
-                val angle = from + turn / 2
+                // Half the turn from one slot to the next; two slots face each other, so each gap gets half a turn the same way.
+                val turn = if (slots.size == 2) PI.toFloat() else turnBetween(a.x, a.y, b.x, b.y)
+                val angle = atan2(a.y, a.x) + turn / 2
                 val at = centre + Offset(cos(angle) * radius, sin(angle) * radius)
                 addPath(diamond(at, half, half * 0.6f, angle + PI.toFloat() / 2))
             }
@@ -266,15 +246,14 @@ object SkyrimArt : ThemeArt {
     @Composable
     override fun HomeHeader(modifier: Modifier) = Compass(modifier)
 
-    /** A menu is the ground squared off between hairlines, a diamond at the middle of each, as the game's are. */
     @Composable
-    override fun menuBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, RectangleShape).hairlined(MaterialTheme.colorScheme.outline)
+    override fun menuBox(ground: PanelGround): Modifier = hairlinedBox(ground)
 
     override val menuRim: BorderStroke?
         @Composable get() = null
 
     @Composable
-    override fun dialogBox(ground: PanelGround): Modifier = Modifier.solidGround(ground, RectangleShape).hairlined(MaterialTheme.colorScheme.outline)
+    override fun dialogBox(ground: PanelGround): Modifier = hairlinedBox(ground)
 
     @Composable
     override fun typography(day: Boolean): Typography = SkyrimTypography
@@ -334,52 +313,57 @@ private fun Compass(modifier: Modifier) {
                 val tick = 3.dp.toPx()
                 val fade = Brush.horizontalGradient(0f to Color.Transparent, 0.18f to CompassSmoke, 0.82f to CompassSmoke, 1f to Color.Transparent)
                 val hairline = Brush.horizontalGradient(0f to Color.Transparent, 0.12f to CompassLine, 0.88f to CompassLine, 1f to Color.Transparent)
-
-                // Where a bearing lies along the bar, and how much it fades toward the ends; null off the bar.
-                fun place(bearing: Float, facing: Float): Pair<Float, Float>? {
-                    val off = ((bearing - facing) % 360f + 540f) % 360f - 180f
-                    val share = off / (COMPASS_FIELD / 2)
-                    if (abs(share) > 1f) return null
-                    return size.width / 2 + share * reach * 0.92f to (1f - abs(share).pow(4))
-                }
+                val pointer = diamond(Offset(size.width / 2, mid - band / 2), tick * 1.4f, tick)
+                // A map's places' bearings, worked out once for each map rather than on each turn of the phone.
+                var bearingsOf: PaintedMap<ImageBitmap>? = null
+                var bearings = FloatArray(0)
 
                 onDrawBehind {
                     drawRect(fade, topLeft = Offset(0f, mid - band / 2), size = Size(size.width, band))
                     drawLine(hairline, Offset(0f, mid - band / 2), Offset(size.width, mid - band / 2), line.width)
                     drawLine(hairline, Offset(0f, mid + band / 2), Offset(size.width, mid + band / 2), line.width)
-                    drawPath(diamond(Offset(size.width / 2, mid - band / 2), tick * 1.4f, tick), CompassLine)
+                    drawPath(pointer, CompassLine)
 
                     val facing = heading() ?: 0f
+                    // How far along the bar from its middle a bearing lies, from -1 to 1, or past that off the bar.
+                    fun share(bearing: Float) = turnBetween(facing, bearing) / (COMPASS_FIELD / 2)
+                    fun x(share: Float) = size.width / 2 + share * reach * 0.92f
+                    fun fading(share: Float) = 1f - abs(share).pow(4)
+
                     for (step in 0 until 8) {
-                        val (x, alpha) = place(step * 45f, facing) ?: continue
+                        val share = share(step * 45f)
+                        if (abs(share) > 1f) continue
                         if (step % 2 == 0) {
                             val text = if (step == 0) northLetter else letters[step / 2]
-                            drawText(text, topLeft = Offset(x - text.size.width / 2f, mid - text.size.height / 2f), alpha = alpha)
+                            drawText(text, topLeft = Offset(x(share) - text.size.width / 2f, mid - text.size.height / 2f), alpha = fading(share))
                         } else {
-                            drawLine(CompassLine.copy(alpha = CompassLine.alpha * alpha), Offset(x, mid - tick), Offset(x, mid + tick), line.width)
+                            drawLine(CompassLine.copy(alpha = CompassLine.alpha * fading(share)), Offset(x(share), mid - tick), Offset(x(share), mid + tick), line.width)
                         }
                     }
-                    (map() ?: madeUp())?.let { painted -> drawPlaces(painted, facing, markSide, mid, ::place) }
+
+                    val painted = map() ?: madeUp() ?: return@onDrawBehind
+                    if (painted !== bearingsOf) {
+                        bearingsOf = painted
+                        bearings = bearingsOf(painted)
+                    }
+                    painted.icons.forEachIndexed { i, icon ->
+                        val share = share(bearings[i])
+                        if (abs(share) > 1f) return@forEachIndexed
+                        val at = Offset(x(share), mid)
+                        drawCircle(CompassShade.copy(alpha = CompassShade.alpha * fading(share) * 0.5f), markSide * 0.55f, at)
+                        drawIcon(icon.image, at, markSide, fading(share))
+                    }
                 }
             },
     )
 }
 
-/** The places on [painted] at their bearings from its middle, which the map is centerd on. */
-private fun DrawScope.drawPlaces(
-    painted: PaintedMap<ImageBitmap>,
-    facing: Float,
-    side: Int,
-    mid: Float,
-    place: (bearing: Float, facing: Float) -> Pair<Float, Float>?,
-) {
-    painted.icons.forEach { icon ->
-        val dx = icon.x - MINIMAP_SIZE / 2f
-        val dy = icon.y - MINIMAP_SIZE / 2f
-        val bearing = Math.toDegrees(atan2(dx.toDouble(), -dy.toDouble())).toFloat()
-        val (x, alpha) = place(bearing, facing) ?: return@forEach
-        drawCircle(CompassShade.copy(alpha = CompassShade.alpha * alpha * 0.5f), side * 0.55f, Offset(x, mid))
-        drawIcon(icon.image, Offset(x, mid), side, alpha)
+/** The bearing of each of [painted]'s places from its middle, which the map is centered on, in degrees clockwise from north. */
+private fun bearingsOf(painted: PaintedMap<ImageBitmap>): FloatArray {
+    val middle = painted.ground.width / 2
+    return FloatArray(painted.icons.size) { i ->
+        val icon = painted.icons[i]
+        Math.toDegrees(atan2((icon.x - middle).toDouble(), (middle - icon.y).toDouble())).toFloat()
     }
 }
 
@@ -414,14 +398,23 @@ private fun diamond(center: Offset, long: Float, short: Float, angle: Float = -P
     }
 }
 
-/** Hairlines in [ink] along the top and bottom edges, each with a diamond at its middle. */
-private fun Modifier.hairlined(ink: Color) = drawWithContent {
-    drawContent()
-    val width = 1.dp.toPx()
-    val half = 3.dp.toPx()
-    for (y in listOf(width / 2, size.height - width / 2)) {
-        drawLine(ink, Offset(0f, y), Offset(size.width, y), width)
-        drawPath(diamond(Offset(size.width / 2, y), half * 1.6f, half, 0f), ink)
+/**
+ * A menu's or dialog's box, as the game's are: the solid [ground] squared off, between hairlines along its top and bottom
+ * edges, each with a diamond at its middle.
+ */
+@Composable
+private fun hairlinedBox(ground: PanelGround): Modifier {
+    val ink = MaterialTheme.colorScheme.outline
+    return Modifier.solidGround(ground, RectangleShape).drawWithCache {
+        val width = 1.dp.toPx()
+        val half = 3.dp.toPx()
+        val edges = listOf(width / 2, size.height - width / 2)
+        val diamonds = Path().apply { edges.forEach { y -> addPath(diamond(Offset(size.width / 2, y), half * 1.6f, half, 0f)) } }
+        onDrawWithContent {
+            drawContent()
+            edges.forEach { y -> drawLine(ink, Offset(0f, y), Offset(size.width, y), width) }
+            drawPath(diamonds, ink)
+        }
     }
 }
 
@@ -440,9 +433,7 @@ private fun Modifier.shield() = drawWithCache {
         }
         drawCircle(ShieldIron, radius - rim.width / 2, style = rim)
         for (i in 0 until SHIELD_RIVETS) {
-            val angle = 2 * PI.toFloat() * i / SHIELD_RIVETS
-            val at = center + Offset(cos(angle), sin(angle)) * (radius - rim.width / 2)
-            drawCircle(ShieldRivet, rim.width * 0.22f, at)
+            drawCircle(ShieldRivet, rim.width * 0.22f, center + direction(360f * i / SHIELD_RIVETS) * (radius - rim.width / 2))
         }
     }
 }
