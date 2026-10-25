@@ -177,7 +177,7 @@ private fun worldMapOrbAt(size: Size, scale: Int) = size.center + (WORLD_MAP_ORB
 
 /**
  * The game's status orbs, which its resizable interface hangs down the minimap frame's left: where each one's top left
- * is from the map's centre.
+ * is from the map's center.
  */
 private enum class StatusOrb(val at: IntOffset) {
     Hitpoints(IntOffset(-129, -37)),
@@ -192,7 +192,7 @@ private enum class StatusOrb(val at: IntOffset) {
 
 /**
  * A status orb's frame, a box for its number on the left and the orb on the right; where the orb's fill and icon sit in
- * it, and how wide; the box its number is centred in; and how opaque the game draws the fill.
+ * it, and how wide; the box its number is centered in; and how opaque the game draws the fill.
  */
 private val STATUS_ORB_SIZE = IntSize(57, 34)
 private val ORB_FILL_AT = IntOffset(27, 4)

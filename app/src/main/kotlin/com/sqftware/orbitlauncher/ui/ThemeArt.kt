@@ -232,8 +232,8 @@ interface ThemeArt {
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
     /**
-     * What the emblem hangs out among the ring's icons, for an emblem of a size: boxes round its centre, which the ring
-     * spreads its icons round rather than over. By default nothing.
+     * What the emblem hangs out among the ring's icons, for an emblem of a size: boxes around its center, which the
+     * ring spreads its icons around rather than over. By default nothing.
      */
     @Composable
     fun emblemReach(): (Size) -> List<Bounds> = NoReach

@@ -225,7 +225,7 @@ fun HomeRing(
     val nameLine = hangingNameLine
     val nameWidths = rememberNameWidths()
     val reach = art.emblemReach()
-    // What the emblem hangs past its disc on a box [width] by [height], as boxes round its centre.
+    // What the emblem hangs past its disc on a box [width] by [height], as boxes around its center.
     fun reachOn(width: Float, height: Float) = (min(width, height) * EMBLEM_FRACTION).let { reach(Size(it, it)) }
     // The arc icons on a box [width] by [height] spread over, clear of what the emblem hangs past its disc however
     // crowded the ring, with room for names if they show: so one serves every ring on the box, and measuring and

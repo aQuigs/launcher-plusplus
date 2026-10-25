@@ -270,7 +270,7 @@ class RingGeometryTest {
     }
 
     @Test
-    fun `a few slots on an arc keep the whole ring's spacing, centred on it`() {
+    fun `a few slots on an arc keep the whole ring's spacing, centered on it`() {
         val arc = RingArc(0.0, 1.5 * PI)
         listOf(PI / 12, PI / 12 + 2 * PI / 3, PI / 12 + 4 * PI / 3).forEachIndexed { index, angle ->
             assertEquals(angle, arc.angle(index, 3), 1e-9)
@@ -345,7 +345,7 @@ class RingGeometryTest {
     }
 
     @Test
-    fun `the free arc leaves room round a box on the ring's left`() {
+    fun `the free arc leaves room around a box on the ring's left`() {
         val radius = 150f
         val reach = 34f
         val box = Bounds(-170f, -20f, -110f, 40f)
