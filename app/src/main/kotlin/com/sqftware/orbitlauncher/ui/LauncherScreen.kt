@@ -1570,6 +1570,7 @@ fun LauncherScreen(
                                                 }
                                                 if (isHome) {
                                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        LocalThemeArt.current.HomeHeader(Modifier.padding(top = 12.dp))
                                                         ClockOrThemePreview(
                                                             bar = if (previewing) ({
                                                                 ThemePreviewBar(

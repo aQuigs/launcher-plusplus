@@ -1,8 +1,37 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import kotlinx.coroutines.delay
+
+/** The credit the map data's licences ask to show with the map. */
+internal const val MAP_CREDIT = "© OpenMapTiles © OpenStreetMap"
+private const val CREDIT_MILLIS = 5_000L
+private const val CREDIT_FADE_MILLIS = 1_000
+
+/**
+ * The alpha of the map's credit over the map: whole each time a map of where the user is comes to be [shown], fading
+ * five seconds later, as OpenStreetMap's attribution rules allow; the launcher's menu keeps it a tap away.
+ */
+@Composable
+internal fun mapCreditAlpha(shown: Boolean): Animatable<Float, AnimationVector1D> {
+    val alpha = remember { Animatable(1f) }
+    LaunchedEffect(shown) {
+        if (shown) {
+            alpha.snapTo(1f)
+            delay(CREDIT_MILLIS)
+            alpha.animateTo(0f, tween(CREDIT_FADE_MILLIS))
+        }
+    }
+    return alpha
+}
 
 /**
  * The minimap of where the user is: a 152 px square holding an opaque disc on clear corners, and the icons on it, meant

@@ -5,6 +5,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.hypot
 
@@ -186,6 +187,32 @@ class MinimapPainterTest {
             if (a.ground[x, y] == b.ground[x - dx, y - dy]) same++
         }
         assertTrue("$same of $shared pixels agree", same >= shared * 0.98)
+    }
+
+    @Test
+    fun skyrimPaintsTheSceneInGreysWithItsIconsAndNobody() {
+        val skyrim = MinimapPainter(MinimapSprites(trees = listOf(tree), npc = npc, icons = icons), MapStyle.Skyrim)
+        val tiles = OpenMapTiles.tilesFor(centre, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
+        val scene = OpenMapTiles.scene(centre, tiles, MapFrame.MINIMAP)
+        val map = skyrim.paint(scene.copy(figures = listOf(Figure(local(40, 40), Dot.Player))), MapFrame.MINIMAP)
+
+        val ground = map.ground.argb.filter { it ushr 24 == 0xFF }
+        assertTrue(ground.isNotEmpty())
+        assertTrue(ground.all { abs((it shr 16 and 0xFF) - (it shr 8 and 0xFF)) <= 3 && abs((it and 0xFF) - (it shr 8 and 0xFF)) <= 5 })
+        assertTrue(map.ground.argb.none { it == TREE || it == NPC })
+        assertEquals(painter.paint(scene, MapFrame.MINIMAP).icons.map { it.x to it.y }, map.icons.map { it.x to it.y })
+    }
+
+    @Test
+    fun skyrimCastsABuildingsShadowDownAndRight() {
+        val skyrim = MinimapPainter(MinimapSprites(), MapStyle.Skyrim)
+        val built = skyrim.paintDisc(MapScene(centre, buildings = listOf(Building(rect(60, 60, 90, 80), seed = 1))))
+        val bare = skyrim.paintDisc(MapScene(centre))
+        fun Pixels.light(x: Int, y: Int) = this[x, y] shr 8 and 0xFF
+        // The roof stands paler than the ground, its shadow falls past its lower right corner and not past its upper left.
+        assertTrue(built.light(75, 70) > bare.light(75, 70))
+        assertTrue(built.light(91, 81) < bare.light(91, 81))
+        assertEquals(bare.light(57, 57), built.light(57, 57))
     }
 
     private fun MinimapPainter.paintDisc(scene: MapScene) = paint(scene, MapFrame.MINIMAP).ground

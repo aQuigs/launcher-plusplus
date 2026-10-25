@@ -297,24 +297,25 @@ class MainActivity : ComponentActivity() {
                 }
                 // The map follows the user only while the launcher is visible, like the clock. The state outlives a change
                 // of key, so turning it off must drop the last map.
-                val mapping = whereIAm == WhereIAm.Shown && shownTheme.mapsWhereIAm
-                val minimap = produceState<PaintedMap<ImageBitmap>?>(null, mapping) {
+                val mapStyle = shownTheme.mapStyle
+                val mapping = whereIAm == WhereIAm.Shown && mapStyle != null
+                val minimap = produceState<PaintedMap<ImageBitmap>?>(null, mapping, mapStyle) {
                     value = null
-                    if (mapping) {
+                    if (mapping && mapStyle != null) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            if (location.isGranted()) liveMinimap.maps().collect { value = it }
+                            if (location.isGranted()) liveMinimap.maps(mapStyle).collect { value = it }
                         }
                     }
                 }
                 // Without where the user is, the map wanders made-up places instead, walking only while the screen's
                 // ambient motion moves in sight.
-                val wandering = whereIAm != WhereIAm.Shown && shownTheme.mapsWhereIAm
+                val wandering = whereIAm != WhereIAm.Shown && mapStyle != null
                 var ambientInSight by remember { mutableStateOf(false) }
-                val madeUpMap = produceState<PaintedMap<ImageBitmap>?>(null, wandering) {
+                val madeUpMap = produceState<PaintedMap<ImageBitmap>?>(null, wandering, mapStyle) {
                     value = null
-                    if (wandering) {
+                    if (wandering && mapStyle != null) {
                         repeatOnLifecycle(Lifecycle.State.STARTED) {
-                            snapshotFlow { ambientInSight }.collectLatest { walking -> wanderingMinimap.maps(walking).collect { value = it } }
+                            snapshotFlow { ambientInSight }.collectLatest { walking -> wanderingMinimap.maps(walking, mapStyle).collect { value = it } }
                         }
                     }
                 }

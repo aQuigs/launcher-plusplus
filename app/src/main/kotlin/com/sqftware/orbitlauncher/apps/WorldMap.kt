@@ -3,6 +3,7 @@ package com.sqftware.orbitlauncher.apps
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapFrame
+import com.sqftware.orbitlauncher.domain.minimap.MapStyle
 import com.sqftware.orbitlauncher.domain.minimap.MapTiles
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 
@@ -15,9 +16,9 @@ interface WorldMap {
     suspend fun paint(centre: LatLon, frame: MapFrame): PaintedMap<ImageBitmap>?
 }
 
-/** The world map drawn from map [tiles] with the theme's [art], as the minimap is. */
+/** The world map drawn from map [tiles] with the theme's [art], as the Old School minimap is: only Old School has one. */
 class TiledWorldMap(tiles: MapTiles, art: MinimapArt) : WorldMap {
     private val maker = BitmapMapMaker(tiles, art)
 
-    override suspend fun paint(centre: LatLon, frame: MapFrame) = maker.paint(centre, frame)
+    override suspend fun paint(centre: LatLon, frame: MapFrame) = maker.paint(centre, frame, MapStyle.OldSchool)
 }
