@@ -1,6 +1,5 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -77,7 +77,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import com.sqftware.orbitlauncher.domain.WhereIAm
+import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppSettings
@@ -121,21 +121,26 @@ import com.sqftware.orbitlauncher.domain.SpinFeats
 import com.sqftware.orbitlauncher.domain.SpinStats
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.appOptions
 import com.sqftware.orbitlauncher.domain.canPair
 import com.sqftware.orbitlauncher.domain.contentsOf
 import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.flipped
+import com.sqftware.orbitlauncher.domain.minimap.Journal
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.MapStyle
+import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
-import com.sqftware.orbitlauncher.domain.minimap.Journal
-import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
-import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.ui.theme.Spacing
+import java.io.Serializable
+import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -144,9 +149,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.io.Serializable
-import kotlin.math.roundToInt
-import kotlin.math.sign
 
 object LauncherTags {
     const val PAGER = "launcher_pager"
@@ -311,7 +313,7 @@ fun LauncherScreen(
     heading: () -> Float?,
     journal: Journal,
     onJournalChange: (Journal) -> Unit,
-    worldMaps: () -> WorldMap,
+    worldMaps: (MapStyle) -> WorldMap,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
@@ -591,11 +593,13 @@ fun LauncherScreen(
     // The system bars go with the launcher while the wallpaper shows alone.
     var showingWallpaper by rememberSaveable { mutableStateOf(false) }
     val latestOnSystemBarsShownChange by rememberUpdatedState(onSystemBarsShownChange)
-    val barsHidden = showingWallpaper || showingWorldMap
+    val worldMapArt = LocalThemeArt.current.worldMap
+    val worldMapShown = showingWorldMap && worldMapArt != null && theme.mapStyle != null
+    val barsHidden = showingWallpaper || worldMapShown
     LaunchedEffect(barsHidden) { latestOnSystemBarsShownChange(!barsHidden) }
     // Every page stays composed, so the ring page must be told when nobody can see it.
     // A screen of its own over the pages, which go while it is up.
-    val covered = pickingCollection || editingPages || showingWorldMap
+    val covered = pickingCollection || editingPages || worldMapShown
     val ringInSight = settled.kind == PageKind.Ring && !drawerOpen && !covered && !showingWallpaper
     // The first frame holds only the page in view, so the others' widgets and cards do not delay it.
     val firstFrameDrawn by produceState(false) {
@@ -1367,6 +1371,7 @@ fun LauncherScreen(
     // keyboard is left to the drawer, the one place here that types: a dialog's keyboard must not reflow the pages behind it.
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val openWorldMap = remember { { showingWorldMap = true } }
+    val markQuest = remember { { at: LatLon -> latestOnJournalChange(latestJournal.copy(quest = at)) } }
     CompositionLocalProvider(
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
@@ -1968,10 +1973,19 @@ fun LauncherScreen(
                 }
             }
             // The whole window, through the bars, which hide while it is up.
-            if (showingWorldMap) {
+            val worldMapStyle = theme.mapStyle
+            if (worldMapShown && worldMapArt != null && worldMapStyle != null) {
                 // One visit's map, so the tiles it decoded go with it.
-                val worldMap = remember { worldMaps() }
-                WorldMapScreen(here = { minimap()?.centre }, worldMap, onClose = { showingWorldMap = false })
+                val worldMap = remember(worldMapStyle) { worldMaps(worldMapStyle) }
+                WorldMapScreen(
+                    here = { minimap()?.centre },
+                    map = worldMap,
+                    art = worldMapArt,
+                    moving = ambientMotion,
+                    onPick = markQuest.takeIf { theme.keepsJournal },
+                    pickLabel = MARK_QUEST,
+                    onClose = { showingWorldMap = false },
+                )
             }
         }
     }

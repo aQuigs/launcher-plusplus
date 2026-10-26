@@ -133,6 +133,9 @@ interface ThemeArt {
     @Composable
     fun HomeHeader(discovery: String?, modifier: Modifier) = Unit
 
+    /** How the theme's world map of where the user is looks, if it has one: by default it has none. */
+    val worldMap: WorldMapArt? get() = null
+
     /**
      * The theme's weather, drawn over the wallpaper behind the launcher's pages and over the drawer's ground behind its
      * list, at the [turn] of its cycle, in degrees, an hour to a turn: by default none.

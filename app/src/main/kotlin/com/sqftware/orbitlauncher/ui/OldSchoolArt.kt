@@ -201,6 +201,8 @@ private const val CLOCK_SCALE = 2
  * folder shows its previews in an orb and opens round the minimap, badges are hitsplats, and text is in its fonts.
  */
 object OldSchoolArt : ThemeArt {
+    override val worldMap: WorldMapArt = OldSchoolWorldMap
+
     override val hintInk: Color
         @Composable get() = StackCount
 
@@ -673,11 +675,11 @@ internal fun DrawScope.drawSprite(image: ImageBitmap, topLeft: Offset, scale: In
     drawSpritePart(image, IntRect(0, 0, image.width, image.height), topLeft, scale, tint, alpha)
 
 /** [image] at [topLeft], each of its pixels [scale] screen pixels square, which is crisp on a whole scale and between them as a zoom passes. */
-internal fun DrawScope.drawSpriteScaled(image: ImageBitmap, topLeft: IntOffset, scale: Float) = drawImage(
+internal fun DrawScope.drawSpriteScaled(image: ImageBitmap, topLeft: IntOffset, scale: Float, filterQuality: FilterQuality = FilterQuality.None) = drawImage(
     image,
     dstOffset = topLeft,
     dstSize = IntSize((image.width * scale).roundToInt(), (image.height * scale).roundToInt()),
-    filterQuality = FilterQuality.None,
+    filterQuality = filterQuality,
 )
 
 /** [image] as [drawSprite] draws it, centred on [centre]. */

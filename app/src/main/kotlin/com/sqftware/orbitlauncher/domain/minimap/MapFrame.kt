@@ -8,8 +8,8 @@ internal const val MAX_NPCS = 10
  * The ground a painting covers, [width] by [height] pixels, cut to a disc if [round], and how much it may mark: at most
  * [maxIcons] map icons, [maxPerIcon] of any one, and [maxNpcs] dots of people. A map that [followsUser] is centred on
  * them and turns with them, so its icons come apart to stay upright; it keeps its centre clear for their marker and
- * judges the place as a whole, nearest them first. Any other is painted north up to a world-wide grid, icons and all,
- * and judges each place by its own surroundings, so paintings of one place agree.
+ * judges the place as a whole, nearest them first. Any other is painted north up to a world-wide grid and judges each
+ * place by its own surroundings, so paintings of one place agree.
  */
 class MapFrame(
     val width: Int,

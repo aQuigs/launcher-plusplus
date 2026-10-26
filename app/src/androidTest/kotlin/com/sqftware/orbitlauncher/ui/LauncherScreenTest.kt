@@ -2299,6 +2299,29 @@ class LauncherScreenTest {
     }
 
     @Test
+    fun skyrimsCompassOpensTheWorldMapWhereATapMarksTheQuest() {
+        val bryantPark = LatLon(40.7536, -73.9832)
+        theme = Theme.Skyrim
+        art = SkyrimArt
+        whereIAm = WhereIAm.Shown
+        shownMinimap = PaintedMap(bryantPark, ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList())
+        show()
+
+        compose.onNodeWithContentDescription("World map").performClick()
+        compose.onNodeWithTag(WorldMapTags.MAP).assertIsDisplayed()
+
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { click(Offset(centerX, centerY - 200f)) }
+
+        compose.runOnIdle {
+            val quest = checkNotNull(journal.quest)
+            assertTrue(quest.lat > bryantPark.lat)
+            assertEquals(bryantPark.lon, quest.lon, 1e-6)
+        }
+        compose.onNodeWithContentDescription("Close").performClick()
+        compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
+    }
+
+    @Test
     fun skyrimNamesAPlaceTheFirstTimeTheUserComesToItAndTheJournalKeepsIt() {
         val bryantPark = LatLon(40.7536, -73.9832)
         theme = Theme.Skyrim
