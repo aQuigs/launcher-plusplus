@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.sqftware.orbitlauncher.domain.SpinStats
 
@@ -50,11 +49,6 @@ class SharedPreferencesSpinStatsStore(context: Context) : SpinStatsStore {
         putInt(LAST_DAY_SPINS, stats.lastDaySpins)
         putInt(STREAK, stats.streak)
     }
-
-    // Preferences hold no doubles, and a float total would start rounding off each spin's fraction of a turn as it grows.
-    private fun SharedPreferences.getDouble(key: String) = Double.fromBits(getLong(key, 0.0.toRawBits()))
-
-    private fun SharedPreferences.Editor.putDouble(key: String, value: Double) = putLong(key, value.toRawBits())
 
     private companion object {
         const val SPINS = "spins"

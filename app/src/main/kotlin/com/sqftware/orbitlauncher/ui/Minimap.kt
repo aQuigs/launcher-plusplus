@@ -5,10 +5,12 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import kotlinx.coroutines.delay
 import kotlin.math.cos
@@ -26,15 +28,18 @@ internal inline fun forEachUprightIcon(
     heading: Float,
     draw: (ImageBitmap, Offset) -> Unit,
 ) {
+    val middle = painted.ground.width / 2
+    painted.icons.forEach { icon ->
+        draw(icon.image, center + (Offset(icon.x - middle, icon.y - middle) * scale).turnedWith(heading))
+    }
+}
+
+/** This offset from the middle of a map, once the map is turned with the phone's [heading]. */
+internal fun Offset.turnedWith(heading: Float): Offset {
     val turn = Math.toRadians(-heading.toDouble())
     val cos = cos(turn).toFloat()
     val sin = sin(turn).toFloat()
-    val middle = painted.ground.width / 2
-    painted.icons.forEach { icon ->
-        val dx = (icon.x - middle) * scale
-        val dy = (icon.y - middle) * scale
-        draw(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos))
-    }
+    return Offset(x * cos - y * sin, x * sin + y * cos)
 }
 
 /** The credit the map data's licences ask to show with the map. */
@@ -80,3 +85,6 @@ val LocalHeading = staticCompositionLocalOf<() -> Float?> { { null } }
 
 /** Opens the world map over the launcher, round where the minimap last placed the user. */
 val LocalOpenWorldMap = staticCompositionLocalOf<() -> Unit> { {} }
+
+/** The spot the user's quest marker points to, if they have one, for a theme that keeps a journal. */
+val LocalQuest = compositionLocalOf<LatLon?> { null }
