@@ -64,3 +64,7 @@ val QuestGoldEdge = Smoke.copy(alpha = 0.85f)
 val Snowflake = Snow
 val SnowEdge = Smoke.copy(alpha = 0.18f)
 val MistBank = Snow.copy(alpha = 0.16f)
+
+/** The skills menu's sky round the ring: the blue and the deeper violet of the nebula behind the constellation. */
+val SkillNebula = Color(0xFF5D7FC8).copy(alpha = 0.16f)
+val SkillNebulaDeep = Color(0xFF7A62B8).copy(alpha = 0.12f)
