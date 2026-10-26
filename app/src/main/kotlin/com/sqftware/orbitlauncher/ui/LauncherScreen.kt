@@ -1411,7 +1411,7 @@ fun LauncherScreen(
                     sheetShadowElevation = 0.dp,
                     containerColor = Color.Transparent,
                     sheetContent = {
-                        Column(
+                        Box(
                             Modifier.drawBehind {
                                 val strip = DRAWER_PEEK.toPx()
                                 val open = drawerRaised()
@@ -1423,69 +1423,76 @@ fun LauncherScreen(
                                 }
                             }.nestedScroll(drawerScroll),
                         ) {
-                            DrawerHandle(
-                                open = drawerOpen,
-                                onClick = { if (drawerOpen) closeDrawer() else openDrawer() },
-                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                            // Faded in with the drawer, as the home page's fades out under it, so the weather is never doubled.
+                            LocalThemeArt.current.Weather(
+                                moving = ambientMotion && drawerOpen && !covered,
+                                modifier = Modifier.matchParentSize().graphicsLayer { alpha = drawerRaised() },
                             )
-                            AppDrawer(
-                                apps = apps.orEmpty(),
-                                icon = actions.icon,
-                                onLaunch = actions.launch,
-                                menu = drawerMenu,
-                                mostUsedMenu = mostUsedMenu,
-                                drag = dragFromDrawer,
-                                query = query,
-                                onQueryChange = { query = it },
-                                searchFocus = searchFocus,
-                                unread = unread,
-                                onClearBadge = actions.clearBadge,
-                                controls = DrawerControls(
-                                    style = drawerStyle,
-                                    onStyleChange = onDrawerStyleChange,
-                                    sorting = (openMenu as? OpenMenu.DrawerSort)?.expanded == true,
-                                    onSortingChange = { open ->
-                                        if (open) openMenuUnlessDragging { openMenu = OpenMenu.DrawerSort() } else closeMenu()
+                            Column {
+                                DrawerHandle(
+                                    open = drawerOpen,
+                                    onClick = { if (drawerOpen) closeDrawer() else openDrawer() },
+                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                )
+                                AppDrawer(
+                                    apps = apps.orEmpty(),
+                                    icon = actions.icon,
+                                    onLaunch = actions.launch,
+                                    menu = drawerMenu,
+                                    mostUsedMenu = mostUsedMenu,
+                                    drag = dragFromDrawer,
+                                    query = query,
+                                    onQueryChange = { query = it },
+                                    searchFocus = searchFocus,
+                                    unread = unread,
+                                    onClearBadge = actions.clearBadge,
+                                    controls = DrawerControls(
+                                        style = drawerStyle,
+                                        onStyleChange = onDrawerStyleChange,
+                                        sorting = (openMenu as? OpenMenu.DrawerSort)?.expanded == true,
+                                        onSortingChange = { open ->
+                                            if (open) openMenuUnlessDragging { openMenu = OpenMenu.DrawerSort() } else closeMenu()
+                                        },
+                                    ),
+                                    foregroundTime = foregroundTime,
+                                    onOpenUsageSettings = openUsageSettings,
+                                    picking = when (val pick = picking) {
+                                        is DrawerPick.Apps -> {
+                                            val place = pick.place
+                                            val picked = homeApps[place]
+                                            Picking(
+                                                header = {
+                                                    when (place) {
+                                                        is HomePlace.Folder -> AddingPicker("folder")
+                                                        HomePlace.Ring, HomePlace.Dock ->
+                                                            PlacePicker(place = place, onPlaceChange = { picking = DrawerPick.Apps(it) })
+                                                    }
+                                                },
+                                                isPicked = { it in picked },
+                                                onToggle = { app -> changeHomeApps { toggle(place, app) } },
+                                            )
+                                        }
+                                        is DrawerPick.Card -> collections.card(pick.kind)?.let { card ->
+                                            Picking(
+                                                header = { AddingPicker(pick.kind.title) },
+                                                isPicked = { it in card.apps },
+                                                onToggle = { changeCollections { toggleApp(pick.kind, it) } },
+                                            )
+                                        }
+                                        // Only an app it makes a pair with can be its partner.
+                                        is DrawerPick.Partner -> splitting?.let { first ->
+                                            Picking(
+                                                header = { PartnerPicker(first) },
+                                                isPicked = { it.key == first.key },
+                                                onToggle = { makePair(first, it, pick.spot) },
+                                                mark = PickMark.Dot,
+                                                isPickable = { canPair(first, it) },
+                                            )
+                                        }
+                                        null -> null
                                     },
-                                ),
-                                foregroundTime = foregroundTime,
-                                onOpenUsageSettings = openUsageSettings,
-                                picking = when (val pick = picking) {
-                                    is DrawerPick.Apps -> {
-                                        val place = pick.place
-                                        val picked = homeApps[place]
-                                        Picking(
-                                            header = {
-                                                when (place) {
-                                                    is HomePlace.Folder -> AddingPicker("folder")
-                                                    HomePlace.Ring, HomePlace.Dock ->
-                                                        PlacePicker(place = place, onPlaceChange = { picking = DrawerPick.Apps(it) })
-                                                }
-                                            },
-                                            isPicked = { it in picked },
-                                            onToggle = { app -> changeHomeApps { toggle(place, app) } },
-                                        )
-                                    }
-                                    is DrawerPick.Card -> collections.card(pick.kind)?.let { card ->
-                                        Picking(
-                                            header = { AddingPicker(pick.kind.title) },
-                                            isPicked = { it in card.apps },
-                                            onToggle = { changeCollections { toggleApp(pick.kind, it) } },
-                                        )
-                                    }
-                                    // Only an app it makes a pair with can be its partner.
-                                    is DrawerPick.Partner -> splitting?.let { first ->
-                                        Picking(
-                                            header = { PartnerPicker(first) },
-                                            isPicked = { it.key == first.key },
-                                            onToggle = { makePair(first, it, pick.spot) },
-                                            mark = PickMark.Dot,
-                                            isPickable = { canPair(first, it) },
-                                        )
-                                    }
-                                    null -> null
-                                },
-                            )
+                                )
+                            }
                         }
                     },
                     // The collapsed sheet is full height and continues below the scaffold, where the list would show through the
@@ -1496,6 +1503,10 @@ fun LauncherScreen(
                         .clipToBounds()
                         .then(if (covered) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
                 ) { padding ->
+                    LocalThemeArt.current.Weather(
+                        moving = ambientMotion && !drawerOpen && !covered && !showingWallpaper,
+                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - drawerRaised() },
+                    )
                     HorizontalPager(
                         state = pagerState,
                         key = { layout.pages[it].id },

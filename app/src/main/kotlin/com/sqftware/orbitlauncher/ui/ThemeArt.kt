@@ -133,6 +133,13 @@ interface ThemeArt {
     @Composable
     fun HomeHeader(discovery: String?, modifier: Modifier) = Unit
 
+    /**
+     * The theme's weather, drawn over the wallpaper behind the launcher's pages and over the drawer's ground behind its
+     * list, still unless it is [moving]: by default none.
+     */
+    @Composable
+    fun Weather(moving: Boolean, modifier: Modifier) = Unit
+
     /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
     @Composable
     fun ClockTime(time: String, modifier: Modifier) = PlainClockTime(time, modifier)
