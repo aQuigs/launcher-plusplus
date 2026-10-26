@@ -150,7 +150,8 @@ private val Condensed = FontFamily(
  * Skyrim: an homage to the northern game's interface, drawn by hand rather than from its files. The emblem is its local
  * map of where the user is, turned with the phone, with the player's arrow at its middle; the compass runs along the top
  * of the home page between carved ends, with the map's places and the user's quest marked on it, and names each place the
- * user discovers below it; folders are round Nord shields; menus are smoke between bone hairlines, in a condensed type.
+ * user discovers below it; snow and mist drift over the launcher; folders are round Nord shields; menus are smoke between
+ * bone hairlines, in a condensed type.
  */
 object SkyrimArt : ThemeArt {
     override val hintInk: Color
@@ -310,6 +311,9 @@ object SkyrimArt : ThemeArt {
             Discovery(discovery)
         }
     }
+
+    @Composable
+    override fun Weather(turn: () -> Float, modifier: Modifier) = SnowAndMist(turn, modifier)
 
     @Composable
     override fun menuBox(ground: PanelGround): Modifier = hairlinedBox(ground)

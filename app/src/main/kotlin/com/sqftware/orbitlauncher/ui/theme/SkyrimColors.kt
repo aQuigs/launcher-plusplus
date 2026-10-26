@@ -56,3 +56,11 @@ val DiscoverySmoke = Smoke.copy(alpha = 0.92f)
 /** The gold of the quest marker on the compass and the map, edged so it holds on a pale roof. */
 val QuestGold = Color(0xFFE6BE5A)
 val QuestGoldEdge = Smoke.copy(alpha = 0.85f)
+
+/**
+ * The weather over the launcher: snowflakes of snow, each in a faint dark halo so it shows on a pale wallpaper too, and
+ * the white of the mist at its thickest.
+ */
+val Snowflake = Snow
+val SnowEdge = Smoke.copy(alpha = 0.18f)
+val MistBank = Snow.copy(alpha = 0.16f)
