@@ -241,7 +241,7 @@ data class HomePress(val launcherInFront: Boolean)
  * home page ([previewing]), and try others there ([onPreviewThemeChange]) until one is used ([onThemeChange]) or the try is
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
- * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
+ * show whether what the theme moves on its own (the planets and the emblem, the gears, the weather) moves and flip it ([ambientMotion],
  * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed, each told in a toast, [onToast]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn, keep the [journal] of the user's travels ([onJournalChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
@@ -610,6 +610,9 @@ fun LauncherScreen(
     LaunchedEffect(ambient) { latestOnAmbientInSightChange(ambient) }
     val skyTurns = ambient && folderLook.moves(folders = (ring + shownDock).any { it is RingItem.Folder }, planets = planets.values)
     val sky = rememberUpdatedState(turnAngle(skyTurns, FOLDER_SKY_TURN_MILLIS))
+    // The weather moves where the rest of the theme does, and in the open drawer. One clock drives both its copies.
+    val weather = rememberUpdatedState(turnAngle(ambient || (ambientMotion && drawerOpen && !covered), WEATHER_CYCLE_S * 1_000))
+    val readWeather = remember { { weather.value.value } }
     // A place the journal has not got is named over the home page while the user can see it, and kept only once it has
     // been shown, so a place reached with the drawer open or on another page waits until home is back in sight.
     val place by remember { derivedStateOf { minimap()?.place } }
@@ -1423,9 +1426,9 @@ fun LauncherScreen(
                                 }
                             }.nestedScroll(drawerScroll),
                         ) {
-                            // Faded in with the drawer, as the home page's fades out under it, so the weather is never doubled.
+                            // Faded in with the drawer as the home page's fades out under it, each flake in the same place in both.
                             LocalThemeArt.current.Weather(
-                                moving = ambientMotion && drawerOpen && !covered,
+                                turn = readWeather,
                                 modifier = Modifier.matchParentSize().graphicsLayer { alpha = drawerRaised() },
                             )
                             Column {
@@ -1504,7 +1507,7 @@ fun LauncherScreen(
                         .then(if (covered) Modifier.alpha(0f).clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier),
                 ) { padding ->
                     LocalThemeArt.current.Weather(
-                        moving = ambientMotion && !drawerOpen && !covered && !showingWallpaper,
+                        turn = readWeather,
                         modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - drawerRaised() },
                     )
                     HorizontalPager(

@@ -135,10 +135,10 @@ interface ThemeArt {
 
     /**
      * The theme's weather, drawn over the wallpaper behind the launcher's pages and over the drawer's ground behind its
-     * list, still unless it is [moving]: by default none.
+     * list, at the [turn] of its cycle, in degrees, an hour to a turn: by default none.
      */
     @Composable
-    fun Weather(moving: Boolean, modifier: Modifier) = Unit
+    fun Weather(turn: () -> Float, modifier: Modifier) = Unit
 
     /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
     @Composable

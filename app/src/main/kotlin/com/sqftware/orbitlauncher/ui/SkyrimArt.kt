@@ -313,7 +313,7 @@ object SkyrimArt : ThemeArt {
     }
 
     @Composable
-    override fun Weather(moving: Boolean, modifier: Modifier) = SnowAndMist(moving, modifier)
+    override fun Weather(turn: () -> Float, modifier: Modifier) = SnowAndMist(turn, modifier)
 
     @Composable
     override fun menuBox(ground: PanelGround): Modifier = hairlinedBox(ground)
