@@ -10,6 +10,7 @@ class MadeUpPlacesTest {
     private val m = METRES_PER_PIXEL
     private val painter = MinimapPainter(
         MinimapSprites(trees = listOf(Pixels(1, 1, intArrayOf(TREE))), icons = MapIcon.entries.associateWith { Pixels(1, 1, intArrayOf(TREE)) }),
+        MapStyle.OldSchool,
     )
 
     @Test

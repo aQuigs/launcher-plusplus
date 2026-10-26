@@ -25,17 +25,16 @@ interface MapTiles {
 
 /**
  * Paints maps as the user moves or pans: it picks the tiles each centre needs and keeps those it has decoded, since a
- * centre 50 m on usually needs the very same ones. One caller at a time. The [sprites] are read once, on the first paint.
+ * centre 50 m on usually needs the very same ones. One caller at a time. A style's [sprites] are read on each paint in it.
  */
-class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
-    private val painter by lazy { MinimapPainter(sprites()) }
+class MinimapMaker(private val tiles: MapTiles, private val sprites: (MapStyle) -> MinimapSprites) {
     private val decoded = mutableMapOf<TileId, VectorTile>()
 
     /**
-     * The map in [frame] round [at], centred as the frame centres it, or null while a tile it needs cannot be had: a map
-     * with a tile missing would show made-up grass where that tile belongs.
+     * The map in [frame] round [at] in [style], centred as the frame centres it, or null while a tile it needs cannot be
+     * had: a map with a tile missing would show made-up grass where that tile belongs.
      */
-    suspend fun paint(at: LatLon, frame: MapFrame): PaintedMap<Pixels>? {
+    suspend fun paint(at: LatLon, frame: MapFrame, style: MapStyle): PaintedMap<Pixels>? {
         val centre = frame.centreFor(at)
         val needed = OpenMapTiles.tilesFor(centre, frame)
         decoded.keys.retainAll(needed.toSet())
@@ -49,6 +48,6 @@ class MinimapMaker(private val tiles: MapTiles, sprites: () -> MinimapSprites) {
             }
         }
         if (decoded.size < needed.size) return null
-        return painter.paint(OpenMapTiles.scene(centre, decoded, frame), frame)
+        return MinimapPainter(sprites(style), style).paint(OpenMapTiles.scene(centre, decoded, frame), frame)
     }
 }

@@ -1588,6 +1588,8 @@ fun LauncherScreen(
                                                             }) else null,
                                                         ) {
                                                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = clockShade }) {
+                                                                // In the clock's room, so the preview bar and the reorder switch take its place as they take the clock's.
+                                                                LocalThemeArt.current.HomeHeader(Modifier.padding(top = 12.dp))
                                                                 HomeClock(
                                                                     face = clock,
                                                                     onTimeClick = onOpenClock,

@@ -30,12 +30,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -118,11 +114,9 @@ import com.sqftware.orbitlauncher.ui.theme.MinimapSelf
 import com.sqftware.orbitlauncher.ui.theme.MinimapSelfEdge
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.StackCount
-import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 
 /** How many of the game's pixels wide the screen is: the mobile client's portrait width, which sets how big one is. */
 private const val GAME_WIDTH = 270
@@ -149,15 +143,9 @@ private const val SOCKET_RADIUS = 23
  */
 private const val EMBLEM_REACH = 1.15f
 
-/**
- * The credit the map data's licences ask to show with the map, along the bottom of the disc: how wide it may run and
- * how far below the centre its foot is, in game pixels.
- */
-internal const val MAP_CREDIT = "© OpenMapTiles © OpenStreetMap"
+/** The map's credit along the bottom of the disc: how wide it may run and how far below the centre its foot is, in game pixels. */
 private const val CREDIT_WIDTH = 104
 private const val CREDIT_DROP = 70
-private const val CREDIT_MILLIS = 5_000L
-private const val CREDIT_FADE_MILLIS = 1_000
 
 /** The whole game pixels the minimap is drawn at in an emblem of [size]: as large as reaches its room, and no larger than the rest of the game. */
 private fun mapScale(size: Size, px: Int) = fitScale(size.minDimension * EMBLEM_REACH, 2f * FRAME_RADIUS, px)
@@ -237,17 +225,8 @@ object OldSchoolArt : ThemeArt {
         val heading = LocalHeading.current
         val measurer = rememberTextMeasurer()
         val creditStyle = MaterialTheme.typography.labelSmall.copy(color = MinimapSelf, textAlign = TextAlign.Center)
-        // OpenStreetMap's attribution rules let the credit fade five seconds after a map first shows; the launcher's
-        // menu keeps it a tap away.
-        val creditAlpha = remember { Animatable(1f) }
         val mapShown by remember { derivedStateOf { map() != null } }
-        LaunchedEffect(mapShown) {
-            if (mapShown) {
-                creditAlpha.snapTo(1f)
-                delay(CREDIT_MILLIS)
-                creditAlpha.animateTo(0f, tween(CREDIT_FADE_MILLIS))
-            }
-        }
+        val creditAlpha = mapCreditAlpha(mapShown)
         Box(modifier) {
             Spacer(
                 Modifier
@@ -263,15 +242,9 @@ object OldSchoolArt : ThemeArt {
             // draws only the icons again.
             Spacer(
                 Modifier.matchParentSize().graphicsLayer().drawBehind {
-                    val minimap = shown()?.takeIf { it.icons.isNotEmpty() } ?: return@drawBehind
+                    val minimap = shown() ?: return@drawBehind
                     val scale = mapScale(size, px)
-                    val turn = Math.toRadians(-(heading() ?: 0f).toDouble())
-                    val (cos, sin) = cos(turn).toFloat() to sin(turn).toFloat()
-                    minimap.icons.forEach { icon ->
-                        val dx = (icon.x - MAP_RADIUS) * scale
-                        val dy = (icon.y - MAP_RADIUS) * scale
-                        drawSpriteCentred(icon.image, center + Offset(dx * cos - dy * sin, dx * sin + dy * cos), scale)
-                    }
+                    forEachUprightIcon(minimap, center, scale.toFloat(), heading() ?: 0f) { image, at -> drawSpriteCentred(image, at, scale) }
                 },
             )
             // Under the frame, whose socket's own pixels edge it.
@@ -608,7 +581,7 @@ object OldSchoolArt : ThemeArt {
         get() = SquareShapes
 }
 
-private val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it) }
+internal val SquareShapes = RoundedCornerShape(0).let { Shapes(it, it, it, it, it) }
 
 /** An item fits a square this many game pixels across: its canvas less the clear rows round the mark. */
 private const val ITEM_FIT = 28f

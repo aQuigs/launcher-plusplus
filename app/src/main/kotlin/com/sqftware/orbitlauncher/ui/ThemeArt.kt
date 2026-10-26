@@ -126,6 +126,10 @@ interface ThemeArt {
     @Composable
     fun BadgeFace(unread: Unread, modifier: Modifier) = BubbleBadge(unread, modifier)
 
+    /** What the theme shows along the top of the home page, over the clock: by default nothing. */
+    @Composable
+    fun HomeHeader(modifier: Modifier) = Unit
+
     /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
     @Composable
     fun ClockTime(time: String, modifier: Modifier) = PlainClockTime(time, modifier)
@@ -264,6 +268,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.CrystalCity -> CrystalArt
     Theme.GreenCore -> GreenCoreArt
     Theme.OldSchool -> OldSchoolArt
+    Theme.Skyrim -> SkyrimArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }

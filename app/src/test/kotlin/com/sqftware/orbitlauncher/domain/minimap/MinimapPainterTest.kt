@@ -5,6 +5,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.hypot
 
@@ -13,7 +14,7 @@ class MinimapPainterTest {
     private val tree = solid(1, 1, TREE)
     private val npc = solid(3, 3, NPC)
     private val icons = MapIcon.entries.associateWith { solid(3, 3, ICON or it.ordinal) }
-    private val painter = MinimapPainter(MinimapSprites(trees = listOf(tree), npc = npc, icons = icons))
+    private val painter = MinimapPainter(MinimapSprites(trees = listOf(tree), npc = npc, icons = icons), MapStyle.OldSchool)
 
     @Test
     fun paintsAnOpaqueDiscOnAClearSquare() {
@@ -30,7 +31,7 @@ class MinimapPainterTest {
 
     @Test
     fun paintsBareGroundAsGrassWithNoWallsAndNoSelfMarker() {
-        val disc = MinimapPainter(MinimapSprites()).paintDisc(MapScene(centre)).argb
+        val disc = MinimapPainter(MinimapSprites(), MapStyle.OldSchool).paintDisc(MapScene(centre)).argb
         val ground = disc.filter { it ushr 24 == 0xFF }.toSet()
         assertTrue(ground.all { it shr 8 and 0xFF == 0x8F && it and 0xFF == 0x24 })
         assertTrue(WALL !in ground)
@@ -39,7 +40,7 @@ class MinimapPainterTest {
     @Test
     fun wallsOnlyTheOutsideOfTouchingBuildings() {
         // Two footprints sharing an edge at x = 70 make one structure: the edge between them is floor, not wall.
-        val disc = MinimapPainter(MinimapSprites()).paintDisc(
+        val disc = MinimapPainter(MinimapSprites(), MapStyle.OldSchool).paintDisc(
             MapScene(centre, buildings = listOf(Building(rect(40, 40, 70, 60), seed = 1), Building(rect(70, 40, 100, 60), seed = 2))),
         )
         assertEquals(WALL, disc[40, 50])
@@ -56,24 +57,24 @@ class MinimapPainterTest {
     fun givesAStructureAtMostTwoDoorsOfOneTileEach() {
         val building = Building(rect(40, 40, 110, 60), seed = 3)
         val entered = (45..105 step 10).map { Poi(local(it, 41), door = true) }
-        val disc = MinimapPainter(MinimapSprites()).paintDisc(MapScene(centre, buildings = listOf(building), pois = entered)).argb
+        val disc = MinimapPainter(MinimapSprites(), MapStyle.OldSchool).paintDisc(MapScene(centre, buildings = listOf(building), pois = entered)).argb
         assertEquals(MAX_DOORS * DOOR_PX, disc.count { it == DOOR })
 
-        val one = MinimapPainter(MinimapSprites()).paintDisc(MapScene(centre, buildings = listOf(building), pois = entered.take(1))).argb
+        val one = MinimapPainter(MinimapSprites(), MapStyle.OldSchool).paintDisc(MapScene(centre, buildings = listOf(building), pois = entered.take(1))).argb
         assertEquals(DOOR_PX, one.count { it == DOOR })
     }
 
     @Test
     fun spacesWoodlandTreesApart() {
         val wood = Area(Ground.Grass, listOf(rect(0, 0, 152, 152)), order = 0, woodland = true)
-        val trees = MinimapPainter(MinimapSprites(trees = listOf(tree))).paintDisc(MapScene(centre, areas = listOf(wood))).spots(TREE)
+        val trees = MinimapPainter(MinimapSprites(trees = listOf(tree)), MapStyle.OldSchool).paintDisc(MapScene(centre, areas = listOf(wood))).spots(TREE)
         assertTrue("${trees.size} trees", trees.size > 20)
         assertMinimumSpacing(trees, TREE_SPACING_PX)
     }
 
     @Test
     fun decoratesTreelessGrassWithWiderSpacedTrees() {
-        val trees = MinimapPainter(MinimapSprites(trees = listOf(tree))).paintDisc(MapScene(centre)).spots(TREE)
+        val trees = MinimapPainter(MinimapSprites(trees = listOf(tree)), MapStyle.OldSchool).paintDisc(MapScene(centre)).spots(TREE)
         assertTrue("${trees.size} trees", trees.size > 5)
         assertMinimumSpacing(trees, DECOR_SPACING_PX)
     }
@@ -81,7 +82,7 @@ class MinimapPainterTest {
     @Test
     fun keepsTreesOffRoadsAndFloors() {
         val road = Way(WayKind.Road, 200.0, listOf(Local(-200.0, 0.0), Local(200.0, 0.0)))
-        val disc = MinimapPainter(MinimapSprites(trees = listOf(tree))).paintDisc(MapScene(centre, ways = listOf(road)))
+        val disc = MinimapPainter(MinimapSprites(trees = listOf(tree)), MapStyle.OldSchool).paintDisc(MapScene(centre, ways = listOf(road)))
         assertTrue(disc.spots(TREE).isEmpty())
     }
 
@@ -121,7 +122,7 @@ class MinimapPainterTest {
         val sprites = MinimapSprites(npc = solid(3, 3, NPC), player = solid(3, 3, PLAYER))
         // Two NPCs closer than the mapped people's spacing both show, and a player on one of them covers it.
         val figures = listOf(Figure(local(40, 40), Dot.Player), Figure(local(40, 40), Dot.Npc), Figure(local(42, 40), Dot.Npc))
-        val disc = MinimapPainter(sprites).paintDisc(MapScene(centre, figures = figures))
+        val disc = MinimapPainter(sprites, MapStyle.OldSchool).paintDisc(MapScene(centre, figures = figures))
         assertEquals(PLAYER, disc[40, 40])
         assertEquals(NPC, disc[43, 40])
         assertEquals(9, disc.argb.count { it == PLAYER })
@@ -130,7 +131,7 @@ class MinimapPainterTest {
     @Test
     fun pavesBuiltUpPlaces() {
         val blocks = (0 until 4).flatMap { i -> (0 until 4).map { j -> Building(rect(20 + i * 30, 20 + j * 30, 40 + i * 30, 40 + j * 30), seed = (i * 4 + j).toLong()) } }
-        val disc = MinimapPainter(MinimapSprites()).paintDisc(MapScene(centre, buildings = blocks))
+        val disc = MinimapPainter(MinimapSprites(), MapStyle.OldSchool).paintDisc(MapScene(centre, buildings = blocks))
         assertEquals(PLAZA, disc[17, 76])
     }
 
@@ -159,7 +160,7 @@ class MinimapPainterTest {
     @Test
     fun theWorldMapPavesOnlyWhereBuildingsStandClose() {
         val blocks = (0 until 4).flatMap { i -> (0 until 4).map { j -> Building(rect(20 + i * 30, 20 + j * 30, 45 + i * 30, 45 + j * 30), seed = (i * 4 + j).toLong()) } }
-        val ground = MinimapPainter(MinimapSprites()).paint(MapScene(centre, buildings = blocks), WORLD_MAP).ground
+        val ground = MinimapPainter(MinimapSprites(), MapStyle.OldSchool).paint(MapScene(centre, buildings = blocks), WORLD_MAP).ground
         // The world map's centre pixel is the minimap's, 436 px further in.
         val offset = WORLD_SIZE / 2 - MINIMAP_SIZE / 2
         assertEquals(PLAZA, ground[77 + offset, 77 + offset])
@@ -186,6 +187,32 @@ class MinimapPainterTest {
             if (a.ground[x, y] == b.ground[x - dx, y - dy]) same++
         }
         assertTrue("$same of $shared pixels agree", same >= shared * 0.98)
+    }
+
+    @Test
+    fun skyrimPaintsTheSceneInGreysWithItsIconsAndNobody() {
+        val skyrim = MinimapPainter(MinimapSprites(trees = listOf(tree), npc = npc, icons = icons), MapStyle.Skyrim)
+        val tiles = OpenMapTiles.tilesFor(centre, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
+        val scene = OpenMapTiles.scene(centre, tiles, MapFrame.MINIMAP)
+        val map = skyrim.paint(scene.copy(figures = listOf(Figure(local(40, 40), Dot.Player))), MapFrame.MINIMAP)
+
+        val ground = map.ground.argb.filter { it ushr 24 == 0xFF }
+        assertTrue(ground.isNotEmpty())
+        assertTrue(ground.all { abs((it shr 16 and 0xFF) - (it shr 8 and 0xFF)) <= 3 && abs((it and 0xFF) - (it shr 8 and 0xFF)) <= 5 })
+        assertTrue(map.ground.argb.none { it == TREE || it == NPC })
+        assertEquals(painter.paint(scene, MapFrame.MINIMAP).icons.map { it.x to it.y }, map.icons.map { it.x to it.y })
+    }
+
+    @Test
+    fun skyrimCastsABuildingsShadowDownAndRight() {
+        val skyrim = MinimapPainter(MinimapSprites(), MapStyle.Skyrim)
+        val built = skyrim.paintDisc(MapScene(centre, buildings = listOf(Building(rect(60, 60, 90, 80), seed = 1))))
+        val bare = skyrim.paintDisc(MapScene(centre))
+        fun Pixels.light(x: Int, y: Int) = this[x, y] shr 8 and 0xFF
+        // The roof stands paler than the ground, its shadow falls past its lower right corner and not past its upper left.
+        assertTrue(built.light(75, 70) > bare.light(75, 70))
+        assertTrue(built.light(91, 81) < bare.light(91, 81))
+        assertEquals(bare.light(57, 57), built.light(57, 57))
     }
 
     private fun MinimapPainter.paintDisc(scene: MapScene) = paint(scene, MapFrame.MINIMAP).ground

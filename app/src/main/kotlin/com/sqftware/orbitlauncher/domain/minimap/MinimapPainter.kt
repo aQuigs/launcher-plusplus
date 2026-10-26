@@ -66,19 +66,35 @@ private const val WOOD_FLOOR_SHARE = 0.3
 private const val ICON_SPACING_PX = 24.0
 
 /**
- * Paints the Old School map of a [MapScene] in a [MapFrame], the minimap's disc or a stretch of the world map, at
- * [METRES_PER_PIXEL], built the way the game builds its minimap. Every 4 px tile gets a flat ground colour; walls are 1 px lines round each structure with a few
+ * Paints the map of a [MapScene] in a [MapFrame], the minimap's disc or a stretch of the world map, at
+ * [METRES_PER_PIXEL], laid out the way the old game builds its minimap and colored in [style]. In the Old School style every 4 px tile gets a flat ground color; walls are 1 px lines around each structure with a few
  * doors; trees and the dots of people go on top. The map icons and the self marker are left to whoever shows the map,
  * so they stay upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
  * it moves.
  */
-class MinimapPainter(private val sprites: MinimapSprites) {
+class MinimapPainter(private val sprites: MinimapSprites, private val style: MapStyle) {
     /**
      * The ground in [frame], opaque, clear outside a round frame's circle, and its icons: apart, for the user's map to
      * keep upright as it turns, or in the ground of a map that never turns.
      */
-    fun paint(scene: MapScene, frame: MapFrame): PaintedMap<Pixels> = Painting(scene, sprites, frame).run()
+    fun paint(scene: MapScene, frame: MapFrame): PaintedMap<Pixels> = Painting(scene, sprites, frame, style).run()
 }
+
+/**
+ * The ground a painting has laid out, for a style to color, pixel by pixel of a [width] by [height] view: what each is
+ * made of, whether it is a structure's wall, which structure it is in (0 for none), and whether a rail runs over it;
+ * the spots [trees] stand on; and the [shade] of each pixel's grass, a smooth field from 0 to 1 keyed by places on Earth.
+ */
+internal class GroundLayout(
+    val width: Int,
+    val height: Int,
+    val ground: Array<Ground>,
+    val walls: BooleanArray,
+    val structure: IntArray,
+    val rails: BooleanArray,
+    val trees: List<Px>,
+    val shade: DoubleArray,
+)
 
 /** The world-wide pixel grid seeded features and the world map keep to, in pixels to the mercator metre. */
 internal fun gridPixelsPerMetre(lat: Double) = WebMercator.gridScale(lat) / METRES_PER_PIXEL
@@ -90,7 +106,7 @@ internal fun onSeedGrid(at: LatLon): LatLon {
     return WebMercator.toLatLon(Mercator((floor(m.x * scale) + 0.5) / scale, -(floor(-m.y * scale) + 0.5) / scale))
 }
 
-private class Px(val x: Double, val y: Double)
+internal class Px(val x: Double, val y: Double)
 
 /**
  * Spots in a [width] by [height] view kept apart, filed by the grid of [cell] px squares they fall in, so a check looks
@@ -171,7 +187,12 @@ private class Window(marked: BooleanArray, private val width: Int, private val h
         sums[y1 * (width + 1) + x1] - sums[y0 * (width + 1) + x1] - sums[y1 * (width + 1) + x0] + sums[y0 * (width + 1) + x0]
 }
 
-private class Painting(private val scene: MapScene, private val sprites: MinimapSprites, private val frame: MapFrame) {
+private class Painting(
+    private val scene: MapScene,
+    private val sprites: MinimapSprites,
+    private val frame: MapFrame,
+    private val style: MapStyle,
+) {
     private val w = frame.width
     private val h = frame.height
 
@@ -259,32 +280,51 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             for (m in 0 until count) cls[members[m]] = floor
         }
         val walls = BooleanArray(w * h) { comp[it] != 0 && anyNeighbour(it) { k -> comp[k] == 0 } }
-
-        // 4. flat tiles: one colour per ground, grass shaded only by a smooth field across tiles
+        val rails = BooleanArray(w * h).also { rails ->
+            scene.ways.filter { it.kind == WayKind.Rail }.forEach { rail -> linePixels(rail.points.map(::px)) { rails[it] = true } }
+        }
         val noise = grassNoise()
+        val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), DoubleArray(w * h) { noise[tileOf(it % w, it / w)] })
+
+        val icons = when (style) {
+            MapStyle.OldSchool -> {
+                paintOldSchool(layout)
+                placeIcons().also { icons ->
+                    paintNpcs(icons)
+                    paintFigures()
+                }
+            }
+            MapStyle.Skyrim -> {
+                paintSkyrim(layout, img)
+                placeIcons()
+            }
+        }
+
+        frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
+        if (frame.followsUser) return PaintedMap(scene.centre, Pixels(w, h, img), icons)
+        icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
+        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
+    }
+
+    private fun paintOldSchool(layout: GroundLayout) {
+        // flat tiles: one color per ground, grass shaded only by a smooth field across tiles
         for (i in 0 until w * h) {
             img[i] = when (val g = cls[i]) {
-                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, noise[tileOf(i % w, i / w)])
+                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, layout.shade[i])
                 Ground.Water -> if (anyNeighbour(i) { cls[it] != Ground.Water }) WATER_EDGE else WATER_BASE
                 else -> GROUND_COLOUR[g.ordinal]
             }
         }
         blendGrass()
 
-        // 5. thin lines, then the walls on top
-        scene.ways.filter { it.kind == WayKind.Rail }.forEach { rail -> linePixels(rail.points.map(::px)) { img[it] = RAIL } }
-        for (i in 0 until w * h) if (walls[i]) img[i] = WALL
+        // thin lines, then the walls on top
+        for (i in 0 until w * h) {
+            if (layout.rails[i]) img[i] = RAIL
+            if (layout.walls[i]) img[i] = WALL
+        }
 
-        paintDoors(walls, comp)
-        paintTrees()
-        val icons = placeIcons()
-        paintNpcs(icons)
-        paintFigures()
-
-        frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
-        if (frame.followsUser) return PaintedMap(scene.centre, Pixels(w, h, img), icons)
-        icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
-        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
+        paintDoors(layout.walls, layout.structure)
+        paintTrees(layout.trees)
     }
 
     private fun groundOf(kind: WayKind) = when (kind) {
@@ -422,7 +462,17 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
 
     // --- trees ---------------------------------------------------------------------------------
 
-    private fun paintTrees() {
+    private fun paintTrees(trees: List<Px>) {
+        if (sprites.trees.isEmpty()) return
+        for (t in trees.sortedBy { it.y }) {
+            val pick = stableRandom(TREE_SALT, (round(t.x).toInt() + originX).toLong(), (round(t.y).toInt() + originY).toLong())
+            val sprite = sprites.trees[(pick * sprites.trees.size).toInt().coerceAtMost(sprites.trees.size - 1)]
+            blit(sprite, t.x.toInt() - sprite.width / 2, t.y.toInt() - (sprite.height - 2))
+        }
+    }
+
+    /** Where trees stand: in woods, and scattered as decoration where the map gives none. */
+    private fun treeSpots(): List<Px> {
         // Woods get a tree in about one world cell of 60 px² each, wherever the cell's seeded spot falls on their grass.
         val wood = BooleanArray(w * h)
         scene.areas.filter { it.woodland }.forEach { area -> area.polygons.forEach { polygon -> scanPolygon(pxRings(polygon)) { wood[it] = true } } }
@@ -451,13 +501,7 @@ private class Painting(private val scene: MapScene, private val sprites: Minimap
             true
         }
         standing(decor, DECOR_SPACING_PX).filter { placed.clear(it, DECOR_SPACING_PX) }.forEach { placed += it }
-
-        if (sprites.trees.isEmpty()) return
-        for (t in placed.all.sortedBy { it.y }) {
-            val pick = stableRandom(TREE_SALT, (round(t.x).toInt() + originX).toLong(), (round(t.y).toInt() + originY).toLong())
-            val sprite = sprites.trees[(pick * sprites.trees.size).toInt().coerceAtMost(sprites.trees.size - 1)]
-            blit(sprite, t.x.toInt() - sprite.width / 2, t.y.toInt() - (sprite.height - 2))
-        }
+        return placed.all
     }
 
     /**
