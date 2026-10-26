@@ -73,7 +73,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
-import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.turnBetween
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
@@ -94,16 +93,15 @@ import com.sqftware.orbitlauncher.ui.theme.ShieldBoardDark
 import com.sqftware.orbitlauncher.ui.theme.ShieldBoardLight
 import com.sqftware.orbitlauncher.ui.theme.ShieldIron
 import com.sqftware.orbitlauncher.ui.theme.ShieldRivet
-import com.sqftware.orbitlauncher.ui.theme.SkillGlow
 import com.sqftware.orbitlauncher.ui.theme.SkillNebula
 import com.sqftware.orbitlauncher.ui.theme.SkillNebulaDeep
-import com.sqftware.orbitlauncher.ui.theme.SkillRay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -142,19 +140,21 @@ private const val QUEST_HERE_M = 15.0
 private const val DISCOVERY_IN_MILLIS = 800
 private const val DISCOVERY_OUT_MILLIS = 1_200
 
-/** The fewest slots that make a constellation; fewer are a hairline track. */
-private const val MIN_CONSTELLATION = 3
+/** The fewest slots that make a constellation: a triangle's lines would run under the emblem, so fewer are a hairline track. */
+private const val MIN_CONSTELLATION = 4
 
 /**
  * How far a slot's branch swings off the line out from the ring's middle, in radians, and how far out it reaches, and the
  * field of faint stars, as shares of the ring's radius.
  */
 private const val BRANCH_SWING = 0.5f
+private const val BRANCH_SEED = 17
+private const val FIELD_SEED = 29
 private const val BRANCH_REACH = 1.22f
 private const val FIELD_STARS = 40
 private const val FIELD_REACH = 1.3f
 
-/** How far a ring star's glow and its rays reach, as shares of its disc's diameter. */
+/** How far a slot's glow and its rays reach from its middle, as shares of its disc's diameter. */
 private const val STAR_GLOW = 0.95f
 private const val STAR_RAYS = 0.78f
 
@@ -306,12 +306,13 @@ object SkyrimArt : ThemeArt {
             slots.forEachIndexed { i, star -> if (i == 0) moveTo(star.x, star.y) else lineTo(star.x, star.y) }
             close()
         }
-        // Seeded by the slots' count, so the branches stay put as the ring is redrawn.
-        val random = Random(slots.size)
+        val starSide = 2.5.dp.toPx()
+        // Kept on the page, which a crowded ring reaches nearly to the edge of.
+        fun reach(share: Float) = min(radius * share, size.minDimension / 2 - 3 * starSide)
+        val swing = Random(BRANCH_SEED)
         val branchEnds = slots.map { slot ->
-            val out = slot - centre
-            val angle = atan2(out.y, out.x) + (random.nextFloat() - 0.5f) * BRANCH_SWING
-            centre + Offset(cos(angle), sin(angle)) * radius * BRANCH_REACH
+            val angle = slot.angleFrom(centre) + (swing.nextFloat() - 0.5f) * BRANCH_SWING
+            centre + Offset(cos(angle), sin(angle)) * reach(BRANCH_REACH)
         }
         val branches = Path().apply {
             slots.zip(branchEnds).forEach { (slot, end) ->
@@ -319,13 +320,19 @@ object SkyrimArt : ThemeArt {
                 lineTo(end.x, end.y)
             }
         }
-        val midpoints = slots.indices.map { i -> (slots[i] + slots[(i + 1) % slots.size]) / 2f }
-        val field = List(FIELD_STARS) {
-            val angle = random.nextFloat() * 2 * PI.toFloat()
-            val distance = radius * FIELD_REACH * sqrt(random.nextFloat())
-            centre + Offset(cos(angle), sin(angle)) * distance to random.nextFloat()
+        val sparkles = Path().apply {
+            branchEnds.forEach { addPath(sparkle(it, starSide * 1.6f)) }
+            slots.indices.forEach { i -> addPath(sparkle((slots[i] + slots[(i + 1) % slots.size]) / 2f, starSide * 1.6f)) }
         }
-        val starSide = 2.5.dp.toPx()
+        val sky = Random(FIELD_SEED)
+        val field = List(FIELD_STARS) {
+            val angle = sky.nextFloat() * 2 * PI.toFloat()
+            val distance = reach(FIELD_REACH) * sqrt(sky.nextFloat())
+            centre + Offset(cos(angle), sin(angle)) * distance to sky.nextFloat()
+        }
+        // Each slot a star, the app or folder on it at its heart: a glow round it and four thin rays, one pointing out.
+        val glows = slots.map { Brush.radialGradient(0f to colours.mark, 1f to Color.Transparent, center = it, radius = iconSize * STAR_GLOW) }
+        val rays = Path().apply { slots.forEach { addPath(sparkle(it, iconSize * STAR_RAYS, waist = 0.06f, angle = it.angleFrom(centre))) } }
         val nebulae = listOf(Offset(-0.35f, -0.25f) to SkillNebula, Offset(0.3f, 0.35f) to SkillNebulaDeep).map { (at, colour) ->
             val middle = centre + at * radius
             middle to Brush.radialGradient(0f to colour, 1f to Color.Transparent, center = middle, radius = radius * 0.95f)
@@ -333,21 +340,18 @@ object SkyrimArt : ThemeArt {
         return { glow, alpha ->
             if (alpha > 0f) {
                 nebulae.forEach { (middle, brush) -> drawCircle(brush, radius * 0.95f, middle, alpha = alpha) }
+                slots.zip(glows).forEach { (slot, brush) -> drawCircle(brush, iconSize * STAR_GLOW, slot, alpha = (0.3f + 0.2f * glow) * alpha) }
                 val ink = colours.starLine.copy(alpha = (colours.starLine.alpha + 0.3f * glow) * alpha)
                 clipPath(discs, ClipOp.Difference) {
                     field.forEach { (at, bright) -> drawCircle(colours.mark, starSide * (0.25f + 0.35f * bright), at, alpha = (0.2f + 0.4f * bright) * alpha) }
                     drawPath(lines, ink, style = line)
                     drawPath(branches, ink.copy(alpha = ink.alpha * 0.7f), style = line)
+                    drawPath(rays, colours.mark, alpha = 0.6f * alpha)
                 }
-                (branchEnds + midpoints).forEach { drawPath(sparkle(it, starSide * 1.6f), colours.mark, alpha = (0.7f + 0.3f * glow) * alpha) }
+                drawPath(sparkles, colours.mark, alpha = (0.7f + 0.3f * glow) * alpha)
             }
         }
     }
-
-    /** Each app on the ring a star: a glow with four rays, round the disc it sits on. */
-    @Composable
-    override fun iconGround(): Modifier =
-        if (LocalIconPlace.current == IconPlace.Ring) Modifier.starGlow().then(super.iconGround()) else super.iconGround()
 
     @Composable
     override fun folderWear(folder: RingItem.Folder): FolderWear = FolderWear(SHIELD_DISC, Modifier.shield())
@@ -673,7 +677,7 @@ private fun CacheDrawScope.hairlineTrack(
     iconSize: Float,
     colours: RingColors,
 ): DrawScope.(glow: Float, alpha: Float) -> Unit {
-        val track = Stroke(1.dp.toPx())
+    val track = Stroke(1.dp.toPx())
     val half = 3.dp.toPx()
     val studs = Path().apply {
         if (slots.size < 2) return@apply
@@ -699,32 +703,24 @@ private fun CacheDrawScope.hairlineTrack(
     }
 }
 
-/** A star of the skills menu at [center]: four rays, [half] from it to each tip, pinched in toward it to [waist] of that. */
-private fun sparkle(center: Offset, half: Float, waist: Float = 0.18f): Path {
-    val pinch = half * waist
+/**
+ * A star of the skills menu at [center]: four rays, [half] from it to each tip, the first at [angle], pinched in toward it
+ * to [waist] of that between them.
+ */
+private fun sparkle(center: Offset, half: Float, waist: Float = 0.18f, angle: Float = 0f): Path {
+    val along = Offset(cos(angle), sin(angle)) * half
+    val corners = listOf(along, Offset(-along.y, along.x), -along, Offset(along.y, -along.x))
     return Path().apply {
-        moveTo(center.x, center.y - half)
-        lineTo(center.x + pinch, center.y - pinch)
-        lineTo(center.x + half, center.y)
-        lineTo(center.x + pinch, center.y + pinch)
-        lineTo(center.x, center.y + half)
-        lineTo(center.x - pinch, center.y + pinch)
-        lineTo(center.x - half, center.y)
-        lineTo(center.x - pinch, center.y - pinch)
+        corners.forEachIndexed { i, tip ->
+            val pinch = center + (tip + corners[(i + 1) % 4]) * waist
+            if (i == 0) moveTo(center.x + tip.x, center.y + tip.y) else lineTo(center.x + tip.x, center.y + tip.y)
+            lineTo(pinch.x, pinch.y)
+        }
         close()
     }
 }
 
-/** A star's glow under an app on the ring: light fading out past the disc, and four rays reaching beyond it. */
-private fun Modifier.starGlow() = drawWithCache {
-    val reach = size.minDimension * STAR_GLOW
-    val glow = Brush.radialGradient(0f to SkillGlow, 0.45f to SkillGlow.copy(alpha = SkillGlow.alpha * 0.4f), 1f to Color.Transparent, center = size.center, radius = reach)
-    val rays = sparkle(size.center, size.minDimension * STAR_RAYS, waist = 0.06f)
-    onDrawBehind {
-        drawCircle(glow, reach)
-        drawPath(rays, SkillRay)
-    }
-}
+private fun Offset.angleFrom(centre: Offset) = atan2(y - centre.y, x - centre.x)
 
 /** A Nord's round shield: boards of two woods inside an iron rim set with rivets. */
 private fun Modifier.shield() = drawWithCache {

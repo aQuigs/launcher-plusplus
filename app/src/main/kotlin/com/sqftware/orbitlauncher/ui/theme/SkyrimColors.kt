@@ -65,11 +65,6 @@ val Snowflake = Snow
 val SnowEdge = Smoke.copy(alpha = 0.18f)
 val MistBank = Snow.copy(alpha = 0.16f)
 
-/**
- * The skills menu's sky round the ring: the glow under each app's star and its rays, cold white, and the blue and the
- * deeper violet of the nebula behind the constellation.
- */
-val SkillGlow = Color(0xFFD6E4FF).copy(alpha = 0.5f)
-val SkillRay = Color(0xFFEAF1FF).copy(alpha = 0.6f)
+/** The skills menu's sky round the ring: the blue and the deeper violet of the nebula behind the constellation. */
 val SkillNebula = Color(0xFF5D7FC8).copy(alpha = 0.16f)
 val SkillNebulaDeep = Color(0xFF7A62B8).copy(alpha = 0.12f)
