@@ -16,9 +16,9 @@ interface WorldMap {
     suspend fun paint(centre: LatLon, frame: MapFrame): PaintedMap<ImageBitmap>?
 }
 
-/** The world map drawn from map [tiles] with the theme's [art], as the Old School minimap is: only Old School has one. */
-class TiledWorldMap(tiles: MapTiles, art: MinimapArt) : WorldMap {
+/** The world map drawn from map [tiles] with the theme's [art] in its [style], as its minimap is. */
+class TiledWorldMap(tiles: MapTiles, art: MinimapArt, private val style: MapStyle) : WorldMap {
     private val maker = BitmapMapMaker(tiles, art)
 
-    override suspend fun paint(centre: LatLon, frame: MapFrame) = maker.paint(centre, frame, MapStyle.OldSchool)
+    override suspend fun paint(centre: LatLon, frame: MapFrame) = maker.paint(centre, frame, style)
 }

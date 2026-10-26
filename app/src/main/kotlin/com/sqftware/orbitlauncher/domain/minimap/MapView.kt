@@ -43,6 +43,9 @@ data class MapView(val centre: LatLon, val scale: Double, val width: Int, val he
     /** Where [at] shows, in screen pixels right of and below the middle. */
     fun onScreen(at: LatLon) = centre.shiftTo(at).let { MapShift(it.x * scale, it.y * scale) }
 
+    /** The place that shows [x] screen pixels right of the middle and [y] below it. */
+    fun at(x: Double, y: Double) = centre.shifted(MapShift(x / scale, y / scale))
+
     /**
      * Whether [painted] leaves too little ground past the view's edge, as the view pans or zooms out towards it, and the
      * next painting should be started round the view before the view reaches past it; with nothing painted, it should.

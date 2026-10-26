@@ -1,42 +1,29 @@
 package com.sqftware.orbitlauncher.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import com.sqftware.orbitlauncher.ui.theme.legible
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.zIndex
-import com.sqftware.orbitlauncher.domain.minimap.LatLon
-import com.sqftware.orbitlauncher.domain.minimap.bearingTo
-import com.sqftware.orbitlauncher.domain.minimap.shiftTo
-import com.sqftware.orbitlauncher.domain.minimap.WebMercator
-import com.sqftware.orbitlauncher.ui.theme.QuestGold
-import com.sqftware.orbitlauncher.ui.theme.QuestGoldEdge
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.clip
@@ -52,14 +39,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.DeviceFontFamilyName
@@ -73,10 +68,15 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.RingItem
-import com.sqftware.orbitlauncher.domain.turnBetween
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import com.sqftware.orbitlauncher.domain.minimap.WebMercator
+import com.sqftware.orbitlauncher.domain.minimap.bearingTo
+import com.sqftware.orbitlauncher.domain.minimap.shiftTo
+import com.sqftware.orbitlauncher.domain.turnBetween
 import com.sqftware.orbitlauncher.ui.theme.CompassLetter
 import com.sqftware.orbitlauncher.ui.theme.CompassLine
 import com.sqftware.orbitlauncher.ui.theme.CompassShade
@@ -88,6 +88,8 @@ import com.sqftware.orbitlauncher.ui.theme.LocalMapRim
 import com.sqftware.orbitlauncher.ui.theme.LocalMapVignette
 import com.sqftware.orbitlauncher.ui.theme.PlayerArrow
 import com.sqftware.orbitlauncher.ui.theme.PlayerArrowEdge
+import com.sqftware.orbitlauncher.ui.theme.QuestGold
+import com.sqftware.orbitlauncher.ui.theme.QuestGoldEdge
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.ShieldBoardDark
 import com.sqftware.orbitlauncher.ui.theme.ShieldBoardLight
@@ -95,13 +97,14 @@ import com.sqftware.orbitlauncher.ui.theme.ShieldIron
 import com.sqftware.orbitlauncher.ui.theme.ShieldRivet
 import com.sqftware.orbitlauncher.ui.theme.SkillNebula
 import com.sqftware.orbitlauncher.ui.theme.SkillNebulaDeep
+import com.sqftware.orbitlauncher.ui.theme.legible
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -179,6 +182,8 @@ private val Condensed = FontFamily(
  * bone hairlines, in a condensed type.
  */
 object SkyrimArt : ThemeArt {
+    override val worldMap: WorldMapArt = SkyrimWorldMap
+
     override val hintInk: Color
         @Composable get() = LocalMapInk
 
@@ -363,7 +368,7 @@ object SkyrimArt : ThemeArt {
     @Composable
     override fun HomeHeader(discovery: String?, modifier: Modifier) {
         Column(modifier.zIndex(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Compass()
+            Compass(opensWorldMap())
             Discovery(discovery)
         }
     }
@@ -426,7 +431,7 @@ private fun Compass(modifier: Modifier = Modifier) {
         modifier
             .fillMaxWidth(COMPASS_SPAN)
             .height(COMPASS_HEIGHT)
-            // Only decoration: the places it marks have no action, and the map's credit is in the launcher's menu.
+            // Read only as the way to the world map: the places it marks have no action, and the map's credit is in the launcher's menu.
             .clearAndSetSemantics {}
             .drawWithCache {
                 val letters = listOf("N", "E", "S", "W").map { measurer.measure(it, letterStyle) }
@@ -582,8 +587,21 @@ private fun Discovery(discovery: String?) {
     }
 }
 
+/** A tap that opens the world map round where the user is, once there is a map of it to open round. */
+@Composable
+private fun opensWorldMap(): Modifier {
+    val map = LocalMinimap.current
+    val open = LocalOpenWorldMap.current
+    val mapShown by remember { derivedStateOf { map() != null } }
+    return if (mapShown) {
+        Modifier.clickable(onClickLabel = "Open the world map", role = Role.Button, onClick = open).semantics { contentDescription = "World map" }
+    } else {
+        Modifier
+    }
+}
+
 /** [color] across the middle, fading out over the [fade] share of the width at each end. */
-private fun fadedAtEnds(color: Color, fade: Float) = Brush.horizontalGradient(0f to Color.Transparent, fade to color, 1 - fade to color, 1f to Color.Transparent)
+internal fun fadedAtEnds(color: Color, fade: Float) = Brush.horizontalGradient(0f to Color.Transparent, fade to color, 1 - fade to color, 1f to Color.Transparent)
 
 /**
  * Where [quest] lies from the middle of the map [painted], in its pixels east and south: where it is if the map reaches
@@ -599,7 +617,7 @@ private fun questSpot(painted: PaintedMap<ImageBitmap>, quest: LatLon): Offset {
 }
 
 /** The game's gold quest marker, [half] from its middle to its tip: the player's arrow, pointing down, built once to be drawn anywhere. */
-private class QuestMarker(val half: Float) {
+internal class QuestMarker(val half: Float) {
     private val shape = playerArrow(Offset.Zero, -half)
     private val edge = Stroke(half * 0.14f)
 
@@ -619,7 +637,7 @@ private fun bearingsOf(painted: PaintedMap<ImageBitmap>): FloatArray {
 }
 
 /** [image] drawn [side] pixels square around [center], scaled smoothly. */
-private fun DrawScope.drawIcon(image: ImageBitmap, center: Offset, side: Int, alpha: Float = 1f) = drawImage(
+internal fun DrawScope.drawIcon(image: ImageBitmap, center: Offset, side: Int, alpha: Float = 1f) = drawImage(
     image,
     dstOffset = IntOffset((center.x - side / 2f).roundToInt(), (center.y - side / 2f).roundToInt()),
     dstSize = IntSize(side, side),
@@ -628,7 +646,7 @@ private fun DrawScope.drawIcon(image: ImageBitmap, center: Offset, side: Int, al
 )
 
 /** The player's arrow on the local map, pointing up the way they face, [half] from its middle to its tip, notched at its tail. */
-private fun playerArrow(center: Offset, half: Float) = Path().apply {
+internal fun playerArrow(center: Offset, half: Float) = Path().apply {
     moveTo(center.x, center.y - half)
     lineTo(center.x + half * 0.7f, center.y + half * 0.8f)
     lineTo(center.x, center.y + half * 0.35f)

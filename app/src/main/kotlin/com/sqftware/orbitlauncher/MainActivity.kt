@@ -1,9 +1,5 @@
 package com.sqftware.orbitlauncher
 
-import com.sqftware.orbitlauncher.domain.turnedPast
-import kotlinx.coroutines.flow.runningReduce
-import com.sqftware.orbitlauncher.domain.easeHeading
-import com.sqftware.orbitlauncher.apps.SensorHeadingSource
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -16,18 +12,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
-import com.sqftware.orbitlauncher.apps.TiledWorldMap
-import com.sqftware.orbitlauncher.apps.WanderingMinimap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
@@ -35,6 +29,7 @@ import com.sqftware.orbitlauncher.apps.PlatformLocationSource
 import com.sqftware.orbitlauncher.apps.PlayAppUpdates
 import com.sqftware.orbitlauncher.apps.ResourceMinimapArt
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
+import com.sqftware.orbitlauncher.apps.SensorHeadingSource
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAmbientMotionStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppNamesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesAppSettingsStore
@@ -43,26 +38,28 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesDrawerStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesGridPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHomeOnReturnStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesJournalStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
-import com.sqftware.orbitlauncher.apps.SharedPreferencesJournalStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesSpinStatsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWhereIAmStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesWidgetPageStore
 import com.sqftware.orbitlauncher.apps.StatusBarNotificationShade
-import com.sqftware.orbitlauncher.apps.SystemToasts
 import com.sqftware.orbitlauncher.apps.SystemAppUsage
 import com.sqftware.orbitlauncher.apps.SystemDefaultAppFinder
 import com.sqftware.orbitlauncher.apps.SystemRelauncher
 import com.sqftware.orbitlauncher.apps.SystemRinger
+import com.sqftware.orbitlauncher.apps.SystemToasts
 import com.sqftware.orbitlauncher.apps.SystemWallClock
 import com.sqftware.orbitlauncher.apps.SystemWallpaper
 import com.sqftware.orbitlauncher.apps.SystemWidgetHost
+import com.sqftware.orbitlauncher.apps.TiledWorldMap
+import com.sqftware.orbitlauncher.apps.WanderingMinimap
 import com.sqftware.orbitlauncher.apps.WindowSystemBars
 import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
@@ -79,28 +76,31 @@ import com.sqftware.orbitlauncher.domain.RingPages
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WhereIAm
+import com.sqftware.orbitlauncher.domain.easeHeading
 import com.sqftware.orbitlauncher.domain.feats
-import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.domain.minimap.MADE_UP_TOUR
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import com.sqftware.orbitlauncher.domain.suggestSetup
+import com.sqftware.orbitlauncher.domain.turnedPast
 import com.sqftware.orbitlauncher.ui.AppActions
 import com.sqftware.orbitlauncher.ui.HomePress
 import com.sqftware.orbitlauncher.ui.LauncherScreen
 import com.sqftware.orbitlauncher.ui.PinRequest
 import com.sqftware.orbitlauncher.ui.Themed
 import com.sqftware.orbitlauncher.ui.WidgetActions
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.runningReduce
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.time.LocalDate
 
 private const val LEAVE_FOR_SETTINGS_MILLIS = 2_000L
 
@@ -505,7 +505,7 @@ class MainActivity : ComponentActivity() {
                         journal = it
                         journalStore.save(it)
                     },
-                    worldMaps = { TiledWorldMap(mapTiles, minimapArt) },
+                    worldMaps = { style -> TiledWorldMap(mapTiles, minimapArt, style) },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPages = widgetPages,

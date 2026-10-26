@@ -21,6 +21,13 @@ class MapViewTest {
     }
 
     @Test
+    fun aSpotOnTheScreenIsThePlaceThatShowsThere() {
+        val spot = view.onScreen(view.at(300.0, -200.0))
+        assertEquals(300.0, spot.x, 1e-6)
+        assertEquals(-200.0, spot.y, 1e-6)
+    }
+
+    @Test
     fun aZoomKeepsTheGroundUnderTheFingers() {
         // The fingers 300 px right of and 200 px above the middle, as the map goes from 4 to 6 screen pixels a map pixel.
         val under = view.centre.shifted(MapShift(300.0 / 4, -200.0 / 4))

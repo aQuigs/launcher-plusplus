@@ -63,7 +63,8 @@ private const val DECOR_TRIES = 4
 private const val DECOR_MIN_MAPPED = 5
 private val WOOD_CELL_PX = sqrt(60.0)
 private const val WOOD_FLOOR_SHARE = 0.3
-private const val ICON_SPACING_PX = 24.0
+/** How far apart a painting keeps its map icons, in its pixels. */
+internal const val ICON_SPACING_PX = 24.0
 
 /**
  * Paints the map of a [MapScene] in a [MapFrame], the minimap's disc or a stretch of the world map, at
@@ -75,7 +76,8 @@ private const val ICON_SPACING_PX = 24.0
 class MinimapPainter(private val sprites: MinimapSprites, private val style: MapStyle) {
     /**
      * The ground in [frame], opaque, clear outside a round frame's circle, and its icons: apart, for the user's map to
-     * keep upright as it turns, or in the ground of a map that never turns.
+     * keep upright as it turns and for Skyrim's to draw smoothly at a size of their own, or in the ground of the old
+     * game's world map.
      */
     fun paint(scene: MapScene, frame: MapFrame): PaintedMap<Pixels> = Painting(scene, sprites, frame, style).run()
 }
@@ -301,7 +303,8 @@ private class Painting(
         }
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
-        if (frame.followsUser) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
+        // The local map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
+        if (frame.followsUser || style == MapStyle.Skyrim) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
         icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
         return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
     }
