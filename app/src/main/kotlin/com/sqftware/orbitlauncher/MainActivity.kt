@@ -48,6 +48,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesJournalStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesSpinStatsStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesThemeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesUpdateCheckStore
@@ -155,6 +156,7 @@ class MainActivity : ComponentActivity() {
         val systemBars = WindowSystemBars(window)
         val relauncher = SystemRelauncher(this)
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
+        val journalStore = SharedPreferencesJournalStore(this)
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this, location)
@@ -231,6 +233,7 @@ class MainActivity : ComponentActivity() {
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
+                var journal by remember { mutableStateOf(journalStore.load()) }
                 var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
                 var pickTip by remember { mutableStateOf(pickTipStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
@@ -497,6 +500,11 @@ class MainActivity : ComponentActivity() {
                     minimap = readMinimap,
                     madeUpMap = readMadeUpMap,
                     heading = readHeading,
+                    journal = journal,
+                    onJournalChange = {
+                        journal = it
+                        journalStore.save(it)
+                    },
                     worldMaps = { TiledWorldMap(mapTiles, minimapArt) },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,

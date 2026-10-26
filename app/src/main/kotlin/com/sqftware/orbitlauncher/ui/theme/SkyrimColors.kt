@@ -36,8 +36,8 @@ val PlayerArrowEdge = Smoke.copy(alpha = 0.8f)
 val LocalMapInk = Snow
 
 /**
- * The compass along the top of the home page: the smoke its bar fades out of at both ends, its bone hairlines and
- * letters, and the shade under its marks so a mark reads over any wallpaper.
+ * The compass along the top of the home page: the smoke of its bar, its bone hairlines and letters, and the shade of its
+ * carved ends and under its marks, so a mark reads over any wallpaper.
  */
 val CompassSmoke = Smoke.copy(alpha = 0.55f)
 val CompassLine = Bone.copy(alpha = 0.85f)
@@ -49,3 +49,10 @@ val ShieldBoardDark = Color(0xFF4A3526)
 val ShieldBoardLight = Color(0xFF5E4431)
 val ShieldIron = Color(0xFF5C5E60)
 val ShieldRivet = Color(0xFFB4B6B8)
+
+/** The smoke behind a discovered place's name, dense enough to hide the clock it lies over. */
+val DiscoverySmoke = Smoke.copy(alpha = 0.92f)
+
+/** The gold of the quest marker on the compass and the map, edged so it holds on a pale roof. */
+val QuestGold = Color(0xFFE6BE5A)
+val QuestGoldEdge = Smoke.copy(alpha = 0.85f)

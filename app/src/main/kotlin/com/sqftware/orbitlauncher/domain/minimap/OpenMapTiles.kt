@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.domain.minimap
 
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.hypot
 
 /**
  * Turns OpenMapTiles vector tiles (https://openmaptiles.org/schema) into the [MapScene] a minimap draws. OpenMapTiles
@@ -10,8 +11,8 @@ import kotlin.math.floor
 object OpenMapTiles {
     const val ZOOM = 14
 
-    /** The layers the minimap draws from; the rest (names, house numbers, boundaries) are never decoded. */
-    val LAYERS = setOf("water", "landcover", "landuse", "transportation", "building", "poi")
+    /** The layers the minimap draws from, and names the place it is in from; the rest (house numbers, boundaries) are never decoded. */
+    val LAYERS = setOf("water", "landcover", "landuse", "transportation", "building", "poi", "place")
 
     /** The tags the rules read. */
     val KEYS = setOf("class", "subclass", "brunnel", "service", "layer", "level", "indoor", "ramp", "render_min_height", "name")
@@ -30,6 +31,8 @@ object OpenMapTiles {
         val ways = mutableListOf<Way>()
         val buildings = mutableListOf<Building>()
         val pois = mutableListOf<Poi>()
+        var place: String? = null
+        var placeDistance = Double.MAX_VALUE
 
         // In a fixed order, so what is placed first under a spacing rule never depends on which tile came in first.
         for ((id, tile) in tiles.entries.sortedWith(compareBy({ it.key.y }, { it.key.x }))) {
@@ -70,8 +73,22 @@ object OpenMapTiles {
                     if (abs(at.east) <= reach && abs(at.north) <= reach) poiOf(feature, at)?.let { pois += it }
                 }
             }
+            // A place is mapped as a point at its middle, and the tiles carry those well beyond their edges, so the
+            // nearest names the neighborhood or village the map is in.
+            tile["place"]?.let { layer ->
+                val placed = placed(id, layer)
+                for (feature in layer.features.filter { it.type == GeometryType.Point && it.string("class") in SETTLEMENTS }) {
+                    val name = feature.string("name") ?: continue
+                    val at = placed.local(feature.parts.firstOrNull()?.firstOrNull() ?: continue)
+                    val distance = hypot(at.east, at.north)
+                    if (distance < placeDistance) {
+                        place = name
+                        placeDistance = distance
+                    }
+                }
+            }
         }
-        return MapScene(centre, areas, ways, buildings, pois)
+        return MapScene(centre, areas, ways, buildings, pois, place = place)
     }
 
     /**
@@ -102,6 +119,9 @@ object OpenMapTiles {
     private class AreaRule(val ground: Ground, val order: Int, val woodland: Boolean = false, val builtUpOnly: Boolean = false)
 
     private val AREA_LAYERS = listOf("water", "landcover", "landuse", "transportation")
+
+    /** The places someone is in, from a city down to a neighborhood; a country or an island is too big to say where. */
+    private val SETTLEMENTS = setOf("city", "town", "village", "hamlet", "suburb", "quarter", "neighbourhood", "isolated_dwelling")
     private val GRASS = AreaRule(Ground.Grass, 0)
     private val LANDCOVER = mapOf(
         "grass" to GRASS, "farmland" to GRASS, "wetland" to GRASS,

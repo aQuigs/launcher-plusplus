@@ -5,10 +5,12 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.sqftware.orbitlauncher.domain.minimap.Journal
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import kotlinx.coroutines.delay
 import kotlin.math.cos
@@ -80,3 +82,9 @@ val LocalHeading = staticCompositionLocalOf<() -> Float?> { { null } }
 
 /** Opens the world map over the launcher, round where the minimap last placed the user. */
 val LocalOpenWorldMap = staticCompositionLocalOf<() -> Unit> { {} }
+
+/** The user's [journal] of their travels, and where a change to it goes. */
+class KeptJournal(val journal: Journal, val onChange: (Journal) -> Unit)
+
+/** The journal a theme that marks quests and discoveries reads and writes; it changes seldom, so only its readers recompose. */
+val LocalJournal = compositionLocalOf { KeptJournal(Journal()) {} }

@@ -136,6 +136,20 @@ class OpenMapTilesTest {
     }
 
     @Test
+    fun namesTheNearestSettlementEvenFarOffTheTileButNotACountry() {
+        val scene = scene(
+            "place" to listOf(
+                point(mapOf("class" to "country", "name" to "United States"), TilePoint(2049, 2049)),
+                point(mapOf("class" to "neighbourhood", "name" to "Midtown South"), TilePoint(2400, 2300)),
+                point(mapOf("class" to "quarter", "name" to "Midtown"), TilePoint(-900, 2048)),
+            ),
+        )
+
+        assertEquals("Midtown South", scene.place)
+        assertNull(scene().place)
+    }
+
+    @Test
     fun buildsBryantParkFromRealTiles() {
         val bryantPark = LatLon(40.7536, -73.9832)
         val tiles = OpenMapTiles.tilesFor(bryantPark, MapFrame.MINIMAP).associateWith { OpenMapTiles.decode(fixture("${it.z}-${it.x}-${it.y}.mvt")) }
@@ -146,6 +160,7 @@ class OpenMapTilesTest {
         assertTrue(scene.ways.any { it.kind == WayKind.Road })
         assertTrue(scene.pois.any { it.icon == MapIcon.Transportation })
         assertNull(scene.pois.firstOrNull { it.icon == null && !it.npc })
+        assertEquals("Midtown", scene.place)
     }
 
     private companion object {

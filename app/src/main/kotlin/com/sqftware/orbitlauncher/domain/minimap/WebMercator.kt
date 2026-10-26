@@ -2,12 +2,14 @@ package com.sqftware.orbitlauncher.domain.minimap
 
 import kotlin.math.PI
 import kotlin.math.atan
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.round
+import kotlin.math.sin
 import kotlin.math.tan
 
 data class LatLon(val lat: Double, val lon: Double)
@@ -57,6 +59,27 @@ object WebMercator {
         val from = toMercator(a)
         val to = toMercator(b)
         return hypot(to.x - from.x, to.y - from.y) * groundScale((a.lat + b.lat) / 2)
+    }
+
+    /** Ground meters east and north from [from] to [to], at the scale at [from], close enough for places a few kilometers apart. */
+    fun groundOffset(from: LatLon, to: LatLon): Local {
+        val a = toMercator(from)
+        val b = toMercator(to)
+        val scale = groundScale(from.lat)
+        return Local((b.x - a.x) * scale, (b.y - a.y) * scale)
+    }
+
+    /**
+     * Which way to set out from [from] to reach [to] by the shortest way round the Earth, in degrees clockwise from
+     * north, so a place across an ocean is pointed to as a compass would, not along the map's straight line.
+     */
+    fun bearing(from: LatLon, to: LatLon): Double {
+        val lat1 = Math.toRadians(from.lat)
+        val lat2 = Math.toRadians(to.lat)
+        val dLon = Math.toRadians(to.lon - from.lon)
+        val east = sin(dLon) * cos(lat2)
+        val north = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        return Math.toDegrees(atan2(east, north)).mod(360.0)
     }
 
     fun tileSize(z: Int) = 2 * HALF_WORLD_M / (1 shl z)

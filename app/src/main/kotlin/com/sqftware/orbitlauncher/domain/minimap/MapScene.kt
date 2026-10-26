@@ -42,7 +42,7 @@ enum class Dot { Npc, Player }
 /** Someone moving about the map at a spot, drawn as their [dot]. */
 data class Figure(val at: Local, val dot: Dot)
 
-/** Everything a minimap centred on [centre] draws, in ground metres around it. */
+/** Everything a minimap centred on [centre] draws, in ground metres around it, and the name of the [place] it is in, if known. */
 data class MapScene(
     val centre: LatLon,
     val areas: List<Area> = emptyList(),
@@ -50,4 +50,5 @@ data class MapScene(
     val buildings: List<Building> = emptyList(),
     val pois: List<Poi> = emptyList(),
     val figures: List<Figure> = emptyList(),
+    val place: String? = null,
 )

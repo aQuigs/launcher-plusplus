@@ -132,6 +132,7 @@ import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
+import com.sqftware.orbitlauncher.domain.minimap.Journal
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -158,6 +159,8 @@ object LauncherTags {
 const val AUTO_SET_UP = "Auto set up"
 const val SHOW_WHERE_I_AM = "Show where I am"
 const val MAP_DATA_CREDIT = "Map data © OpenStreetMap"
+const val MARK_QUEST = "Mark quest here"
+const val CLEAR_QUEST = "Clear quest marker"
 const val PICK_TIP = "Long-press the center to choose the ring's apps"
 
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
@@ -236,7 +239,7 @@ data class HomePress(val launcherInFront: Boolean)
  * closed, show the theme's own pick of the [folderLooks] and choose another of its looks ([onFolderLooksChange]), and
  * while trying it pick among its [colourways] ([onColourwaysChange]),
  * show whether what the theme moves on its own (the planets and the emblem, the gears) moves and flip it ([ambientMotion],
- * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed, each told in a toast, [onToast]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn,
+ * [onAmbientMotionChange]) and tell whether it moves in sight ([onAmbientInSightChange]), show whether the ring names its apps and flip it ([appNames], [onAppNamesChange]), show whether a drag round the ring spins it and flip it ([ringSpin], [onRingSpinChange]), show the [spinStats] that every spin of the ring or a folder adds to ([onSpin], which says what records it beat and milestones it passed, each told in a toast, [onToast]), show whether the launcher comes back on the home page and flip it ([homeOnReturn], [onHomeOnReturnChange]), show whether the launcher checks for its own updates and flip it ([onCheckForUpdatesChange]), show whether the minimap shows where the user is and flip it ([whereIAm], [onShowWhereIAmChange]) and open the licence of its data ([onOpenMapLicence]), with the [minimap], the [madeUpMap] shown without one, and the phone's [heading] read where they are drawn, keep the [journal] of the user's travels ([onJournalChange]),
  * offer the theme's scene, if it has one, and hand over how to draw it as the wallpaper ([onSetWallpaper]) once a dialog has asked,
  * restart the launcher ([onRestart]), and reset it ([onReset]) once a dialog has asked. The ring, the dock and folders
  * hold [pinnedShortcuts] as they hold apps; a [PinRequest] closes all that is open, as HOME in front does, and asks on
@@ -303,6 +306,8 @@ fun LauncherScreen(
     minimap: () -> PaintedMap<ImageBitmap>?,
     madeUpMap: () -> PaintedMap<ImageBitmap>?,
     heading: () -> Float?,
+    journal: Journal,
+    onJournalChange: (Journal) -> Unit,
     worldMaps: () -> WorldMap,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
@@ -401,6 +406,8 @@ fun LauncherScreen(
     val latestWhereIAm by rememberUpdatedState(whereIAm)
     val latestOnShowWhereIAmChange by rememberUpdatedState(onShowWhereIAmChange)
     val latestOnOpenMapLicence by rememberUpdatedState(onOpenMapLicence)
+    val latestJournal by rememberUpdatedState(journal)
+    val latestOnJournalChange by rememberUpdatedState(onJournalChange)
 
     // The open folder takes the ring over wherever it is kept, and is named by its place and slot, so Back reaches it
     // through this screen's BackHandler.
@@ -1210,6 +1217,11 @@ fun LauncherScreen(
                                 toggleRow(SHOW_WHERE_I_AM, latestWhereIAm == WhereIAm.Shown) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
                                 // The map shows its credit only for a moment, so the licence is always a tap away here.
                                 MenuRow(MAP_DATA_CREDIT) { latestOnOpenMapLicence() }.takeIf { latestTheme.mapsWhereIAm },
+                                minimap()?.takeIf { latestTheme.marksQuests }?.let { map ->
+                                    MenuRow(MARK_QUEST) { latestOnJournalChange(latestJournal.copy(quest = map.centre)) }
+                                },
+                                MenuRow(CLEAR_QUEST) { latestOnJournalChange(latestJournal.copy(quest = null)) }
+                                    .takeIf { latestTheme.marksQuests && latestJournal.quest != null },
                                 toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
                             listOf(
@@ -1338,6 +1350,7 @@ fun LauncherScreen(
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
+        LocalJournal provides KeptJournal(journal, onJournalChange),
         LocalOpenWorldMap provides openWorldMap,
     ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {

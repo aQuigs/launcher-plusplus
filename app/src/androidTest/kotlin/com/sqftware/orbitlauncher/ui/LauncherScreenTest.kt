@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.apps.WorldMap
+import com.sqftware.orbitlauncher.domain.minimap.Journal
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
@@ -179,6 +180,7 @@ class LauncherScreenTest {
     private var updatesOpened = 0
     private var checkForUpdates by mutableStateOf(true)
     private var whereIAm by mutableStateOf(WhereIAm.Hidden)
+    private var journal by mutableStateOf(Journal())
     private var shownMinimap by mutableStateOf<PaintedMap<ImageBitmap>?>(null)
     private data class WorldMapPaint(val centre: LatLon, val frame: MapFrame)
     private val worldMapPaints = mutableListOf<WorldMapPaint>()
@@ -331,6 +333,8 @@ class LauncherScreenTest {
             minimap = { shownMinimap },
             madeUpMap = { null },
             heading = { null },
+            journal = journal,
+            onJournalChange = { journal = it },
             worldMaps = { worldMap },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
@@ -2273,6 +2277,42 @@ class LauncherScreenTest {
         compose.runOnIdle { assertEquals(WhereIAm.Shown, whereIAm) }
         compose.longPressEmptyHomeSpace()
         compose.onNode(row).assertIsOn()
+    }
+
+    @Test
+    fun theLauncherMenuMarksAQuestWhereTheUserIsAndClearsIt() {
+        val bryantPark = LatLon(40.7536, -73.9832)
+        theme = Theme.Skyrim
+        whereIAm = WhereIAm.Shown
+        shownMinimap = PaintedMap(bryantPark, ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList())
+        show()
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText(CLEAR_QUEST).assertDoesNotExist()
+
+        compose.onNodeWithText(MARK_QUEST).performClick()
+
+        compose.runOnIdle { assertEquals(bryantPark, journal.quest) }
+        compose.longPressEmptyHomeSpace()
+        compose.onNodeWithText(CLEAR_QUEST).performClick()
+        compose.runOnIdle { assertEquals(null, journal.quest) }
+    }
+
+    @Test
+    fun skyrimNamesAPlaceTheFirstTimeTheUserComesToItAndTheJournalKeepsIt() {
+        val bryantPark = LatLon(40.7536, -73.9832)
+        theme = Theme.Skyrim
+        art = SkyrimArt
+        whereIAm = WhereIAm.Shown
+        journal = Journal(discovered = setOf("Kips Bay"))
+        shownMinimap = PaintedMap(bryantPark, ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList(), place = "Midtown")
+        show()
+
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("MIDTOWN").fetchSemanticsNodes().isNotEmpty() }
+        compose.runOnIdle { assertEquals(setOf("Kips Bay", "Midtown"), journal.discovered) }
+
+        shownMinimap = PaintedMap(bryantPark, ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList(), place = "Kips Bay")
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("MIDTOWN").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("KIPS BAY").assertDoesNotExist()
     }
 
     @Test

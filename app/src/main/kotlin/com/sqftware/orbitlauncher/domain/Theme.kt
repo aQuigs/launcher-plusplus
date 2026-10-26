@@ -56,6 +56,9 @@ enum class Theme(
 
     val mapsWhereIAm: Boolean get() = mapStyle != null
 
+    /** Whether the theme marks a quest the user sets on its compass, as the game's does. */
+    val marksQuests: Boolean get() = mapStyle == MapStyle.Skyrim
+
     /** Whether the user has a folder look to choose, which a theme with one has not. */
     val choosesFolderLook: Boolean get() = folderLooks.size > 1
 

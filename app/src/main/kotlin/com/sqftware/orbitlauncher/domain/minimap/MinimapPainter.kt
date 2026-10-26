@@ -301,7 +301,7 @@ private class Painting(
         }
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
-        if (frame.followsUser) return PaintedMap(scene.centre, Pixels(w, h, img), icons)
+        if (frame.followsUser) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
         icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
         return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
     }

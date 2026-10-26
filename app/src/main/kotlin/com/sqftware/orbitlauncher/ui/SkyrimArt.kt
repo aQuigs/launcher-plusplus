@@ -1,6 +1,28 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.zIndex
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.METRES_PER_PIXEL
+import com.sqftware.orbitlauncher.domain.minimap.WebMercator
+import com.sqftware.orbitlauncher.ui.theme.QuestGold
+import com.sqftware.orbitlauncher.ui.theme.QuestGoldEdge
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,6 +77,7 @@ import com.sqftware.orbitlauncher.ui.theme.CompassLetter
 import com.sqftware.orbitlauncher.ui.theme.CompassLine
 import com.sqftware.orbitlauncher.ui.theme.CompassShade
 import com.sqftware.orbitlauncher.ui.theme.CompassSmoke
+import com.sqftware.orbitlauncher.ui.theme.DiscoverySmoke
 import com.sqftware.orbitlauncher.ui.theme.LocalMapFog
 import com.sqftware.orbitlauncher.ui.theme.LocalMapInk
 import com.sqftware.orbitlauncher.ui.theme.LocalMapRim
@@ -84,10 +107,27 @@ private const val VIGNETTE_FROM = 0.6f
 /** How many degrees of the horizon the compass shows, from end to end: a little past the quarters either side, as the game's does. */
 private const val COMPASS_FIELD = 200f
 
-/** How tall the compass is, how wide its marks are drawn, and how much of the page's width it spans. */
-private val COMPASS_HEIGHT = 44.dp
+/**
+ * How tall the compass is, its bar as a share of that, how wide its marks are drawn, how much of the page's width it
+ * spans, and how wide each carved end is, as a share of the bar's height.
+ */
+private val COMPASS_HEIGHT = 52.dp
+private const val COMPASS_BAND = 0.5f
 private val COMPASS_MARK = 18.dp
-private const val COMPASS_SPAN = 0.86f
+private const val COMPASS_SPAN = 0.9f
+private const val COMPASS_END = 1.2f
+
+/** The quest marker, as a share of the compass bar's height, and on the map as a share of its radius. */
+private const val QUEST_ON_COMPASS = 0.45f
+private const val QUEST_ON_MAP = 0.11f
+
+/** How far out the map marks a quest beyond it, at its edge, as a share of its radius. */
+private const val QUEST_REACH = 0.8f
+
+/** How long a place's name takes to show when it is discovered, stays, and fades. */
+private const val DISCOVERY_IN_MILLIS = 800
+private const val DISCOVERY_HOLD_MILLIS = 3_500L
+private const val DISCOVERY_OUT_MILLIS = 1_200
 
 /** A shield's previews take its boss, its boards show around them, and so many rivets hold its rim. */
 private const val SHIELD_DISC = 0.64f
@@ -105,8 +145,8 @@ private val Condensed = FontFamily(
 /**
  * Skyrim: an homage to the northern game's interface, drawn by hand rather than from its files. The emblem is its local
  * map of where the user is, turned with the phone, with the player's arrow at its middle; the compass runs along the top
- * of the home page with the map's places marked on it; folders are round Nord shields; menus are smoke between bone
- * hairlines, in a condensed type.
+ * of the home page between carved ends, with the map's places and the user's quest marked on it, and names each place the
+ * user discovers below it; folders are round Nord shields; menus are smoke between bone hairlines, in a condensed type.
  */
 object SkyrimArt : ThemeArt {
     override val hintInk: Color
@@ -123,6 +163,7 @@ object SkyrimArt : ThemeArt {
         val madeUp = LocalMadeUpMap.current
         val shown = { map() ?: madeUp() }
         val heading = LocalHeading.current
+        val quest = LocalJournal.current.journal.quest
         val mapShown by remember { derivedStateOf { map() != null } }
         val creditAlpha = mapCreditAlpha(mapShown)
         val measurer = rememberTextMeasurer()
@@ -143,6 +184,7 @@ object SkyrimArt : ThemeArt {
                     val radius = size.emblemRadius
                     val iconSide = (2 * radius * MAP_ICON_SHARE).roundToInt()
                     forEachUprightIcon(painted, center, 2 * radius / MINIMAP_SIZE, heading() ?: 0f) { image, at -> drawIcon(image, at, iconSide) }
+                    if (map() != null) quest?.let { drawQuestOnMap(painted, it, radius, heading() ?: 0f) }
                 },
             )
             Spacer(
@@ -162,7 +204,7 @@ object SkyrimArt : ThemeArt {
                         MAP_CREDIT.replace(" ©", "\n©"),
                         creditStyle,
                         // Narrow enough that its lines fit inside the disc where they sit.
-                        constraints = Constraints(maxWidth = (radius * 0.9f).roundToInt()),
+                        constraints = Constraints(maxWidth = (radius * 1.2f).roundToInt()),
                     )
                     onDrawBehind {
                         drawCircle(vignette, radius)
@@ -171,7 +213,7 @@ object SkyrimArt : ThemeArt {
                             drawPath(arrow, PlayerArrowEdge, style = arrowEdge)
                         }
                         if (map() != null && creditAlpha.value > 0f) {
-                            drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + radius * 0.88f - credit.size.height), alpha = creditAlpha.value)
+                            drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + radius * 0.8f - credit.size.height), alpha = creditAlpha.value)
                         }
                         drawCircle(LocalMapRim.outer, radius - outer.width / 2, style = outer)
                         drawCircle(LocalMapRim.inner, radius - outer.width, style = inner)
@@ -243,8 +285,14 @@ object SkyrimArt : ThemeArt {
     /** Skyrim's panels are plain smoke. */
     override fun DrawScope.drawBackdrop(colour: Color, scrolled: Float) = Unit
 
+    /** The compass, and over what lies below it, the name of each place the user discovers. */
     @Composable
-    override fun HomeHeader(modifier: Modifier) = Compass(modifier)
+    override fun HomeHeader(modifier: Modifier) {
+        Column(modifier.zIndex(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Compass()
+            Discovery()
+        }
+    }
 
     @Composable
     override fun menuBox(ground: PanelGround): Modifier = hairlinedBox(ground)
@@ -284,16 +332,17 @@ private val SkyrimTypography = Typography().let { type ->
 }
 
 /**
- * The game's compass: a bar of smoke between bone hairlines that fades out at both ends, the quarters lettered on it and
- * the map's places marked at their bearings, sliding along it as the phone turns. It stays north up without a heading:
- * with no compass in the phone, or while "Show where I am" is off, as headings are read only for the map of where the
- * user is.
+ * The game's compass: a bar of smoke between bone hairlines and carved ends, the quarters lettered on it and the map's
+ * places marked at their bearings, with the user's quest in gold, sliding along it as the phone turns. It stays north up
+ * without a heading: with no compass in the phone, or while "Show where I am" is off, as headings are read only for the
+ * map of where the user is.
  */
 @Composable
-private fun Compass(modifier: Modifier) {
+private fun Compass(modifier: Modifier = Modifier) {
     val map = LocalMinimap.current
     val madeUp = LocalMadeUpMap.current
     val heading = LocalHeading.current
+    val quest = LocalJournal.current.journal.quest
     val measurer = rememberTextMeasurer()
     val letterStyle = MaterialTheme.typography.titleMedium.copy(color = CompassLetter, fontWeight = FontWeight.Medium)
     Spacer(
@@ -305,29 +354,40 @@ private fun Compass(modifier: Modifier) {
             .drawWithCache {
                 val letters = listOf("N", "E", "S", "W").map { measurer.measure(it, letterStyle) }
                 val northLetter = measurer.measure("N", letterStyle.copy(fontWeight = FontWeight.Bold))
-                val mid = size.height * 0.5f
-                val band = size.height * 0.62f
-                val reach = size.width / 2
+                val mid = size.height / 2
+                val band = size.height * COMPASS_BAND
+                val top = mid - band / 2
+                val bottom = mid + band / 2
+                val endWidth = band * COMPASS_END
+                // The marks run between the carved ends, fading as they reach them.
+                val reach = size.width / 2 - endWidth
                 val line = Stroke(1.dp.toPx())
                 val markSide = COMPASS_MARK.roundToPx()
                 val tick = 3.dp.toPx()
-                val fade = Brush.horizontalGradient(0f to Color.Transparent, 0.18f to CompassSmoke, 0.82f to CompassSmoke, 1f to Color.Transparent)
-                val hairline = Brush.horizontalGradient(0f to Color.Transparent, 0.12f to CompassLine, 0.88f to CompassLine, 1f to Color.Transparent)
-                val pointer = diamond(Offset(size.width / 2, mid - band / 2), tick * 1.4f, tick)
-                // A map's places' bearings, worked out once for each map rather than on each turn of the phone.
+                val end = compassEnd(endWidth, mid, band)
+                val pointer = diamond(Offset(size.width / 2, top), tick * 1.4f, tick)
+                // A map's places' bearings, and the quest's, worked out once for each map rather than on each turn of the phone.
                 var bearingsOf: PaintedMap<ImageBitmap>? = null
                 var bearings = FloatArray(0)
+                var questBearing: Float? = null
 
                 onDrawBehind {
-                    drawRect(fade, topLeft = Offset(0f, mid - band / 2), size = Size(size.width, band))
-                    drawLine(hairline, Offset(0f, mid - band / 2), Offset(size.width, mid - band / 2), line.width)
-                    drawLine(hairline, Offset(0f, mid + band / 2), Offset(size.width, mid + band / 2), line.width)
+                    val barStart = endWidth * 0.9f
+                    drawRect(CompassSmoke, topLeft = Offset(barStart, top), size = Size(size.width - 2 * barStart, band))
+                    drawLine(CompassLine, Offset(barStart, top), Offset(size.width - barStart, top), line.width)
+                    drawLine(CompassLine, Offset(barStart, bottom), Offset(size.width - barStart, bottom), line.width)
+                    for (side in listOf(1f, -1f)) {
+                        scale(side, 1f) {
+                            drawPath(end, CompassShade)
+                            drawPath(end, CompassLine, style = line)
+                        }
+                    }
                     drawPath(pointer, CompassLine)
 
                     val facing = heading() ?: 0f
                     // How far along the bar from its middle a bearing lies, from -1 to 1, or past that off the bar.
                     fun share(bearing: Float) = turnBetween(facing, bearing) / (COMPASS_FIELD / 2)
-                    fun x(share: Float) = size.width / 2 + share * reach * 0.92f
+                    fun x(share: Float) = size.width / 2 + share * reach
                     fun fading(share: Float) = 1f - abs(share).pow(4)
 
                     for (step in 0 until 8) {
@@ -345,6 +405,8 @@ private fun Compass(modifier: Modifier) {
                     if (painted !== bearingsOf) {
                         bearingsOf = painted
                         bearings = bearingsOf(painted)
+                        // Only a map of where the user is knows where they stand.
+                        questBearing = quest?.takeIf { painted === map() }?.let { WebMercator.bearing(painted.centre, it).toFloat() }
                     }
                     painted.icons.forEachIndexed { i, icon ->
                         val share = share(bearings[i])
@@ -353,9 +415,124 @@ private fun Compass(modifier: Modifier) {
                         drawCircle(CompassShade.copy(alpha = CompassShade.alpha * fading(share) * 0.5f), markSide * 0.55f, at)
                         drawIcon(icon.image, at, markSide, fading(share))
                     }
+                    questBearing?.let { bearing ->
+                        val share = share(bearing)
+                        if (abs(share) <= 1f) drawQuestMarker(Offset(x(share), mid), band * QUEST_ON_COMPASS, fading(share))
+                    }
                 }
             },
     )
+}
+
+/**
+ * The left of the compass's carved ends, [width] wide, round a bar [band] high at [mid]: a pointed jewel the bar ends in,
+ * held by a claw curling out above and below it, as the game's compass is. The right end is its mirror image.
+ */
+private fun compassEnd(width: Float, mid: Float, band: Float): Path {
+    val half = band / 2
+    return Path().apply {
+        moveTo(width * 0.02f, mid)
+        lineTo(width * 0.55f, mid - half * 0.8f)
+        lineTo(width, mid)
+        lineTo(width * 0.55f, mid + half * 0.8f)
+        close()
+        for (side in listOf(-1f, 1f)) {
+            val edge = mid + side * half
+            moveTo(width * 1.1f, edge)
+            cubicTo(width * 1.0f, edge + side * half * 0.9f, width * 0.55f, edge + side * half * 1.2f, width * 0.3f, edge + side * half * 0.9f)
+            cubicTo(width * 0.6f, edge + side * half * 0.6f, width * 0.75f, edge + side * half * 0.2f, width * 0.78f, edge)
+            close()
+        }
+    }
+}
+
+/**
+ * The name of each place the user comes to that the journal has not got, written large under the compass as the game
+ * names a place discovered, then fading; the journal keeps it, so the name shows only the first time.
+ */
+@Composable
+private fun Discovery() {
+    val map = LocalMinimap.current
+    val kept by rememberUpdatedState(LocalJournal.current)
+    val place by remember { derivedStateOf { map()?.place } }
+    var shown by remember { mutableStateOf<String?>(null) }
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(place) {
+        val journal = kept.journal.discovering(place) ?: return@LaunchedEffect
+        kept.onChange(journal)
+        shown = place
+        try {
+            alpha.snapTo(0f)
+            alpha.animateTo(1f, tween(DISCOVERY_IN_MILLIS))
+            delay(DISCOVERY_HOLD_MILLIS)
+            alpha.animateTo(0f, tween(DISCOVERY_OUT_MILLIS))
+        } finally {
+            shown = null
+        }
+    }
+    val name = shown ?: return
+    val type = MaterialTheme.typography
+    Column(
+        Modifier
+            .fillMaxWidth(COMPASS_SPAN)
+            // Over what lies below, rather than pushing it down for the moment the name shows.
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                layout(placeable.width, 0) { placeable.place(0, 0) }
+            }
+            .graphicsLayer { this.alpha = alpha.value }
+            .drawBehind {
+                drawRect(Brush.horizontalGradient(0f to Color.Transparent, 0.2f to DiscoverySmoke, 0.8f to DiscoverySmoke, 1f to Color.Transparent))
+            }
+            .padding(vertical = 10.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            name.uppercase(),
+            style = type.headlineMedium.copy(color = CompassLetter, letterSpacing = 0.12.em),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(
+            Modifier
+                .padding(vertical = 4.dp)
+                .fillMaxWidth(0.6f)
+                .height(7.dp)
+                .drawWithCache {
+                    val hairline = Brush.horizontalGradient(0f to Color.Transparent, 0.2f to CompassLine, 0.8f to CompassLine, 1f to Color.Transparent)
+                    val jewel = diamond(size.center, size.height * 0.9f, size.height / 2, 0f)
+                    onDrawBehind {
+                        drawLine(hairline, Offset(0f, center.y), Offset(size.width, center.y), 1.dp.toPx())
+                        drawPath(jewel, CompassLine)
+                    }
+                },
+        )
+        Text("DISCOVERED", style = type.titleSmall.copy(color = CompassLetter, letterSpacing = 0.3.em))
+    }
+}
+
+/** The quest marker at [quest] on the map [painted], [radius] round, turned with the phone's [heading]; at its edge if beyond it. */
+private fun DrawScope.drawQuestOnMap(painted: PaintedMap<ImageBitmap>, quest: LatLon, radius: Float, heading: Float) {
+    val offset = WebMercator.groundOffset(painted.centre, quest)
+    val scale = 2 * radius / MINIMAP_SIZE / METRES_PER_PIXEL.toFloat()
+    val turn = Math.toRadians(-heading.toDouble())
+    val cos = cos(turn).toFloat()
+    val sin = sin(turn).toFloat()
+    val dx = offset.east.toFloat() * scale
+    val dy = -offset.north.toFloat() * scale
+    var at = Offset(dx * cos - dy * sin, dx * sin + dy * cos)
+    val far = radius * QUEST_REACH
+    if (at.getDistance() > far) at *= far / at.getDistance()
+    val half = radius * QUEST_ON_MAP
+    // Its tip on the spot, as a pin's.
+    drawQuestMarker(center + at - Offset(0f, half), half)
+}
+
+/** The game's gold quest marker, [half] from its middle at [center] to its tip: the player's arrow, pointing down. */
+private fun DrawScope.drawQuestMarker(center: Offset, half: Float, alpha: Float = 1f) {
+    val marker = playerArrow(center, -half)
+    drawPath(marker, QuestGold, alpha = alpha)
+    drawPath(marker, QuestGoldEdge, alpha = alpha, style = Stroke(half * 0.14f))
 }
 
 /** The bearing of each of [painted]'s places from its middle, which the map is centered on, in degrees clockwise from north. */
