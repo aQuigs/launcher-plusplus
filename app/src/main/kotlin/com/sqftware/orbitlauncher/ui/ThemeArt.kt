@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.CardColour
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.MenuDefaults
@@ -230,6 +231,13 @@ interface ThemeArt {
     fun emblemBox(edge: Color): Modifier =
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
+    /**
+     * What the emblem hangs out among the ring's icons, for an emblem of a size: boxes around its center, which the
+     * ring spreads its icons around rather than over. By default nothing.
+     */
+    @Composable
+    fun emblemReach(): (Size) -> List<Bounds> = NoReach
+
     /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
     val foldersOpenRoundEmblem: Boolean
         get() = false
@@ -309,3 +317,5 @@ class FolderStyle(
 )
 
 val LocalFolderStyle = compositionLocalOf { FolderStyle(Theme.Space.folderLooks.first()) }
+
+private val NoReach: (Size) -> List<Bounds> = { emptyList() }

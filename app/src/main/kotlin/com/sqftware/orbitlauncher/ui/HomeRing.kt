@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.ClipOp
@@ -73,7 +74,10 @@ import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.RingArc
 import com.sqftware.orbitlauncher.domain.folderSlotOffset
+import com.sqftware.orbitlauncher.domain.freeArc
+import com.sqftware.orbitlauncher.domain.ringRadii
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
 import com.sqftware.orbitlauncher.domain.rooms
@@ -95,6 +99,9 @@ internal val RING_ICON_SIZE = 56.dp
 
 /** How far ring icons keep inside the ring's box: room for the unread badge's overhang, and a little air besides. */
 internal val RING_EDGE_MARGIN = BADGE_OVERHANG + 4.dp
+
+/** How far ring icons keep from what the emblem hangs past its disc. */
+private val REACH_AIR = 4.dp
 
 /** How far the ring's marks stop short of a name hanging across them. */
 private val NAME_HOLE_AIR = 4.dp
@@ -217,14 +224,31 @@ fun HomeRing(
     val slowTurn = turnAngle(turning, SLOW_TURN_MILLIS)
     val nameLine = hangingNameLine
     val nameWidths = rememberNameWidths()
+    val reach = art.emblemReach()
+    // What the emblem hangs past its disc on a box [width] by [height], as boxes around its center.
+    fun reachOn(width: Float, height: Float) = (min(width, height) * EMBLEM_FRACTION).let { reach(Size(it, it)) }
+    // The arc icons on a box [width] by [height] spread over, clear of what the emblem hangs past its disc however
+    // crowded the ring, with room for names if they show: so one serves every ring on the box, and measuring and
+    // drawing share it.
+    val arcs = remember(reach, names, nameLine, LocalDensity.current) { HashMap<Size, RingArc>() }
+    fun Density.arcOn(width: Float, height: Float): RingArc = arcs.getOrPut(Size(width, height)) {
+        val blocked = reachOn(width, height)
+        val drop = if (names) APP_LABEL_GAP.toPx() + 2 * nameLine.toPx() else 0f
+        if (blocked.isEmpty()) RingArc.Whole else freeArc(blocked, ringRadii(RING_ICON_SIZE.toPx(), min(width, height)), RING_ICON_SIZE.toPx(), REACH_AIR.toPx(), drop)
+    }
+    // Where the ring's slots, or the open [folder]'s, sit on a box [width] by [height].
+    fun Density.slotsOn(width: Float, height: Float, folder: Boolean): (Int, Int) -> Pair<Float, Float> {
+        val arc = arcOn(width, height)
+        return if (folder) ({ index, count -> folderSlotOffset(index, count, arc = arc) }) else ({ index, count -> ringSlotOffset(index, count, arc = arc) })
+    }
     // On a box [width] by [height], whose shorter side the ring takes, and whose longer reaches past it for the bottom name.
-    fun Density.namesOn(width: Float, height: Float, items: List<RingItem>, at: (Int, Int) -> Pair<Float, Float>): HangingNames? {
+    fun Density.namesOn(width: Float, height: Float, items: List<RingItem>, folder: Boolean): HangingNames? {
         if (!names) return null
         val widths = items.map { it.hangingName?.let(nameWidths) }
-        return HangingNames(APP_LABEL_GAP.toPx(), nameLine.toPx(), RING_NAME_AIR.toPx(), widths, at, (height - min(width, height)) / 2)
+        return HangingNames(APP_LABEL_GAP.toPx(), nameLine.toPx(), RING_NAME_AIR.toPx(), widths, slotsOn(width, height, folder), (height - min(width, height)) / 2, reachOn(width, height))
     }
-    fun Density.layoutOn(width: Float, height: Float, items: List<RingItem>, at: (Int, Int) -> Pair<Float, Float> = ::ringSlotOffset) =
-        ringLayout(RING_ICON_SIZE.toPx(), min(width, height), items.size, RING_EDGE_MARGIN.toPx(), namesOn(width, height, items, at))
+    fun Density.layoutOn(width: Float, height: Float, items: List<RingItem>, folder: Boolean = false) =
+        ringLayout(RING_ICON_SIZE.toPx(), min(width, height), items.size, RING_EDGE_MARGIN.toPx(), namesOn(width, height, items, folder), arcOn(width, height))
     // The room each item's name has, by its tag, which only measuring the ring tells, so the names read it from there.
     var rooms by remember { mutableStateOf(emptyMap<String, NameRoom>()) }
     fun nameRoom(item: RingItem): (() -> NameRoom?)? = if (names) ({ rooms[item.tag] }) else null
@@ -333,9 +357,10 @@ fun HomeRing(
             .fillMaxSize()
             // Cached, so the glow and the planet moving do not lay the ring out again every frame.
             .drawWithCache {
-                fun marksFor(items: List<RingItem>, slotOffset: (Int, Int) -> Pair<Float, Float>): DrawScope.(Float, Float) -> Unit {
+                fun marksFor(items: List<RingItem>, folder: Boolean): DrawScope.(Float, Float) -> Unit {
                     val count = items.size
-                    val (radius, iconSize) = layoutOn(size.width, size.height, items, slotOffset)
+                    val slotOffset = slotsOn(size.width, size.height, folder)
+                    val (radius, iconSize) = layoutOn(size.width, size.height, items, folder)
                     val slots = List(count) { index -> slotOffset(index, count).let { (dx, dy) -> size.center + Offset(dx, dy) * radius } }
                     return with(art) { ringMarks(size.center, slots, radius, iconSize, marks) }
                 }
@@ -343,6 +368,7 @@ fun HomeRing(
                 // The marks between icons run under the names that hang below them, so they stop short of each name,
                 // wherever the ring's spin has carried it.
                 fun nameHoles(items: List<RingItem>): ((Float) -> Path)? {
+                    val arc = arcOn(size.width, size.height)
                     val (radius, iconSize) = layoutOn(size.width, size.height, items)
                     val air = NAME_HOLE_AIR.toPx()
                     // From the icon's middle, which covers the marks anyway, so none show in the gap above the name.
@@ -360,7 +386,7 @@ fun HomeRing(
                         path.apply {
                             rewind()
                             holes.forEach { hole ->
-                                val (dx, dy) = ringSlotOffset(hole.index, items.size, turn.toDouble())
+                                val (dx, dy) = ringSlotOffset(hole.index, items.size, turn.toDouble(), arc)
                                 val slot = size.center + Offset(dx, dy) * radius
                                 addRoundRect(RoundRect(slot.x - hole.width / 2, slot.y, slot.x + hole.width / 2, slot.y + hole.depth, CornerRadius(air)))
                             }
@@ -369,8 +395,8 @@ fun HomeRing(
                 }
 
                 // An app on its way in from another place makes way for itself among the ring's.
-                val ringMarks = marksFor(making ?: ring) { index, count -> ringSlotOffset(index, count) }
-                val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> folderSlotOffset(index, count) } }
+                val ringMarks = marksFor(making ?: ring, folder = false)
+                val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App), folder = true) }
                 // In the order shown, which a drag rearranges, as the names are.
                 val nameHoles = if (names && centred == null) nameHoles(making ?: moving.shown(ring)) else null
                 onDrawBehind {
@@ -396,20 +422,21 @@ fun HomeRing(
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
-        val slotAt: (Int, Int) -> Pair<Float, Float> = { index, count -> if (openFolder != null) folderSlotOffset(index, count) else ringSlotOffset(index, count) }
-        val folderAt: (Int, Int) -> Pair<Float, Float> = { index, count -> folderSlotOffset(index, count) }
+        val arc = arcOn(boxWidth, boxHeight)
+        val ringAt = slotsOn(boxWidth, boxHeight, folder = false)
         // The ring's size follows the order its items are kept in, so it holds still while one is dragged round; only the
         // names follow where each is shown.
-        val laid = layoutOn(boxWidth, boxHeight, openFolder?.apps?.map(RingItem::App) ?: making ?: ring, slotAt)
+        val laidItems = openFolder?.apps?.map(RingItem::App) ?: making ?: ring
+        val laid = layoutOn(boxWidth, boxHeight, laidItems, folder = openFolder != null)
         val ringLaid = layoutOn(boxWidth, boxHeight, ring)
         val folderApps = centred?.apps.orEmpty().map(RingItem::App)
-        val folderLaid = layoutOn(boxWidth, boxHeight, folderApps, folderAt)
+        val folderLaid = layoutOn(boxWidth, boxHeight, folderApps, folder = true)
         if (names) {
             val shown = items.take(slots)
             val named = buildMap {
                 ring.zip(ringLaid.names).forEach { (item, room) -> put(item.tag, room) }
                 folderApps.zip(folderLaid.names).forEach { (item, room) -> put(item.tag, room) }
-                val slotRooms = namesOn(boxWidth, boxHeight, shown, slotAt)?.rooms(laid.iconSize, laid.radius, side).orEmpty()
+                val slotRooms = namesOn(boxWidth, boxHeight, shown, folder = openFolder != null)?.rooms(laid.iconSize, laid.radius, side).orEmpty()
                 shown.zip(slotRooms).forEach { (item, room) -> put(item.tag, room) }
             }
             // Read unobserved, so writing it does not measure the ring again.
@@ -446,12 +473,12 @@ fun HomeRing(
                 dockBounds != null -> coordinates?.let {
                     Offset((dockBounds.left + dockBounds.right) / 2, (dockBounds.top + dockBounds.bottom) / 2) - it.localToRoot(middle)
                 } ?: Offset.Zero
-                planetIndex >= 0 -> ringSlotOffset(planetIndex, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
+                planetIndex >= 0 -> ringAt(planetIndex, ring.size).let { (dx, dy) -> Offset(dx, dy) * ringRadius }
                 else -> Offset.Zero
             }
             val slotSize = dockBounds?.let { it.right - it.left } ?: ringIconSize
             val planetAt = middle + planetSlot * (1f - out)
-            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count, turn).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
+            fun slotAt(index: Int, count: Int, radius: Float) = ringSlotOffset(index, count, turn, arc).let { (dx, dy) -> middle + Offset(dx, dy) * radius }
 
             fun Placeable.placeAt(at: Offset, layer: (GraphicsLayerScope.() -> Unit)? = null) {
                 val x = (at.x - width / 2f).roundToInt()
@@ -461,7 +488,7 @@ fun HomeRing(
 
             // On its way out of the planet, [out] of the way: at 0 small and unseen at its heart, at 1 in [slot] of [count].
             fun Placeable.placeSpiralling(index: Int, count: Int, radius: Float, turn: Double) {
-                val (dx, dy) = folderSlotOffset(index, count, (1.0 - out) * SPIRAL + turn)
+                val (dx, dy) = folderSlotOffset(index, count, (1.0 - out) * SPIRAL + turn, arc)
                 placeAt(planetAt + Offset(dx, dy) * (radius * out)) {
                     scaleX = lerp(FOLDED_SCALE, 1f, out)
                     scaleY = scaleX

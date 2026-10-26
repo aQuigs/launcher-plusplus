@@ -170,7 +170,7 @@ class RingGeometryTest {
         sides.filter { it >= 200f }.forEach { side ->
             (1..24).forEach { count ->
                 listOf(::ringSlotOffset, ::folderSlotOffset).forEach { at ->
-                    val names = namesOf(count) { i, c -> at(i, c, 0.0) }
+                    val names = namesOf(count) { i, c -> at(i, c, 0.0, RingArc.Whole) }
                     val layout = ringLayout(fullSize, side, count, margin, names)
                     val boxes = shownBoxes(layout, names, count)
                     val slots = List(count) { names.at(it, count).let { (x, y) -> x * layout.radius to y * layout.radius } }
@@ -267,5 +267,99 @@ class RingGeometryTest {
         assertEquals(0f, restingTurn(0.4f), 0f)
         assertEquals(fullTurn, restingTurn(0.6f * fullTurn), 1e-5f)
         assertEquals(-2 * fullTurn, restingTurn(-2.3f * fullTurn), 1e-5f)
+    }
+
+    @Test
+    fun `a few slots on an arc keep the whole ring's spacing, centered on it`() {
+        val arc = RingArc(0.0, 1.5 * PI)
+        listOf(PI / 12, PI / 12 + 2 * PI / 3, PI / 12 + 4 * PI / 3).forEachIndexed { index, angle ->
+            assertEquals(angle, arc.angle(index, 3), 1e-9)
+        }
+        assertEquals(0.75 * PI, arc.angle(0, 1), 1e-9)
+    }
+
+    @Test
+    fun `more slots than fit at that spacing close up to fill the arc end to end`() {
+        val arc = RingArc(0.5 * PI, PI)
+        assertEquals(0.5 * PI, arc.angle(0, 7), 1e-9)
+        assertEquals(1.5 * PI, arc.angle(6, 7), 1e-9)
+        assertEquals(PI / 6, arc.step(7), 1e-9)
+    }
+
+    @Test
+    fun `a turn moves every slot on an arc alike`() {
+        val arc = RingArc(PI, PI)
+        assertOffset(ringSlotOffset(1, 2, arc = RingArc(PI + 0.3, PI)), ringSlotOffset(1, 2, 0.3, arc))
+    }
+
+    @Test
+    fun `an open folder on an arc spreads over it as the ring does`() {
+        val arc = RingArc(PI, PI)
+        (0 until 4).forEach { assertOffset(ringSlotOffset(it, 4, arc = arc), folderSlotOffset(it, 4, arc = arc)) }
+    }
+
+    @Test
+    fun `a crowded arc shrinks icons sooner than the whole ring`() {
+        val arc = RingArc(0.0, 1.5 * PI)
+        assertTrue(ringLayout(fullSize, phoneSide, 12, margin, arc = arc).iconSize < ringLayout(fullSize, phoneSide, 12, margin).iconSize)
+        assertEquals(ringLayout(fullSize, phoneSide, 4, margin), ringLayout(fullSize, phoneSide, 4, margin, arc = arc))
+    }
+
+    @Test
+    fun `the free arc is the whole ring when nothing is in the way`() {
+        assertEquals(RingArc.Whole, freeArc(emptyList(), 150f..150f, 60f, 4f))
+        assertEquals(RingArc.Whole, freeArc(listOf(Bounds(-200f, 200f, 200f, 300f)), 150f..150f, 60f, 4f))
+    }
+
+    private fun RingArc.holds(angle: Double): Boolean {
+        val turns = ((angle - from) % (2 * PI) + 2 * PI) % (2 * PI)
+        return turns <= sweep
+    }
+
+    @Test
+    fun `the free arc keeps clear at every radius the ring may take`() {
+        val box = Bounds(-170f, -20f, -110f, 40f)
+        val near = freeArc(listOf(box), 120f..120f, 60f, 4f)
+        val far = freeArc(listOf(box), 180f..180f, 60f, 4f)
+        val both = freeArc(listOf(box), 120f..180f, 60f, 4f)
+        assertTrue(both.sweep <= minOf(near.sweep, far.sweep))
+    }
+
+    @Test
+    fun `room for a name keeps the arc off a box just below an icon`() {
+        val box = Bounds(-170f, 40f, -130f, 70f)
+        val left = 1.5 * PI
+        assertTrue(freeArc(listOf(box), 150f..150f, 60f, 4f).holds(left))
+        assertFalse(freeArc(listOf(box), 150f..150f, 60f, 4f, drop = 30f).holds(left))
+    }
+
+    @Test
+    fun `a name stops short of a box beside it`() {
+        val wide = NameWidths(300f)
+        val open = HangingNames(4f, 16f, 4f, listOf(wide, null, null, null))
+        val boxed = open.copy(blocked = listOf(Bounds(50f, -240f, 80f, -200f)))
+        val alone = open.rooms(40f, 250f, 600f).first()
+        val beside = boxed.rooms(40f, 250f, 600f).first()
+        assertEquals(2 * (50f - 4f), beside.width, 1e-3f)
+        assertTrue(beside.width < alone.width)
+    }
+
+    @Test
+    fun `the free arc leaves room around a box on the ring's left`() {
+        val radius = 150f
+        val reach = 34f
+        val box = Bounds(-170f, -20f, -110f, 40f)
+        val arc = freeArc(listOf(box), radius..radius, 60f, 4f)
+        assertFalse(arc.whole)
+        fun clear(angle: Double): Boolean {
+            val x = radius * sin(angle).toFloat()
+            val y = -radius * kotlin.math.cos(angle).toFloat()
+            return hypot(maxOf(box.left - x, 0f, x - box.right), maxOf(box.top - y, 0f, y - box.bottom)) >= reach
+        }
+        (0..100).forEach { assertTrue("at $it%", clear(arc.from + arc.sweep * it / 100)) }
+        // Only what the box blocks is left out: the arc starts and ends within a degree of it.
+        val degree = PI / 180
+        assertFalse(clear(arc.from - degree))
+        assertFalse(clear(arc.from + arc.sweep + degree))
     }
 }

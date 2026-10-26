@@ -6,7 +6,8 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
  * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
  * [iconStyle] it gives each place, and, if it has a [mapStyle], a map of where the user is in that style once they turn
- * it on; one that [keepsJournal] marks the user's quest and names each place they discover.
+ * it on; one that [keepsJournal] marks the user's quest and names each place they discover, and one that [showsVitals]
+ * shows the phone's [Vitals].
  */
 enum class Theme(
     val label: String,
@@ -15,6 +16,7 @@ enum class Theme(
     private val iconStyles: (IconPlace) -> IconStyle = { IconStyle.Plain },
     val mapStyle: MapStyle? = null,
     val keepsJournal: Boolean = false,
+    val showsVitals: Boolean = false,
 ) {
     Space(
         "Space",
@@ -49,6 +51,7 @@ enum class Theme(
         // size down: as large as fits inside the orb's black with its outline.
         iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Ring) 22 else 26) },
         mapStyle = MapStyle.OldSchool,
+        showsVitals = true,
     ),
     Skyrim("Skyrim", listOf(FolderLook.Shield), listOf(Colourway.Nord), mapStyle = MapStyle.Skyrim, keepsJournal = true),
     ;
