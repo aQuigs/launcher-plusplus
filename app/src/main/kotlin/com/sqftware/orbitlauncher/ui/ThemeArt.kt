@@ -126,9 +126,12 @@ interface ThemeArt {
     @Composable
     fun BadgeFace(unread: Unread, modifier: Modifier) = BubbleBadge(unread, modifier)
 
-    /** What the theme shows along the top of the home page, over the clock: by default nothing. */
+    /**
+     * What the theme shows along the top of the home page, over the clock, with the name of the place the user has just
+     * discovered while one is to be shown, its [discovery]: by default nothing.
+     */
     @Composable
-    fun HomeHeader(modifier: Modifier) = Unit
+    fun HomeHeader(discovery: String?, modifier: Modifier) = Unit
 
     /** The home clock's [time], one line, tapped through [modifier]: by default in the scheme's largest light type. */
     @Composable

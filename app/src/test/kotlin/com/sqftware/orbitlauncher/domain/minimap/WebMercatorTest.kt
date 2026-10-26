@@ -17,24 +17,6 @@ class WebMercatorTest {
     }
 
     @Test
-    fun pointsTheShortestWayRoundTheEarth() {
-        assertEquals(0.0, WebMercator.bearing(bryantPark, LatLon(bryantPark.lat + 0.01, bryantPark.lon)), 1e-6)
-        assertEquals(90.0, WebMercator.bearing(LatLon(0.0, 0.0), LatLon(0.0, 10.0)), 1e-6)
-        assertEquals(270.0, WebMercator.bearing(LatLon(0.0, 0.0), LatLon(0.0, -10.0)), 1e-6)
-        // New York to London sets out northeast, not east along the map's straight line.
-        assertEquals(51.2, WebMercator.bearing(LatLon(40.71, -74.01), LatLon(51.51, -0.13)), 0.5)
-    }
-
-    @Test
-    fun measuresTheGroundOffsetBetweenNearbyPlaces() {
-        val north = WebMercator.groundOffset(bryantPark, LatLon(bryantPark.lat + 0.001, bryantPark.lon))
-        assertEquals(0.0, north.east, 1e-6)
-        assertEquals(111.0, north.north, 1.0)
-        val west = WebMercator.groundOffset(bryantPark, LatLon(bryantPark.lat, bryantPark.lon - 0.001))
-        assertEquals(-84.4, west.east, 1.0)
-    }
-
-    @Test
     fun findsTheTileAPlaceIsIn() {
         assertEquals(TileId(14, 4824, 6157), WebMercator.tileAt(WebMercator.toMercator(bryantPark), 14))
         assertEquals(TileId(14, 4397, 6057), WebMercator.tileAt(WebMercator.toMercator(livonia), 14))

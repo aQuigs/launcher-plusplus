@@ -6,7 +6,7 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
  * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
  * [iconStyle] it gives each place, and, if it has a [mapStyle], a map of where the user is in that style once they turn
- * it on.
+ * it on; one that [keepsJournal] marks the user's quest and names each place they discover.
  */
 enum class Theme(
     val label: String,
@@ -14,6 +14,7 @@ enum class Theme(
     val colourways: List<Colourway>,
     private val iconStyles: (IconPlace) -> IconStyle = { IconStyle.Plain },
     val mapStyle: MapStyle? = null,
+    val keepsJournal: Boolean = false,
 ) {
     Space(
         "Space",
@@ -49,15 +50,12 @@ enum class Theme(
         iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Ring) 22 else 26) },
         mapStyle = MapStyle.OldSchool,
     ),
-    Skyrim("Skyrim", listOf(FolderLook.Shield), listOf(Colourway.Nord), mapStyle = MapStyle.Skyrim),
+    Skyrim("Skyrim", listOf(FolderLook.Shield), listOf(Colourway.Nord), mapStyle = MapStyle.Skyrim, keepsJournal = true),
     ;
 
     fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)
 
     val mapsWhereIAm: Boolean get() = mapStyle != null
-
-    /** Whether the theme marks a quest the user sets on its compass, as the game's does. */
-    val marksQuests: Boolean get() = mapStyle == MapStyle.Skyrim
 
     /** Whether the user has a folder look to choose, which a theme with one has not. */
     val choosesFolderLook: Boolean get() = folderLooks.size > 1

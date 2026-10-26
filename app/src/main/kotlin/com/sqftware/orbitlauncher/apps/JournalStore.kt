@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.sqftware.orbitlauncher.domain.minimap.Journal
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
@@ -26,14 +25,11 @@ class SharedPreferencesJournalStore(context: Context) : JournalStore {
             remove(QUEST_LAT)
             remove(QUEST_LON)
         } else {
-            putLong(QUEST_LAT, quest.lat.toRawBits())
-            putLong(QUEST_LON, quest.lon.toRawBits())
+            putDouble(QUEST_LAT, quest.lat)
+            putDouble(QUEST_LON, quest.lon)
         }
         putStringSet(DISCOVERED, journal.discovered)
     }
-
-    // Preferences hold no doubles, and a float puts a spot meters off.
-    private fun SharedPreferences.getDouble(key: String) = Double.fromBits(getLong(key, 0))
 
     private companion object {
         const val QUEST_LAT = "quest_lat"

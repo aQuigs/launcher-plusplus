@@ -31,8 +31,7 @@ object OpenMapTiles {
         val ways = mutableListOf<Way>()
         val buildings = mutableListOf<Building>()
         val pois = mutableListOf<Poi>()
-        var place: String? = null
-        var placeDistance = Double.MAX_VALUE
+        val places = mutableListOf<Pair<Place, Local>>()
 
         // In a fixed order, so what is placed first under a spacing rule never depends on which tile came in first.
         for ((id, tile) in tiles.entries.sortedWith(compareBy({ it.key.y }, { it.key.x }))) {
@@ -73,21 +72,18 @@ object OpenMapTiles {
                     if (abs(at.east) <= reach && abs(at.north) <= reach) poiOf(feature, at)?.let { pois += it }
                 }
             }
-            // A place is mapped as a point at its middle, and the tiles carry those well beyond their edges, so the
-            // nearest names the neighborhood or village the map is in.
+            // The tiles carry places' points well beyond their edges, so the nearest names the neighborhood or village the
+            // map is in.
             tile["place"]?.let { layer ->
                 val placed = placed(id, layer)
                 for (feature in layer.features.filter { it.type == GeometryType.Point && it.string("class") in SETTLEMENTS }) {
                     val name = feature.string("name") ?: continue
-                    val at = placed.local(feature.parts.firstOrNull()?.firstOrNull() ?: continue)
-                    val distance = hypot(at.east, at.north)
-                    if (distance < placeDistance) {
-                        place = name
-                        placeDistance = distance
-                    }
+                    val point = feature.parts.firstOrNull()?.firstOrNull() ?: continue
+                    places += Place(name, WebMercator.toLatLon(placed.mercator(point))) to placed.local(point)
                 }
             }
         }
+        val place = places.minByOrNull { (_, at) -> hypot(at.east, at.north) }?.first
         return MapScene(centre, areas, ways, buildings, pois, place = place)
     }
 

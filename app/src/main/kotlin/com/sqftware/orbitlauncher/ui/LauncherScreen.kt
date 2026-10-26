@@ -160,6 +160,9 @@ const val AUTO_SET_UP = "Auto set up"
 const val SHOW_WHERE_I_AM = "Show where I am"
 const val MAP_DATA_CREDIT = "Map data © OpenStreetMap"
 const val MARK_QUEST = "Mark quest here"
+
+/** How long a place the user discovers is named before it fades. */
+private const val DISCOVERY_MILLIS = 4_500L
 const val CLEAR_QUEST = "Clear quest marker"
 const val PICK_TIP = "Long-press the center to choose the ring's apps"
 
@@ -607,6 +610,21 @@ fun LauncherScreen(
     LaunchedEffect(ambient) { latestOnAmbientInSightChange(ambient) }
     val skyTurns = ambient && folderLook.moves(folders = (ring + shownDock).any { it is RingItem.Folder }, planets = planets.values)
     val sky = rememberUpdatedState(turnAngle(skyTurns, FOLDER_SKY_TURN_MILLIS))
+    // A place the journal has not got is named over the home page while the user can see it, and kept only once it has
+    // been shown, so a place reached with the drawer open or on another page waits until home is back in sight.
+    val place by remember { derivedStateOf { minimap()?.place } }
+    val discovering = theme.keepsJournal && ringInSight && settled == LauncherPage.Home && !previewing && !switchShown
+    var discovery by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(place, discovering) {
+        val found = place?.takeIf { discovering && latestJournal.discovering(it) != null } ?: return@LaunchedEffect
+        discovery = found.name
+        try {
+            delay(DISCOVERY_MILLIS)
+            latestJournal.discovering(found)?.let(latestOnJournalChange)
+        } finally {
+            discovery = null
+        }
+    }
     // The menu is a focusable popup window, so Back reaches its onDismissRequest before this screen's BackHandler.
     var openMenu by remember { mutableStateOf<OpenMenu?>(null) }
     var openingMenu by remember { mutableStateOf<Job?>(null) }
@@ -1217,11 +1235,11 @@ fun LauncherScreen(
                                 toggleRow(SHOW_WHERE_I_AM, latestWhereIAm == WhereIAm.Shown) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
                                 // The map shows its credit only for a moment, so the licence is always a tap away here.
                                 MenuRow(MAP_DATA_CREDIT) { latestOnOpenMapLicence() }.takeIf { latestTheme.mapsWhereIAm },
-                                minimap()?.takeIf { latestTheme.marksQuests }?.let { map ->
+                                minimap()?.takeIf { latestTheme.keepsJournal }?.let { map ->
                                     MenuRow(MARK_QUEST) { latestOnJournalChange(latestJournal.copy(quest = map.centre)) }
                                 },
                                 MenuRow(CLEAR_QUEST) { latestOnJournalChange(latestJournal.copy(quest = null)) }
-                                    .takeIf { latestTheme.marksQuests && latestJournal.quest != null },
+                                    .takeIf { latestTheme.keepsJournal && latestJournal.quest != null },
                                 toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
                             listOf(
@@ -1350,7 +1368,7 @@ fun LauncherScreen(
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
-        LocalJournal provides KeptJournal(journal, onJournalChange),
+        LocalQuest provides journal.quest,
         LocalOpenWorldMap provides openWorldMap,
     ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
@@ -1602,7 +1620,7 @@ fun LauncherScreen(
                                                         ) {
                                                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = clockShade }) {
                                                                 // In the clock's room, so the preview bar and the reorder switch take its place as they take the clock's.
-                                                                LocalThemeArt.current.HomeHeader(Modifier.padding(top = 12.dp))
+                                                                LocalThemeArt.current.HomeHeader(discovery, Modifier.padding(top = 12.dp))
                                                                 HomeClock(
                                                                     face = clock,
                                                                     onTimeClick = onOpenClock,

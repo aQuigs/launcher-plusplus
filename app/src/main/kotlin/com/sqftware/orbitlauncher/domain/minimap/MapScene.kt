@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
+import kotlin.math.roundToLong
+
 /** A point in ground metres east and north of the map's centre. */
 data class Local(val east: Double, val north: Double)
 
@@ -42,7 +44,17 @@ enum class Dot { Npc, Player }
 /** Someone moving about the map at a spot, drawn as their [dot]. */
 data class Figure(val at: Local, val dot: Dot)
 
-/** Everything a minimap centred on [centre] draws, in ground metres around it, and the name of the [place] it is in, if known. */
+/**
+ * A named place, a neighborhood or a village, mapped as a point at its middle, [at]. Its [key] is its name and that point
+ * to about a kilometer, so two places of one name in different towns are told apart, while the one point that two tiles
+ * each place a little differently is still one place.
+ */
+data class Place(val name: String, val at: LatLon) {
+    val key: String
+        get() = "$name@${(at.lat * 100).roundToLong()},${(at.lon * 100).roundToLong()}"
+}
+
+/** Everything a minimap centred on [centre] draws, in ground metres around it, and the [place] it is in, if known. */
 data class MapScene(
     val centre: LatLon,
     val areas: List<Area> = emptyList(),
@@ -50,5 +62,5 @@ data class MapScene(
     val buildings: List<Building> = emptyList(),
     val pois: List<Poi> = emptyList(),
     val figures: List<Figure> = emptyList(),
-    val place: String? = null,
+    val place: Place? = null,
 )

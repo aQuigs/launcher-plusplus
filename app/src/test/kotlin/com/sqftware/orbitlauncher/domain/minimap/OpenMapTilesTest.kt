@@ -145,7 +145,7 @@ class OpenMapTilesTest {
             ),
         )
 
-        assertEquals("Midtown South", scene.place)
+        assertEquals("Midtown South", scene.place?.name)
         assertNull(scene().place)
     }
 
@@ -160,7 +160,7 @@ class OpenMapTilesTest {
         assertTrue(scene.ways.any { it.kind == WayKind.Road })
         assertTrue(scene.pois.any { it.icon == MapIcon.Transportation })
         assertNull(scene.pois.firstOrNull { it.icon == null && !it.npc })
-        assertEquals("Midtown", scene.place)
+        assertEquals("Midtown", scene.place?.name)
     }
 
     private companion object {
