@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
                 var journal by remember { mutableStateOf(journalStore.load()) }
-                val trails by trailRecorder.trails.collectAsStateWithLifecycle()
+                val trails = trailRecorder.trails.collectAsStateWithLifecycle()
                 var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
                 var pickTip by remember { mutableStateOf(pickTipStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
@@ -510,8 +510,17 @@ class MainActivity : ComponentActivity() {
                         journalStore.save(it)
                     },
                     worldMaps = { style -> TiledWorldMap(mapTiles, minimapArt, style) },
-                    trails = trails,
-                    onLogTrail = { if (it) trailRecorder.start() else trailRecorder.stop() },
+                    trails = { trails.value },
+                    onLogTrail = { on ->
+                        when {
+                            !on -> trailRecorder.stop()
+                            location.isPrecise() -> trailRecorder.start()
+                            else -> {
+                                toasts.show("A trail needs precise location")
+                                location.request()
+                            }
+                        }
+                    },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPages = widgetPages,

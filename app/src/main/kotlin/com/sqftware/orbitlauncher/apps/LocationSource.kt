@@ -19,14 +19,20 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
-import java.util.concurrent.Executor
 
 interface LocationSource {
     /** Whether the user lets the launcher know roughly where they are. */
     fun isGranted(): Boolean
 
-    /** Asks the user for it; the answer comes on [answers]. */
+    /** Whether the user lets the launcher know precisely where they are, as a trail needs. */
+    fun isPrecise(): Boolean
+
+    /** Asks the user for it, precisely if they will; the answer comes on [answers]. */
     fun request()
 
     /** Each answer to a [request]: whether the user granted it. */
@@ -70,6 +76,9 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
     override fun isGranted() =
         context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
+    override fun isPrecise() =
+        context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
     // Android asks for precise location only alongside approximate, so the user can still choose either.
     override fun request() = dialog.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
 
@@ -85,47 +94,66 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
         }
     }
 
-    override fun locations(): Flow<LatLon> = callbackFlow {
-        val provider = manager.bestProvider()
-        if (!isGranted() || provider == null) {
-            close()
-            return@callbackFlow
-        }
-        val executor = Executor { it.run() }
-        val send = { location: Location? -> location?.let { trySend(LatLon(it.latitude, it.longitude)) } }
-        val listener = LocationListenerCompat { send(it) }
+    override fun locations(): Flow<LatLon> = flow {
+        val provider = manager.firstEnabled(cheapProviders())
+        if (!isGranted() || provider == null) return@flow
+        val request = LocationRequestCompat.Builder(UPDATE_MILLIS)
+            .setMinUpdateDistanceMeters(UPDATE_METRES)
+            .setQuality(LocationRequestCompat.QUALITY_BALANCED_POWER_ACCURACY)
+            .build()
+        emitAll(merge(firstFix(provider), manager.updates(provider, request)).map { LatLon(it.latitude, it.longitude) })
+    }.conflate()
+
+    // The last fix if it is fresh, or else one current fix.
+    private fun firstFix(provider: String): Flow<Location> = callbackFlow {
         val cancel = CancellationSignal()
         try {
             val last = manager.getLastKnownLocation(provider)?.takeIf { System.currentTimeMillis() - it.time < FRESH_MILLIS }
-            if (last != null) send(last) else LocationManagerCompat.getCurrentLocation(manager, provider, cancel, executor) { send(it) }
-            val request = LocationRequestCompat.Builder(UPDATE_MILLIS)
-                .setMinUpdateDistanceMeters(UPDATE_METRES)
-                .setQuality(LocationRequestCompat.QUALITY_BALANCED_POWER_ACCURACY)
-                .build()
-            LocationManagerCompat.requestLocationUpdates(manager, provider, request, executor, listener)
+            if (last != null) {
+                send(last)
+                close()
+            } else {
+                LocationManagerCompat.getCurrentLocation(manager, provider, cancel, Runnable::run) { fix ->
+                    fix?.let(::trySend)
+                    close()
+                }
+            }
         } catch (e: SecurityException) {
-            // Revoked between the check and the request: the map simply stops.
             Log.w(TAG, "Location access was revoked", e)
             close()
         }
-        awaitClose {
-            cancel.cancel()
-            try {
-                LocationManagerCompat.removeUpdates(manager, listener)
-            } catch (e: SecurityException) {
-                Log.w(TAG, "Location access was revoked", e)
-            }
-        }
-    }.conflate()
-}
+        awaitClose { cancel.cancel() }
+    }
 
-// The fused provider, on Android 12 and up, mixes GPS, Wi-Fi and cell fixes as a request's quality asks; the network
-// provider, before it, gives the cheap ones. GPS is the fallback where neither is on.
-internal fun LocationManager.bestProvider(): String? {
-    val candidates = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    // The fused provider, on Android 12 and up, mixes in Wi-Fi and cell fixes for the least power; the network provider
+    // does the same before it. GPS is the fallback where neither is on.
+    private fun cheapProviders() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
     } else {
         listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
     }
-    return candidates.firstOrNull { it in allProviders && isProviderEnabled(it) }
+}
+
+/** The first of [candidates] the phone has and has turned on. */
+internal fun LocationManager.firstEnabled(candidates: List<String>) = candidates.firstOrNull { it in allProviders && isProviderEnabled(it) }
+
+/**
+ * Each fix [provider] gives as [request] asks, for as long as it is collected. It ends at once if location access was
+ * revoked before it could ask.
+ */
+internal fun LocationManager.updates(provider: String, request: LocationRequestCompat): Flow<Location> = callbackFlow {
+    val listener = LocationListenerCompat { trySend(it) }
+    try {
+        LocationManagerCompat.requestLocationUpdates(this@updates, provider, request, Runnable::run, listener)
+    } catch (e: SecurityException) {
+        Log.w(TAG, "Location access was revoked", e)
+        close()
+    }
+    awaitClose {
+        try {
+            LocationManagerCompat.removeUpdates(this@updates, listener)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Location access was revoked", e)
+        }
+    }
 }

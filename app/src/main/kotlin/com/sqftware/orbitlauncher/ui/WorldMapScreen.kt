@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
@@ -44,11 +47,13 @@ import androidx.compose.ui.unit.round
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.minimap.PaintedSpan
+import com.sqftware.orbitlauncher.domain.minimap.Trail
 import com.sqftware.orbitlauncher.domain.minimap.Trails
 import com.sqftware.orbitlauncher.domain.minimap.ZoomSteps
 import com.sqftware.orbitlauncher.domain.minimap.paintRetryDelay
@@ -81,12 +86,12 @@ interface WorldMapArt {
     @Composable
     fun YouAreHere(at: LatLon, view: () -> MapView)
 
-    /** Draws a trail the user logged, through [points] on the screen in the order they went, a game pixel being [gamePixel]. */
-    fun DrawScope.drawTrail(points: List<Offset>, gamePixel: Int)
+    /** Draws a trail the user logged along [path] on the screen, a game pixel being [gamePixel]. */
+    fun DrawScope.drawTrail(path: Path, gamePixel: Int)
 
-    /** What starts logging a trail with [onLog] true or, while [logging], stops it. */
+    /** A button on the map showing [glyph], read as [label], that [onClick]s. */
     @Composable
-    fun LogTrail(logging: Boolean, onLog: (Boolean) -> Unit, modifier: Modifier)
+    fun MapButton(glyph: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier)
 
     /** What the theme lays over the map in the [view], still unless [moving]: by default nothing. */
     @Composable
@@ -101,9 +106,8 @@ interface WorldMapArt {
     fun Close(onClose: () -> Unit, modifier: Modifier)
 }
 
-/** A line through [points], for a theme's art to draw a trail along. */
-internal fun trailPath(points: List<Offset>) = Path().apply {
-    points.forEachIndexed { i, it -> if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) }
+private fun MapView.trailPath(trail: Trail) = Path().apply {
+    trail.forEachIndexed { i, at -> spot(at).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }
 }
 
 /** Where [at] shows on the screen, from its top left. */
@@ -126,7 +130,7 @@ fun WorldMapScreen(
     moving: Boolean,
     onPick: ((LatLon) -> Unit)?,
     pickLabel: String,
-    trails: Trails,
+    trails: () -> Trails,
     onLogTrail: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -140,6 +144,8 @@ fun WorldMapScreen(
     var view by remember { mutableStateOf(MapView(start, px.toDouble(), 0, 0)) }
     var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
     var unreachable by remember { mutableStateOf(false) }
+    // Read apart from the trails, so a fix redraws the map without composing it again.
+    val logging by remember { derivedStateOf { trails().logging } }
     // A touch that only stops the zoom gliding to its step picks nothing.
     var stoppedGlide by remember { mutableStateOf(false) }
 
@@ -218,7 +224,7 @@ fun WorldMapScreen(
                     val scale = view.scale.toFloat()
                     with(art) { drawPainting(painting, (view.spot(painting.centre) - middle * scale).round(), scale) }
                 }
-                trails.trails.forEach { trail -> with(art) { drawTrail(trail.points.map { view.spot(it) }, px) } }
+                trails().all.forEach { with(art) { drawTrail(view.trailPath(it), px) } }
             }
             .semantics {
                 contentDescription = "Map of where you are"
@@ -246,7 +252,12 @@ fun WorldMapScreen(
                 if (onPick != null) art.PickHint(Modifier.fillMaxWidth())
                 Text(MAP_CREDIT, color = art.ink, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
-            art.LogTrail(trails.logging, onLogTrail, Modifier.align(Alignment.TopStart).padding(Spacing.Tight))
+            art.MapButton(
+                glyph = if (logging) StopGlyph else ImageVector.vectorResource(R.drawable.ic_trail),
+                label = if (logging) STOP_TRAIL else LOG_TRAIL,
+                onClick = { onLogTrail(!logging) },
+                modifier = Modifier.align(Alignment.TopStart).padding(Spacing.Tight),
+            )
             art.Close(onClose, Modifier.align(Alignment.TopEnd).padding(Spacing.Tight))
         }
     }

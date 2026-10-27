@@ -339,7 +339,7 @@ class LauncherScreenTest {
             journal = journal,
             onJournalChange = { journal = it },
             worldMaps = { worldMap },
-            trails = trails,
+            trails = { trails },
             onLogTrail = { trails = if (it) trails.started() else trails.stopped() },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },

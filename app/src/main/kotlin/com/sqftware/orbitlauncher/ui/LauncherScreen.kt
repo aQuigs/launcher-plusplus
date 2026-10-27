@@ -315,7 +315,7 @@ fun LauncherScreen(
     journal: Journal,
     onJournalChange: (Journal) -> Unit,
     worldMaps: (MapStyle) -> WorldMap,
-    trails: Trails,
+    trails: () -> Trails,
     onLogTrail: (Boolean) -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
