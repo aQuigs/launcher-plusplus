@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
@@ -17,7 +18,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -27,7 +34,9 @@ import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
+import com.sqftware.orbitlauncher.ui.theme.GameShadow
 import com.sqftware.orbitlauncher.ui.theme.WorldMapInk
+import com.sqftware.orbitlauncher.ui.theme.WorldMapTrail
 import com.sqftware.orbitlauncher.ui.theme.WorldMapVoid
 import kotlin.math.roundToInt
 
@@ -40,6 +49,9 @@ private const val YOU_ARE_HERE_REST_MS = 270
 private const val YOU_ARE_HERE_SWING_MS = 530
 private const val YOU_ARE_HERE_QUARTER_MS = YOU_ARE_HERE_REST_MS + YOU_ARE_HERE_SWING_MS
 private val YouAreHereSwing = CubicBezierEasing(0.3f, 0.1f, 0.7f, 0.9f)
+
+// In game pixels, as wide as a road on the map at its nearest step.
+private const val TRAIL_WIDTH = 2
 
 /** The old game's world map: its pixels crisp on black, its turning star where the user is, and its red cross. */
 internal object OldSchoolWorldMap : WorldMapArt {
@@ -68,6 +80,19 @@ internal object OldSchoolWorldMap : WorldMapArt {
                 .graphicsLayer { rotationZ = turn }
                 .spriteSized(star, scale),
         )
+    }
+
+    /** In the game's yellow, shadowed a game pixel down and right as its text is, in crisp square corners. */
+    override fun DrawScope.drawTrail(path: Path, gamePixel: Int) {
+        val line = Stroke(TRAIL_WIDTH * gamePixel.toFloat(), cap = StrokeCap.Square, join = StrokeJoin.Miter)
+        translate(gamePixel.toFloat(), gamePixel.toFloat()) { drawPath(path, GameShadow, style = line) }
+        drawPath(path, WorldMapTrail, style = line)
+    }
+
+    /** The game's small stone button. */
+    @Composable
+    override fun MapButton(glyph: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier) {
+        Box(modifier.clickable(role = Role.Button, onClick = onClick)) { StoneButtonFace(glyph, label, Modifier) }
     }
 
     /** The game's red cross that closes its world map, in its top right corner, lit while held. */

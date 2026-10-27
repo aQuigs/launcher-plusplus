@@ -22,10 +22,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
@@ -39,6 +45,8 @@ import com.sqftware.orbitlauncher.ui.theme.CompassSmoke
 import com.sqftware.orbitlauncher.ui.theme.LocalMapFog
 import com.sqftware.orbitlauncher.ui.theme.LocalMapInk
 import com.sqftware.orbitlauncher.ui.theme.LocalMapVignette
+import com.sqftware.orbitlauncher.ui.theme.MapTrail
+import com.sqftware.orbitlauncher.ui.theme.MapTrailEdge
 import com.sqftware.orbitlauncher.ui.theme.PlayerArrow
 import com.sqftware.orbitlauncher.ui.theme.PlayerArrowEdge
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -138,10 +146,22 @@ internal object SkyrimWorldMap : WorldMapArt {
         )
     }
 
+    /** In snow dashes over a dark edge, smooth as the rest of its map. */
+    override fun DrawScope.drawTrail(path: Path, gamePixel: Int) {
+        val dashes = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))
+        fun line(width: Dp) = Stroke(width.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = dashes)
+        drawPath(path, MapTrailEdge, style = line(4.dp))
+        drawPath(path, MapTrail, style = line(2.dp))
+    }
+
+    /** Its glyph in snow on a disc of smoke. */
     @Composable
-    override fun Close(onClose: () -> Unit, modifier: Modifier) {
-        IconButton(onClick = onClose, modifier = modifier.background(CompassSmoke, CircleShape)) {
-            Icon(Icons.Default.Close, contentDescription = "Close", tint = LocalMapInk)
+    override fun MapButton(glyph: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier) {
+        IconButton(onClick = onClick, modifier = modifier.background(CompassSmoke, CircleShape)) {
+            Icon(glyph, contentDescription = label, tint = LocalMapInk)
         }
     }
+
+    @Composable
+    override fun Close(onClose: () -> Unit, modifier: Modifier) = MapButton(Icons.Default.Close, "Close", onClose, modifier)
 }

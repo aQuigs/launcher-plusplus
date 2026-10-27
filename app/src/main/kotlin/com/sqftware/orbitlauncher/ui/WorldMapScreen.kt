@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +31,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
@@ -43,11 +47,14 @@ import androidx.compose.ui.unit.round
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.minimap.PaintedSpan
+import com.sqftware.orbitlauncher.domain.minimap.Trail
+import com.sqftware.orbitlauncher.domain.minimap.Trails
 import com.sqftware.orbitlauncher.domain.minimap.ZoomSteps
 import com.sqftware.orbitlauncher.domain.minimap.paintRetryDelay
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -60,6 +67,9 @@ import kotlinx.coroutines.launch
 object WorldMapTags {
     const val MAP = "world_map"
 }
+
+internal const val LOG_TRAIL = "Log a trail"
+internal const val STOP_TRAIL = "Stop the trail"
 
 /** How a theme's world map looks: the ground behind and over the painting, and the marks it lays on it. */
 interface WorldMapArt {
@@ -76,6 +86,13 @@ interface WorldMapArt {
     @Composable
     fun YouAreHere(at: LatLon, view: () -> MapView)
 
+    /** Draws a trail the user logged along [path] on the screen, a game pixel being [gamePixel]. */
+    fun DrawScope.drawTrail(path: Path, gamePixel: Int)
+
+    /** A button on the map showing [glyph], read as [label], that [onClick]s. */
+    @Composable
+    fun MapButton(glyph: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier)
+
     /** What the theme lays over the map in the [view], still unless [moving]: by default nothing. */
     @Composable
     fun Over(view: () -> MapView, moving: Boolean) = Unit
@@ -89,6 +106,10 @@ interface WorldMapArt {
     fun Close(onClose: () -> Unit, modifier: Modifier)
 }
 
+private fun MapView.trailPath(trail: Trail) = Path().apply {
+    trail.forEachIndexed { i, at -> spot(at).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }
+}
+
 /** Where [at] shows on the screen, from its top left. */
 internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width / 2.0 + it.x).toFloat(), (height / 2.0 + it.y).toFloat()) }
 
@@ -98,7 +119,8 @@ internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width
  * zooms it, settling on the nearest of the zoom steps, and, given [onPick], a tap on the ground hands it the place
  * tapped, as the [pickLabel] action does the middle of the map. A new stretch is painted round the view as it nears the
  * edge of the last, which stays until it comes. The art's close, or [onClose] otherwise, closes it, as it closes itself
- * when there is nowhere to open it round, as on a return to a launcher the system had ended.
+ * when there is nowhere to open it round, as on a return to a launcher the system had ended. The [trails] the user
+ * logged lie on the ground, and the art's button starts or stops one with [onLogTrail].
  */
 @Composable
 fun WorldMapScreen(
@@ -108,6 +130,8 @@ fun WorldMapScreen(
     moving: Boolean,
     onPick: ((LatLon) -> Unit)?,
     pickLabel: String,
+    trails: () -> Trails,
+    onLogTrail: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
     val start = remember { here() }
@@ -120,6 +144,8 @@ fun WorldMapScreen(
     var view by remember { mutableStateOf(MapView(start, px.toDouble(), 0, 0)) }
     var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
     var unreachable by remember { mutableStateOf(false) }
+    // Read apart from the trails, so a fix redraws the map without composing it again.
+    val logging by remember { derivedStateOf { trails().logging } }
     // A touch that only stops the zoom gliding to its step picks nothing.
     var stoppedGlide by remember { mutableStateOf(false) }
 
@@ -198,6 +224,7 @@ fun WorldMapScreen(
                     val scale = view.scale.toFloat()
                     with(art) { drawPainting(painting, (view.spot(painting.centre) - middle * scale).round(), scale) }
                 }
+                trails().all.forEach { with(art) { drawTrail(view.trailPath(it), px) } }
             }
             .semantics {
                 contentDescription = "Map of where you are"
@@ -225,6 +252,12 @@ fun WorldMapScreen(
                 if (onPick != null) art.PickHint(Modifier.fillMaxWidth())
                 Text(MAP_CREDIT, color = art.ink, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
+            art.MapButton(
+                glyph = if (logging) StopGlyph else ImageVector.vectorResource(R.drawable.ic_trail),
+                label = if (logging) STOP_TRAIL else LOG_TRAIL,
+                onClick = { onLogTrail(!logging) },
+                modifier = Modifier.align(Alignment.TopStart).padding(Spacing.Tight),
+            )
             art.Close(onClose, Modifier.align(Alignment.TopEnd).padding(Spacing.Tight))
         }
     }

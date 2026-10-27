@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.apps.WorldMap
 import com.sqftware.orbitlauncher.domain.minimap.Journal
+import com.sqftware.orbitlauncher.domain.minimap.Trails
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
@@ -182,6 +183,7 @@ class LauncherScreenTest {
     private var checkForUpdates by mutableStateOf(true)
     private var whereIAm by mutableStateOf(WhereIAm.Hidden)
     private var journal by mutableStateOf(Journal())
+    private var trails by mutableStateOf(Trails())
     private var shownMinimap by mutableStateOf<PaintedMap<ImageBitmap>?>(null)
     private data class WorldMapPaint(val centre: LatLon, val frame: MapFrame)
     private val worldMapPaints = mutableListOf<WorldMapPaint>()
@@ -337,6 +339,8 @@ class LauncherScreenTest {
             journal = journal,
             onJournalChange = { journal = it },
             worldMaps = { worldMap },
+            trails = { trails },
+            onLogTrail = { trails = if (it) trails.started() else trails.stopped() },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
             widgetPages = widgetPages,
@@ -2438,6 +2442,23 @@ class LauncherScreenTest {
         compose.onNodeWithContentDescription("World map").performClick()
         Espresso.pressBack()
         compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
+    }
+
+    @Test
+    fun theWorldMapsButtonStartsLoggingATrailAndStopsIt() {
+        theme = Theme.OldSchool
+        art = OldSchoolArt
+        homeApps = HomeApps(ring = ringOf(clock))
+        whereIAm = WhereIAm.Shown
+        shownMinimap = PaintedMap(LatLon(40.7536, -73.9832), ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList())
+        show()
+        compose.onNodeWithContentDescription("World map").performClick()
+
+        compose.onNodeWithContentDescription(LOG_TRAIL).performClick()
+        compose.runOnIdle { assertTrue(trails.logging) }
+
+        compose.onNodeWithContentDescription(STOP_TRAIL).performClick()
+        compose.runOnIdle { assertFalse(trails.logging) }
     }
 
     @Test
