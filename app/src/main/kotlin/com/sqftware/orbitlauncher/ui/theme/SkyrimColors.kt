@@ -53,6 +53,10 @@ val ShieldRivet = Color(0xFFB4B6B8)
 /** The smoke behind a discovered place's name, dense enough to hide the clock it lies over. */
 val DiscoverySmoke = Smoke.copy(alpha = 0.92f)
 
+/** A trail the user logged, on the world map: snow dashes, edged so they hold on a pale roof. */
+val MapTrail = Snow
+val MapTrailEdge = Smoke.copy(alpha = 0.8f)
+
 /** The gold of the quest marker on the compass and the map, edged so it holds on a pale roof. */
 val QuestGold = Color(0xFFE6BE5A)
 val QuestGoldEdge = Smoke.copy(alpha = 0.85f)

@@ -86,7 +86,7 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
     }
 
     override fun locations(): Flow<LatLon> = callbackFlow {
-        val provider = provider()
+        val provider = manager.bestProvider()
         if (!isGranted() || provider == null) {
             close()
             return@callbackFlow
@@ -117,15 +117,15 @@ class PlatformLocationSource(private val context: Context, registry: ActivityRes
             }
         }
     }.conflate()
+}
 
-    // The fused provider, on Android 12 and up, mixes in Wi-Fi and cell fixes for the least power; the network provider
-    // does the same before it. GPS is the fallback where neither is on.
-    private fun provider(): String? {
-        val candidates = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-        } else {
-            listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-        }
-        return candidates.firstOrNull { it in manager.allProviders && manager.isProviderEnabled(it) }
+// The fused provider, on Android 12 and up, mixes GPS, Wi-Fi and cell fixes as a request's quality asks; the network
+// provider, before it, gives the cheap ones. GPS is the fallback where neither is on.
+internal fun LocationManager.bestProvider(): String? {
+    val candidates = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+    } else {
+        listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
     }
+    return candidates.firstOrNull { it in allProviders && isProviderEnabled(it) }
 }

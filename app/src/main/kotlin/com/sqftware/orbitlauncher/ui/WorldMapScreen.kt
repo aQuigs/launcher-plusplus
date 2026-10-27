@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -48,6 +49,7 @@ import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.minimap.PaintedSpan
+import com.sqftware.orbitlauncher.domain.minimap.Trails
 import com.sqftware.orbitlauncher.domain.minimap.ZoomSteps
 import com.sqftware.orbitlauncher.domain.minimap.paintRetryDelay
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -60,6 +62,9 @@ import kotlinx.coroutines.launch
 object WorldMapTags {
     const val MAP = "world_map"
 }
+
+internal const val LOG_TRAIL = "Log a trail"
+internal const val STOP_TRAIL = "Stop the trail"
 
 /** How a theme's world map looks: the ground behind and over the painting, and the marks it lays on it. */
 interface WorldMapArt {
@@ -76,6 +81,13 @@ interface WorldMapArt {
     @Composable
     fun YouAreHere(at: LatLon, view: () -> MapView)
 
+    /** Draws a trail the user logged, through [points] on the screen in the order they went, a game pixel being [gamePixel]. */
+    fun DrawScope.drawTrail(points: List<Offset>, gamePixel: Int)
+
+    /** What starts logging a trail with [onLog] true or, while [logging], stops it. */
+    @Composable
+    fun LogTrail(logging: Boolean, onLog: (Boolean) -> Unit, modifier: Modifier)
+
     /** What the theme lays over the map in the [view], still unless [moving]: by default nothing. */
     @Composable
     fun Over(view: () -> MapView, moving: Boolean) = Unit
@@ -89,6 +101,11 @@ interface WorldMapArt {
     fun Close(onClose: () -> Unit, modifier: Modifier)
 }
 
+/** A line through [points], for a theme's art to draw a trail along. */
+internal fun trailPath(points: List<Offset>) = Path().apply {
+    points.forEachIndexed { i, it -> if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) }
+}
+
 /** Where [at] shows on the screen, from its top left. */
 internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width / 2.0 + it.x).toFloat(), (height / 2.0 + it.y).toFloat()) }
 
@@ -98,7 +115,8 @@ internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width
  * zooms it, settling on the nearest of the zoom steps, and, given [onPick], a tap on the ground hands it the place
  * tapped, as the [pickLabel] action does the middle of the map. A new stretch is painted round the view as it nears the
  * edge of the last, which stays until it comes. The art's close, or [onClose] otherwise, closes it, as it closes itself
- * when there is nowhere to open it round, as on a return to a launcher the system had ended.
+ * when there is nowhere to open it round, as on a return to a launcher the system had ended. The [trails] the user
+ * logged lie on the ground, and the art's button starts or stops one with [onLogTrail].
  */
 @Composable
 fun WorldMapScreen(
@@ -108,6 +126,8 @@ fun WorldMapScreen(
     moving: Boolean,
     onPick: ((LatLon) -> Unit)?,
     pickLabel: String,
+    trails: Trails,
+    onLogTrail: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
     val start = remember { here() }
@@ -198,6 +218,7 @@ fun WorldMapScreen(
                     val scale = view.scale.toFloat()
                     with(art) { drawPainting(painting, (view.spot(painting.centre) - middle * scale).round(), scale) }
                 }
+                trails.trails.forEach { trail -> with(art) { drawTrail(trail.points.map { view.spot(it) }, px) } }
             }
             .semantics {
                 contentDescription = "Map of where you are"
@@ -225,6 +246,7 @@ fun WorldMapScreen(
                 if (onPick != null) art.PickHint(Modifier.fillMaxWidth())
                 Text(MAP_CREDIT, color = art.ink, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
+            art.LogTrail(trails.logging, onLogTrail, Modifier.align(Alignment.TopStart).padding(Spacing.Tight))
             art.Close(onClose, Modifier.align(Alignment.TopEnd).padding(Spacing.Tight))
         }
     }
