@@ -1,9 +1,10 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
 import com.sqftware.orbitlauncher.domain.rgb
+import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
-/** How bright each ground is on Skyrim's local map, from 0 to 255: a gray world, its roads and roofs the palest. */
+/** How bright each ground is on a relief map, from 0 to 255: a dim world, its roads and roofs the palest. */
 private val GROUND_LIGHT = IntArray(Ground.entries.size).also { light ->
     mapOf(
         Ground.Grass to 0, Ground.Road to 150, Ground.Walk to 134, Ground.Path to 124, Ground.Plaza to 118,
@@ -30,12 +31,17 @@ private const val CROWN_PX = 2.6
 private const val CROWN_LEFT = 0.5
 private const val CROWN_LIT = 0.8
 
+/** The Pip-Boy's phosphor: the green of its dark, and its red and blue to its green. */
+private const val PHOSPHOR_FLOOR = 14.0
+private const val PHOSPHOR_RED = 0.2
+private const val PHOSPHOR_BLUE = 0.5
+
 /**
- * Colors [layout] as Skyrim's local map: a gray ground seen from above under a light from the upper left, a touch
- * cold, roofs standing off it in their shadows, trees as dark crowns, and all of it softened as the game's view from
- * high above is. Writes the pixels, opaque, to [into].
+ * Colors [layout] as a game's local map in relief, as Skyrim's and Fallout's are: a ground seen from above under a light
+ * from the upper left, roofs standing off it in their shadows, trees as dark crowns, and all of it softened as the
+ * games' view from high above is, each light from 0 to 255 in its [tint]. Writes the pixels, opaque, to [into].
  */
-internal fun paintSkyrim(layout: GroundLayout, into: IntArray) {
+internal fun paintRelief(layout: GroundLayout, into: IntArray, tint: LightTint) {
     val w = layout.width
     val h = layout.height
     val structure = layout.structure
@@ -74,12 +80,23 @@ internal fun paintSkyrim(layout: GroundLayout, into: IntArray) {
         for (dy in -1..1) for (dx in -1..1) {
             sum += light[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)] * weights[dx + 1] * weights[dy + 1]
         }
-        into[i] = cold(sum / 16)
+        into[i] = tint.tint(sum / 16)
     }
 }
 
-/** A gray of [light], tinted a touch toward blue as the game's northern light is. */
+/** Skyrim's gray of [light], tinted a touch toward blue as the game's northern light is. */
 internal fun cold(light: Double): Int {
     val v = light.roundToInt().coerceIn(0, 255)
     return rgb((v - 3).coerceAtLeast(0), v, (v + 5).coerceAtMost(255))
+}
+
+/**
+ * The Pip-Boy's green of [light], as its screen glows: the shadows pressed down toward the tube's dark, as the light to the
+ * power of 1.5, so roofs and roads stand out of a dim ground, and never quite black.
+ */
+internal fun phosphor(light: Double): Int {
+    val lit = (light / 255).coerceIn(0.0, 1.0)
+    val v = lit * sqrt(lit)
+    val green = PHOSPHOR_FLOOR + (255 - PHOSPHOR_FLOOR) * v
+    return rgb((green * PHOSPHOR_RED).roundToInt(), green.roundToInt(), (green * PHOSPHOR_BLUE).roundToInt())
 }

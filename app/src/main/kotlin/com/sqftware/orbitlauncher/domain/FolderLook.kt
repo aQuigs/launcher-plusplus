@@ -91,6 +91,12 @@ enum class FolderLook(val label: String) {
 
     /** A Nord's round shield of boards in an iron rim, its previews on its boss. */
     Shield("Shield"),
+
+    /** A vault's round door, cogged at its edge, its previews in its middle. */
+    VaultDoor("Vault door"),
+
+    /** A bottle cap, crimped round its edge, its previews on its face. */
+    BottleCap("Bottle cap"),
 }
 
 /**
@@ -105,7 +111,8 @@ fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
     FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal,
     FolderLook.FoldedSquare, FolderLook.Envelope,
-    FolderLook.Cube, FolderLook.Geode, FolderLook.HexCell, FolderLook.Items, FolderLook.Shield -> false
+    FolderLook.Cube, FolderLook.Geode, FolderLook.HexCell, FolderLook.Items, FolderLook.Shield,
+    FolderLook.VaultDoor, FolderLook.BottleCap -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */

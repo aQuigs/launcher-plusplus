@@ -30,4 +30,5 @@ enum class Colourway(val label: String) {
     Green("Green"),
     Classic("Classic"),
     Nord("Nord"),
+    Phosphor("Phosphor"),
 }

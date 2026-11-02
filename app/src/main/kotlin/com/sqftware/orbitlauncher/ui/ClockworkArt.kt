@@ -15,7 +15,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -119,7 +118,7 @@ object ClockworkArt : ThemeArt {
         val cog = Modifier.graphicsLayer { rotationZ = style.minutes() * 6f * GEAR_TURNS_PER_HOUR }.drawWithCache {
             val half = size.minDimension / 2
             // Only the toothed rim, so the glass disc over the hub stays glass, as a sub-dial's is.
-            val cog = cogPath(size.center, half * GEAR_TIP, half * GEAR_ROOT).apply {
+            val cog = cogPath(size.center, half * GEAR_TIP, half * GEAR_ROOT, GEAR_TEETH).apply {
                 fillType = PathFillType.EvenOdd
                 addOval(Rect(size.center, half * GEAR_DISC * 0.97f))
             }
@@ -205,22 +204,4 @@ private fun Modifier.subDialMarks(): Modifier = drawWithCache {
         drawContent()
         drawPath(marks, DialEdge.inner, style = mark)
     }
-}
-
-/** A cog's outline round [centre]: [GEAR_TEETH] flat-topped teeth out to [outer], from a rim at [root]. */
-private fun cogPath(centre: Offset, outer: Float, root: Float): Path = Path().apply {
-    val step = 360f / GEAR_TEETH
-    repeat(GEAR_TEETH) { tooth ->
-        val start = tooth * step
-        listOf(
-            start to root,
-            start + step * 0.12f to outer,
-            start + step * 0.42f to outer,
-            start + step * 0.54f to root,
-        ).forEachIndexed { index, (degrees, reach) ->
-            val at = centre + direction(degrees) * reach
-            if (tooth == 0 && index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
-        }
-    }
-    close()
 }

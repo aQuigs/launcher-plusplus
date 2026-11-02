@@ -40,15 +40,6 @@ import com.sqftware.orbitlauncher.domain.minimap.ICON_SPACING_PX
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
-import com.sqftware.orbitlauncher.ui.theme.CompassLine
-import com.sqftware.orbitlauncher.ui.theme.CompassSmoke
-import com.sqftware.orbitlauncher.ui.theme.LocalMapFog
-import com.sqftware.orbitlauncher.ui.theme.LocalMapInk
-import com.sqftware.orbitlauncher.ui.theme.LocalMapVignette
-import com.sqftware.orbitlauncher.ui.theme.MapTrail
-import com.sqftware.orbitlauncher.ui.theme.MapTrailEdge
-import com.sqftware.orbitlauncher.ui.theme.PlayerArrow
-import com.sqftware.orbitlauncher.ui.theme.PlayerArrowEdge
 import com.sqftware.orbitlauncher.ui.theme.Spacing
 import com.sqftware.orbitlauncher.ui.theme.legible
 import kotlin.math.min
@@ -66,12 +57,12 @@ private val ICON_SIDE = 22.dp
 private const val ICON_OF_SPACING = 0.85f
 
 /**
- * The northern game's world map: the local map's gray ground seen from above, darkening toward the edges as the game's
- * fades into cloud, snow drifting over it, the player's arrow turned the way they face and the gold quest marker.
+ * A game's world map in [look]: the local map's ground seen from above, darkening toward the edges, the theme's
+ * [drift] over it, the player's arrow turned the way they face and the quest marker.
  */
-internal object SkyrimWorldMap : WorldMapArt {
-    override val void = LocalMapFog
-    override val ink = LocalMapInk
+internal class HudWorldMap(private val look: HudLook, private val drift: Drift) : WorldMapArt {
+    override val void = look.colors.fog
+    override val ink = look.colors.ink
 
     // Smooth, as the local map is drawn, not in crisp pixels like the old game's, its icons upright and of one size.
     override fun DrawScope.drawPainting(painting: PaintedMap<ImageBitmap>, topLeft: IntOffset, scale: Float) {
@@ -97,8 +88,8 @@ internal object SkyrimWorldMap : WorldMapArt {
                     val arrow = playerArrow(size.center, PLAYER_HALF.toPx())
                     val edge = Stroke(1.5.dp.toPx())
                     onDrawBehind {
-                        drawPath(arrow, PlayerArrow)
-                        drawPath(arrow, PlayerArrowEdge, style = edge)
+                        drawPath(arrow, look.colors.ink)
+                        drawPath(arrow, look.colors.arrowEdge, style = edge)
                     }
                 },
         )
@@ -107,15 +98,23 @@ internal object SkyrimWorldMap : WorldMapArt {
     @Composable
     override fun Over(view: () -> MapView, moving: Boolean) {
         val quest = LocalQuest.current
-        val weather = turnAngle(moving, WEATHER_CYCLE_S * 1_000)
-        // In a layer of its own, so a frame of snow redraws only the snow.
-        SnowAndMist({ weather.value }, Modifier.fillMaxSize().graphicsLayer())
+        val turn = turnAngle(moving, WEATHER_CYCLE_S * 1_000)
+        // Each in a layer of its own, so a frame of weather redraws only the weather, and a pan only the quest marker.
+        DriftingWeather(drift, { turn.value }, Modifier.fillMaxSize().graphicsLayer())
+        Spacer(
+            Modifier.fillMaxSize().graphicsLayer().drawWithCache {
+                val over = with(look) { screenOver() }
+                val fade = Brush.radialGradient(0.5f to Color.Transparent, 1f to look.colors.rim.outer, center = size.center, radius = size.maxDimension * 0.62f)
+                onDrawBehind {
+                    over()
+                    drawRect(fade)
+                }
+            },
+        )
         Spacer(
             Modifier.fillMaxSize().drawWithCache {
-                val fade = Brush.radialGradient(0.5f to Color.Transparent, 1f to LocalMapVignette, center = size.center, radius = size.maxDimension * 0.62f)
-                val marker = QuestMarker(QUEST_HALF.toPx())
+                val marker = QuestMarker(look, QUEST_HALF.toPx())
                 onDrawBehind {
-                    drawRect(fade)
                     // Its tip on the spot, as a pin's.
                     quest?.let { with(marker) { draw(view().spot(it) - Offset(0f, marker.half)) } }
                 }
@@ -123,18 +122,18 @@ internal object SkyrimWorldMap : WorldMapArt {
         )
     }
 
-    /** The hint as the game's map lays its own along the foot of the screen, on smoke between hairlines. */
+    /** The hint as the games' maps lay their own along the foot of the screen, on smoke between hairlines. */
     @Composable
     override fun PickHint(modifier: Modifier) {
         Text(
             "Tap the map to mark your quest",
-            style = MaterialTheme.typography.labelLarge.legible(LocalMapInk),
-            color = LocalMapInk,
+            style = MaterialTheme.typography.labelLarge.legible(look.colors.ink),
+            color = look.colors.ink,
             textAlign = TextAlign.Center,
             modifier = modifier
                 .drawWithCache {
-                    val smoke = fadedAtEnds(CompassSmoke, 0.2f)
-                    val line = fadedAtEnds(CompassLine, 0.2f)
+                    val smoke = fadedAtEnds(look.colors.smoke, 0.2f)
+                    val line = fadedAtEnds(look.colors.line, 0.2f)
                     val hairline = size.copy(height = 1.dp.toPx())
                     onDrawBehind {
                         drawRect(smoke)
@@ -146,19 +145,19 @@ internal object SkyrimWorldMap : WorldMapArt {
         )
     }
 
-    /** In snow dashes over a dark edge, smooth as the rest of its map. */
+    /** In dashes of the map's ink over the dark edge the arrow has, so they hold on a pale roof, smooth as the rest of its map. */
     override fun DrawScope.drawTrail(path: Path, gamePixel: Int) {
         val dashes = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))
         fun line(width: Dp) = Stroke(width.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = dashes)
-        drawPath(path, MapTrailEdge, style = line(4.dp))
-        drawPath(path, MapTrail, style = line(2.dp))
+        drawPath(path, look.colors.arrowEdge, style = line(4.dp))
+        drawPath(path, look.colors.ink, style = line(2.dp))
     }
 
-    /** Its glyph in snow on a disc of smoke. */
+    /** Its glyph in the map's ink on a disc of smoke. */
     @Composable
     override fun MapButton(glyph: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier) {
-        IconButton(onClick = onClick, modifier = modifier.background(CompassSmoke, CircleShape)) {
-            Icon(glyph, contentDescription = label, tint = LocalMapInk)
+        IconButton(onClick = onClick, modifier = modifier.background(look.colors.smoke, CircleShape)) {
+            Icon(glyph, contentDescription = label, tint = look.colors.ink)
         }
     }
 
