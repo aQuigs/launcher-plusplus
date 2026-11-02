@@ -17,14 +17,14 @@ interface MinimapArt {
 }
 
 /**
- * How many pixels across Skyrim's map icons are drawn from their vectors: enough to stay sharp at the size the map
- * shows them, which scales them smoothly rather than by whole pixels.
+ * How many pixels across a smooth style's map icons are drawn from their vectors: enough to stay sharp at the size the
+ * map shows them, which scales them smoothly rather than by whole pixels.
  */
-const val SKYRIM_ICON_PX = 72
+const val SMOOTH_ICON_PX = 72
 
 /**
  * The map's sprites from the app's drawables, decoded once: Old School's at their own pixel size, as the game draws
- * them, and Skyrim's icons drawn from their vectors at [SKYRIM_ICON_PX].
+ * them, and a smooth style's icons drawn from their vectors at [SMOOTH_ICON_PX].
  */
 class ResourceMinimapArt(private val context: Context) : MinimapArt {
     private val oldSchool by lazy {
@@ -36,14 +36,14 @@ class ResourceMinimapArt(private val context: Context) : MinimapArt {
         )
     }
 
-    private val skyrim by lazy {
-        val drawn = mutableMapOf<Int, Pixels>()
-        MinimapSprites(icons = MapIcon.entries.associateWith { drawn.getOrPut(skyrimDrawableOf(it)) { vector(skyrimDrawableOf(it)) } })
-    }
+    private val skyrim by lazy { vectorSprites(::skyrimDrawableOf) }
+
+    private val fallout by lazy { vectorSprites(::falloutDrawableOf) }
 
     override fun sprites(style: MapStyle) = when (style) {
         MapStyle.OldSchool -> oldSchool
         MapStyle.Skyrim -> skyrim
+        MapStyle.Fallout -> fallout
     }
 
     private fun oldSchoolDrawableOf(icon: MapIcon) = when (icon) {
@@ -78,9 +78,28 @@ class ResourceMinimapArt(private val context: Context) : MinimapArt {
         MapIcon.QuestStart -> R.drawable.skyrim_quest
     }
 
+    // The Pip-Boy marks where to drink, to trade for caps, to pray, to catch a train, to be patched up or to draw water,
+    // and where a town's business is done.
+    private fun falloutDrawableOf(icon: MapIcon) = when (icon) {
+        MapIcon.Pub, MapIcon.CookeryShop, MapIcon.KebabShop -> R.drawable.fallout_bar
+        MapIcon.Bank, MapIcon.GrandExchange, MapIcon.GeneralStore, MapIcon.FoodShop, MapIcon.ClothesShop,
+        MapIcon.JewelleryShop, MapIcon.Hairdresser, MapIcon.PetShop -> R.drawable.fallout_cap
+        MapIcon.Altar -> R.drawable.fallout_chapel
+        MapIcon.Transportation -> R.drawable.fallout_station
+        MapIcon.Apothecary -> R.drawable.fallout_clinic
+        MapIcon.WaterSource -> R.drawable.fallout_water
+        MapIcon.QuestStart -> R.drawable.fallout_quest
+    }
+
+    /** Each icon drawn from the vector [drawableOf] gives it, each vector drawn once however many icons share it. */
+    private fun vectorSprites(drawableOf: (MapIcon) -> Int): MinimapSprites {
+        val drawn = mutableMapOf<Int, Pixels>()
+        return MinimapSprites(icons = MapIcon.entries.associateWith { drawn.getOrPut(drawableOf(it)) { vector(drawableOf(it)) } })
+    }
+
     private fun sprite(@DrawableRes id: Int): Pixels =
         BitmapFactory.decodeResource(context.resources, id, BitmapFactory.Options().apply { inScaled = false }).pixels()
 
     private fun vector(@DrawableRes id: Int): Pixels =
-        checkNotNull(ContextCompat.getDrawable(context, id)).toBitmap(SKYRIM_ICON_PX, SKYRIM_ICON_PX).pixels()
+        checkNotNull(ContextCompat.getDrawable(context, id)).toBitmap(SMOOTH_ICON_PX, SMOOTH_ICON_PX).pixels()
 }

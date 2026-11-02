@@ -282,6 +282,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.GreenCore -> GreenCoreArt
     Theme.OldSchool -> OldSchoolArt
     Theme.Skyrim -> SkyrimArt
+    Theme.Fallout -> FalloutArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }

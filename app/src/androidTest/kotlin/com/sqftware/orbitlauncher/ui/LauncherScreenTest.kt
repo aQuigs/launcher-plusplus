@@ -2322,10 +2322,15 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun skyrimNamesAPlaceTheFirstTimeTheUserComesToItAndTheJournalKeepsIt() {
+    fun skyrimNamesAPlaceTheFirstTimeTheUserComesToItAndTheJournalKeepsIt() = namesAPlaceTheFirstTimeTheUserComesToIt(Theme.Skyrim, SkyrimArt)
+
+    @Test
+    fun falloutNamesAPlaceTheFirstTimeTheUserComesToItAndTheJournalKeepsIt() = namesAPlaceTheFirstTimeTheUserComesToIt(Theme.Fallout, FalloutArt)
+
+    private fun namesAPlaceTheFirstTimeTheUserComesToIt(shownTheme: Theme, shownArt: ThemeArt) {
         val bryantPark = LatLon(40.7536, -73.9832)
-        theme = Theme.Skyrim
-        art = SkyrimArt
+        theme = shownTheme
+        art = shownArt
         whereIAm = WhereIAm.Shown
         val midtown = Place("Midtown", LatLon(40.7549, -73.9840))
         val kipsBay = Place("Kips Bay", LatLon(40.7423, -73.9801))

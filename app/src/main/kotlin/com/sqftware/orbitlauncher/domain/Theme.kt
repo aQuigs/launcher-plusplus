@@ -51,6 +51,13 @@ enum class Theme(
         mapStyle = MapStyle.OldSchool,
     ),
     Skyrim("Skyrim", listOf(FolderLook.Shield), listOf(Colourway.Nord), mapStyle = MapStyle.Skyrim, keepsJournal = true),
+    Fallout(
+        "Fallout",
+        listOf(FolderLook.VaultDoor, FolderLook.BottleCap),
+        listOf(Colourway.Phosphor),
+        mapStyle = MapStyle.Fallout,
+        keepsJournal = true,
+    ),
     ;
 
     fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)

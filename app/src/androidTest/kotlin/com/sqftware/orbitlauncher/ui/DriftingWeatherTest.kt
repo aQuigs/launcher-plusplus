@@ -3,6 +3,7 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
@@ -17,26 +18,32 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs
 
-class SkyrimWeatherTest {
+class DriftingWeatherTest {
     @get:Rule
     val compose = createComposeRule()
 
     @Test
-    fun theSnowFallsWithItsClockAndComesBackRoundAfterACycle() {
+    fun eachWeatherDriftsWithItsClockAndComesBackRoundAfterACycle() {
+        val drift = mutableStateOf(Snowfall)
         val turn = mutableFloatStateOf(90f)
-        compose.setContent { SnowAndMist({ turn.floatValue }, Modifier.size(240.dp).background(Color.Black).testTag(TAG)) }
-        val start = frame()
+        compose.setContent { DriftingWeather(drift.value, { turn.floatValue }, Modifier.size(240.dp).background(Color.Black).testTag(TAG)) }
 
-        turn.floatValue = 90.01f
-        assertFalse("fallen as the clock moves", alike(start, frame()))
+        listOf(Snowfall, Dust).forEach { weather ->
+            drift.value = weather
+            turn.floatValue = 90f
+            val start = frame()
 
-        turn.floatValue = 450f
-        assertTrue("where it was a whole cycle later", alike(start, frame()))
+            turn.floatValue = 90.01f
+            assertFalse("moved as the clock moves", alike(start, frame()))
+
+            turn.floatValue = 450f
+            assertTrue("where it was a whole cycle later", alike(start, frame()))
+        }
     }
 
     private fun frame() = compose.onNodeWithTag(TAG).captureToImage().toPixelMap().buffer
 
-    // A whole cycle later a flake is back within a rounding of where it was, which can shade its edge a level apart.
+    // A whole cycle later a mote is back within a rounding of where it was, which can shade its edge a level apart.
     private fun alike(a: IntArray, b: IntArray) = a.indices.all { i ->
         (0 until 32 step 8).all { shift -> abs((a[i] shr shift and 0xFF) - (b[i] shr shift and 0xFF)) <= 2 }
     }
