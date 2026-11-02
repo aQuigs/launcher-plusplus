@@ -204,6 +204,18 @@ class MinimapPainterTest {
     }
 
     @Test
+    fun falloutsPhosphorGlowsGreenBrighterWithTheLightAndNeverBlack() {
+        val glows = (0..255).map { phosphor(it.toDouble()) }
+        fun Int.red() = this shr 16 and 0xFF
+        fun Int.green() = this shr 8 and 0xFF
+        fun Int.blue() = this and 0xFF
+
+        assertTrue(glows.all { it ushr 24 == 0xFF && it.green() > it.blue() && it.blue() > it.red() })
+        assertTrue(glows.first().green() > 0)
+        assertTrue(glows.zipWithNext().all { (dim, bright) -> bright.green() >= dim.green() })
+    }
+
+    @Test
     fun skyrimCastsABuildingsShadowDownAndRight() {
         val skyrim = MinimapPainter(MinimapSprites(), MapStyle.Skyrim)
         val built = skyrim.paintDisc(MapScene(centre, buildings = listOf(Building(rect(60, 60, 90, 80), seed = 1))))

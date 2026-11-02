@@ -76,7 +76,7 @@ internal const val ICON_SPACING_PX = 24.0
 class MinimapPainter(private val sprites: MinimapSprites, private val style: MapStyle) {
     /**
      * The ground in [frame], opaque, clear outside a round frame's circle, and its icons: apart, for the user's map to
-     * keep upright as it turns and for Skyrim's to draw smoothly at a size of their own, or in the ground of the old
+     * keep upright as it turns and for a smooth style's to draw at a size of their own, or in the ground of the old
      * game's world map.
      */
     fun paint(scene: MapScene, frame: MapFrame): PaintedMap<Pixels> = Painting(scene, sprites, frame, style).run()
@@ -288,23 +288,21 @@ private class Painting(
         val noise = grassNoise()
         val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), DoubleArray(w * h) { noise[tileOf(it % w, it / w)] })
 
-        val icons = when (style) {
-            MapStyle.OldSchool -> {
-                paintOldSchool(layout)
-                placeIcons().also { icons ->
-                    paintNpcs(icons)
-                    paintFigures()
-                }
-            }
-            MapStyle.Skyrim -> {
-                paintSkyrim(layout, img)
-                placeIcons()
+        val relief = style.relief
+        val icons = if (relief != null) {
+            paintRelief(layout, img, relief)
+            placeIcons()
+        } else {
+            paintOldSchool(layout)
+            placeIcons().also { icons ->
+                paintNpcs(icons)
+                paintFigures()
             }
         }
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
-        // The local map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
-        if (frame.followsUser || style == MapStyle.Skyrim) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
+        // A relief map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
+        if (frame.followsUser || relief != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
         icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
         return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
     }

@@ -31,6 +31,24 @@ internal fun ticks(centre: Offset, count: Int, from: Float, to: Float, kept: (In
     }
 }
 
+/** A cog's outline round [centre], or a crimped edge's: [teeth] flat-topped teeth out to [outer], from a rim at [root]. */
+internal fun cogPath(centre: Offset, outer: Float, root: Float, teeth: Int): Path = Path().apply {
+    val step = 360f / teeth
+    repeat(teeth) { tooth ->
+        val start = tooth * step
+        listOf(
+            start to root,
+            start + step * 0.12f to outer,
+            start + step * 0.42f to outer,
+            start + step * 0.54f to root,
+        ).forEachIndexed { index, (degrees, reach) ->
+            val at = centre + direction(degrees) * reach
+            if (tooth == 0 && index == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y)
+        }
+    }
+    close()
+}
+
 /**
  * A ring's marks for a theme whose ring is a dial's scale: a track through the [slots] on a circle of [radius] round
  * [centre], crossed by [minor] and [major] marks, all kept clear of the slots' discs [iconSize] across. They brighten as

@@ -21,41 +21,28 @@ internal val SkyrimPalette = Palette(
 )
 
 /**
- * The local map's disc: the fog it shows before a map is painted, the dark its edge fades into, and its rim, a bone
- * hairline around a dark one so it holds on any wallpaper.
+ * The northern game's heads-up display: a gray fog before the local map is painted, its rim a bone hairline around a
+ * dark one so it holds on any wallpaper, snow-white words and arrow, bone hairlines on smoke along the compass, and the
+ * gold of the quest marker, each edged in smoke so it holds on a pale roof.
  */
-val LocalMapFog = Color(0xFF3A3D40)
-val LocalMapVignette = Smoke.copy(alpha = 0.7f)
-val LocalMapRim = DiscEdge(outer = Smoke.copy(alpha = 0.7f), inner = Bone.copy(alpha = 0.85f))
-
-/** The player's arrow at the local map's middle, edged so it shows on a pale roof. */
-val PlayerArrow = Snow
-val PlayerArrowEdge = Smoke.copy(alpha = 0.8f)
-
-/** What the local map's credit is written in, over its gray. */
-val LocalMapInk = Snow
-
-/**
- * The compass along the top of the home page: the smoke of its bar, its bone hairlines and letters, and the shade of its
- * carved ends and under its marks, so a mark reads over any wallpaper.
- */
-val CompassSmoke = Smoke.copy(alpha = 0.55f)
-val CompassLine = Bone.copy(alpha = 0.85f)
-val CompassLetter = Snow
-val CompassShade = Smoke.copy(alpha = 0.8f)
+val SkyrimHudColors = HudColors(
+    fog = Color(0xFF3A3D40),
+    rim = DiscEdge(outer = Smoke.copy(alpha = 0.7f), inner = Bone.copy(alpha = 0.85f)),
+    ink = Snow,
+    arrowEdge = Smoke.copy(alpha = 0.8f),
+    smoke = Smoke.copy(alpha = 0.55f),
+    line = Bone.copy(alpha = 0.85f),
+    shade = Smoke.copy(alpha = 0.8f),
+    band = Smoke.copy(alpha = 0.92f),
+    quest = Color(0xFFE6BE5A),
+    questEdge = Smoke.copy(alpha = 0.85f),
+)
 
 /** A shield folder's boards in two shades of old wood, the iron of its rim and boss, and the gleam on its rivets. */
 val ShieldBoardDark = Color(0xFF4A3526)
 val ShieldBoardLight = Color(0xFF5E4431)
 val ShieldIron = Color(0xFF5C5E60)
 val ShieldRivet = Color(0xFFB4B6B8)
-
-/** The smoke behind a discovered place's name, dense enough to hide the clock it lies over. */
-val DiscoverySmoke = Smoke.copy(alpha = 0.92f)
-
-/** The gold of the quest marker on the compass and the map, edged so it holds on a pale roof. */
-val QuestGold = Color(0xFFE6BE5A)
-val QuestGoldEdge = Smoke.copy(alpha = 0.85f)
 
 /**
  * The weather over the launcher: snowflakes of snow, each in a faint dark halo so it shows on a pale wallpaper too, and
