@@ -25,11 +25,8 @@ private const val GAME_FONT_SIZE = 16
  * to twice it for display type.
  */
 internal fun gameTypography(px: Int, density: Density, shadowed: Boolean): Typography {
-    fun style(fontPixel: Int, family: FontFamily = GameFont, weight: FontWeight = FontWeight.Normal): TextStyle {
-        val size = with(density) { (GAME_FONT_SIZE * fontPixel).toSp() }
-        val shadow = Shadow(GameShadow, Offset(fontPixel.toFloat(), fontPixel.toFloat()), 0f).takeIf { shadowed }
-        return TextStyle(fontFamily = family, fontWeight = weight, fontSize = size, lineHeight = size * 1.15f, shadow = shadow)
-    }
+    fun style(fontPixel: Int, family: FontFamily = GameFont, weight: FontWeight = FontWeight.Normal) =
+        gameStyle(fontPixel, density, shadowed, family, weight)
     val small = max(1, px / 2)
     val mid = max(small + 1, px * 3 / 4)
     return Typography(
@@ -56,3 +53,20 @@ internal fun gameTypography(px: Int, density: Density, shadowed: Boolean): Typog
  * its broad letters would stand a size above the other themes' menus, and the next whole scale down a size below.
  */
 internal fun Typography.gameMenu() = copy(labelLarge = bodyLarge)
+
+/** The game's small font with its shadow, each of its pixels [fontPixel] screen pixels: the type of a status orb's number. */
+internal fun gameSmallType(fontPixel: Int, density: Density) = gameStyle(fontPixel, density, shadowed = true, GameSmallFont, lines = 1f)
+
+/** A style in one of the game's fonts, each of its pixels [fontPixel] screen pixels, its lines [lines] its size apart. */
+private fun gameStyle(
+    fontPixel: Int,
+    density: Density,
+    shadowed: Boolean,
+    family: FontFamily = GameFont,
+    weight: FontWeight = FontWeight.Normal,
+    lines: Float = 1.15f,
+): TextStyle {
+    val size = with(density) { (GAME_FONT_SIZE * fontPixel).toSp() }
+    val shadow = Shadow(GameShadow, Offset(fontPixel.toFloat(), fontPixel.toFloat()), 0f).takeIf { shadowed }
+    return TextStyle(fontFamily = family, fontWeight = weight, fontSize = size, lineHeight = size * lines, shadow = shadow)
+}
