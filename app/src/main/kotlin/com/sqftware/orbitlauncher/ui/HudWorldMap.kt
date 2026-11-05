@@ -22,10 +22,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
@@ -139,10 +145,22 @@ internal class HudWorldMap(private val look: HudLook, private val drift: Drift) 
         )
     }
 
+    /** In dashes of the map's ink over the dark edge the arrow has, so they hold on a pale roof, smooth as the rest of its map. */
+    override fun DrawScope.drawTrail(path: Path, gamePixel: Int) {
+        val dashes = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))
+        fun line(width: Dp) = Stroke(width.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = dashes)
+        drawPath(path, look.colors.arrowEdge, style = line(4.dp))
+        drawPath(path, look.colors.ink, style = line(2.dp))
+    }
+
+    /** Its glyph in the map's ink on a disc of smoke. */
     @Composable
-    override fun Close(onClose: () -> Unit, modifier: Modifier) {
-        IconButton(onClick = onClose, modifier = modifier.background(look.colors.smoke, CircleShape)) {
-            Icon(Icons.Default.Close, contentDescription = "Close", tint = look.colors.ink)
+    override fun MapButton(glyph: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier) {
+        IconButton(onClick = onClick, modifier = modifier.background(look.colors.smoke, CircleShape)) {
+            Icon(glyph, contentDescription = label, tint = look.colors.ink)
         }
     }
+
+    @Composable
+    override fun Close(onClose: () -> Unit, modifier: Modifier) = MapButton(Icons.Default.Close, "Close", onClose, modifier)
 }

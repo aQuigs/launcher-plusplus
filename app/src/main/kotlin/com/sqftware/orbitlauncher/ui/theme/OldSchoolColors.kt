@@ -76,3 +76,6 @@ val WorldMapVoid = Color.Black
 
 /** What the world map says over itself, its credit and whether it is loading, in the game's white. */
 val WorldMapInk = Color.White
+
+/** A trail the user logged, on the world map: the game's yellow, shadowed as its text is. */
+val WorldMapTrail = Yellow

@@ -42,3 +42,6 @@ internal val HiddenGlyph = materialGlyph(
         "3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15" +
         ".02-.16c0-1.66-1.34-3-3-3l-.17.01z",
 )
+
+/** Stops what is going on. */
+internal val StopGlyph = materialGlyph("Stop", "M6 6h12v12H6z")
