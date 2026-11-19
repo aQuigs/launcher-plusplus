@@ -3336,7 +3336,7 @@ class LauncherScreenTest {
 
         compose.onRoot().performTouchInput {
             down(handle)
-            moveBy(Offset(0f, -viewConfiguration.touchSlop * 2))
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
             repeat(10) { moveBy(Offset(width / 20f, 0f)) }
             up()
         }

@@ -8,7 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
@@ -87,6 +88,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -202,8 +204,8 @@ private const val EXPAND_MILLIS = 200
 
 /**
  * The collection cards on [page], top to bottom, and a button under them to add one. A card's header names it and
- * carries a handle to drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], a gear that
- * calls [onSettings], and a chevron that calls [onToggleExpanded]: a compact card shows the rows its look sets of its
+ * carries a handle to hold and drag it above or below the others, a pencil on a hand-picked card that calls [onEdit], a
+ * gear that calls [onSettings], and a chevron that calls [onToggleExpanded]: a compact card shows the rows its look sets of its
  * first apps, with a mark along its bottom when it holds more, and an expanded one every app, each named as its look
  * says. The built-in cards work out as many apps as their
  * look allows from [builtInApps] and [foregroundTime], the hand-picked ones from [apps], pairs included, and Most Used
@@ -378,6 +380,7 @@ private fun CardHeader(
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, tween(EXPAND_MILLIS), label = "chevron")
 
     val art = LocalThemeArt.current
+    val haptics = LocalHapticFeedback.current
 
     // At least a button high, and as high as a theme's title needs.
     BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = HEADER_BUTTON)) {
@@ -386,26 +389,22 @@ private fun CardHeader(
         val handleStart = minOf((maxWidth - HEADER_BUTTON) / 2, maxWidth - HEADER_BUTTON * 4)
         // Kept clear of the handle, which a long title on a narrow screen would otherwise run under.
         art.CardTitle(kind.glyph, kind.title, Modifier.align(Alignment.CenterStart).width(handleStart - 4.dp))
-        // A drag straight from the touch, with no long press: a vertical one, so a swipe across the handle still pages.
+        // Held before it moves, so a scroll or a page swipe that starts on the handle never takes the card with it.
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = handleStart)
                 .size(HEADER_BUTTON)
-                .pointerInput(index) {
+                .pointerInput(index, haptics) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        var overSlop = 0f
-                        val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over ->
-                            change.consume()
-                            overSlop = over
-                        } ?: return@awaitEachGesture
+                        val press = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         reorder.dragging = index
-                        reorder.offset = overSlop
-                        // Not verticalDrag, which leaves a move straight across to the pager and so loses the card to it.
+                        // Every move is taken, even straight across, or the pager would take the card from the finger.
                         try {
-                            val dragged = drag(start.id) {
+                            val dragged = drag(press.id) {
                                 reorder.moveBy(it.positionChange().y)
                                 it.consume()
                             }
