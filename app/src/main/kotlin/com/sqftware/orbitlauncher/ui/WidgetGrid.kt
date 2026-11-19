@@ -93,7 +93,6 @@ import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.cellRange
-import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.heldDrag
 import com.sqftware.orbitlauncher.domain.isLauncherBlock
 import com.sqftware.orbitlauncher.domain.nearestCells
@@ -172,11 +171,6 @@ private val CONTROL_SIZE = 40.dp
 // How far the edit controls reach past the outline's corners. Any reach keeps the bin and the handle apart on a widget
 // one row tall, since each is half a row; half the page's padding keeps them clear of the screen's edge.
 private val CONTROL_REACH = Spacing.Edge / 2
-
-// A finger this near the page's top or bottom edge, dragging a widget or its handle, scrolls the page, and at the edge
-// itself this fast, a second.
-private val EDGE_ZONE = 72.dp
-private val EDGE_SPEED = 900.dp
 
 /** The length of [cells] cells [cell] long and the gaps between them. */
 private fun span(cells: Int, cell: Dp) = cell * cells + GAP * (cells - 1)
@@ -374,9 +368,7 @@ fun WidgetGrid(
     LaunchedEffect(dragging) {
         if (!dragging || fixed) return@LaunchedEffect
         val follower = edge.stretch ?: heldFollower
-        val zone = with(density) { EDGE_ZONE.toPx() }
-        val speed = with(density) { EDGE_SPEED.toPx() }
-        scroll.scrollAtEdges(speed, pull = { edgePull(finger, scroll.viewportSize.toFloat(), zone) }, room = follower.room, follow = follower.follow)
+        scroll.scrollAtPageEdges(density, at = { finger }, room = follower.room, follow = follower.follow)
     }
 
     Box(

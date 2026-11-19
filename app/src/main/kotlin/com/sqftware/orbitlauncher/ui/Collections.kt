@@ -62,6 +62,7 @@ import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -162,6 +163,12 @@ object CollectionTags {
 class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
 
 /**
+ * An app held over a collections page: where the finger is, in the page's coordinates, and what to tell once the page has
+ * scrolled under the still finger, which is then over something else.
+ */
+class HeldApp(val finger: () -> Offset, val onScrolled: () -> Unit)
+
+/**
  * Where the hand-picked cards lie, so an app dragged from anywhere can be dropped on one. Their coordinates rather than
  * their bounds, as with a place's positions: a page scrolling past would otherwise write them every frame.
  */
@@ -212,7 +219,8 @@ private const val EXPAND_MILLIS = 200
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
  * to drop it there; on a built-in card, it lifts the app as a [drag]. Each hand-picked card says where it lies to the
  * [drops], and the [dropTarget] is outlined. While one of its apps is on the move, a card shows where they would be if it
- * were dropped. Apps wear their [unread] counts.
+ * were dropped. While an app is [held] over the page, a finger near its top or bottom scrolls it, so the cards off
+ * screen can be reached. Apps wear their [unread] counts.
  */
 @Composable
 fun CollectionsColumn(
@@ -235,17 +243,30 @@ fun CollectionsColumn(
     drops: CardDrops? = null,
     dropTarget: CollectionKind? = null,
     bin: BinTarget? = null,
+    held: HeldApp? = null,
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
-    val gap = with(LocalDensity.current) { Spacing.Gap.toPx() }
+    val density = LocalDensity.current
+    val gap = with(density) { Spacing.Gap.toPx() }
     val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }
+    val scroll = rememberScrollState()
+    val latestHeld by rememberUpdatedState(held)
+    LaunchedEffect(held != null) {
+        if (held != null) scroll.scrollAtPageEdges(density, at = { latestHeld?.finger()?.y ?: Float.NaN })
+    }
 
     Box(modifier.fillMaxSize()) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
-            modifier = Modifier.fillMaxSize().verticalPageScroll().padding(Spacing.Edge),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalPageScroll(scroll)
+                // Once the cards are laid out where the scroll put them, not as it steps: what is under the finger is
+                // worked out from where they are.
+                .onGloballyPositioned { latestHeld?.onScrolled() }
+                .padding(Spacing.Edge),
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {

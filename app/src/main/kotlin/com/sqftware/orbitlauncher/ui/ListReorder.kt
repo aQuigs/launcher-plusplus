@@ -18,7 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.sqftware.orbitlauncher.domain.edgePull
 import kotlinx.coroutines.flow.first
 
 /**
@@ -120,6 +123,18 @@ fun Modifier.reorderItem(reorder: ListReorder, index: Int): Modifier {
             val moved = onScreen * if (dragged) reorder.offset else shift
             if (reorder.horizontal) translationX = moved else translationY = moved
         }
+}
+
+// A finger this near a page's top or bottom edge, holding something dragged, scrolls the page, and at the edge itself this
+// fast, a second.
+private val PAGE_EDGE_ZONE = 72.dp
+private val PAGE_EDGE_SPEED = 900.dp
+
+/** [scrollAtEdges] for a page, under a finger held [at] so far down it, or not a number while it pulls nowhere. */
+suspend fun ScrollState.scrollAtPageEdges(density: Density, at: () -> Float, room: (px: Float) -> Float = { it }, follow: (px: Float) -> Unit = {}) {
+    val zone = with(density) { PAGE_EDGE_ZONE.toPx() }
+    val speed = with(density) { PAGE_EDGE_SPEED.toPx() }
+    scrollAtEdges(speed, pull = { edgePull(at(), viewportSize.toFloat(), zone) }, room, follow)
 }
 
 /**
