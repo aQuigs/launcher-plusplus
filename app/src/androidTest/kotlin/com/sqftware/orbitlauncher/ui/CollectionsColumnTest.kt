@@ -239,7 +239,22 @@ class CollectionsColumnTest {
     }
 
     @Test
-    fun draggingAHandleLiftsTheCardMakesTheOthersWayAndReordersOnRelease() {
+    fun aSwipeFromAHandleLeavesTheCardWhereItIs() {
+        page = CollectionsPage().add(tools)
+        show()
+        val handle = compose.collectionHandle(tools).fetchSemanticsNode().boundsInRoot.center
+
+        compose.onRoot().performTouchInput {
+            down(handle)
+            repeat(10) { moveBy(Offset(0f, -30.dp.toPx())) }
+            up()
+        }
+
+        compose.runOnIdle { assertEquals(listOf(NewApps, MostUsed, tools), page.cards.map { it.kind }) }
+    }
+
+    @Test
+    fun holdingAHandleLiftsTheCardMakesTheOthersWayAndReordersOnRelease() {
         page = CollectionsPage().add(tools)
         show()
         val newAppsTop = topOf(compose.collectionCard(NewApps))
@@ -248,7 +263,7 @@ class CollectionsColumnTest {
 
         compose.onRoot().performTouchInput {
             down(handle)
-            moveBy(Offset(0f, -viewConfiguration.touchSlop * 2))
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
             // Past New Apps' middle: to its top and a little further, since the two cards are the same height.
             repeat(10) { moveBy(Offset(0f, -(toolsTop - newAppsTop + 20.dp).toPx() / 10)) }
         }
