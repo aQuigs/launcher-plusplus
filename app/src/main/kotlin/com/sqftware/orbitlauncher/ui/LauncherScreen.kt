@@ -132,7 +132,6 @@ import com.sqftware.orbitlauncher.domain.minimap.Journal
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MapStyle
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
-import com.sqftware.orbitlauncher.domain.minimap.Trails
 import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.pairOf
 import com.sqftware.orbitlauncher.domain.planetsOf
@@ -315,8 +314,6 @@ fun LauncherScreen(
     journal: Journal,
     onJournalChange: (Journal) -> Unit,
     worldMaps: (MapStyle) -> WorldMap,
-    trails: () -> Trails,
-    onLogTrail: (Boolean) -> Unit,
     isHomeApp: Boolean,
     onBecomeHomeApp: () -> Unit,
     widgetPages: WidgetPages,
@@ -1997,8 +1994,6 @@ fun LauncherScreen(
                     moving = ambientMotion,
                     onPick = markQuest.takeIf { theme.keepsJournal },
                     pickLabel = MARK_QUEST,
-                    trails = trails,
-                    onLogTrail = onLogTrail,
                     onClose = { showingWorldMap = false },
                 )
             }

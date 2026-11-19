@@ -19,7 +19,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
@@ -27,7 +26,6 @@ import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
 import com.sqftware.orbitlauncher.apps.PlatformLocationSource
-import com.sqftware.orbitlauncher.apps.ServiceTrailRecorder
 import com.sqftware.orbitlauncher.apps.PlayAppUpdates
 import com.sqftware.orbitlauncher.apps.ResourceMinimapArt
 import com.sqftware.orbitlauncher.apps.RoleManagerHomeRole
@@ -161,7 +159,6 @@ class MainActivity : ComponentActivity() {
         val journalStore = SharedPreferencesJournalStore(this)
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
-        val trailRecorder = ServiceTrailRecorder(this, activityResultRegistry)
         val headingSource = SensorHeadingSource(this, location)
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)
@@ -237,7 +234,6 @@ class MainActivity : ComponentActivity() {
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
                 var journal by remember { mutableStateOf(journalStore.load()) }
-                val trails = trailRecorder.trails.collectAsStateWithLifecycle()
                 var homeOnReturn by remember { mutableStateOf(homeOnReturnStore.load()) }
                 var pickTip by remember { mutableStateOf(pickTipStore.load()) }
                 // The first face is read before the first frame too, so the ring does not move down when the clock arrives.
@@ -510,17 +506,6 @@ class MainActivity : ComponentActivity() {
                         journalStore.save(it)
                     },
                     worldMaps = { style -> TiledWorldMap(mapTiles, minimapArt, style) },
-                    trails = { trails.value },
-                    onLogTrail = { on ->
-                        when {
-                            !on -> trailRecorder.stop()
-                            location.isPrecise() -> trailRecorder.start()
-                            else -> {
-                                toasts.show("A trail needs precise location")
-                                location.request()
-                            }
-                        }
-                    },
                     isHomeApp = isHomeApp,
                     onBecomeHomeApp = homeRole::request,
                     widgetPages = widgetPages,
