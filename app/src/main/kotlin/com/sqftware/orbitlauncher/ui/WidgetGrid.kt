@@ -93,7 +93,6 @@ import com.sqftware.orbitlauncher.domain.WIDGET_ROW_HEIGHT_DP
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.cellRange
-import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.heldDrag
 import com.sqftware.orbitlauncher.domain.isLauncherBlock
 import com.sqftware.orbitlauncher.domain.nearestCells
@@ -369,9 +368,7 @@ fun WidgetGrid(
     LaunchedEffect(dragging) {
         if (!dragging || fixed) return@LaunchedEffect
         val follower = edge.stretch ?: heldFollower
-        val zone = with(density) { PAGE_EDGE_ZONE.toPx() }
-        val speed = with(density) { PAGE_EDGE_SPEED.toPx() }
-        scroll.scrollAtEdges(speed, pull = { edgePull(finger, scroll.viewportSize.toFloat(), zone) }, room = follower.room, follow = follower.follow)
+        scroll.scrollAtPageEdges(density, at = { finger }, room = follower.room, follow = follower.follow)
     }
 
     Box(

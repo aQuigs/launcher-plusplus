@@ -66,7 +66,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,7 +87,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -119,7 +117,6 @@ import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.MAX_COLLECTION_NAME
 import com.sqftware.orbitlauncher.domain.MoreMark
 import com.sqftware.orbitlauncher.domain.UnreadCounts
-import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
@@ -166,11 +163,10 @@ object CollectionTags {
 class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
 
 /**
- * An app held over a collections page: where the finger is, in root coordinates, or null while it is over something
- * floating above the page, such as the bin, and what to tell once the page has scrolled under the still finger, which
- * is then over something else.
+ * An app held over a collections page: where the finger is, in the page's coordinates, and what to tell once the page has
+ * scrolled under the still finger, which is then over something else.
  */
-class HeldApp(val finger: () -> Offset?, val onScrolled: () -> Unit)
+class HeldApp(val finger: () -> Offset, val onScrolled: () -> Unit)
 
 /**
  * Where the hand-picked cards lie, so an app dragged from anywhere can be dropped on one. Their coordinates rather than
@@ -256,23 +252,21 @@ fun CollectionsColumn(
     val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }
     val scroll = rememberScrollState()
-    var top by remember { mutableFloatStateOf(0f) }
     val latestHeld by rememberUpdatedState(held)
-
     LaunchedEffect(held != null) {
-        if (held == null) return@LaunchedEffect
-        val zone = with(density) { PAGE_EDGE_ZONE.toPx() }
-        val speed = with(density) { PAGE_EDGE_SPEED.toPx() }
-        scroll.scrollAtEdges(
-            speed,
-            pull = { latestHeld?.finger()?.let { edgePull(it.y - top, scroll.viewportSize.toFloat(), zone) } ?: 0f },
-        ) { latestHeld?.onScrolled() }
+        if (held != null) scroll.scrollAtPageEdges(density, at = { latestHeld?.finger()?.y ?: Float.NaN })
     }
 
-    Box(modifier.fillMaxSize().onGloballyPositioned { top = it.positionInRoot().y }) {
+    Box(modifier.fillMaxSize()) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
-            modifier = Modifier.fillMaxSize().verticalPageScroll(scroll).padding(Spacing.Edge),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalPageScroll(scroll)
+                // Once the cards are laid out where the scroll put them, not as it steps: what is under the finger is
+                // worked out from where they are.
+                .onGloballyPositioned { latestHeld?.onScrolled() }
+                .padding(Spacing.Edge),
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {
