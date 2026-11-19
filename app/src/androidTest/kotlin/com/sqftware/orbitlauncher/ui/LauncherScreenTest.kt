@@ -112,6 +112,7 @@ import com.sqftware.orbitlauncher.domain.RingSlot
 import com.sqftware.orbitlauncher.domain.RingerMode
 import com.sqftware.orbitlauncher.domain.SpinStats
 import com.sqftware.orbitlauncher.domain.Theme
+import com.sqftware.orbitlauncher.domain.Vitals
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetPages
@@ -336,6 +337,8 @@ class LauncherScreenTest {
             heading = { null },
             journal = journal,
             onJournalChange = { journal = it },
+            vitals = { Vitals() },
+            onOpenVital = {},
             worldMaps = { worldMap },
             isHomeApp = isHomeApp,
             onBecomeHomeApp = { homeRequests++ },
