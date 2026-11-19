@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.flow.first
 
@@ -121,6 +122,11 @@ fun Modifier.reorderItem(reorder: ListReorder, index: Int): Modifier {
             if (reorder.horizontal) translationX = moved else translationY = moved
         }
 }
+
+// A finger this near a page's top or bottom edge, holding something dragged, scrolls the page, and at the edge itself this
+// fast, a second.
+val PAGE_EDGE_ZONE = 72.dp
+val PAGE_EDGE_SPEED = 900.dp
 
 /**
  * Scrolls while a held finger is near an edge, as [pull] says, from -1 at the start to 1 at the end, faster the nearer it is,

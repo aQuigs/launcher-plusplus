@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -48,6 +49,7 @@ class CollectionsColumnTest {
     private var usageSettingsOpened = 0
     private val menusOpened = mutableListOf<Pair<CollectionKind, AppEntry>>()
     private val settingsOpened = mutableListOf<CollectionKind>()
+    private var held by mutableStateOf<HeldApp?>(null)
 
     private fun show() = compose.setContent {
         CollectionsColumn(
@@ -64,6 +66,7 @@ class CollectionsColumnTest {
             onAdd = { adds++ },
             onOpenUsageSettings = { usageSettingsOpened++ },
             menu = { kind -> AppMenu(onOpen = { menusOpened += kind to it }, content = {}) },
+            held = held,
         )
     }
 
@@ -259,5 +262,20 @@ class CollectionsColumnTest {
 
         compose.runOnIdle { assertEquals(listOf(tools, NewApps, MostUsed), page.cards.map { it.kind }) }
         assertTrue("Tools now on top", topOf(compose.collectionCard(tools)) < topOf(compose.collectionCard(NewApps)))
+    }
+
+    @Test
+    fun anAppHeldNearTheBottomScrollsThePageDownToTheButton() {
+        page = AppCategory.entries.fold(CollectionsPage()) { page, category -> page.add(CollectionKind.Category(category)) }
+        show()
+        compose.addCollectionButton().assertIsNotDisplayed()
+        val bottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
+        var scrolled = 0
+
+        held = HeldApp(finger = { Offset(100f, bottom - 1f) }, onScrolled = { scrolled++ })
+        compose.waitForIdle()
+
+        compose.addCollectionButton().assertIsDisplayed()
+        assertTrue("told of the scroll", scrolled > 0)
     }
 }

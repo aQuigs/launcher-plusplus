@@ -173,11 +173,6 @@ private val CONTROL_SIZE = 40.dp
 // one row tall, since each is half a row; half the page's padding keeps them clear of the screen's edge.
 private val CONTROL_REACH = Spacing.Edge / 2
 
-// A finger this near the page's top or bottom edge, dragging a widget or its handle, scrolls the page, and at the edge
-// itself this fast, a second.
-private val EDGE_ZONE = 72.dp
-private val EDGE_SPEED = 900.dp
-
 /** The length of [cells] cells [cell] long and the gaps between them. */
 private fun span(cells: Int, cell: Dp) = cell * cells + GAP * (cells - 1)
 
@@ -374,8 +369,8 @@ fun WidgetGrid(
     LaunchedEffect(dragging) {
         if (!dragging || fixed) return@LaunchedEffect
         val follower = edge.stretch ?: heldFollower
-        val zone = with(density) { EDGE_ZONE.toPx() }
-        val speed = with(density) { EDGE_SPEED.toPx() }
+        val zone = with(density) { PAGE_EDGE_ZONE.toPx() }
+        val speed = with(density) { PAGE_EDGE_SPEED.toPx() }
         scroll.scrollAtEdges(speed, pull = { edgePull(finger, scroll.viewportSize.toFloat(), zone) }, room = follower.room, follow = follower.follow)
     }
 

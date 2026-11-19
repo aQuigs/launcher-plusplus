@@ -62,9 +62,11 @@ import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,6 +88,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -116,6 +119,7 @@ import com.sqftware.orbitlauncher.domain.ForegroundTime
 import com.sqftware.orbitlauncher.domain.MAX_COLLECTION_NAME
 import com.sqftware.orbitlauncher.domain.MoreMark
 import com.sqftware.orbitlauncher.domain.UnreadCounts
+import com.sqftware.orbitlauncher.domain.edgePull
 import com.sqftware.orbitlauncher.domain.mostUsed
 import com.sqftware.orbitlauncher.domain.newApps
 import com.sqftware.orbitlauncher.domain.title
@@ -160,6 +164,13 @@ object CollectionTags {
 
 /** The bin a lifted app can be dropped on: whether the finger is over it, and where it lies, in root coordinates. */
 class BinTarget(val highlighted: Boolean, val onPositioned: (Bounds) -> Unit)
+
+/**
+ * An app held over a collections page: where the finger is, in root coordinates, or null while it is over something
+ * floating above the page, such as the bin, and what to tell once the page has scrolled under the still finger, which
+ * is then over something else.
+ */
+class HeldApp(val finger: () -> Offset?, val onScrolled: () -> Unit)
 
 /**
  * Where the hand-picked cards lie, so an app dragged from anywhere can be dropped on one. Their coordinates rather than
@@ -212,7 +223,8 @@ private const val EXPAND_MILLIS = 200
  * through the card's [rearrange], to move it among the card's apps or, while the [bin] sits at the bottom of the page,
  * to drop it there; on a built-in card, it lifts the app as a [drag]. Each hand-picked card says where it lies to the
  * [drops], and the [dropTarget] is outlined. While one of its apps is on the move, a card shows where they would be if it
- * were dropped. Apps wear their [unread] counts.
+ * were dropped. While an app is [held] over the page, a finger near its top or bottom scrolls it, so the cards off
+ * screen can be reached. Apps wear their [unread] counts.
  */
 @Composable
 fun CollectionsColumn(
@@ -235,17 +247,32 @@ fun CollectionsColumn(
     drops: CardDrops? = null,
     dropTarget: CollectionKind? = null,
     bin: BinTarget? = null,
+    held: HeldApp? = null,
     unread: UnreadCounts = UnreadCounts(),
     onClearBadge: ((AppEntry) -> Unit)? = null,
 ) {
-    val gap = with(LocalDensity.current) { Spacing.Gap.toPx() }
+    val density = LocalDensity.current
+    val gap = with(density) { Spacing.Gap.toPx() }
     val reorder = remember(gap) { ListReorder(gap) }
     SideEffect { reorder.count = page.cards.size }
+    val scroll = rememberScrollState()
+    var top by remember { mutableFloatStateOf(0f) }
+    val latestHeld by rememberUpdatedState(held)
 
-    Box(modifier.fillMaxSize()) {
+    LaunchedEffect(held != null) {
+        if (held == null) return@LaunchedEffect
+        val zone = with(density) { PAGE_EDGE_ZONE.toPx() }
+        val speed = with(density) { PAGE_EDGE_SPEED.toPx() }
+        scroll.scrollAtEdges(
+            speed,
+            pull = { latestHeld?.finger()?.let { edgePull(it.y - top, scroll.viewportSize.toFloat(), zone) } ?: 0f },
+        ) { latestHeld?.onScrolled() }
+    }
+
+    Box(modifier.fillMaxSize().onGloballyPositioned { top = it.positionInRoot().y }) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.Gap),
-            modifier = Modifier.fillMaxSize().verticalPageScroll().padding(Spacing.Edge),
+            modifier = Modifier.fillMaxSize().verticalPageScroll(scroll).padding(Spacing.Edge),
         ) {
             page.cards.forEachIndexed { index, card ->
                 key(card.kind.name) {

@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -483,8 +484,9 @@ fun LauncherScreen(
     // when the finger changes zone or position, not whenever it moves. The targets are those of the page the pager is on
     // or on its way to. The ring and the dock are measured on the home page and judged where it settles, at the pager's
     // origin: a drag from another page goes home under the finger, and a drop must not miss because the page has not
-    // arrived yet.
-    var finger by remember { mutableStateOf(Offset.Zero) }
+    // arrived yet. Set again where it is, it still tells its readers: a page scrolling under a still finger moves the
+    // targets.
+    var finger by remember { mutableStateOf(Offset.Zero, neverEqualPolicy()) }
     val inView by remember { derivedStateOf { latestLayout.pageAt(pagerState.targetPage) } }
     val ringPageCoordinates = remember { mutableMapOf<String, LayoutCoordinates>() }
     var pagerOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -523,6 +525,9 @@ fun LauncherScreen(
             if (switchShown) switchHalves.entries.find { it.value.contains(finger.x, finger.y) }?.key else null
         }
     }
+    // Not over the bin or the switch, which float over the bottom and top of a collections page, so resting there does
+    // not scroll it.
+    val heldOverCards = remember { HeldApp(finger = { finger.takeUnless { overBin || overSwitch != null } }, onScrolled = { finger = finger }) }
     val latestOnReorderModeChange by rememberUpdatedState(onReorderModeChange)
     LaunchedEffect(overSwitch) {
         val mode = overSwitch ?: return@LaunchedEffect
@@ -1785,6 +1790,7 @@ fun LauncherScreen(
                                         drops = cardDrops.getOrPut(page.id) { CardDrops() },
                                         dropTarget = cardTarget?.takeIf { it.page == page }?.kind,
                                         bin = if (active && binShown) BinTarget(overBin, onPositioned = { binBounds = it }) else null,
+                                        held = heldOverCards.takeIf { page == inView && dragged?.app != null },
                                         unread = unread,
                                         onClearBadge = actions.clearBadge,
                                     )
