@@ -22,8 +22,8 @@ interface PlaceSearch {
     /** The places [query] names, best first; none when it names none or the search cannot be made. */
     suspend fun find(query: String): List<PlaceValue>
 
-    /** Opens the maps app, where a place found can be shared back to the launcher. */
-    fun openMaps()
+    /** Opens the maps app, where a place found can be shared back to the launcher, and says whether it did. */
+    fun openMaps(): Boolean
 }
 
 /** [PlaceSearch] through the system's geocoder, which needs no key of the launcher's own. */
@@ -66,10 +66,16 @@ class GeocoderPlaceSearch(private val context: Context) : PlaceSearch {
         val address = lines.joinToString(", ")
         val first = lines.firstOrNull().orEmpty()
         val name = featureName?.takeIf { it.isNotBlank() && !it.all(Char::isDigit) && !first.startsWith(it) } ?: first
-        return PlaceValue(label = name.ifEmpty { address }, address = address, latitude = latitude, longitude = longitude)
+        // Some geocoders leave out where a place is, and reading it then throws.
+        return PlaceValue(
+            label = name.ifEmpty { address },
+            address = address,
+            latitude = latitude.takeIf { hasLatitude() },
+            longitude = longitude.takeIf { hasLongitude() },
+        )
     }
 
-    override fun openMaps() = startOrLog(TAG, "maps") {
+    override fun openMaps() = started(TAG, "maps") {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

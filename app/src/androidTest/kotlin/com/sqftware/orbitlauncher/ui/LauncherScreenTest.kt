@@ -270,7 +270,7 @@ class LauncherScreenTest {
         openStorePage = storePagesOpened::add,
         uninstall = uninstalled::add,
         findPlaces = { listOf(found) },
-        openMaps = {},
+        openMaps = { false },
     )
 
     // The screen's own, so a test can take the launcher out of sight and back without the activity.
@@ -1146,6 +1146,22 @@ class LauncherScreenTest {
             assertEquals(listOf(mapOf(InputKind.Place to home)), answered)
             assertEquals(listOf(home, found), recentPlaces)
         }
+    }
+
+    @Test
+    fun anIntentIconSplitsWithAnotherApp() {
+        val uber = AppEntry("Uber", "com.ubercab", "com.ubercab.Main")
+        val asking = openedAs(uber, openChoices(uber).last())!!
+        apps = listOf(clock, mail, uber)
+        homeApps = HomeApps(ring = ringOf(asking))
+        show()
+
+        compose.ringSlot(asking).performTouchInput { longClick() }
+        compose.onNodeWithText("Split with…").performClick()
+        compose.onNodeWithText("Pick an app to split with Uber ride").assertIsDisplayed()
+        compose.onNodeWithText("Mail").performClick()
+
+        compose.runOnIdle { assertEquals(HomeApps(ring = Ring(listOf(RingSlot.App(asking.key), RingSlot.App(pairOf(asking, mail)!!.key)))), homeApps) }
     }
 
     @Test

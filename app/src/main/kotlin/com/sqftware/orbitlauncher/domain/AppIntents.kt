@@ -35,7 +35,7 @@ const val ACTION_VIEW = "android.intent.action.VIEW"
 enum class InputKind {
     Place {
         override fun decode(text: String): InputValue? {
-            val parts = text.split(FIELD_SEPARATOR)
+            val parts = text.split(FIELD_SEPARATOR).map { URLDecoder.decode(it, "UTF-8") }
             if (parts.size != 4) return null
             return PlaceValue(parts[0], parts[1], parts[2].toDoubleOrNull(), parts[3].toDoubleOrNull())
         }
@@ -56,7 +56,7 @@ sealed interface InputValue {
     fun encode(): String
 }
 
-/** A place called [label] at [address], and where it is when that is known. */
+/** A place called [label] at [address], and where it is when that is known. Its fields may hold any text, line breaks too. */
 data class PlaceValue(
     override val label: String,
     val address: String,
@@ -66,7 +66,7 @@ data class PlaceValue(
     override val kind get() = InputKind.Place
 
     override fun encode() = listOf(label, address, latitude?.toString().orEmpty(), longitude?.toString().orEmpty())
-        .joinToString(FIELD_SEPARATOR)
+        .joinToString(FIELD_SEPARATOR) { URLEncoder.encode(it, "UTF-8") }
 }
 
 private const val FIELD_SEPARATOR = "\n"

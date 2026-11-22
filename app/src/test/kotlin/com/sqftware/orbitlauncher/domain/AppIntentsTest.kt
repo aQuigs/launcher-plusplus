@@ -42,9 +42,10 @@ class AppIntentsTest {
     fun `an intent icon's key is storable, is no other kind of key, and resolves while its app is installed`() {
         val saved = openedAs(uber, OpenChoice.Intent(ride, asks = false), work)!!
         val asking = openedAs(uber, OpenChoice.Intent(ride, asks = true))!!
+        val pasted = openedAs(uber, OpenChoice.Intent(ride, asks = false), PlaceValue("Eiffel Tower\nParis", "Av. Gustave Eiffel\nParis"))!!
         val apps = AppsByKey(listOf(uber, mail))
 
-        listOf(saved, asking).forEach {
+        listOf(saved, asking, pasted).forEach {
             assertTrue(isStorable(it.key))
             assertNull(pairKeys(it.key))
             assertEquals(it, apps[it.key])

@@ -28,5 +28,5 @@ class AppActions(
     val openStorePage: (AppEntry) -> Unit,
     val uninstall: (AppEntry) -> Unit,
     val findPlaces: suspend (String) -> List<PlaceValue>,
-    val openMaps: () -> Unit,
+    val openMaps: () -> Boolean,
 )

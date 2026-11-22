@@ -386,7 +386,8 @@ fun <T> SearchDialog(
             Column {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = onQueryChange,
+                    // A pasted line break would end up in what is found, though the field shows one line.
+                    onValueChange = { onQueryChange(it.replace('\n', ' ')) },
                     label = { Text(fieldLabel) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),

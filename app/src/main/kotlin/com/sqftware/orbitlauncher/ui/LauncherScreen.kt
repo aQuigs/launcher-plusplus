@@ -586,7 +586,8 @@ fun LauncherScreen(
     var query by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val splittingKey = (picking as? DrawerPick.Partner)?.app
-    val splitting = remember(apps, splittingKey) { splittingKey?.let { key -> apps?.find { it.key == key } } }
+    // Resolved as a stored key is, as the app to split may be one opened to an intent, which the app list does not hold.
+    val splitting = remember(apps, splittingKey) { splittingKey?.let { key -> apps?.let(::AppsByKey)?.get(key) } }
     val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen && dragged == null
     LaunchedEffect(drawerSettledClosed) {
         if (drawerSettledClosed) {
@@ -1378,7 +1379,7 @@ fun LauncherScreen(
     val latestOnToast by rememberUpdatedState(onToast)
     LaunchedEffect(sharedPlaces) {
         sharedPlaces.collect { text ->
-            val query = placeQueryFromShare(text) ?: return@collect
+            val query = placeQueryFromShare(text.take(MAX_SHARED_PLACE)) ?: return@collect
             if (asking?.kind == InputKind.Place) {
                 promptQuery = query
             } else {
@@ -2039,7 +2040,7 @@ fun LauncherScreen(
                         kind = prompt.kind,
                         query = promptQuery,
                         onQueryChange = { promptQuery = it },
-                        sources = InputSources(recentPlaces, actions.findPlaces, openMaps = { errand(actions.openMaps) }),
+                        sources = InputSources(recentPlaces, actions.findPlaces, openMaps = { if (actions.openMaps()) onErrand = true }),
                         onAnswer = { value ->
                             asking = null
                             if (value is PlaceValue) onRecentPlacesChange(recentPlaces.withRecent(value))
@@ -2155,6 +2156,9 @@ private sealed interface Drag {
 }
 
 /** The folder open [at] its place and slot on the ring page [page]. */
+/** The most of a shared text read for a place: any app can share text, and a place's name and address are short. */
+private const val MAX_SHARED_PLACE = 500
+
 /** The icon [app], pressed at [spot], whose way of opening is being chosen: for a pair, its app [member]'s. */
 private class ChoosingOpen(val app: AppEntry, val member: AppEntry, val spot: AppSpot)
 
