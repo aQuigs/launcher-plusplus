@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.domain
 
+import com.sqftware.orbitlauncher.domain.minimap.MapStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,6 +32,23 @@ class ThemeTest {
         assertTrue(!FolderLook.SubDial.moves(folders = true, planets = listOf(Planet.Earth)))
         assertTrue(!FolderLook.SolarSystem.moves(folders = true, planets = listOf(Planet.Mercury)))
         assertTrue(FolderLook.SolarSystem.moves(folders = true, planets = listOf(Planet.Mercury, Planet.Earth)))
+    }
+
+    @Test
+    fun `night falls at seven in the evening and ends at six in the morning`() {
+        assertTrue(!isNight(6 * 60))
+        assertTrue(!isNight(19 * 60 - 1))
+        assertTrue(isNight(19 * 60))
+        assertTrue(isNight(0))
+        assertTrue(isNight(6 * 60 - 1))
+    }
+
+    @Test
+    fun `a map that darkens with the sky takes its night style after dark, and the rest keep theirs`() {
+        assertEquals(MapStyle.Gta, Theme.Gta.mapStyleAt(12 * 60))
+        assertEquals(MapStyle.GtaNight, Theme.Gta.mapStyleAt(23 * 60))
+        assertEquals(MapStyle.Skyrim, Theme.Skyrim.mapStyleAt(23 * 60))
+        assertEquals(null, Theme.Space.mapStyleAt(23 * 60))
     }
 
     @Test

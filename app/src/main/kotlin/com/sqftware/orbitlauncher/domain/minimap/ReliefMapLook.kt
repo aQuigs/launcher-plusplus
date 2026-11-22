@@ -36,6 +36,9 @@ private const val PHOSPHOR_FLOOR = 14.0
 private const val PHOSPHOR_RED = 0.2
 private const val PHOSPHOR_BLUE = 0.5
 
+/** A paint for a map in relief in [tint], as [paintRelief] colors it. */
+internal fun relief(tint: LightTint) = GroundPaint { layout, into -> paintRelief(layout, into, tint) }
+
 /**
  * Colors [layout] as a game's local map in relief, as Skyrim's and Fallout's are: a ground seen from above under a light
  * from the upper left, roofs standing off it in their shadows, trees as dark crowns, and all of it softened as the
@@ -71,16 +74,21 @@ internal fun paintRelief(layout: GroundLayout, into: IntArray, tint: LightTint) 
         }
     }
 
-    // Softened by a 3 by 3 binomial blur, its weights summing to 16, edges held.
+    val soft = softened(w, h, light)
+    for (i in 0 until w * h) into[i] = tint.tint(soft[i])
+}
+
+/** [values] over a [w] by [h] view softened by a 3 by 3 binomial blur, its weights summing to 16, its edges held. */
+internal fun softened(w: Int, h: Int, values: DoubleArray): DoubleArray {
     val weights = intArrayOf(1, 2, 1)
-    for (i in 0 until w * h) {
+    return DoubleArray(w * h) { i ->
         val x = i % w
         val y = i / w
         var sum = 0.0
         for (dy in -1..1) for (dx in -1..1) {
-            sum += light[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)] * weights[dx + 1] * weights[dy + 1]
+            sum += values[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)] * weights[dx + 1] * weights[dy + 1]
         }
-        into[i] = tint.tint(sum / 16)
+        sum / 16
     }
 }
 

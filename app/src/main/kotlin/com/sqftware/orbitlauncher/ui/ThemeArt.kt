@@ -109,7 +109,8 @@ interface ThemeArt {
     /**
      * What an app's icon, or a folder's previews, sit on, drawn under them on a layer the size of the disc, which it
      * may reach past: by default the disc. Only drawn, never round the icon, so it cannot move or size it.
-     * [LocalIconPlace] says whether the icon is on the home ring or elsewhere, where a theme may frame it differently.
+     * [LocalIconPlace] says whether the icon is on the home ring, in an open folder or elsewhere, where a theme may frame it
+     * differently.
      */
     @Composable
     fun iconGround(): Modifier = Modifier.background(LocalBoxColors.current.on(LocalGround.current), CircleShape)
@@ -230,6 +231,13 @@ interface ThemeArt {
     fun emblemBox(edge: Color): Modifier =
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
+    /**
+     * What lies over an open [folder]'s face in the ring's centre, filling the item, [shown] from 0 to 1 as its apps go
+     * out round it: by default nothing.
+     */
+    @Composable
+    fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) = Unit
+
     /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
     val foldersOpenRoundEmblem: Boolean
         get() = false
@@ -283,6 +291,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.OldSchool -> OldSchoolArt
     Theme.Skyrim -> SkyrimArt
     Theme.Fallout -> FalloutArt
+    Theme.Gta -> GtaArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }
@@ -296,7 +305,7 @@ fun Themed(theme: Theme, colourway: Colourway, lightWallpaper: Boolean, content:
     }
 }
 
-private val MaterialTypography = Typography()
+internal val MaterialTypography = Typography()
 private val MaterialShapes = Shapes()
 
 /**

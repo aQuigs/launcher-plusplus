@@ -429,7 +429,7 @@ object OldSchoolArt : ThemeArt {
 
     /** On the ring, the game's orb; elsewhere nothing. */
     @Composable
-    override fun iconGround(): Modifier = if (LocalIconPlace.current == IconPlace.Ring) Modifier.orb() else Modifier
+    override fun iconGround(): Modifier = if (LocalIconPlace.current != IconPlace.Elsewhere) Modifier.orb() else Modifier
 
     /** An item keeps its own outline, so neither its pixels nor its ripple are cut to a disc. */
     override val iconShape: Shape?

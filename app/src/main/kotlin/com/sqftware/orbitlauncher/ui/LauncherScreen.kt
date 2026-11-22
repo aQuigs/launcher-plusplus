@@ -1385,6 +1385,7 @@ fun LauncherScreen(
         LocalHeading provides heading,
         LocalQuest provides journal.quest,
         LocalOpenWorldMap provides openWorldMap,
+        LocalUnread provides remember(unread, apps) { unread.among(apps.orEmpty()) },
     ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
@@ -1983,7 +1984,7 @@ fun LauncherScreen(
                 }
             }
             // The whole window, through the bars, which hide while it is up.
-            val worldMapStyle = theme.mapStyle
+            val worldMapStyle = theme.mapStyleAt(clock.minuteOfDay)
             if (worldMapShown && worldMapArt != null && worldMapStyle != null) {
                 // One visit's map, so the tiles it decoded go with it.
                 val worldMap = remember(worldMapStyle) { worldMaps(worldMapStyle) }

@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.domain.minimap
 
 import com.sqftware.orbitlauncher.domain.Pixels
+import com.sqftware.orbitlauncher.domain.opaque
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -225,6 +226,19 @@ class MinimapPainterTest {
         assertTrue(built.light(75, 70) > bare.light(75, 70))
         assertTrue(built.light(91, 81) < bare.light(91, 81))
         assertEquals(bare.light(57, 57), built.light(57, 57))
+    }
+
+    @Test
+    fun gtaPaintsEachGroundFlatInItsDayOrNightColor() {
+        val day = MinimapPainter(MinimapSprites(), MapStyle.Gta)
+        val built = day.paintDisc(MapScene(centre, buildings = listOf(Building(rect(60, 60, 90, 80), seed = 1))))
+        val night = MinimapPainter(MinimapSprites(), MapStyle.GtaNight).paintDisc(MapScene(centre))
+
+        // Bare land is the land's one color, and a building sits flat in its block, with no wall round it.
+        assertEquals(opaque(GtaDayGround.land), day.paintDisc(MapScene(centre))[76, 76])
+        assertEquals(opaque(GtaDayGround.block), built[75, 70])
+        assertEquals(opaque(GtaDayGround.block), built[62, 62])
+        assertEquals(opaque(GtaNightGround.land), night[76, 76])
     }
 
     private fun MinimapPainter.paintDisc(scene: MapScene) = paint(scene, MapFrame.MINIMAP).ground

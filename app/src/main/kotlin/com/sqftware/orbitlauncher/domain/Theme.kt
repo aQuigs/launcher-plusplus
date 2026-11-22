@@ -6,7 +6,8 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
  * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
  * [iconStyle] it gives each place, and, if it has a [mapStyle], a map of where the user is in that style once they turn
- * it on; one that [keepsJournal] marks the user's quest and names each place they discover.
+ * it on, in its [nightMapStyle] after dark; one that [keepsJournal] marks the user's quest and names each place they
+ * discover.
  */
 enum class Theme(
     val label: String,
@@ -15,6 +16,7 @@ enum class Theme(
     private val iconStyles: (IconPlace) -> IconStyle = { IconStyle.Plain },
     val mapStyle: MapStyle? = null,
     val keepsJournal: Boolean = false,
+    private val nightMapStyle: MapStyle? = mapStyle,
 ) {
     Space(
         "Space",
@@ -47,7 +49,7 @@ enum class Theme(
         listOf(Colourway.Classic),
         // The ring's icons sit in the game's round orbs, a smaller frame than an inventory slot, so an item there is a
         // size down: as large as fits inside the orb's black with its outline.
-        iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Ring) 22 else 26) },
+        iconStyles = { place -> IconStyle.Item(if (place == IconPlace.Elsewhere) 26 else 22) },
         mapStyle = MapStyle.OldSchool,
     ),
     Skyrim("Skyrim", listOf(FolderLook.Shield), listOf(Colourway.Nord), mapStyle = MapStyle.Skyrim, keepsJournal = true),
@@ -58,11 +60,22 @@ enum class Theme(
         mapStyle = MapStyle.Fallout,
         keepsJournal = true,
     ),
+    Gta(
+        "GTA",
+        listOf(FolderLook.WeaponWheel),
+        listOf(Colourway.Vice),
+        mapStyle = MapStyle.Gta,
+        keepsJournal = true,
+        nightMapStyle = MapStyle.GtaNight,
+    ),
     ;
 
     fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)
 
     val mapsWhereIAm: Boolean get() = mapStyle != null
+
+    /** The style the map is painted in at [minuteOfDay]: the night's after dark, as a game's map darkens with its sky. */
+    fun mapStyleAt(minuteOfDay: Int): MapStyle? = if (isNight(minuteOfDay)) nightMapStyle else mapStyle
 
     /** Whether the user has a folder look to choose, which a theme with one has not. */
     val choosesFolderLook: Boolean get() = folderLooks.size > 1

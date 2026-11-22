@@ -54,7 +54,7 @@ private const val ICON_OF_SPACING = 0.85f
  * A game's world map in [look]: the local map's ground seen from above, darkening toward the edges, the theme's
  * [drift] over it, the player's arrow turned the way they face and the quest marker.
  */
-internal class HudWorldMap(private val look: HudLook, private val drift: Drift) : WorldMapArt {
+internal class HudWorldMap(private val look: HudLook, private val drift: Drift?) : WorldMapArt {
     override val void = look.colors.fog
     override val ink = look.colors.ink
 
@@ -92,9 +92,11 @@ internal class HudWorldMap(private val look: HudLook, private val drift: Drift) 
     @Composable
     override fun Over(view: () -> MapView, moving: Boolean) {
         val quest = LocalQuest.current
-        val turn = turnAngle(moving, WEATHER_CYCLE_S * 1_000)
         // Each in a layer of its own, so a frame of weather redraws only the weather, and a pan only the quest marker.
-        DriftingWeather(drift, { turn.value }, Modifier.fillMaxSize().graphicsLayer())
+        drift?.let {
+            val turn = turnAngle(moving, WEATHER_CYCLE_S * 1_000)
+            DriftingWeather(it, { turn.value }, Modifier.fillMaxSize().graphicsLayer())
+        }
         Spacer(
             Modifier.fillMaxSize().graphicsLayer().drawWithCache {
                 val over = with(look) { screenOver() }

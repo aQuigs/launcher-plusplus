@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import kotlinx.coroutines.delay
@@ -88,3 +89,6 @@ val LocalOpenWorldMap = staticCompositionLocalOf<() -> Unit> { {} }
 
 /** The spot the user's quest marker points to, if they have one, for a theme that keeps a journal. */
 val LocalQuest = compositionLocalOf<LatLon?> { null }
+
+/** How many unread notifications each of the launcher's apps has, for a theme's art that shows it beyond the badges. */
+val LocalUnread = compositionLocalOf { UnreadCounts() }
