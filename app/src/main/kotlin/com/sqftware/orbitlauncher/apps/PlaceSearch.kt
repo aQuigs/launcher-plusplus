@@ -1,0 +1,75 @@
+package com.sqftware.orbitlauncher.apps
+
+import android.content.Context
+import android.content.Intent
+import android.location.Address
+import android.location.Geocoder
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import com.sqftware.orbitlauncher.domain.PlaceValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import kotlin.coroutines.resume
+
+private const val TAG = "PlaceSearch"
+private const val MAX_RESULTS = 5
+
+/** Finds places for the prompt that asks for one. */
+interface PlaceSearch {
+    /** The places [query] names, best first; none when it names none or the search cannot be made. */
+    suspend fun find(query: String): List<PlaceValue>
+
+    /** Opens the maps app, where a place found can be shared back to the launcher. */
+    fun openMaps()
+}
+
+/** [PlaceSearch] through the system's geocoder, which needs no key of the launcher's own. */
+class GeocoderPlaceSearch(private val context: Context) : PlaceSearch {
+    private val geocoder = Geocoder(context)
+
+    override suspend fun find(query: String): List<PlaceValue> {
+        if (query.isBlank() || !Geocoder.isPresent()) return emptyList()
+        return addresses(query).map { it.toPlace() }
+    }
+
+    private suspend fun addresses(query: String): List<Address> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            suspendCancellableCoroutine { done ->
+                geocoder.getFromLocationName(query, MAX_RESULTS, object : Geocoder.GeocodeListener {
+                    override fun onGeocode(addresses: MutableList<Address>) = done.resume(addresses)
+
+                    override fun onError(errorMessage: String?) {
+                        Log.w(TAG, "Cannot find places: $errorMessage")
+                        done.resume(emptyList())
+                    }
+                })
+            }
+        } else {
+            withContext(Dispatchers.IO) {
+                try {
+                    @Suppress("DEPRECATION")
+                    geocoder.getFromLocationName(query, MAX_RESULTS).orEmpty()
+                } catch (e: IOException) {
+                    Log.w(TAG, "Cannot find places", e)
+                    emptyList()
+                }
+            }
+        }
+
+    // An address the geocoder found for a business names it as its feature; for a street address, the feature is the house
+    // number, which says less than the address's first line.
+    private fun Address.toPlace(): PlaceValue {
+        val lines = (0..maxAddressLineIndex).map(::getAddressLine)
+        val address = lines.joinToString(", ")
+        val first = lines.firstOrNull().orEmpty()
+        val name = featureName?.takeIf { it.isNotBlank() && !it.all(Char::isDigit) && !first.startsWith(it) } ?: first
+        return PlaceValue(label = name.ifEmpty { address }, address = address, latitude = latitude, longitude = longitude)
+    }
+
+    override fun openMaps() = startOrLog(TAG, "maps") {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}

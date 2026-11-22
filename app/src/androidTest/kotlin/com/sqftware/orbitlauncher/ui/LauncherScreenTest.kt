@@ -117,9 +117,15 @@ import com.sqftware.orbitlauncher.domain.WidgetPage
 import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.feats
+import com.sqftware.orbitlauncher.domain.InputKind
+import com.sqftware.orbitlauncher.domain.InputValue
+import com.sqftware.orbitlauncher.domain.PlaceValue
+import com.sqftware.orbitlauncher.domain.openChoices
+import com.sqftware.orbitlauncher.domain.openedAs
 import com.sqftware.orbitlauncher.domain.pairOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -195,6 +201,9 @@ class LauncherScreenTest {
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
     private val launched = mutableListOf<AppEntry>()
+    private val answered = mutableListOf<Map<InputKind, InputValue>>()
+    private var recentPlaces by mutableStateOf(emptyList<PlaceValue>())
+    private val found = PlaceValue("Work", "1 Main St, Springfield", 37.5, -122.25)
     private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
     private val started = mutableListOf<AppShortcut>()
     private val infoOpened = mutableListOf<AppEntry>()
@@ -245,7 +254,10 @@ class LauncherScreenTest {
     private var resets = 0
     private val actions = AppActions(
         icon = { _, _ -> null },
-        launch = launched::add,
+        launch = { app, answers ->
+            launched += app
+            answered += answers
+        },
         clearBadge = {},
         shortcuts = {
             shortcutsLoaded.await()
@@ -257,6 +269,8 @@ class LauncherScreenTest {
         hasStorePage = { hasStorePage },
         openStorePage = storePagesOpened::add,
         uninstall = uninstalled::add,
+        findPlaces = { listOf(found) },
+        openMaps = {},
     )
 
     // The screen's own, so a test can take the launcher out of sight and back without the activity.
@@ -277,6 +291,7 @@ class LauncherScreenTest {
             onLayoutChange = { layout = it },
             homePresses = homePresses,
             pinRequests = pinRequests,
+            sharedPlaces = emptyFlow(),
             apps = apps,
             pinnedShortcuts = pinnedShortcuts,
             ringPages = ringPages,
@@ -352,6 +367,8 @@ class LauncherScreenTest {
             onOpenBadgeSettings = { badgeSettingsOpened++ },
             appSettings = appSettings,
             onAppSettingsChange = { appSettings = it },
+            recentPlaces = recentPlaces,
+            onRecentPlacesChange = { recentPlaces = it },
             onOpenNotifications = { notificationsOpened++ },
             onSystemBarsShownChange = { barsShown += it },
             onAmbientInSightChange = {},
@@ -1095,6 +1112,63 @@ class LauncherScreenTest {
             assertEquals(listOf(mail), infoOpened)
             assertEquals(listOf(mail), uninstalled)
             assertEquals(emptyList<AppEntry>(), launched)
+        }
+    }
+
+    @Test
+    fun aPairWhoseAppsBothAskForAPlaceAsksOnceAndOpensBothWithTheAnswer() {
+        val uber = AppEntry("Uber", "com.ubercab", "com.ubercab.Main")
+        val lyft = AppEntry("Lyft", "me.lyft.android", "me.lyft.android.Main")
+        val home = PlaceValue("Home", "2 Elm St", 37.0, -122.0)
+        apps = listOf(clock, mail, uber, lyft)
+        recentPlaces = listOf(found, home)
+        homeApps = HomeApps(ring = ringOf(pairOf(uber, lyft)!!))
+        show()
+
+        val asking = { app: AppEntry -> openedAs(app, openChoices(app).last())!! }
+        compose.ringSlot(pairOf(uber, lyft)!!).performTouchInput { longClick() }
+        compose.onNodeWithText("Open Uber with intent…").performClick()
+        compose.onNodeWithText("Ride to a place you pick each time").performClick()
+        compose.ringSlot(pairOf(asking(uber), lyft)!!).performTouchInput { longClick() }
+        compose.onNodeWithText("Open Lyft with intent…").performClick()
+        compose.onNodeWithText("Ride to a place you pick each time").performClick()
+
+        val both = pairOf(asking(uber), asking(lyft))!!
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(both)), homeApps) }
+        compose.ringSlot(both).performClick()
+        compose.onNodeWithTag(OpenWithTags.PROMPT).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(emptyList<AppEntry>(), launched) }
+        compose.onNodeWithText("Home").performClick()
+
+        compose.onNodeWithTag(OpenWithTags.PROMPT).assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(listOf(both), launched)
+            assertEquals(listOf(mapOf(InputKind.Place to home)), answered)
+            assertEquals(listOf(home, found), recentPlaces)
+        }
+    }
+
+    @Test
+    fun aPlacePickedNowIsSavedInTheIconWhichThenOpensWithoutAsking() {
+        val uber = AppEntry("Uber", "com.ubercab", "com.ubercab.Main")
+        apps = listOf(clock, mail, uber)
+        homeApps = HomeApps(ring = ringOf(uber))
+        show()
+
+        compose.ringSlot(uber).performTouchInput { longClick() }
+        compose.onNodeWithText("Open with intent…").performClick()
+        compose.onNodeWithText("Ride to a place you pick now").performClick()
+        compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("1 Main")
+        compose.waitUntil { compose.onAllNodesWithText("Work").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Work").performClick()
+
+        val saved = openedAs(uber, openChoices(uber)[1], found)!!
+        compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(saved)), homeApps) }
+        compose.ringSlot(saved).assertContentDescriptionEquals("Uber ride: Work").performClick()
+        compose.onNodeWithTag(OpenWithTags.PROMPT).assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(listOf(saved), launched)
+            assertEquals(listOf(emptyMap<InputKind, InputValue>()), answered)
         }
     }
 

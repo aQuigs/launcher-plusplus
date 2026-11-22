@@ -30,6 +30,10 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.IconStyle
+import com.sqftware.orbitlauncher.domain.InputKind
+import com.sqftware.orbitlauncher.domain.InputValue
+import com.sqftware.orbitlauncher.domain.IntentRequest
+import com.sqftware.orbitlauncher.domain.request
 import com.sqftware.orbitlauncher.domain.ITEM_LAYER_SIZE
 import com.sqftware.orbitlauncher.domain.itemMark
 import com.sqftware.orbitlauncher.domain.itemSprite
@@ -157,7 +161,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     // A pair has no icon of its own: the screen draws its apps' together.
     private fun entryIcon(app: AppEntry, density: Int): Drawable? = when (val kind = app.kind) {
-        EntryKind.App -> activityIcon(app, density)
+        EntryKind.App, is EntryKind.Intent -> activityIcon(app, density)
         is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
         is EntryKind.AppPair -> null
     }
@@ -174,7 +178,7 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
             ?.let { if (it is AdaptiveIconDrawable) it else InsetDrawable(it, SQUARE_IN_CIRCLE) }
             ?: activityIcon(shortcut, density)
 
-    override fun launch(app: AppEntry) = startOrLog(TAG, app.key) {
+    override fun launch(app: AppEntry, answers: Map<InputKind, InputValue>) = startOrLog(TAG, app.key) {
         when (val kind = app.kind) {
             EntryKind.App -> app.user?.let { user ->
                 // A paused work profile starts nothing; asking to unpause it shows the system's own prompt, as a tap on a
@@ -186,9 +190,22 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
                 }
             }
             is EntryKind.Shortcut -> launcherApps.startShortcut(app.packageName, kind.id, null, null, ownUser)
-            is EntryKind.AppPair -> context.startActivity(SplitScreenActivity.intent(context, kind.first.component, kind.second.component))
+            is EntryKind.Intent -> kind.request(answers)?.let { context.startActivity(it.toIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            is EntryKind.AppPair -> {
+                val first = opening(kind.first, answers) ?: return@startOrLog
+                val second = opening(kind.second, answers) ?: return@startOrLog
+                context.startActivity(SplitScreenActivity.intent(context, first, second))
+            }
         }
     }
+
+    // What starts one of a pair's apps: its start screen, or the intent it is opened straight to.
+    private fun opening(app: AppEntry, answers: Map<InputKind, InputValue>): Intent? = when (val kind = app.kind) {
+        is EntryKind.Intent -> kind.request(answers)?.toIntent()
+        else -> Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(app.component)
+    }
+
+    private fun IntentRequest.toIntent(): Intent = Intent(action, data?.let(Uri::parse)).setPackage(packageName)
 
     override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
         val user = app.user

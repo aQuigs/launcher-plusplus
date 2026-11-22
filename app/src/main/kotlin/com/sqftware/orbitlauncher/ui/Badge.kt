@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.badgeText
 import com.sqftware.orbitlauncher.ui.theme.LocalBoxColors
@@ -82,6 +83,26 @@ fun BoxScope.WorkMark(app: AppEntry, modifier: Modifier = Modifier) {
             .ringed(fill = LocalBoxColors.current.floating, edge = colors.primary)
             .size(18.dp)
             .padding(4.dp),
+    )
+}
+
+/**
+ * A bolt on an icon that opens an app straight to an intent, or a pair one of whose apps does, on the bottom-end corner
+ * the [WorkMark] takes on a work app, which opens no intents; nothing on any other.
+ */
+@Composable
+fun BoxScope.IntentMark(app: AppEntry, modifier: Modifier = Modifier) {
+    if (app.opens.none { it.kind is EntryKind.Intent }) return
+
+    val colors = MaterialTheme.colorScheme
+    Icon(
+        imageVector = IntentGlyph,
+        contentDescription = "Opens with intent",
+        tint = colors.primary,
+        modifier = overCorner(modifier, top = false)
+            .ringed(fill = LocalBoxColors.current.floating, edge = colors.primary)
+            .size(18.dp)
+            .padding(3.dp),
     )
 }
 

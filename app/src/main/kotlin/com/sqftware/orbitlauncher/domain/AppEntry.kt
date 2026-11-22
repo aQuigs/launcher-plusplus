@@ -2,11 +2,11 @@ package com.sqftware.orbitlauncher.domain
 
 /**
  * Something the home screen can hold and start, as its [kind] says: a launchable activity, a shortcut an app pinned to the
- * home screen, which belongs to its app's [activityName], or a pair of apps. [canUninstall] is false for an app built into
+ * home screen, which belongs to its app's [activityName], an app opened straight to an intent, or a pair of apps. [canUninstall] is false for an app built into
  * the system. [installedAt] is when its package was first installed, in epoch milliseconds, and [category] the kind of app
  * its package says it is, if it says. [workProfile] is the serial number of the work profile an app belongs to, or null
  * for one of the user's own. A pair belongs to no one package, so its package and activity names are empty; make one with
- * [pairOf].
+ * [pairOf]. One opened to an intent has its app's names; make one with [intentEntryOf].
  */
 data class AppEntry(
     val label: String,
@@ -19,13 +19,14 @@ data class AppEntry(
     val workProfile: Long? = null,
 ) {
     /**
-     * Identifies one activity, shortcut or pair whatever its label, so it survives relabelling and reloads of the app list.
+     * Identifies one activity, shortcut, app opened to an intent, or pair whatever its label, so it survives relabelling and reloads of the app list.
      * A work app's differs from the same app's in the user's own profile.
      */
     val key: String = when (kind) {
         EntryKind.App -> activityKey(packageName, activityName)
         is EntryKind.Shortcut -> shortcutKey(packageName, kind.id)
         is EntryKind.AppPair -> pairKey(kind.first.key, kind.second.key)
+        is EntryKind.Intent -> intentKey(kind.intent.id, kind.source, kind.app.key)
     }.let { inProfile(it, workProfile) }
 
     val isWork: Boolean get() = workProfile != null
@@ -47,7 +48,7 @@ data class AppEntry(
      * are not told apart from its app's. Made once, as every icon reads it.
      */
     val badgePackages: List<String> = when (kind) {
-        EntryKind.App -> listOf(packageKey)
+        EntryKind.App, is EntryKind.Intent -> listOf(packageKey)
         is EntryKind.Shortcut -> emptyList()
         is EntryKind.AppPair -> listOf(kind.first.packageKey, kind.second.packageKey)
     }
@@ -64,8 +65,11 @@ sealed interface EntryKind {
     /** The shortcut [id] its app pinned to the home screen. */
     data class Shortcut(val id: String) : EntryKind
 
-    /** Two plain apps side by side in split screen, [first] on top. */
+    /** Two apps side by side in split screen, [first] on top, each plain or opened [straight to an intent][Intent]. */
     data class AppPair(val first: AppEntry, val second: AppEntry) : EntryKind
+
+    /** The plain [app] opened straight to [intent], with its input from [source], or none for an intent that takes none. */
+    data class Intent(val app: AppEntry, val intent: AppIntent, val source: InputSource?) : EntryKind
 }
 
 fun activityKey(packageName: String, activityName: String) = "$packageName/$activityName"
@@ -79,8 +83,8 @@ fun shortcutKey(packageName: String, id: String) = "$packageName#$id"
 /**
  * The key of the pair of the apps keyed [first] and [second]. Keys are stored, so it must be neither an activity's nor a
  * shortcut's, and must split back into the two ([pairKeys]). It starts with '|', where those start with a package name,
- * which never holds one. A class name holds none either (a Java identifier, and dex allows no '|' in one), so the next
- * '|' ends [first]. Neither key holds a tab or a line break, so the pair's is storable too.
+ * which never holds one. A class name holds none either (a Java identifier, and dex allows no '|' in one), nor does an
+ * [intent key][intentKey], so the next '|' ends [first]. Neither key holds a tab or a line break, so the pair's is storable too.
  */
 fun pairKey(first: String, second: String) = "$PAIR$first$PAIR$second"
 
@@ -100,13 +104,18 @@ private const val PAIR = "|"
  */
 fun inProfile(key: String, workProfile: Long?) = if (workProfile == null) key else "@$workProfile:$key"
 
-/** [apps] by key, and a pair by its key while both its apps are among them, so a pair resolves wherever a key does. */
+/**
+ * [apps] by key, an app opened to an intent by its key while the app is among them, and a pair by its key while both
+ * its apps are, so each resolves wherever a key does.
+ */
 class AppsByKey(apps: List<AppEntry>) {
     private val byKey = apps.associateBy { it.key }
 
-    operator fun get(key: String): AppEntry? = byKey[key] ?: pairKeys(key)?.let { (first, second) ->
-        pairOf(byKey[first] ?: return null, byKey[second] ?: return null)
+    operator fun get(key: String): AppEntry? = single(key) ?: pairKeys(key)?.let { (first, second) ->
+        pairOf(single(first) ?: return null, single(second) ?: return null)
     }
+
+    private fun single(key: String): AppEntry? = byKey[key] ?: intentEntryFor(key, byKey::get)
 }
 
 /**

@@ -76,6 +76,28 @@
             </intent-filter>
         </activity>
 
+        <!-- Not exported: MainActivity takes a shared place only through it, so the place came through SharePlaceActivity. -->
+        <activity-alias
+            android:name=".SharedPlaces"
+            android:exported="false"
+            android:targetActivity=".MainActivity" />
+
+        <!-- In the share sheet for text, so a place found in a maps app fills the prompt for an icon that asks for one. -->
+        <activity
+            android:name=".SharePlaceActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:label="@string/share_place"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- Only the launcher starts it, to open a pair of apps in split screen. It stays until the second app is started,
              so it is see-through rather than without display, and keeps its history, which would end it once the first
              app covers it. The split and the apps' own orientations resize it, which it rides out rather than start the

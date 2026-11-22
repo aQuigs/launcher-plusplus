@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.sqftware.orbitlauncher.apps.GeocoderPlaceSearch
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
@@ -41,6 +42,7 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesJournalStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
+import com.sqftware.orbitlauncher.apps.SharedPreferencesRecentPlacesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
@@ -116,6 +118,8 @@ class MainActivity : ComponentActivity() {
     // A channel, unlike the presses, keeps a request that starts the activity until the screen is there to collect it.
     private val pinRequestChannel = Channel<PinRequest>(Channel.CONFLATED)
     private val pinRequests = pinRequestChannel.receiveAsFlow()
+    private val sharedPlaceChannel = Channel<String>(Channel.CONFLATED)
+    private val sharedPlaces = sharedPlaceChannel.receiveAsFlow()
     private lateinit var repository: LauncherAppsRepository
     private lateinit var widgetHost: SystemWidgetHost
     private var barsLight: Boolean? = null
@@ -149,6 +153,8 @@ class MainActivity : ComponentActivity() {
         val collectionsStore = SharedPreferencesCollectionsStore(this)
         val gridPagesStore = SharedPreferencesGridPagesStore(this)
         val appSettingsStore = SharedPreferencesAppSettingsStore(this)
+        val recentPlacesStore = SharedPreferencesRecentPlacesStore(this)
+        val placeSearch = GeocoderPlaceSearch(this)
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
@@ -177,7 +183,7 @@ class MainActivity : ComponentActivity() {
         val clearBadge = { app: AppEntry -> app.opens.forEach { badges.opened(it.packageKey) } }
 
         // A rotation must not ask again.
-        if (savedInstanceState == null) askToPin(intent)
+        if (savedInstanceState == null) takeHandedOn(intent)
 
         setContent {
             // Read before the first frame, so the launcher never flashes the other look. A new wallpaper is set from
@@ -203,9 +209,9 @@ class MainActivity : ComponentActivity() {
                 val actions = remember(appLists?.index ?: 0, iconStyles) {
                     AppActions(
                         icon = { app, place -> repository.icon(app, iconStyles.getValue(place)) },
-                        launch = {
-                            clearBadge(it)
-                            repository.launch(it)
+                        launch = { app, answers ->
+                            clearBadge(app)
+                            repository.launch(app, answers)
                         },
                         clearBadge = clearBadge,
                         shortcuts = repository::shortcuts,
@@ -218,6 +224,8 @@ class MainActivity : ComponentActivity() {
                         hasStorePage = repository::hasStorePage,
                         openStorePage = repository::openStorePage,
                         uninstall = repository::uninstall,
+                        findPlaces = placeSearch::find,
+                        openMaps = placeSearch::openMaps,
                     )
                 }
                 // Read before the first frame, unlike the app list, so the ring never flashes its empty-ring hint. The
@@ -231,6 +239,7 @@ class MainActivity : ComponentActivity() {
                 var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
+                var recentPlaces by remember { mutableStateOf(recentPlacesStore.load()) }
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
                 var journal by remember { mutableStateOf(journalStore.load()) }
@@ -404,6 +413,7 @@ class MainActivity : ComponentActivity() {
                     onLayoutChange = ::changeLayout,
                     homePresses = homePresses,
                     pinRequests = pinRequests,
+                    sharedPlaces = sharedPlaces,
                     apps = apps,
                     pinnedShortcuts = pinnedShortcuts,
                     ringPages = ringPages,
@@ -524,6 +534,11 @@ class MainActivity : ComponentActivity() {
                         appSettings = it
                         appSettingsStore.save(it)
                     },
+                    recentPlaces = recentPlaces,
+                    onRecentPlacesChange = {
+                        recentPlaces = it
+                        recentPlacesStore.save(it)
+                    },
                     onOpenNotifications = shade::open,
                     onSystemBarsShownChange = systemBars::setShown,
                     onAmbientInSightChange = { ambientInSight = it },
@@ -553,15 +568,19 @@ class MainActivity : ComponentActivity() {
             val broughtToFront = intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0
             homePresses.tryEmit(HomePress(launcherInFront = !broughtToFront))
         } else {
-            askToPin(intent)
+            takeHandedOn(intent)
         }
     }
 
-    // PinShortcutActivity hands on what the system asks it to confirm.
-    private fun askToPin(intent: Intent) {
-        if (intent.component?.className != PIN_REQUESTS) return
-        val pin = repository.pinRequest(intent) ?: return
-        pinRequestChannel.trySend(PinRequest(pin.shortcut, pin.appLabel, pin::icon, pin::accept))
+    // PinShortcutActivity hands on what the system asks it to confirm, and SharePlaceActivity a place shared with the launcher.
+    private fun takeHandedOn(intent: Intent) {
+        when (intent.component?.className) {
+            PIN_REQUESTS -> {
+                val pin = repository.pinRequest(intent) ?: return
+                pinRequestChannel.trySend(PinRequest(pin.shortcut, pin.appLabel, pin::icon, pin::accept))
+            }
+            SHARED_PLACES -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let(sharedPlaceChannel::trySend)
+        }
     }
 
     // The bars draw their icons in the same ink as LauncherTheme for the wallpaper, whatever the system theme. A fixed

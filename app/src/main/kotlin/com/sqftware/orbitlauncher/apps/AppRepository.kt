@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.IconStyle
+import com.sqftware.orbitlauncher.domain.InputKind
+import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.RingPages
 import kotlinx.coroutines.flow.Flow
 
@@ -25,10 +27,11 @@ interface AppRepository {
     suspend fun icon(app: AppEntry, style: IconStyle = IconStyle.Plain): ImageBitmap?
 
     /**
-     * Starts [app], the pinned shortcut, or the pair's two apps together in split screen. Does nothing if it has gone since
-     * the list was loaded.
+     * Starts [app], the pinned shortcut, the app straight to its intent, or the pair's two apps together in split screen,
+     * filling in what an intent [asks][com.sqftware.orbitlauncher.domain.asks] for from [answers]. Does nothing if it has
+     * gone since the list was loaded, or an answer it needs is missing.
      */
-    fun launch(app: AppEntry)
+    fun launch(app: AppEntry, answers: Map<InputKind, InputValue> = emptyMap())
 
     /**
      * At most four of the app's shortcuts, manifest ones first. None for a pinned shortcut or a pair, or until the launcher is

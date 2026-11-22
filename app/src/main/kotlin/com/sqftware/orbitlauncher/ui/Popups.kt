@@ -1,5 +1,7 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.Spacing
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 // Every dialog and menu of the launcher is one of these, so each sits on the drawer's ground (held by the
@@ -342,6 +345,75 @@ fun <T> ChoiceDialog(
         modifier = modifier,
     )
 }
+
+/**
+ * Asks for one thing found by a search for the [query] typed in its field, labeled [fieldLabel]: what [find] finds for
+ * it, or the [idle] ones while it is blank, each named by its [label] over its [description], if any. A tap on one hands
+ * it to [onChoose]; [extra], if any, is a button beside Cancel, and Cancel, Back and a tap outside call [onDismiss]. The
+ * query is the caller's, so text from elsewhere can fill it.
+ */
+@Composable
+fun <T> SearchDialog(
+    title: String,
+    fieldLabel: String,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    idle: List<T>,
+    find: suspend (String) -> List<T>,
+    label: (T) -> String,
+    onChoose: (T) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    description: (T) -> String? = { null },
+    extra: (@Composable () -> Unit)? = null,
+    fieldTag: String = "",
+) {
+    var found by remember { mutableStateOf<List<T>>(emptyList()) }
+    // A search a keystroke later replaces it, so only the last of a burst of keystrokes asks.
+    LaunchedEffect(query) {
+        if (query.isBlank()) return@LaunchedEffect
+        delay(SEARCH_PAUSE_MILLIS)
+        found = find(query)
+    }
+    val shown = if (query.isBlank()) idle else found
+
+    GroundDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = extra ?: {},
+        dismissButton = { LauncherButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text(title) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    label = { Text(fieldLabel) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    modifier = Modifier.fillMaxWidth().testTag(fieldTag).focusRequester(rememberShownFocus()),
+                )
+                Column(Modifier.padding(top = Spacing.Tight).verticalScroll(rememberScrollState())) {
+                    shown.forEach { choice ->
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .clickable { onChoose(choice) }
+                                .padding(vertical = Spacing.Tight),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(label(choice))
+                            description(choice)?.let { SupportingText(it) }
+                        }
+                    }
+                }
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+private const val SEARCH_PAUSE_MILLIS = 300L
 
 /**
  * Focus for a text field in a pop-up, requested once the pop-up's own window has focus: a text field focused before then
