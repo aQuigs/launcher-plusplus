@@ -73,7 +73,8 @@ import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.NameRoom
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.UnreadCounts
-import com.sqftware.orbitlauncher.domain.folderSlotOffset
+import com.sqftware.orbitlauncher.domain.openFolderRadius
+import com.sqftware.orbitlauncher.domain.openFolderSlotOffset
 import com.sqftware.orbitlauncher.domain.ringLayout
 import com.sqftware.orbitlauncher.domain.ringSlotOffset
 import com.sqftware.orbitlauncher.domain.rooms
@@ -208,6 +209,7 @@ fun HomeRing(
     val arrival = rearrange?.arriving
     val making = if (openFolder == null) arrival?.preview(ring) else null
     val slots = openFolder?.apps?.size ?: making?.size ?: ring.size
+    val folderLook = LocalFolderStyle.current.look
     val glow by animateFloatAsState(if (highlighted) 1f else 0f, label = "ring_glow")
     val marks = LocalRingColors.current
     val art = LocalThemeArt.current
@@ -372,7 +374,7 @@ fun HomeRing(
 
                 // An app on its way in from another place makes way for itself among the ring's.
                 val ringMarks = marksFor(making ?: ring) { index, count -> ringSlotOffset(index, count) }
-                val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> folderSlotOffset(index, count) } }
+                val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App)) { index, count -> openFolderSlotOffset(folderLook, index, count) } }
                 // In the order shown, which a drag rearranges, as the names are.
                 val nameHoles = if (names && centred == null) nameHoles(making ?: moving.shown(ring)) else null
                 onDrawBehind {
@@ -398,8 +400,10 @@ fun HomeRing(
         val side = min(constraints.maxWidth, constraints.maxHeight).toFloat()
         val boxWidth = constraints.maxWidth.toFloat()
         val boxHeight = constraints.maxHeight.toFloat()
-        val slotAt: (Int, Int) -> Pair<Float, Float> = { index, count -> if (openFolder != null) folderSlotOffset(index, count) else ringSlotOffset(index, count) }
-        val folderAt: (Int, Int) -> Pair<Float, Float> = { index, count -> folderSlotOffset(index, count) }
+        val slotAt: (Int, Int) -> Pair<Float, Float> = { index, count ->
+            if (openFolder != null) openFolderSlotOffset(folderLook, index, count) else ringSlotOffset(index, count)
+        }
+        val folderAt: (Int, Int) -> Pair<Float, Float> = { index, count -> openFolderSlotOffset(folderLook, index, count) }
         // The ring's size follows the order its items are kept in, so it holds still while one is dragged round; only the
         // names follow where each is shown.
         val laid = layoutOn(boxWidth, boxHeight, openFolder?.apps?.map(RingItem::App) ?: making ?: ring, slotAt)
@@ -417,9 +421,11 @@ fun HomeRing(
             // Read unobserved, so writing it does not measure the ring again.
             if (named != Snapshot.withoutReadObservation { rooms }) rooms = named
         }
-        val (radius, iconSize) = laid
+        val (laidRadius, iconSize) = laid
+        val radius = if (openFolder != null) openFolderRadius(folderLook, laidRadius, iconSize, boxWidth, boxHeight) else laidRadius
         val (ringRadius, ringIconSize) = ringLaid
-        val (folderRadius, folderIconSize) = folderLaid
+        val (laidFolderRadius, folderIconSize) = folderLaid
+        val folderRadius = openFolderRadius(folderLook, laidFolderRadius, folderIconSize, boxWidth, boxHeight)
         val centreSize = (side * EMBLEM_FRACTION).roundToInt()
         val placeables = measurables.map { measurable ->
             val part = measurable.layoutId as Part
@@ -463,7 +469,7 @@ fun HomeRing(
 
             // On its way out of the planet, [out] of the way: at 0 small and unseen at its heart, at 1 in [slot] of [count].
             fun Placeable.placeSpiralling(index: Int, count: Int, radius: Float, turn: Double) {
-                val (dx, dy) = folderSlotOffset(index, count, (1.0 - out) * SPIRAL + turn)
+                val (dx, dy) = openFolderSlotOffset(folderLook, index, count, (1.0 - out) * SPIRAL + turn)
                 placeAt(planetAt + Offset(dx, dy) * (radius * out)) {
                     scaleX = lerp(FOLDED_SCALE, 1f, out)
                     scaleY = scaleX

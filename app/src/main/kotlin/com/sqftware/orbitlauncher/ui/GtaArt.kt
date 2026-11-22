@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,6 +35,8 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.em
 import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.WHEEL_TILE_TALL
+import com.sqftware.orbitlauncher.domain.WHEEL_TILE_WIDE
 import com.sqftware.orbitlauncher.ui.theme.Condensed
 import com.sqftware.orbitlauncher.ui.theme.GtaHudColors
 import com.sqftware.orbitlauncher.ui.theme.HeadingDisc
@@ -42,6 +46,7 @@ import com.sqftware.orbitlauncher.ui.theme.WantedLit
 import com.sqftware.orbitlauncher.ui.theme.WantedUnlit
 import com.sqftware.orbitlauncher.ui.theme.WheelChip
 import com.sqftware.orbitlauncher.ui.theme.WheelChipEdge
+import com.sqftware.orbitlauncher.ui.theme.WheelPool
 import com.sqftware.orbitlauncher.ui.theme.WheelTile
 import com.sqftware.orbitlauncher.ui.theme.WheelVeil
 import com.sqftware.orbitlauncher.ui.theme.legible
@@ -54,8 +59,6 @@ private const val MAP_ASPECT = 1.8f
 private const val MAP_CORNER = 0.16f
 
 /** A weapon wheel's tile round an app's disc: how much wider and taller than the disc it reaches. */
-private const val TILE_WIDE = 1.62f
-private const val TILE_TALL = 1.2f
 
 /** The most stars a wanted level has, as in the game. */
 private const val MAX_WANTED = 6
@@ -77,7 +80,7 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     override val scene: ThemeScene = Sunset
 
     /** The game blurs and darkens the world behind its weapon wheel. */
-    override val folderBackdrop = FolderBackdrop(blur = 10.dp, veil = WheelVeil)
+    override val folderBackdrop = FolderBackdrop(blur = 16.dp, veil = WheelVeil)
 
     /** No track: the game leaves its world clear, so the ring is drawn only as the place an app being dragged would land. */
     override fun CacheDrawScope.ringMarks(
@@ -93,7 +96,8 @@ object GtaArt : HudArt(GtaHud, drift = null) {
 
     /** A closed folder is a dark chip with a hairline round it, its previews on it. */
     @Composable
-    override fun folderWear(folder: RingItem.Folder): FolderWear = FolderWear(behind = Modifier.wheelChip())
+    // The wheel's middle is the game's world under its name, not a chip.
+    override fun folderWear(folder: RingItem.Folder): FolderWear = FolderWear(behind = Modifier.wheelChip(), fadesOpen = true)
 
     /** In an open folder an app stands on its tile of the weapon wheel, its disc over it as anywhere. */
     @Composable
@@ -105,14 +109,18 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     /** The wheel's middle: the folder's name, as the game names the weapon picked, coming in as its apps go out to their tiles. */
     @Composable
     override fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) {
-        // A folder the user never named has nothing to call it: the game's middle shows a name only when it has one.
-        if (folder.name.isBlank()) return
         val ink = GtaHudColors.ink
-        Box(modifier.graphicsLayer { alpha = shown() }, contentAlignment = Alignment.Center) {
-            Text(
+        // The shade deepens toward the wheel's middle, as the game's does, so the name reads on a pale wallpaper and an
+        // unnamed folder's middle still shows where a tap closes it.
+        Box(
+            modifier.graphicsLayer { alpha = shown() }.drawBehind { drawCircle(WheelPool) },
+            contentAlignment = Alignment.Center,
+        ) {
+            // A folder the user never named has nothing to call it: the game's middle shows a name only when it has one.
+            if (folder.name.isNotBlank()) Text(
                 folder.name.uppercase(),
                 Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleLarge.legible(ink),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold).legible(ink),
                 color = ink,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -252,7 +260,7 @@ private fun Modifier.wheelChip() = drawWithCache {
 
 /** A weapon wheel's tile, wider and a little taller than the disc it lies under. */
 private fun Modifier.wheelTile() = drawWithCache {
-    val tile = Size(size.width * TILE_WIDE, size.height * TILE_TALL)
+    val tile = Size(size.width * WHEEL_TILE_WIDE, size.height * WHEEL_TILE_TALL)
     val topLeft = size.center - Offset(tile.width / 2, tile.height / 2)
     onDrawBehind { drawRect(WheelTile, topLeft, tile) }
 }

@@ -40,6 +40,31 @@ fun ringSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Floa
 fun folderSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Float> =
     ringSlotOffset(index, count, if (count > 1) turn - PI / count else turn)
 
+/**
+ * Where slot [index] of an open folder of [count] apps in [look] sits, plus [turn]: a weapon wheel's on the compass points
+ * from the top, one straight above the middle, as the game lays its wheel out; any other look's where [folderSlotOffset]
+ * puts it, where its previews showed it.
+ */
+fun openFolderSlotOffset(look: FolderLook, index: Int, count: Int, turn: Double = 0.0): Pair<Float, Float> =
+    if (look == FolderLook.WeaponWheel) ringSlotOffset(index, count, turn) else folderSlotOffset(index, count, turn)
+
+/** How much wider and taller than its icon a weapon wheel's tile is. */
+const val WHEEL_TILE_WIDE = 1.62f
+const val WHEEL_TILE_TALL = 1.2f
+
+/** How far from the middle the game's weapon wheel sets its tiles, as a share of the screen's width. */
+private const val WHEEL_RADIUS_FRACTION = 0.344f
+
+/**
+ * How far from the middle an open folder of [look] sets its apps, [size] across, in a box [width] by [height], where the
+ * ring's layout gives [radius]: a weapon wheel reaches out as wide as the game's, its tiles still inside the box.
+ */
+fun openFolderRadius(look: FolderLook, radius: Float, size: Float, width: Float, height: Float): Float {
+    if (look != FolderLook.WeaponWheel) return radius
+    val wheel = minOf(width * WHEEL_RADIUS_FRACTION, width / 2 - size * WHEEL_TILE_WIDE / 2, height / 2 - size * WHEEL_TILE_TALL / 2)
+    return maxOf(radius, wheel)
+}
+
 /** How wide a name is on one line, and broken onto two at a word, infinite for a name of one word. */
 data class NameWidths(val oneLine: Float, val twoLines: Float = Float.POSITIVE_INFINITY)
 

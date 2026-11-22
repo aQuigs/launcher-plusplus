@@ -176,7 +176,7 @@ internal fun Modifier.blurredBehindFolder(backdrop: FolderBackdrop?, shown: () -
     }
 
 /** How much of a thing on the page fades behind an open folder, so the veil darkens it as it does the wallpaper. */
-private const val BEHIND_FOLDER_DIM = 0.45f
+private const val BEHIND_FOLDER_DIM = 0.25f
 
 /** How a folder named [name] holding [count] apps is read out. */
 fun folderDescription(name: String, count: Int): String =
@@ -185,14 +185,21 @@ fun folderDescription(name: String, count: Int): String =
 /**
  * What a folder look wears: a [disc] of that share of the item, [behind] drawn under it on the whole item, which it may
  * reach past, and [over] drawn on the disc over the previews. Each is drawn on a layer of its own, never round the
- * previews, so none of them can move or size them.
+ * previews, so none of them can move or size them. [behind] and the disc stay round an open folder's middle unless the
+ * look [fadesOpen] with the previews, leaving the middle bare.
  */
-class FolderWear(val disc: Float = 1f, val behind: Modifier = Modifier, val over: Modifier = Modifier)
+class FolderWear(
+    val disc: Float = 1f,
+    val behind: Modifier = Modifier,
+    val over: Modifier = Modifier,
+    val fadesOpen: Boolean = false,
+)
 
 /**
  * [folder] in the look of [LocalFolderStyle], filling the item: up to four previews of its apps, laid out the same in
  * every theme and look, on the disc and in what the theme's [ThemeArt.folderWear] gives it. [inner] fades the previews,
- * as when the folder takes the ring's centre and its apps are round it instead; [presses] ripple its disc. Give it a
+ * or the whole face for a look that [fades open][FolderWear.fadesOpen], as when the folder takes the ring's centre and its
+ * apps are round it instead; [presses] ripple its disc. Give it a
  * layer of its own, so what turns with the sky redraws only the folder, not the page round it.
  */
 @Composable
@@ -208,10 +215,12 @@ fun FolderFace(
     if (style.look == FolderLook.Orbit) return OrbitFace(folder, icon, style.minutes, inner, modifier)
 
     val wear = LocalThemeArt.current.folderWear(folder)
-    Box(modifier) {
+    // A look that fades open goes as one image, its wear and disc with the previews; any other keeps them round them.
+    val opening = Modifier.graphicsLayer { alpha = inner() }
+    Box(if (wear.fadesOpen) modifier.then(opening) else modifier) {
         Spacer(Modifier.matchParentSize().then(wear.behind))
         IconDisc(presses, Modifier.matchParentSize(), wear.disc) {
-            FolderPreviews(folder.apps, icon, Modifier.graphicsLayer { alpha = inner() })
+            FolderPreviews(folder.apps, icon, if (wear.fadesOpen) Modifier else opening)
             Spacer(Modifier.fillMaxSize(wear.disc).then(wear.over))
         }
     }
