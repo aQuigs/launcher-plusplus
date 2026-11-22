@@ -27,6 +27,12 @@ data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismis
     /** How many apps have something unread. */
     val appsWithUnread: Int get() = byPackage.count { it.value > 0 }
 
+    /** These counts of [apps]' packages alone. */
+    fun among(apps: List<AppEntry>): UnreadCounts {
+        val packages = apps.flatMapTo(HashSet()) { it.badgePackages }
+        return UnreadCounts(byPackage.filterKeys { it in packages }, dismissed intersect packages)
+    }
+
     fun badge(app: AppEntry) = badge(listOf(app))
 
     /** The badge for a folder of [apps]: each package counted once, however many of its activities and pairs are in there. */

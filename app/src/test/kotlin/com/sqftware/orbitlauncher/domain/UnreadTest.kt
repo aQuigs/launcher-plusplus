@@ -160,4 +160,10 @@ class UnreadTest {
         assertEquals(0, UnreadCounts().appsWithUnread)
         assertEquals(2, UnreadCounts(mapOf(mail.packageName to 5, chat.packageName to 1)).appsWithUnread)
     }
+
+    @Test
+    fun `counts among apps leave out packages with no icon of theirs`() {
+        val counts = UnreadCounts(mapOf(mail.packageName to 5, "android" to 1), dismissed = setOf("android"))
+        assertEquals(UnreadCounts(mapOf(mail.packageName to 5)), counts.among(listOf(mail, chat)))
+    }
 }

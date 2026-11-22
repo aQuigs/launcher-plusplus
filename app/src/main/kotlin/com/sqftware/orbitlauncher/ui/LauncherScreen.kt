@@ -1385,7 +1385,7 @@ fun LauncherScreen(
         LocalHeading provides heading,
         LocalQuest provides journal.quest,
         LocalOpenWorldMap provides openWorldMap,
-        LocalUnread provides unread,
+        LocalUnread provides remember(unread, apps) { unread.among(apps.orEmpty()) },
     ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(

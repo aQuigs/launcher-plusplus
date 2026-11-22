@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.em
 import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
@@ -117,7 +118,7 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     /** The compass along the top, and under it, at its right, the wanted level. */
     @Composable
     override fun HomeHeader(discovery: String?, modifier: Modifier) {
-        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier.zIndex(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             HudHeader(GtaHud, discovery, Modifier)
             WantedLevel(LocalUnread.current.appsWithUnread.coerceAtMost(MAX_WANTED), Modifier.fillMaxWidth(COMPASS_SPAN).padding(top = 4.dp))
         }

@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
@@ -158,9 +159,9 @@ abstract class HudArt internal constructor(private val hud: HudLook, private val
     override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) =
         LocalMapEmblem(hud, marked, modifier)
 
-    /** The map fills the emblem's window and draws its own rim. */
+    /** The map fills the emblem's window and draws its own rim, its marks reaching out to the cell's edge. */
     @Composable
-    override fun emblemBox(edge: Color): Modifier = Modifier.clip(hud.window)
+    override fun emblemBox(edge: Color): Modifier = Modifier.clip(hud.window.cell)
 
     @Composable
     override fun HomeHeader(discovery: String?, modifier: Modifier) = HudHeader(hud, discovery, modifier)
@@ -203,6 +204,9 @@ internal class MapWindow(private val aspect: Float, private val corner: Float) :
 
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) = Outline.Rounded(outline(size))
 
+    /** The window grown out to the cell's edge, room for what a look draws on its rim: for the disc, the cell's own circle. */
+    val cell = GenericShape { size, _ -> addRoundRect(outline(size, inset = size.emblemRadius - size.minDimension / 2)) }
+
     companion object {
         /** The cell's own disc, as the northern games frame their maps. */
         val Disc = MapWindow(aspect = 1f, corner = 0.5f)
@@ -228,8 +232,8 @@ internal class QuestMarker(look: HudLook, val half: Float) {
 /**
  * The local map of where the user is in [look], else of a made-up place, or fog until there is one, turned with the
  * phone, its icons kept upright, darkening into a rimmed edge, with the player's arrow at the middle unless [marked] is
- * false because a hint lies over it, all inside the look's window, which the emblem's box clips it to. What turns is a
- * layer of its own, so a turn moves it without drawing the rest again.
+ * false because a hint lies over it, all inside the look's window, the marks on its rim reaching past it. What turns is
+ * a layer of its own, so a turn moves it without drawing the rest again.
  */
 @Composable
 internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) {
@@ -247,6 +251,7 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
         Spacer(
             Modifier
                 .matchParentSize()
+                .clip(window)
                 .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                 .drawBehind {
                     val radius = window.reach(size)
@@ -254,13 +259,15 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                 },
         )
         Spacer(
-            Modifier.matchParentSize().graphicsLayer().drawWithCache {
+            Modifier.matchParentSize().clip(window).drawWithCache {
                 val radius = window.reach(size)
                 val scale = 2 * radius / MINIMAP_SIZE
                 val iconSide = (2 * radius * MAP_ICON_SHARE).roundToInt()
                 val marker = QuestMarker(look, radius * QUEST_ON_MAP)
-                // A marker at the edge stays whole inside the window, its tip on the spot.
-                val markerRoom = window.bounds(size).let { Rect(it.left + marker.half, it.top + 2 * marker.half, it.right - marker.half, it.bottom) }
+                // A marker at the edge stays whole inside the window and clear of its rim, its tip on the spot.
+                val markerRoom = window.bounds(size).let {
+                    Rect(it.left + marker.half, it.top + 2 * marker.half, it.right - marker.half, it.bottom - marker.half / 2)
+                }
                 // Where the quest lies on a map, worked out once for each map rather than on each turn of the phone.
                 var spotOf: PaintedMap<ImageBitmap>? = null
                 var spot: Offset? = null
@@ -273,12 +280,12 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                         spot = quest?.takeIf { painted === map() }?.let { questSpot(painted, it) }
                     }
                     // Its tip on the spot, as a pin's.
-                    spot?.let { with(marker) { draw(markerRoom.clamp(center + (it * scale).turnedWith(facing)) - Offset(0f, marker.half)) } }
+                    spot?.let { with(marker) { draw(markerRoom.towards(center, center + (it * scale).turnedWith(facing)) - Offset(0f, marker.half)) } }
                 }
             },
         )
         Spacer(
-            Modifier.matchParentSize().drawWithCache {
+            Modifier.matchParentSize().clip(window).drawWithCache {
                 val radius = window.reach(size)
                 val bounds = window.bounds(size)
                 val over = with(look) { screenOver() }
@@ -470,7 +477,17 @@ private fun opensWorldMap(): Modifier {
 }
 
 /** [point] moved the least way that puts it inside the rect. */
-private fun Rect.clamp(point: Offset) = Offset(point.x.coerceIn(left, right), point.y.coerceIn(top, bottom))
+/** [point], or where the line to it from [middle], which lies inside this, leaves this: so it keeps its bearing. */
+private fun Rect.towards(middle: Offset, point: Offset): Offset {
+    val way = point - middle
+    fun share(to: Float, from: Float, along: Float) = if (along == 0f) 1f else (to - from) / along
+    val reach = minOf(
+        1f,
+        share(if (way.x < 0) left else right, middle.x, way.x),
+        share(if (way.y < 0) top else bottom, middle.y, way.y),
+    )
+    return middle + way * reach
+}
 
 /** [color] across the middle, fading out over the [fade] share of the width at each end. */
 internal fun fadedAtEnds(color: Color, fade: Float) = Brush.horizontalGradient(0f to Color.Transparent, fade to color, 1 - fade to color, 1f to Color.Transparent)
