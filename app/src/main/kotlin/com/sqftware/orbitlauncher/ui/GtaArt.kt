@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -94,7 +95,8 @@ object GtaArt : HudArt(GtaHud, drift = null) {
 
     /** A closed folder is a dark chip with a hairline round it, its previews on it. */
     @Composable
-    override fun folderWear(folder: RingItem.Folder): FolderWear = FolderWear(behind = Modifier.wheelChip())
+    // The wheel's middle is the game's world under its name, not a chip.
+    override fun folderWear(folder: RingItem.Folder): FolderWear = FolderWear(behind = Modifier.wheelChip(), fadesOpen = true)
 
     /** In an open folder an app stands on its tile of the weapon wheel, its disc over it as anywhere. */
     @Composable
@@ -113,7 +115,7 @@ object GtaArt : HudArt(GtaHud, drift = null) {
             Text(
                 folder.name.uppercase(),
                 Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleLarge.legible(ink),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold).legible(ink),
                 color = ink,
                 textAlign = TextAlign.Center,
                 maxLines = 2,

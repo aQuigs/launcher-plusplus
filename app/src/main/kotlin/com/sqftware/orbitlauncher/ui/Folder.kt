@@ -185,9 +185,15 @@ fun folderDescription(name: String, count: Int): String =
 /**
  * What a folder look wears: a [disc] of that share of the item, [behind] drawn under it on the whole item, which it may
  * reach past, and [over] drawn on the disc over the previews. Each is drawn on a layer of its own, never round the
- * previews, so none of them can move or size them.
+ * previews, so none of them can move or size them. [behind] and the disc stay round an open folder's middle unless the
+ * look [fadesOpen] with the previews, leaving the middle bare.
  */
-class FolderWear(val disc: Float = 1f, val behind: Modifier = Modifier, val over: Modifier = Modifier)
+class FolderWear(
+    val disc: Float = 1f,
+    val behind: Modifier = Modifier,
+    val over: Modifier = Modifier,
+    val fadesOpen: Boolean = false,
+)
 
 /**
  * [folder] in the look of [LocalFolderStyle], filling the item: up to four previews of its apps, laid out the same in
@@ -209,9 +215,11 @@ fun FolderFace(
 
     val wear = LocalThemeArt.current.folderWear(folder)
     Box(modifier) {
-        Spacer(Modifier.matchParentSize().then(wear.behind))
-        IconDisc(presses, Modifier.matchParentSize(), wear.disc) {
-            FolderPreviews(folder.apps, icon, Modifier.graphicsLayer { alpha = inner() })
+        // A look that fades open takes its disc with the previews; any other keeps it round them.
+        val opening = Modifier.graphicsLayer { alpha = inner() }
+        Spacer(Modifier.matchParentSize().then(if (wear.fadesOpen) opening else Modifier).then(wear.behind))
+        IconDisc(presses, Modifier.matchParentSize().then(if (wear.fadesOpen) opening else Modifier), wear.disc) {
+            FolderPreviews(folder.apps, icon, if (wear.fadesOpen) Modifier else opening)
             Spacer(Modifier.fillMaxSize(wear.disc).then(wear.over))
         }
     }
