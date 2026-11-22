@@ -174,11 +174,11 @@ object LauncherTags {
 const val AUTO_SET_UP = "Auto set up"
 const val SHOW_WHERE_I_AM = "Show where I am"
 const val MAP_DATA_CREDIT = "Map data © OpenStreetMap"
-const val MARK_QUEST = "Mark quest here"
+private const val MARK_QUEST = "Mark quest here"
+private const val CLEAR_QUEST = "Clear quest marker"
 
 /** How long a place the user discovers is named before it fades. */
 private const val DISCOVERY_MILLIS = 4_500L
-const val CLEAR_QUEST = "Clear quest marker"
 const val PICK_TIP = "Long-press the center to choose the ring's apps"
 
 /** What the emblem's offer on an empty home does, and the way to fill it by hand instead. */
@@ -1319,11 +1319,6 @@ fun LauncherScreen(
                                 toggleRow(SHOW_WHERE_I_AM, latestWhereIAm == WhereIAm.Shown) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
                                 // The map shows its credit only for a moment, so the licence is always a tap away here.
                                 MenuRow(MAP_DATA_CREDIT) { latestOnOpenMapLicence() }.takeIf { latestTheme.mapsWhereIAm },
-                                minimap()?.takeIf { latestTheme.keepsJournal }?.let { map ->
-                                    MenuRow(MARK_QUEST) { latestOnJournalChange(latestJournal.copy(quest = map.centre)) }
-                                },
-                                MenuRow(CLEAR_QUEST) { latestOnJournalChange(latestJournal.copy(quest = null)) }
-                                    .takeIf { latestTheme.keepsJournal && latestJournal.quest != null },
                                 toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
                             listOf(
@@ -1469,7 +1464,7 @@ fun LauncherScreen(
     // keyboard is left to the drawer, the one place here that types: a dialog's keyboard must not reflow the pages behind it.
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val openWorldMap = remember { { showingWorldMap = true } }
-    val markQuest = remember { { at: LatLon -> latestOnJournalChange(latestJournal.copy(quest = at)) } }
+    val markQuest = remember { { at: LatLon? -> latestOnJournalChange(latestJournal.copy(quest = at)) } }
     CompositionLocalProvider(
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
@@ -2120,8 +2115,12 @@ fun LauncherScreen(
                     map = worldMap,
                     art = worldMapArt,
                     moving = ambientMotion,
-                    onPick = markQuest.takeIf { theme.keepsJournal },
-                    pickLabel = MARK_QUEST,
+                    pick = MapPick(
+                        hint = if (journal.quest == null) "Tap the map to mark your quest" else "Tap the map to move your quest, hold to clear it",
+                        pickLabel = MARK_QUEST,
+                        clearLabel = CLEAR_QUEST.takeIf { journal.quest != null },
+                        onPick = markQuest,
+                    ).takeIf { theme.keepsJournal },
                     onClose = { showingWorldMap = false },
                 )
             }

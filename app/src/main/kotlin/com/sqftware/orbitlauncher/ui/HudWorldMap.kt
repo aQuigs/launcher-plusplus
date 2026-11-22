@@ -120,9 +120,9 @@ internal class HudWorldMap(private val look: HudLook, private val drift: Drift?)
 
     /** The hint as the games' maps lay their own along the foot of the screen, on smoke between hairlines. */
     @Composable
-    override fun PickHint(modifier: Modifier) {
+    override fun PickHint(text: String, modifier: Modifier) {
         Text(
-            "Tap the map to mark your quest",
+            text,
             style = MaterialTheme.typography.labelLarge.legible(look.colors.ink),
             color = look.colors.ink,
             textAlign = TextAlign.Center,
