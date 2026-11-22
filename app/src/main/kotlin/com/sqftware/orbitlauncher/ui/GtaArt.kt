@@ -106,7 +106,7 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     @Composable
     override fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) {
         // A folder the user never named has nothing to call it: the game's middle shows a name only when it has one.
-        if (folder.name.isEmpty()) return
+        if (folder.name.isBlank()) return
         val ink = GtaHudColors.ink
         Box(modifier.graphicsLayer { alpha = shown() }, contentAlignment = Alignment.Center) {
             Text(

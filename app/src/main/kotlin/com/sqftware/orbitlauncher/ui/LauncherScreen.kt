@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -666,7 +667,10 @@ fun LauncherScreen(
     LaunchedEffect(open == null) { if (open == null) openFolder = null }
     // What lies behind an open folder, as the theme has it: the page's things blurred under a veil, the wallpaper with them.
     val folderBackdrop = LocalThemeArt.current.folderBackdrop
-    val backdropShown = animateFloatAsState(if (folderBackdrop != null && open != null) 1f else 0f, label = "backdrop")
+    val backdropShown = remember { Animatable(0f) }
+    LaunchedEffect(folderBackdrop != null && open != null && ringInSight) {
+        backdropShown.animateTo(if (folderBackdrop != null && open != null && ringInSight) 1f else 0f)
+    }
     val latestOnWallpaperBlurChange by rememberUpdatedState(onWallpaperBlurChange)
     val density = LocalDensity.current
     LaunchedEffect(folderBackdrop, density) {
@@ -1365,6 +1369,8 @@ fun LauncherScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
         if (homeOnReturn && !onErrand) {
             closeAll()
+            // Gone now, while no frame runs, rather than fading out over the closed folder on the way back.
+            scope.launch { backdropShown.snapTo(0f) }
             pagerState.requestScrollToPage(layout.homeIndex)
         }
     }
@@ -1790,7 +1796,8 @@ fun LauncherScreen(
                                                         icon = actions.icon,
                                                         onLaunch = launch,
                                                         onOpenFolder = { if (active) tapFolder(page.id, it.at) },
-                                                        modifier = Modifier.dropZone(page) { copy(dock = it) }.blurredBehindFolder(folderBackdrop, behindFolder),
+                                                        modifier = Modifier.dropZone(page) { copy(dock = it) }
+                                                            .blurredBehindFolder(folderBackdrop) { if (open?.at?.holder == HomePlace.Dock) 0f else behindFolder() },
                                                         highlighted = page == inView && dropPlace == HomePlace.Dock,
                                                         menu = dockMenu.takeIf { active },
                                                         folderMenu = folderMenu.takeIf { active },

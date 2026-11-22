@@ -25,7 +25,7 @@ data class Unread(val count: Int, val dismissed: Boolean = false) {
 data class UnreadCounts(
     val byPackage: Map<String, Int> = emptyMap(),
     val dismissed: Set<String> = emptySet(),
-    val inShade: Set<String> = byPackage.keys - dismissed,
+    val inShade: Set<String> = byPackage.filterValues { it > 0 }.keys - dismissed,
 ) {
     operator fun get(app: AppEntry): Int = app.badgePackages.sumOf { byPackage[it] ?: 0 }
 

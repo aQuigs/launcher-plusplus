@@ -16,14 +16,20 @@ interface WallpaperBlur {
  */
 class WindowWallpaperBlur(private val window: Window) : WallpaperBlur {
     override fun blur(radius: Int) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !window.windowManager.isCrossWindowBlurEnabled) return
-        // The system draws the blur on the window's dim layer, which it skips while it has nothing to draw, so a dim too
-        // faint to see goes with it.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        // Cleared whether or not the system blurs now, so a blur set before battery saver turned it off cannot come back
+        // with no folder open. The system draws the blur on the window's dim layer, which it skips while it has nothing
+        // to draw, so a dim too faint to see goes with it.
+        val on = radius > 0 && window.windowManager.isCrossWindowBlurEnabled
         val behind = WindowManager.LayoutParams.FLAG_BLUR_BEHIND or WindowManager.LayoutParams.FLAG_DIM_BEHIND
-        window.attributes = window.attributes.apply {
-            blurBehindRadius = radius
+        val attributes = window.attributes
+        val flags = if (on) attributes.flags or behind else attributes.flags and behind.inv()
+        val blurRadius = if (on) radius else 0
+        if (flags == attributes.flags && blurRadius == attributes.blurBehindRadius) return
+        window.attributes = attributes.apply {
+            this.flags = flags
+            blurBehindRadius = blurRadius
             dimAmount = UNSEEN_DIM
-            flags = if (radius > 0) flags or behind else flags and behind.inv()
         }
     }
 }
