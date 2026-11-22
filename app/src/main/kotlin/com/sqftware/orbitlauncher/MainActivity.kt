@@ -25,6 +25,7 @@ import com.sqftware.orbitlauncher.apps.PhotonPlaceFinder
 import com.sqftware.orbitlauncher.apps.SystemPlaceSearch
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
+import com.sqftware.orbitlauncher.apps.QuestRoutes
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
@@ -84,6 +85,7 @@ import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.easeHeading
 import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.minimap.MADE_UP_TOUR
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.domain.turnedPast
@@ -99,6 +101,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.runningReduce
@@ -174,6 +179,7 @@ class MainActivity : ComponentActivity() {
         val minimapArt = ResourceMinimapArt(this)
         val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
         val wanderingMinimap = WanderingMinimap(MADE_UP_TOUR, minimapArt)
+        val questRoutes = QuestRoutes(mapTiles)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { toasts.show("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
@@ -340,6 +346,28 @@ class MainActivity : ComponentActivity() {
                 // The map turns with the phone only while it shows, as the map follows the user. Both are read where
                 // they are drawn, so a new map or a turn redraws the emblem alone.
                 val heading = remember { mutableStateOf<Float?>(null) }
+                // Found again each time the minimap moves on with the user. The state outlives a change of key, so the
+                // route to a quest cleared, or in a theme that has none, is dropped.
+                val guidedQuest = journal.quest.takeIf { shownTheme.guidesToQuest }
+                val route = produceState<List<LatLon>?>(null, guidedQuest) {
+                    value = null
+                    guidedQuest?.let { quest ->
+                        val at = snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged()
+                        questRoutes.routes(at, quest).collect { value = it }
+                    }
+                }
+                // The quest clears once the user gets there. Where they stood as it was set does not count, so one set
+                // close by stays until they move.
+                LaunchedEffect(guidedQuest) {
+                    if (guidedQuest == null) return@LaunchedEffect
+                    snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged().drop(1).collect { at ->
+                        journal.arriving(at)?.let {
+                            journal = it
+                            journalStore.save(it)
+                        }
+                    }
+                }
+                val readRoute = remember { { route.value } }
                 val readMinimap = remember { { minimap.value } }
                 val readMadeUpMap = remember { { madeUpMap.value } }
                 val readHeading = remember { { heading.value } }
@@ -514,6 +542,7 @@ class MainActivity : ComponentActivity() {
                     onShowWhereIAmChange = { on -> if (on) showWhereIAm() else changeWhereIAm(WhereIAm.Hidden) },
                     onOpenMapLicence = mapLicence::open,
                     minimap = readMinimap,
+                    route = readRoute,
                     madeUpMap = readMadeUpMap,
                     heading = readHeading,
                     journal = journal,

@@ -345,6 +345,7 @@ class LauncherScreenTest {
             onShowWhereIAmChange = { whereIAm = if (it) WhereIAm.Shown else WhereIAm.Hidden },
             onOpenMapLicence = {},
             minimap = { shownMinimap },
+            route = { null },
             madeUpMap = { null },
             heading = { null },
             journal = journal,

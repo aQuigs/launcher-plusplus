@@ -20,6 +20,16 @@ class JournalTest {
     }
 
     @Test
+    fun clearsTheQuestOnlyOnceTheUserIsThere() {
+        val quest = LatLon(40.7562, -73.9838)
+        val journal = Journal(quest = quest, discovered = setOf("Midtown"))
+
+        assertNull(journal.arriving(LatLon(40.7536, -73.9832)))
+        assertEquals(Journal(discovered = setOf("Midtown")), journal.arriving(LatLon(40.7559, -73.9838)))
+        assertNull(Journal().arriving(quest))
+    }
+
+    @Test
     fun aPlaceOfTheSameNameInAnotherTownIsNews() {
         val journal = Journal().discovering(Place("Chinatown", LatLon(40.7158, -73.9970)))!!
 

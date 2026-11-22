@@ -71,7 +71,7 @@ private val STAR_GAP = 5.dp
  * GTA: an homage to the coast game's heads-up display, drawn by hand rather than from its files. The emblem is its
  * minimap of where the user is, a wide pastel screen turned with the phone that darkens after dark as the game's does,
  * with the player's arrow at its middle; the compass runs along the top of the home page, a thin line with the heading
- * in a dark disc and the user's destination marked in teal, and over the clock the wanted level is a star for each app
+ * in a dark disc and the user's waypoint marked in purple, and over the clock the wanted level is a star for each app
  * with something unread; the ring is the apps alone on the wallpaper; a folder opens into a weapon wheel of tiles with
  * its name in the middle; menus and the drawer are the pause menu's charcoal, in a condensed type; and the sunset over
  * the coast is a scene for the wallpaper.
@@ -157,7 +157,7 @@ private val GtaTypography = typographyIn(Condensed, display = 0f, heading = 0.02
 
 /**
  * The game's view of where the user is: its pastel minimap on a wide screen with a hairline round it, the compass a thin
- * gray line with the heading in a dark disc, the destination a teal pin, and a place discovered named in condensed caps.
+ * gray line with the heading in a dark disc, the waypoint a purple pin, and a place discovered named in condensed caps.
  */
 private object GtaHud : HudLook {
     override val colors = GtaHudColors

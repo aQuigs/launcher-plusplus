@@ -73,6 +73,10 @@ interface WorldMapArt {
     /** Draws [painting] [scale] screen pixels to each of its own, its top left at [topLeft], and its icons if they are apart. */
     fun DrawScope.drawPainting(painting: PaintedMap<ImageBitmap>, topLeft: IntOffset, scale: Float)
 
+    /** What the theme lays on the ground in the [view], under the user's mark: by default nothing. */
+    @Composable
+    fun OnGround(view: () -> MapView) = Unit
+
     /** Marks [at], where the user is, at its place in the [view]. */
     @Composable
     fun YouAreHere(at: LatLon, view: () -> MapView)
@@ -224,6 +228,7 @@ fun WorldMapScreen(
             }
             .testTag(WorldMapTags.MAP),
     ) {
+        art.OnGround { view }
         here()?.let { art.YouAreHere(it) { view } }
         art.Over({ view }, moving)
         // The bars are hidden while the map is up, so only a cutout takes room from it.
