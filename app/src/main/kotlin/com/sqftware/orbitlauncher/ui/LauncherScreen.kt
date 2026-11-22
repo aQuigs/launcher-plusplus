@@ -2118,7 +2118,7 @@ fun LauncherScreen(
                     pick = MapPick(
                         hint = if (journal.quest == null) "Tap the map to mark your quest" else "Tap the map to move your quest, hold to clear it",
                         pickLabel = MARK_QUEST,
-                        clearLabel = CLEAR_QUEST,
+                        clearLabel = CLEAR_QUEST.takeIf { journal.quest != null },
                         onPick = markQuest,
                     ).takeIf { theme.keepsJournal },
                     onClose = { showingWorldMap = false },

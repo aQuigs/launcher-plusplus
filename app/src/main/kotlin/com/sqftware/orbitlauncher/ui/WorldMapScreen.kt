@@ -94,11 +94,11 @@ interface WorldMapArt {
 internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width / 2.0 + it.x).toFloat(), (height / 2.0 + it.y).toFloat()) }
 
 /**
- * What a tap on the world map does: [onPick] takes the place tapped, or null from a press held and lifted without
- * panning, which clears the pick. The map shows the [hint], and offers both to accessibility as [pickLabel], for the
- * middle of the map, and [clearLabel].
+ * What a tap on the world map does: [onPick] takes the place tapped, or, given a [clearLabel] as there is a pick to
+ * clear, null from a press held and lifted without panning. The map shows the [hint], and offers both to accessibility
+ * as [pickLabel], for the middle of the map, and [clearLabel].
  */
-data class MapPick(val hint: String, val pickLabel: String, val clearLabel: String, val onPick: (LatLon?) -> Unit)
+data class MapPick(val hint: String, val pickLabel: String, val clearLabel: String?, val onPick: (LatLon?) -> Unit)
 
 /**
  * The world map over the whole screen, as a game opens it: the ground round [here], where the minimap last placed the
@@ -190,7 +190,7 @@ fun WorldMapScreen(
                         onStill = { at, held ->
                             val pick = latestPick
                             if (pick != null && !stoppedGlide) {
-                                if (held) pick.onPick(null)
+                                if (held) pick.clearLabel?.let { pick.onPick(null) }
                                 else if (painted != null) pick.onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
                             }
                         },
@@ -214,9 +214,11 @@ fun WorldMapScreen(
                         it.onPick(view.centre)
                         true
                     }
-                    onLongClick(it.clearLabel) {
-                        it.onPick(null)
-                        true
+                    it.clearLabel?.let { label ->
+                        onLongClick(label) {
+                            it.onPick(null)
+                            true
+                        }
                     }
                 }
             }

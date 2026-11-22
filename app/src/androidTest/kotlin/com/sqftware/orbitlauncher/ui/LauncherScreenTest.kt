@@ -2401,6 +2401,7 @@ class LauncherScreenTest {
         compose.runOnIdle { assertEquals(null, journal.quest) }
         compose.onNodeWithContentDescription("Close").performClick()
         compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(null, journal.quest) }
     }
 
     @Test
