@@ -15,16 +15,17 @@ import kotlin.math.abs
 /**
  * Reads pinches and drags on this node. [onDown] comes as a finger lands. Once the fingers pass the touch slop, [onMove]
  * comes with each move: by what factor they spread, how far they went, and where they were, from the node's middle,
- * which a zoom about that point and then the move keeps the ground under the fingers. [onEnd] comes as the last lifts,
- * after [onStill] if one finger lifted without passing the slop, and nothing inside took the touch: where it lifted,
- * and whether it was held past a long press. A finger often rests a moment before it pans, so a hold is known only once
- * it lifts. A button over the node, or a cancel, consumes the touch.
+ * which a zoom about that point and then the move keeps the ground under the fingers. [onEnd] comes as the last lifts.
+ * A lone finger that rests a long press without passing the slop gets [onHold] there and then, still down, so the user
+ * sees it take, even if it pans after; one that lifts sooner gets [onTap] where it lifted. Neither comes if a button
+ * over the node consumes the touch, or a cancel comes first.
  */
 suspend fun PointerInputScope.detectPinchPan(
     onDown: () -> Unit,
     onMove: (zoom: Float, pan: Offset, anchor: Offset) -> Unit,
     onEnd: () -> Unit,
-    onStill: (at: Offset, held: Boolean) -> Unit = { _, _ -> },
+    onTap: (at: Offset) -> Unit,
+    onHold: () -> Unit,
 ) {
     val slop = viewConfiguration.touchSlop
     val holdMillis = viewConfiguration.longPressTimeoutMillis
@@ -32,14 +33,25 @@ suspend fun PointerInputScope.detectPinchPan(
         val down = awaitFirstDown(requireUnconsumed = false)
         onDown()
         var moving = false
+        var held = false
         var fingers = 1
         var last = down
         var zoomed = 1f
         var panned = Offset.Zero
         var anchor = Offset.Zero
         val middle = Offset(size.width / 2f, size.height / 2f)
-        do {
-            val event = awaitPointerEvent()
+        fun still() = !held && !moving && fingers == 1 && !down.isConsumed && !last.isConsumed
+        while (true) {
+            val event = if (still()) {
+                withTimeoutOrNull(down.uptimeMillis + holdMillis - last.uptimeMillis) { awaitPointerEvent() }
+            } else {
+                awaitPointerEvent()
+            }
+            if (event == null) {
+                held = true
+                onHold()
+                continue
+            }
             fingers = maxOf(fingers, event.changes.count { it.pressed })
             last = event.changes.first()
             val zoom = event.calculateZoom()
@@ -54,8 +66,9 @@ suspend fun PointerInputScope.detectPinchPan(
                 onMove(zoom, pan, anchor)
                 event.changes.forEach { if (it.positionChanged()) it.consume() }
             }
-        } while (event.changes.any { it.pressed })
-        if (!moving && fingers == 1 && !down.isConsumed && !last.isConsumed) onStill(last.position, last.uptimeMillis - down.uptimeMillis >= holdMillis)
+            if (event.changes.none { it.pressed }) break
+        }
+        if (still()) onTap(last.position)
         onEnd()
     }
 }
