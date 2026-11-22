@@ -35,9 +35,13 @@ fun OpenWithDialog(app: AppEntry, onChoose: (OpenChoice) -> Unit, onDismiss: () 
     )
 }
 
-/** What the prompts for an intent's input offer and search: the [recentPlaces], [findPlaces] and [openMaps]. */
+/**
+ * What the prompts for an intent's input offer, search and keep: the [recentPlaces], to which [onPlacePicked] adds, and
+ * [findPlaces] and [openMaps].
+ */
 class InputSources(
     val recentPlaces: List<PlaceValue>,
+    val onPlacePicked: (PlaceValue) -> Unit,
     val findPlaces: suspend (String) -> List<PlaceValue>,
     val openMaps: () -> Unit,
 )
@@ -81,7 +85,10 @@ private fun PlacePrompt(
         find = { typed -> sources.findPlaces(typed) + typed.trim().let { PlaceValue(label = it, address = it) } },
         label = PlaceValue::label,
         description = { place -> if (place.latitude == null) "As typed" else place.address.takeIf { it != place.label } },
-        onChoose = onAnswer,
+        onChoose = { place ->
+            sources.onPlacePicked(place)
+            onAnswer(place)
+        },
         onDismiss = onDismiss,
         extra = { LauncherButton(onClick = sources.openMaps) { Text("Find in Maps") } },
         fieldTag = OpenWithTags.FIELD,

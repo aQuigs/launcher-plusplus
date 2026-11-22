@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -334,10 +333,7 @@ fun <T> ChoiceDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (chosen != null) RadioButton(selected = choice == chosen, onClick = null, Modifier.padding(end = Spacing.Edge))
-                        Column(Modifier.padding(vertical = Spacing.Tight)) {
-                            Text(label(choice))
-                            description(choice)?.let { SupportingText(it) }
-                        }
+                        LabelOver(label(choice), description(choice))
                     }
                 }
             }
@@ -395,16 +391,14 @@ fun <T> SearchDialog(
                 )
                 Column(Modifier.padding(top = Spacing.Tight).verticalScroll(rememberScrollState())) {
                     shown.forEach { choice ->
-                        Column(
+                        Row(
                             Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 48.dp)
-                                .clickable { onChoose(choice) }
-                                .padding(vertical = Spacing.Tight),
-                            verticalArrangement = Arrangement.Center,
+                                .clickable { onChoose(choice) },
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(label(choice))
-                            description(choice)?.let { SupportingText(it) }
+                            LabelOver(label(choice), description(choice))
                         }
                     }
                 }
@@ -415,6 +409,15 @@ fun <T> SearchDialog(
 }
 
 private const val SEARCH_PAUSE_MILLIS = 300L
+
+/** A choice in a dialog's list: its [label] over its [description], if any. */
+@Composable
+private fun LabelOver(label: String, description: String?) {
+    Column(Modifier.padding(vertical = Spacing.Tight)) {
+        Text(label)
+        description?.let { SupportingText(it) }
+    }
+}
 
 /**
  * Focus for a text field in a pop-up, requested once the pop-up's own window has focus: a text field focused before then

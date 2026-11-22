@@ -88,6 +88,7 @@ import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.OpenChoice
 import com.sqftware.orbitlauncher.domain.PlaceValue
+import com.sqftware.orbitlauncher.domain.answered
 import com.sqftware.orbitlauncher.domain.asks
 import com.sqftware.orbitlauncher.domain.openedAs
 import com.sqftware.orbitlauncher.domain.placeQueryFromShare
@@ -810,7 +811,6 @@ fun LauncherScreen(
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
     var choosingOpen by remember { mutableStateOf<ChoosingOpen?>(null) }
     var asking by remember { mutableStateOf<Asking?>(null) }
-    var promptQuery by remember { mutableStateOf("") }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var showingSpinStats by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
@@ -864,6 +864,17 @@ fun LauncherScreen(
 
     fun pickPartner(app: AppEntry, spot: AppSpot) = pick(DrawerPick.Partner(app.key, spot))
 
+    // Puts [with] in [app]'s place where it was pressed, and says whether it could: in a slot, a folder or a hand-picked card.
+    fun replaceAt(spot: AppSpot, app: AppEntry, with: AppEntry): Boolean {
+        val card = (spot as? AppSpot.Card)?.kind as? CollectionKind.HandPicked
+        when {
+            spot is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, app, with, shown) } }
+            card != null -> changeCollections { replaceApp(card, app, with) }
+            else -> return false
+        }
+        return true
+    }
+
     // Where the first app was pressed, if the user fills that place, else at the end of the ring: the apps in the drawer
     // and on the built-in cards are the system's. The pair is seen landing, as a pinned shortcut is; a card is on the page
     // the pick was made from.
@@ -882,11 +893,10 @@ fun LauncherScreen(
     // Asks for each of [kinds] in turn, then hands all the answers to [then].
     fun ask(kinds: List<InputKind>, answers: Map<InputKind, InputValue> = emptyMap(), then: (Map<InputKind, InputValue>) -> Unit) {
         val kind = kinds.firstOrNull() ?: return then(answers)
-        promptQuery = ""
         asking = Asking(kind) { value -> ask(kinds.drop(1), answers + (kind to value), then) }
     }
 
-    val launch: (AppEntry) -> Unit = remember(actions) { { app -> ask(app.asks) { actions.launch(app, it) } } }
+    val launch: (AppEntry) -> Unit = remember(actions) { { app -> ask(app.asks) { app.answered(it)?.let(actions.launch) } } }
 
     // Where the icon was pressed it changes; from the drawer or a card the system fills, the new one goes on the ring, as
     // a pair does.
@@ -894,20 +904,14 @@ fun LauncherScreen(
         fun put(saved: InputValue?) {
             val replacement = openedAs(choosing.member, choice, saved) ?: return
             val changed = choosing.app.withMember(choosing.member, replacement)?.takeIf { it != choosing.app } ?: return
-            val spot = choosing.spot
-            val card = (spot as? AppSpot.Card)?.kind as? CollectionKind.HandPicked
-            when {
-                spot is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, choosing.app, changed, shown) } }
-                card != null -> changeCollections { replaceApp(card, choosing.app, changed) }
-                else -> {
-                    changeHomeApps { add(HomePlace.Ring, changed) }
-                    showRingPage()
-                }
+            if (!replaceAt(choosing.spot, choosing.app, changed)) {
+                changeHomeApps { add(HomePlace.Ring, changed) }
+                showRingPage()
             }
         }
 
         val input = (choice as? OpenChoice.Intent)?.takeUnless { it.asks }?.intent?.input
-        if (input == null) put(null) else ask(listOf(input)) { put(it[input]) }
+        ask(listOfNotNull(input)) { put(input?.let(it::get)) }
     }
 
     // A menu still loading its shortcuts is cancelled too, or HOME pressed meanwhile would not stop it opening afterwards.
@@ -964,13 +968,7 @@ fun LauncherScreen(
                             is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
                             AppOption.SplitWith -> pickPartner(app, spot)
                             is AppOption.OpenWith -> choosingOpen = ChoosingOpen(app, option.member ?: app, spot)
-                            AppOption.Flip -> app.flipped()?.let { flipped ->
-                                when (spot) {
-                                    is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, app, flipped, shown) } }
-                                    is AppSpot.Card -> changeCollections { replaceApp(spot.kind, app, flipped) }
-                                    AppSpot.Drawer, AppSpot.MostUsedRow, is AppSpot.Grid -> Unit
-                                }
-                            }
+                            AppOption.Flip -> app.flipped()?.let { replaceAt(spot, app, it) }
                             is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(option.member ?: app))
                             is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
                             AppOption.PlayStore -> errand { actions.openStorePage(app) }
@@ -1381,7 +1379,7 @@ fun LauncherScreen(
         sharedPlaces.collect { text ->
             val query = placeQueryFromShare(text.take(MAX_SHARED_PLACE)) ?: return@collect
             if (asking?.kind == InputKind.Place) {
-                promptQuery = query
+                asking = asking?.copy(query = query)
             } else {
                 val place = latestActions.findPlaces(query).firstOrNull() ?: PlaceValue(query, query)
                 latestOnRecentPlacesChange(latestRecentPlaces.withRecent(place))
@@ -2038,12 +2036,16 @@ fun LauncherScreen(
                 asking?.let { prompt ->
                     InputPrompt(
                         kind = prompt.kind,
-                        query = promptQuery,
-                        onQueryChange = { promptQuery = it },
-                        sources = InputSources(recentPlaces, actions.findPlaces, openMaps = { if (actions.openMaps()) onErrand = true }),
+                        query = prompt.query,
+                        onQueryChange = { asking = prompt.copy(query = it) },
+                        sources = InputSources(
+                            recentPlaces = recentPlaces,
+                            onPlacePicked = { onRecentPlacesChange(recentPlaces.withRecent(it)) },
+                            findPlaces = actions.findPlaces,
+                            openMaps = { if (actions.openMaps()) onErrand = true },
+                        ),
                         onAnswer = { value ->
                             asking = null
-                            if (value is PlaceValue) onRecentPlacesChange(recentPlaces.withRecent(value))
                             prompt.then(value)
                         },
                         onDismiss = { asking = null },
@@ -2155,16 +2157,16 @@ private sealed interface Drag {
     }
 }
 
-/** The folder open [at] its place and slot on the ring page [page]. */
 /** The most of a shared text read for a place: any app can share text, and a place's name and address are short. */
 private const val MAX_SHARED_PLACE = 500
 
 /** The icon [app], pressed at [spot], whose way of opening is being chosen: for a pair, its app [member]'s. */
 private class ChoosingOpen(val app: AppEntry, val member: AppEntry, val spot: AppSpot)
 
-/** A prompt waiting on an input of [kind], and what is done with the answer. */
-private class Asking(val kind: InputKind, val then: (InputValue) -> Unit)
+/** A prompt waiting on an input of [kind], searching for the [query] typed, and what is done with the answer. */
+private data class Asking(val kind: InputKind, val query: String = "", val then: (InputValue) -> Unit)
 
+/** The folder open [at] its place and slot on the ring page [page]. */
 private data class PageFolder(val page: String, val at: HomePlace.Folder)
 
 /** What the drawer is picking apps for. Serializable, so the screen can save it. */

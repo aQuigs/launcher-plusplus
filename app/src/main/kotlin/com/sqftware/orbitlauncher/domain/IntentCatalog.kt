@@ -7,27 +7,9 @@ import java.net.URLEncoder
  * never changes its id, and one taken out leaves its icons unopenable until it is back.
  */
 object IntentCatalog {
-    val all: List<AppIntent> = listOf(UberRide, LyftRide)
-
-    private val byId = all.associateBy { it.id }
-
-    fun forPackage(packageName: String): List<AppIntent> = all.filter { it.packageName == packageName }
-
-    fun byId(id: String): AppIntent? = byId[id]
-}
-
-/** Uber's ride request, picked up where the phone is: https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction */
-private object UberRide : AppIntent {
-    override val id = "uber.ride"
-    override val packageName = "com.ubercab"
-    override val name = "ride"
-    override val label = "Ride to a place"
-    override val input = InputKind.Place
-
-    override fun request(value: InputValue?): IntentRequest {
-        val place = value as PlaceValue
-        return IntentRequest(
-            packageName,
+    private val all: List<AppIntent> = listOf(
+        // Picked up where the phone is: https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction
+        PlaceIntent("uber.ride", "com.ubercab", "ride", "Ride to a place") { place ->
             link(
                 "uber://",
                 "action" to "setPickup",
@@ -36,32 +18,38 @@ private object UberRide : AppIntent {
                 "dropoff[longitude]" to place.longitude?.toString(),
                 "dropoff[nickname]" to place.label,
                 "dropoff[formatted_address]" to place.address,
-            ),
-        )
-    }
-}
-
-/** Lyft's ride, as its Android SDK's deep link builds it: https://github.com/lyft/lyft-android-sdk */
-private object LyftRide : AppIntent {
-    override val id = "lyft.ride"
-    override val packageName = "me.lyft.android"
-    override val name = "ride"
-    override val label = "Ride to a place"
-    override val input = InputKind.Place
-
-    override fun request(value: InputValue?): IntentRequest {
-        val place = value as PlaceValue
-        return IntentRequest(
-            packageName,
+            )
+        },
+        // As Lyft's Android SDK builds its deep link: https://github.com/lyft/lyft-android-sdk
+        PlaceIntent("lyft.ride", "me.lyft.android", "ride", "Ride to a place") { place ->
             link(
                 "lyft://ridetype",
                 "id" to "lyft",
                 "destination[latitude]" to place.latitude?.toString(),
                 "destination[longitude]" to place.longitude?.toString(),
                 "destination[address]" to place.address,
-            ),
-        )
-    }
+            )
+        },
+    )
+
+    private val byId = all.associateBy { it.id }
+
+    fun forPackage(packageName: String): List<AppIntent> = all.filter { it.packageName == packageName }
+
+    fun byId(id: String): AppIntent? = byId[id]
+}
+
+/** An intent that takes a place, and opens the [link] to it. */
+private class PlaceIntent(
+    override val id: String,
+    override val packageName: String,
+    override val name: String,
+    override val label: String,
+    private val link: (PlaceValue) -> String,
+) : AppIntent {
+    override val input = InputKind.Place
+
+    override fun request(value: InputValue?) = IntentRequest(packageName, link(value as PlaceValue))
 }
 
 /** [base] with a query of the [params] that have a value, each URL-encoded; the apps read their brackets unencoded. */

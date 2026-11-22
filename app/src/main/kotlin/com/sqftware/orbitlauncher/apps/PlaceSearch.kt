@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.location.Address
 import android.location.Geocoder
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import com.sqftware.orbitlauncher.domain.PlaceValue
@@ -60,11 +59,11 @@ class GeocoderPlaceSearch(private val context: Context) : PlaceSearch {
         }
 
     // An address the geocoder found for a business names it as its feature; for a street address, the feature is the house
-    // number, which says less than the address's first line.
+    // number, which says less than the start of the address, as far as its first comma: the street.
     private fun Address.toPlace(): PlaceValue {
         val lines = (0..maxAddressLineIndex).map(::getAddressLine)
         val address = lines.joinToString(", ")
-        val first = lines.firstOrNull().orEmpty()
+        val first = lines.firstOrNull().orEmpty().substringBefore(",")
         val name = featureName?.takeIf { it.isNotBlank() && !it.all(Char::isDigit) && !first.startsWith(it) } ?: first
         // Some geocoders leave out where a place is, and reading it then throws.
         return PlaceValue(
@@ -76,6 +75,6 @@ class GeocoderPlaceSearch(private val context: Context) : PlaceSearch {
     }
 
     override fun openMaps() = started(TAG, "maps") {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(mapsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

@@ -209,9 +209,9 @@ class MainActivity : ComponentActivity() {
                 val actions = remember(appLists?.index ?: 0, iconStyles) {
                     AppActions(
                         icon = { app, place -> repository.icon(app, iconStyles.getValue(place)) },
-                        launch = { app, answers ->
-                            clearBadge(app)
-                            repository.launch(app, answers)
+                        launch = {
+                            clearBadge(it)
+                            repository.launch(it)
                         },
                         clearBadge = clearBadge,
                         shortcuts = repository::shortcuts,

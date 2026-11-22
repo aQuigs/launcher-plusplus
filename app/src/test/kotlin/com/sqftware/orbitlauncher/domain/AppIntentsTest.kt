@@ -74,16 +74,19 @@ class AppIntentsTest {
 
     @Test
     fun `the ride links carry the destination, encoded, and the asked place only when answered`() {
-        val asking = openedAs(uber, OpenChoice.Intent(ride, true))!!.kind as EntryKind.Intent
+        val asking = openedAs(uber, OpenChoice.Intent(ride, true))!!
+        val answered = asking.answered(mapOf(InputKind.Place to work))!!
 
-        assertNull(asking.request(emptyMap()))
+        assertNull((asking.kind as EntryKind.Intent).request())
+        assertNull(asking.answered(emptyMap()))
+        assertEquals(openedAs(uber, OpenChoice.Intent(ride, false), work), answered)
         assertEquals(
             IntentRequest(
                 "com.ubercab",
                 "uber://?action=setPickup&pickup=my_location&dropoff[latitude]=37.5&dropoff[longitude]=-122.25" +
                     "&dropoff[nickname]=Work%20%7C%20Office%21&dropoff[formatted_address]=1%20Main%20St%2C%20Springfield",
             ),
-            asking.request(mapOf(InputKind.Place to work)),
+            (answered.kind as EntryKind.Intent).request(),
         )
         assertEquals(
             "lyft://ridetype?id=lyft&destination[address]=Elm%20St",

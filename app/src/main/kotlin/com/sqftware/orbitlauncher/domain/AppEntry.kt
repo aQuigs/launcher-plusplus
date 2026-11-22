@@ -40,6 +40,14 @@ data class AppEntry(
     /** Whether it is a plain app, one launchable activity, rather than a shortcut or a pair. */
     val isApp: Boolean get() = kind == EntryKind.App
 
+    /** The one app it opens: itself, or the app an icon opens with an intent; null for a shortcut or a pair. */
+    val ownApp: AppEntry?
+        get() = when (kind) {
+            EntryKind.App -> this
+            is EntryKind.Intent -> kind.app
+            is EntryKind.Shortcut, is EntryKind.AppPair -> null
+        }
+
     /** What starting it opens: a pair's two apps, else itself. */
     val opens: List<AppEntry> get() = if (kind is EntryKind.AppPair) listOf(kind.first, kind.second) else listOf(this)
 

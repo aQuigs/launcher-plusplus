@@ -7,7 +7,7 @@ fun canPair(first: AppEntry, second: AppEntry): Boolean = first.isPairable && se
  * Whether it can be one of a pair: an app of the user's own, plain or opened to an intent, as the launcher opens a work
  * app only through the system.
  */
-val AppEntry.isPairable: Boolean get() = (isApp || kind is EntryKind.Intent) && !isWork
+val AppEntry.isPairable: Boolean get() = ownApp != null && !isWork
 
 /**
  * The pair of [first] and [second], opened in split screen with [first] on top and named after both, as Pixel names its

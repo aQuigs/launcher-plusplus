@@ -69,7 +69,8 @@ data class PlaceValue(
         .joinToString(FIELD_SEPARATOR) { URLEncoder.encode(it, "UTF-8") }
 }
 
-private const val FIELD_SEPARATOR = "\n"
+// URL-encoding escapes it, and line breaks, so an encoded value is one line of its fields.
+private const val FIELD_SEPARATOR = ","
 
 /** Where the value an [AppIntent] fills in comes from. */
 sealed interface InputSource {
@@ -119,12 +120,8 @@ fun currentChoice(app: AppEntry): OpenChoice? = when (val kind = app.kind) {
     else -> OpenChoice.Usual
 }
 
-/** The plain app an icon opens with an intent, or one that could: itself if it is one. Null for anything else. */
-val AppEntry.intentBase: AppEntry?
-    get() = when (val kind = kind) {
-        is EntryKind.Intent -> kind.app
-        else -> takeIf { it.isApp && !it.isWork }
-    }
+/** The app of the user's own an icon opens, with an intent or without: what can be opened with one. */
+val AppEntry.intentBase: AppEntry? get() = ownApp?.takeUnless { it.isWork }
 
 /**
  * The icon that opens [app] straight to [intent], with its input from [source], or null when the intent is not [app]'s, or
@@ -132,7 +129,7 @@ val AppEntry.intentBase: AppEntry?
  * and the saved input if any.
  */
 fun intentEntryOf(app: AppEntry, intent: AppIntent, source: InputSource?): AppEntry? {
-    if (!app.isApp || app.isWork || app.packageName != intent.packageName) return null
+    if (app.intentBase != app || app.packageName != intent.packageName) return null
     val fits = when (source) {
         null -> intent.input == null
         InputSource.Ask -> intent.input != null
@@ -167,14 +164,23 @@ fun openedAs(app: AppEntry, choice: OpenChoice, saved: InputValue? = null): AppE
 val AppEntry.asks: List<InputKind>
     get() = opens.mapNotNull { (it.kind as? EntryKind.Intent)?.takeIf { kind -> kind.source == InputSource.Ask }?.intent?.input }.distinct()
 
-/** What opens [this] intent's app straight to it, with the input asked for from [answers]; null if that is missing. */
-fun EntryKind.Intent.request(answers: Map<InputKind, InputValue>): IntentRequest? {
-    val value = when (source) {
-        null -> null
-        InputSource.Ask -> answers[intent.input] ?: return null
-        is InputSource.Saved -> source.value
+/**
+ * [this] with each of its apps that [asks] for an input opened with the answer from [answers] instead, so it opens
+ * straight away; null if an answer is missing.
+ */
+fun AppEntry.answered(answers: Map<InputKind, InputValue>): AppEntry? = when (val kind = kind) {
+    is EntryKind.AppPair -> pairOf(kind.first.answered(answers) ?: return null, kind.second.answered(answers) ?: return null)
+    is EntryKind.Intent -> if (kind.source != InputSource.Ask) this else {
+        intentEntryOf(kind.app, kind.intent, InputSource.Saved(answers[kind.intent.input] ?: return null))
     }
-    return intent.request(value)
+    else -> this
+}
+
+/** What opens [this] intent's app straight to it, or null while it still [asks] for its input. */
+fun EntryKind.Intent.request(): IntentRequest? = when (source) {
+    null -> intent.request(null)
+    InputSource.Ask -> null
+    is InputSource.Saved -> intent.request(source.value)
 }
 
 /**
@@ -192,18 +198,12 @@ fun intentKey(intentId: String, source: InputSource?, appKey: String): String {
     return INTENT + listOf(intentId, sourceText, appKey).joinToString(INTENT) { URLEncoder.encode(it, "UTF-8") }
 }
 
-/** The parts of the key [intentKey] made: the intent's id, its encoded source and the app's key; null for another key. */
-internal fun intentKeyParts(key: String): Triple<String, String, String>? {
+/** The icon keyed [key] by [intentKey], given [app] for its app's key, or null if it is not one or no longer makes sense. */
+internal fun intentEntryFor(key: String, app: (String) -> AppEntry?): AppEntry? {
     if (!key.startsWith(INTENT)) return null
     val parts = key.substring(INTENT.length).split(INTENT)
     if (parts.size != 3) return null
-    val (id, source, app) = parts.map { URLDecoder.decode(it, "UTF-8") }
-    return Triple(id, source, app)
-}
-
-/** The icon keyed [key] by [intentKey], given [app] for its app's key, or null if it is not one or no longer makes sense. */
-internal fun intentEntryFor(key: String, app: (String) -> AppEntry?): AppEntry? {
-    val (id, sourceText, appKey) = intentKeyParts(key) ?: return null
+    val (id, sourceText, appKey) = parts.map { URLDecoder.decode(it, "UTF-8") }
     val intent = IntentCatalog.byId(id) ?: return null
     val source = when {
         sourceText == NO_INPUT -> null

@@ -118,7 +118,7 @@ import com.sqftware.orbitlauncher.domain.WidgetPages
 import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.InputKind
-import com.sqftware.orbitlauncher.domain.InputValue
+import com.sqftware.orbitlauncher.domain.answered
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import com.sqftware.orbitlauncher.domain.openChoices
 import com.sqftware.orbitlauncher.domain.openedAs
@@ -201,7 +201,6 @@ class LauncherScreenTest {
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
     private val launched = mutableListOf<AppEntry>()
-    private val answered = mutableListOf<Map<InputKind, InputValue>>()
     private var recentPlaces by mutableStateOf(emptyList<PlaceValue>())
     private val found = PlaceValue("Work", "1 Main St, Springfield", 37.5, -122.25)
     private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
@@ -254,10 +253,7 @@ class LauncherScreenTest {
     private var resets = 0
     private val actions = AppActions(
         icon = { _, _ -> null },
-        launch = { app, answers ->
-            launched += app
-            answered += answers
-        },
+        launch = launched::add,
         clearBadge = {},
         shortcuts = {
             shortcutsLoaded.await()
@@ -1142,8 +1138,7 @@ class LauncherScreenTest {
 
         compose.onNodeWithTag(OpenWithTags.PROMPT).assertDoesNotExist()
         compose.runOnIdle {
-            assertEquals(listOf(both), launched)
-            assertEquals(listOf(mapOf(InputKind.Place to home)), answered)
+            assertEquals(listOf(both.answered(mapOf(InputKind.Place to home))), launched)
             assertEquals(listOf(home, found), recentPlaces)
         }
     }
@@ -1180,11 +1175,10 @@ class LauncherScreenTest {
 
         val saved = openedAs(uber, openChoices(uber)[1], found)!!
         compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(saved)), homeApps) }
-        compose.ringSlot(saved).assertContentDescriptionEquals("Uber ride: Work").performClick()
+        compose.ringSlot(saved).assertContentDescriptionEquals("Uber ride: Work", "Opens with intent").performClick()
         compose.onNodeWithTag(OpenWithTags.PROMPT).assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(listOf(saved), launched)
-            assertEquals(listOf(emptyMap<InputKind, InputValue>()), answered)
         }
     }
 

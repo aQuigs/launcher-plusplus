@@ -88,8 +88,10 @@ fun appOptions(
     val inPlace = place != null || card is CollectionKind.HandPicked
     if (app.isPairable && spot !is AppSpot.Grid) add(AppOption.SplitWith)
     if (spot !is AppSpot.Grid && openChoices(app).isNotEmpty()) add(AppOption.OpenWith())
-    if (badgesEnabled && (app.isApp || app.kind is EntryKind.Intent)) add(AppOption.Badge(settings.isBadgeOff(app)))
-    if (app.isApp) add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
+    if (app.ownApp != null) {
+        if (badgesEnabled) add(AppOption.Badge(settings.isBadgeOff(app)))
+        add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
+    }
     if (app.kind is EntryKind.AppPair) {
         if (inPlace) {
             add(AppOption.Flip)
