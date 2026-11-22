@@ -2395,13 +2395,17 @@ class LauncherScreenTest {
         }
         compose.runOnIdle { assertNotNull(journal.quest) }
 
-        // A hold clears it with the finger still down.
-        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { down(Offset(centerX, centerY - 200f)) }
-        compose.mainClock.advanceTimeBy(1_000)
+        // A hold clears it with the finger still down, and the lift after it marks nothing.
+        var holdMillis = 0L
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput {
+            holdMillis = viewConfiguration.longPressTimeoutMillis
+            down(Offset(centerX, centerY - 200f))
+        }
+        compose.mainClock.advanceTimeBy(holdMillis * 2)
         compose.runOnIdle { assertEquals(null, journal.quest) }
         compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { up() }
-
         compose.runOnIdle { assertEquals(null, journal.quest) }
+
         compose.onNodeWithContentDescription("Close").performClick()
         compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
         compose.runOnIdle { assertEquals(null, journal.quest) }

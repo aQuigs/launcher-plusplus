@@ -17,15 +17,15 @@ import kotlin.math.abs
  * comes with each move: by what factor they spread, how far they went, and where they were, from the node's middle,
  * which a zoom about that point and then the move keeps the ground under the fingers. [onEnd] comes as the last lifts.
  * A lone finger that rests a long press without passing the slop gets [onHold] there and then, still down, so the user
- * sees it take; one that lifts sooner gets [onTap] where it lifted. Neither comes if a button over the node, or a
- * cancel, consumes the touch.
+ * sees it take, even if it pans after; one that lifts sooner gets [onTap] where it lifted. Neither comes if a button
+ * over the node consumes the touch, or a cancel comes first.
  */
 suspend fun PointerInputScope.detectPinchPan(
     onDown: () -> Unit,
     onMove: (zoom: Float, pan: Offset, anchor: Offset) -> Unit,
     onEnd: () -> Unit,
-    onTap: (at: Offset) -> Unit = {},
-    onHold: (at: Offset) -> Unit = {},
+    onTap: (at: Offset) -> Unit,
+    onHold: () -> Unit,
 ) {
     val slop = viewConfiguration.touchSlop
     val holdMillis = viewConfiguration.longPressTimeoutMillis
@@ -40,16 +40,16 @@ suspend fun PointerInputScope.detectPinchPan(
         var panned = Offset.Zero
         var anchor = Offset.Zero
         val middle = Offset(size.width / 2f, size.height / 2f)
-        fun still() = !moving && fingers == 1 && !down.isConsumed && !last.isConsumed
+        fun still() = !held && !moving && fingers == 1 && !down.isConsumed && !last.isConsumed
         while (true) {
-            val event = if (still() && !held) {
+            val event = if (still()) {
                 withTimeoutOrNull(down.uptimeMillis + holdMillis - last.uptimeMillis) { awaitPointerEvent() }
             } else {
                 awaitPointerEvent()
             }
             if (event == null) {
                 held = true
-                onHold(last.position)
+                onHold()
                 continue
             }
             fingers = maxOf(fingers, event.changes.count { it.pressed })
@@ -68,7 +68,7 @@ suspend fun PointerInputScope.detectPinchPan(
             }
             if (event.changes.none { it.pressed }) break
         }
-        if (still() && !held) onTap(last.position)
+        if (still()) onTap(last.position)
         onEnd()
     }
 }

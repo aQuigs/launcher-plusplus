@@ -97,8 +97,8 @@ internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width
 
 /**
  * What a tap on the world map does: [onPick] takes the place tapped, or, given a [clearLabel] as there is a pick to
- * clear, null as soon as a press has been held without panning, the finger still down. The map shows the [hint], and offers both to accessibility
- * as [pickLabel], for the middle of the map, and [clearLabel].
+ * clear, null as soon as a press has been held without panning, the finger still down. The map shows the [hint], and
+ * offers both to accessibility as [pickLabel], for the middle of the map, and [clearLabel].
  */
 data class MapPick(val hint: String, val pickLabel: String, val clearLabel: String?, val onPick: (LatLon?) -> Unit)
 
@@ -192,7 +192,9 @@ fun WorldMapScreen(
                         },
                         onTap = { at ->
                             val pick = latestPick
-                            if (pick != null && !stoppedGlide && painted != null) pick.onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
+                            if (pick != null && !stoppedGlide && painted != null) {
+                                pick.onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
+                            }
                         },
                         onHold = {
                             val pick = latestPick
