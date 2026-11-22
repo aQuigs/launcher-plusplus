@@ -58,6 +58,7 @@ enum class Theme(
         mapStyle = MapStyle.Fallout,
         keepsJournal = true,
     ),
+    NeonCoast("Neon coast", listOf(FolderLook.NeonSign, FolderLook.Sunset), listOf(Colourway.Flamingo, Colourway.Lagoon)),
     ;
 
     fun iconStyle(place: IconPlace): IconStyle = iconStyles(place)

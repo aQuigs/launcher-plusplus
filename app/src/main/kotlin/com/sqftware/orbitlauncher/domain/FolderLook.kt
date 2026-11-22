@@ -97,6 +97,12 @@ enum class FolderLook(val label: String) {
 
     /** A bottle cap, crimped round its edge, its previews on its face. */
     BottleCap("Bottle cap"),
+
+    /** A neon tube bent round its previews on a dark backing, humming brighter and dimmer. */
+    NeonSign("Neon sign"),
+
+    /** A striped sunset sun, its previews on it. */
+    Sunset("Sunset"),
 }
 
 /**
@@ -107,12 +113,12 @@ fun FolderLook.moves(folders: Boolean, planets: Collection<Planet>) = when (this
     FolderLook.SolarSystem -> planets.any(Planet::moves)
     FolderLook.Orbit, FolderLook.Gear, FolderLook.Globe, FolderLook.KoiPond, FolderLook.InkDrop,
     FolderLook.Bacillus, FolderLook.Virus, FolderLook.Cell, FolderLook.Pinwheel, FolderLook.Octahedron,
-    FolderLook.WireSphere, FolderLook.Orb -> folders
+    FolderLook.WireSphere, FolderLook.Orb, FolderLook.NeonSign -> folders
     FolderLook.Rim, FolderLook.Ringed, FolderLook.Plain, FolderLook.SubDial, FolderLook.Island, FolderLook.FoldedMap,
     FolderLook.Stone, FolderLook.Moss, FolderLook.Enso, FolderLook.Seal,
     FolderLook.FoldedSquare, FolderLook.Envelope,
     FolderLook.Cube, FolderLook.Geode, FolderLook.HexCell, FolderLook.Items, FolderLook.Shield,
-    FolderLook.VaultDoor, FolderLook.BottleCap -> false
+    FolderLook.VaultDoor, FolderLook.BottleCap, FolderLook.Sunset -> false
 }
 
 /** The planets of the [FolderLook.SolarSystem] look, in order from the Sun. Pluto counts. Those that [move] turn with the sky. */
