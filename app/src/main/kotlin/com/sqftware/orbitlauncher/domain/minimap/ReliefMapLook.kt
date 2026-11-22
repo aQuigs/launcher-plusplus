@@ -36,6 +36,9 @@ private const val PHOSPHOR_FLOOR = 14.0
 private const val PHOSPHOR_RED = 0.2
 private const val PHOSPHOR_BLUE = 0.5
 
+/** A paint for a map in relief in [tint], as [paintRelief] colors it. */
+internal fun relief(tint: LightTint) = GroundPaint { layout, into -> paintRelief(layout, into, tint) }
+
 /**
  * Colors [layout] as a game's local map in relief, as Skyrim's and Fallout's are: a ground seen from above under a light
  * from the upper left, roofs standing off it in their shadows, trees as dark crowns, and all of it softened as the

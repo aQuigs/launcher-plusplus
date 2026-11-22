@@ -2,8 +2,11 @@ package com.sqftware.orbitlauncher.apps
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import com.sqftware.orbitlauncher.R
 import com.sqftware.orbitlauncher.domain.Pixels
@@ -21,6 +24,11 @@ interface MinimapArt {
  * map shows them, which scales them smoothly rather than by whole pixels.
  */
 const val SMOOTH_ICON_PX = 72
+
+/** A GTA blip's round chip, the dark of the game's map icons, and how much of it its pictogram leaves round the edge. */
+private const val BLIP_CHIP = 0xFF22232B.toInt()
+private const val BLIP_PICTOGRAM = 0xFFFFFFFF.toInt()
+private const val BLIP_MARGIN = 0.22f
 
 /**
  * The map's sprites from the app's drawables, decoded once: Old School's at their own pixel size, as the game draws
@@ -40,10 +48,14 @@ class ResourceMinimapArt(private val context: Context) : MinimapArt {
 
     private val fallout by lazy { vectorSprites(::falloutDrawableOf) }
 
+    // GTA marks the same kinds of place as the wasteland does, each in white on its dark chip.
+    private val gta by lazy { vectorSprites(::falloutDrawableOf, ::blip) }
+
     override fun sprites(style: MapStyle) = when (style) {
         MapStyle.OldSchool -> oldSchool
         MapStyle.Skyrim -> skyrim
         MapStyle.Fallout -> fallout
+        MapStyle.Gta, MapStyle.GtaNight -> gta
     }
 
     private fun oldSchoolDrawableOf(icon: MapIcon) = when (icon) {
@@ -91,10 +103,10 @@ class ResourceMinimapArt(private val context: Context) : MinimapArt {
         MapIcon.QuestStart -> R.drawable.fallout_quest
     }
 
-    /** Each icon drawn from the vector [drawableOf] gives it, each vector drawn once however many icons share it. */
-    private fun vectorSprites(drawableOf: (MapIcon) -> Int): MinimapSprites {
+    /** Each icon drawn by [draw] from the vector [drawableOf] gives it, each vector drawn once however many icons share it. */
+    private fun vectorSprites(drawableOf: (MapIcon) -> Int, draw: (Int) -> Pixels = ::vector): MinimapSprites {
         val drawn = mutableMapOf<Int, Pixels>()
-        return MinimapSprites(icons = MapIcon.entries.associateWith { drawn.getOrPut(drawableOf(it)) { vector(drawableOf(it)) } })
+        return MinimapSprites(icons = MapIcon.entries.associateWith { drawn.getOrPut(drawableOf(it)) { draw(drawableOf(it)) } })
     }
 
     private fun sprite(@DrawableRes id: Int): Pixels =
@@ -102,4 +114,19 @@ class ResourceMinimapArt(private val context: Context) : MinimapArt {
 
     private fun vector(@DrawableRes id: Int): Pixels =
         checkNotNull(ContextCompat.getDrawable(context, id)).toBitmap(SMOOTH_ICON_PX, SMOOTH_ICON_PX).pixels()
+
+    /** The vector's shape in white on a dark round chip, as GTA draws a place on its map. */
+    private fun blip(@DrawableRes id: Int): Pixels {
+        val bitmap = createBitmap(SMOOTH_ICON_PX, SMOOTH_ICON_PX)
+        val canvas = Canvas(bitmap)
+        val half = SMOOTH_ICON_PX / 2f
+        canvas.drawCircle(half, half, half, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BLIP_CHIP })
+        val margin = (SMOOTH_ICON_PX * BLIP_MARGIN).toInt()
+        checkNotNull(ContextCompat.getDrawable(context, id)).mutate().apply {
+            setTint(BLIP_PICTOGRAM)
+            setBounds(margin, margin, SMOOTH_ICON_PX - margin, SMOOTH_ICON_PX - margin)
+            draw(canvas)
+        }
+        return bitmap.pixels()
+    }
 }

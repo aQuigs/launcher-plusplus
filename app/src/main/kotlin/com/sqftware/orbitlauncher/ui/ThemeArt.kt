@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import com.sqftware.orbitlauncher.domain.Unread
+import com.sqftware.orbitlauncher.domain.UnreadCounts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -128,10 +129,10 @@ interface ThemeArt {
 
     /**
      * What the theme shows along the top of the home page, over the clock, with the name of the place the user has just
-     * discovered while one is to be shown, its [discovery]: by default nothing.
+     * discovered while one is to be shown, its [discovery], and what is [unread]: by default nothing.
      */
     @Composable
-    fun HomeHeader(discovery: String?, modifier: Modifier) = Unit
+    fun HomeHeader(discovery: String?, unread: UnreadCounts, modifier: Modifier) = Unit
 
     /** How the theme's world map of where the user is looks, if it has one: by default it has none. */
     val worldMap: WorldMapArt? get() = null
@@ -230,6 +231,14 @@ interface ThemeArt {
     fun emblemBox(edge: Color): Modifier =
         Modifier.clip(CircleShape).drawBehind { drawCircle(edge.copy(alpha = 0.35f), radius = size.emblemRadius, style = Stroke(1.dp.toPx())) }
 
+    /**
+     * An open [folder] in the ring's centre, its apps round it, filling the item, [inner] fading what it shows of them
+     * as they go out round it: by default the folder's own face.
+     */
+    @Composable
+    fun OpenFolderFace(folder: RingItem.Folder, icon: IconLoader, inner: () -> Float, modifier: Modifier) =
+        FolderFace(folder, icon, modifier, inner = inner)
+
     /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
     val foldersOpenRoundEmblem: Boolean
         get() = false
@@ -283,6 +292,7 @@ private fun artOf(theme: Theme): ThemeArt = when (theme) {
     Theme.OldSchool -> OldSchoolArt
     Theme.Skyrim -> SkyrimArt
     Theme.Fallout -> FalloutArt
+    Theme.Gta -> GtaArt
 }
 
 val LocalThemeArt = staticCompositionLocalOf<ThemeArt> { SpaceArt }

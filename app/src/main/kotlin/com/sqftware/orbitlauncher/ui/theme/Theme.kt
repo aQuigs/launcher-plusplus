@@ -146,6 +146,7 @@ private fun paletteOf(colourway: Colourway): Palette = when (colourway) {
     Colourway.Classic -> OldSchoolPalette
     Colourway.Nord -> SkyrimPalette
     Colourway.Phosphor -> FalloutPalette
+    Colourway.Vice -> GtaPalette
 }
 
 val LocalRingColors = staticCompositionLocalOf { lookOf(Colourway.Midnight, lightWallpaper = false).ring }

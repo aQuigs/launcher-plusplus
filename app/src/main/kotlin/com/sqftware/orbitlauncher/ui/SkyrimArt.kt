@@ -27,15 +27,12 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.text.font.DeviceFontFamilyName
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.turnBetween
+import com.sqftware.orbitlauncher.ui.theme.Condensed
 import com.sqftware.orbitlauncher.ui.theme.RingColors
 import com.sqftware.orbitlauncher.ui.theme.ShieldBoardDark
 import com.sqftware.orbitlauncher.ui.theme.ShieldBoardLight
@@ -79,14 +76,6 @@ private const val STAR_RAYS = 0.78f
 private const val SHIELD_DISC = 0.64f
 private const val SHIELD_BOARDS = 5
 private const val SHIELD_RIVETS = 10
-
-/** Skyrim's lettering: a plain condensed sans, spaced out, as the game sets its menus and its compass. */
-private val Condensed = FontFamily(
-    Font(DeviceFontFamilyName("sans-serif-condensed"), FontWeight.Light),
-    Font(DeviceFontFamilyName("sans-serif-condensed"), FontWeight.Normal),
-    Font(DeviceFontFamilyName("sans-serif-condensed"), FontWeight.Medium),
-    Font(DeviceFontFamilyName("sans-serif-condensed"), FontWeight.Bold),
-)
 
 /**
  * Skyrim: an homage to the northern game's interface, drawn by hand rather than from its files. The emblem is its local

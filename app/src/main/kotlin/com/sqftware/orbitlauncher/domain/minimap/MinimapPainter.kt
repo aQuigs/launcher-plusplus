@@ -288,9 +288,9 @@ private class Painting(
         val noise = grassNoise()
         val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), DoubleArray(w * h) { noise[tileOf(it % w, it / w)] })
 
-        val relief = style.relief
-        val icons = if (relief != null) {
-            paintRelief(layout, img, relief)
+        val smooth = style.smooth
+        val icons = if (smooth != null) {
+            smooth.paint(layout, img)
             placeIcons()
         } else {
             paintOldSchool(layout)
@@ -301,8 +301,8 @@ private class Painting(
         }
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
-        // A relief map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
-        if (frame.followsUser || relief != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
+        // A smooth map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
+        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
         icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
         return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
     }

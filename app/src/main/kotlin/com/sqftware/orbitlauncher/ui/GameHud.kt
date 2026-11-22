@@ -26,13 +26,19 @@ import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
@@ -49,8 +55,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
@@ -59,11 +67,13 @@ import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.minimap.WebMercator
 import com.sqftware.orbitlauncher.domain.minimap.bearingTo
 import com.sqftware.orbitlauncher.domain.minimap.shiftTo
+import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.turnBetween
 import com.sqftware.orbitlauncher.ui.theme.HudColors
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -107,13 +117,22 @@ private const val DISCOVERY_OUT_MILLIS = 1_200
 internal interface HudLook {
     val colors: HudColors
 
+    /** What the local map shows through in the emblem's cell: by default the cell's disc. */
+    val window: MapWindow get() = MapWindow.Disc
+
     /** How many degrees apart the compass's ticks are: the quarters are lettered, every 45° tick is long, the rest short. */
     val compassTick: Float
+
+    /**
+     * How far below the compass bar's middle its letters, ticks and places sit, as a share of its height: by default on
+     * it, as the northern games set them; a game that runs its bar as a line hangs them under it.
+     */
+    val compassDrop: Float get() = 0f
 
     /** The quest marker's outline round its middle, [half] from it to its tip, which points down at the spot. */
     fun questShape(half: Float): Path
 
-    /** Builds the marks on the local map's rim, on a circle of [radius] round [center], north first: turned with the map. */
+    /** Builds the marks on the local map's rim, on a circle of [radius] round [center], north first: turned with the map. A window that is no disc has none. */
     fun CacheDrawScope.rimMarks(center: Offset, radius: Float): DrawScope.() -> Unit
 
     /** Builds what lies over the local map and the world map, above the ground and its icons: by default nothing. */
@@ -128,10 +147,10 @@ internal interface HudLook {
 }
 
 /**
- * A theme drawn as a game's heads-up display in [hud], with [drift] for its weather over the pages and the world map:
- * its emblem the local map, its header the compass, and its corners square, as the games' are.
+ * A theme drawn as a game's heads-up display in [hud], with [drift] for its weather over the pages and the world map,
+ * if it has any: its emblem the local map, its header the compass, and its corners square, as the games' are.
  */
-abstract class HudArt internal constructor(private val hud: HudLook, private val drift: Drift) : ThemeArt {
+abstract class HudArt internal constructor(private val hud: HudLook, private val drift: Drift?) : ThemeArt {
     override val worldMap: WorldMapArt = HudWorldMap(hud, drift)
 
     override val hintInk: Color
@@ -141,18 +160,53 @@ abstract class HudArt internal constructor(private val hud: HudLook, private val
     override fun EmblemFace(marked: Boolean, slowTurn: () -> Float, fastTurn: () -> Float, minuteOfDay: () -> Int, modifier: Modifier) =
         LocalMapEmblem(hud, marked, modifier)
 
-    /** The map fills the emblem's circle and draws its own rim. */
+    /** The map fills the emblem's window and draws its own rim. */
     @Composable
-    override fun emblemBox(edge: Color): Modifier = Modifier.clip(CircleShape)
+    override fun emblemBox(edge: Color): Modifier = Modifier.clip(hud.window)
 
     @Composable
-    override fun HomeHeader(discovery: String?, modifier: Modifier) = HudHeader(hud, discovery, modifier)
+    override fun HomeHeader(discovery: String?, unread: UnreadCounts, modifier: Modifier) = HudHeader(hud, discovery, modifier)
 
     @Composable
-    override fun Weather(turn: () -> Float, modifier: Modifier) = DriftingWeather(drift, turn, modifier)
+    override fun Weather(turn: () -> Float, modifier: Modifier) {
+        drift?.let { DriftingWeather(it, turn, modifier) }
+    }
 
     override val shapes: Shapes
         get() = SquareShapes
+}
+
+/**
+ * What the local map shows through in the emblem's cell, as wide as the cell's disc: [aspect] times as wide as it is
+ * tall, its corners rounded by a [corner] share of its height. The map under it is a disc reaching its farthest corner,
+ * so it covers the window however the map turns.
+ */
+internal class MapWindow(private val aspect: Float, private val corner: Float) : Shape {
+    /** The window in a cell of [size], drawn [inset] inside its edge. */
+    fun outline(size: Size, inset: Float = 0f): RoundRect {
+        val bounds = bounds(size).deflate(inset)
+        val round = (bounds(size).height * corner - inset).coerceAtLeast(0f)
+        return RoundRect(bounds, CornerRadius(round))
+    }
+
+    fun bounds(size: Size): Rect {
+        val half = size.emblemRadius
+        return Rect(size.center, half).let { Rect(it.left, size.center.y - half / aspect, it.right, size.center.y + half / aspect) }
+    }
+
+    /** How far from the middle the window's farthest point lies: the radius of the map disc that covers it. */
+    fun reach(size: Size): Float {
+        val bounds = bounds(size)
+        val round = bounds.height * corner
+        return hypot(bounds.width / 2 - round, bounds.height / 2 - round) + round
+    }
+
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) = Outline.Rounded(outline(size))
+
+    companion object {
+        /** The cell's own disc, as the northern games frame their maps. */
+        val Disc = MapWindow(aspect = 1f, corner = 0.5f)
+    }
 }
 
 /** A compass's bar, drawn by [draw], with its marks running [reach] either way from its middle. */
@@ -174,7 +228,8 @@ internal class QuestMarker(look: HudLook, val half: Float) {
 /**
  * The local map of where the user is in [look], else of a made-up place, or fog until there is one, turned with the
  * phone, its icons kept upright, darkening into a rimmed edge, with the player's arrow at the middle unless [marked] is
- * false because a hint lies over it. What turns is a layer of its own, so a turn moves it without drawing the rest again.
+ * false because a hint lies over it, all inside the look's window. What turns is a layer of its own, so a turn moves it
+ * without drawing the rest again.
  */
 @Composable
 internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) {
@@ -187,22 +242,25 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
     val creditAlpha = mapCreditAlpha(mapShown)
     val measurer = rememberTextMeasurer()
     val creditStyle = MaterialTheme.typography.labelSmall.copy(color = look.colors.ink, textAlign = TextAlign.Center)
-    Box(modifier) {
+    val window = look.window
+    Box(modifier.clip(window)) {
         Spacer(
             Modifier
                 .matchParentSize()
                 .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                 .drawBehind {
-                    val radius = size.emblemRadius
+                    val radius = window.reach(size)
                     shown()?.let { drawIcon(it.ground, center, (2 * radius).roundToInt()) } ?: drawCircle(look.colors.fog, radius)
                 },
         )
         Spacer(
             Modifier.matchParentSize().graphicsLayer().drawWithCache {
-                val radius = size.emblemRadius
+                val radius = window.reach(size)
                 val scale = 2 * radius / MINIMAP_SIZE
                 val iconSide = (2 * radius * MAP_ICON_SHARE).roundToInt()
                 val marker = QuestMarker(look, radius * QUEST_ON_MAP)
+                // A marker at the edge stays whole inside the window, its tip on the spot.
+                val markerRoom = window.bounds(size).let { Rect(it.left + marker.half, it.top + 2 * marker.half, it.right - marker.half, it.bottom) }
                 // Where the quest lies on a map, worked out once for each map rather than on each turn of the phone.
                 var spotOf: PaintedMap<ImageBitmap>? = null
                 var spot: Offset? = null
@@ -215,13 +273,14 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                         spot = quest?.takeIf { painted === map() }?.let { questSpot(painted, it) }
                     }
                     // Its tip on the spot, as a pin's.
-                    spot?.let { with(marker) { draw(center + (it * scale).turnedWith(facing) - Offset(0f, marker.half)) } }
+                    spot?.let { with(marker) { draw(markerRoom.clamp(center + (it * scale).turnedWith(facing)) - Offset(0f, marker.half)) } }
                 }
             },
         )
         Spacer(
             Modifier.matchParentSize().drawWithCache {
-                val radius = size.emblemRadius
+                val radius = window.reach(size)
+                val bounds = window.bounds(size)
                 val over = with(look) { screenOver() }
                 val vignette = Brush.radialGradient(
                     VIGNETTE_FROM to Color.Transparent,
@@ -229,28 +288,30 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                     center = size.center,
                     radius = radius,
                 )
-                val arrow = playerArrow(size.center, radius * ARROW_SHARE)
+                val arrow = playerArrow(size.center, bounds.width / 2 * ARROW_SHARE)
                 val arrowEdge = Stroke(1.5.dp.toPx())
                 val outer = Stroke(3.dp.toPx())
                 val inner = Stroke(1.dp.toPx())
+                val outerRim = Path().apply { addRoundRect(window.outline(size, outer.width / 2)) }
+                val innerRim = Path().apply { addRoundRect(window.outline(size, outer.width)) }
                 val credit = measurer.measure(
                     MAP_CREDIT.replace(" ©", "\n©"),
                     creditStyle,
-                    // Narrow enough that its lines fit inside the disc where they sit.
-                    constraints = Constraints(maxWidth = (radius * 1.2f).roundToInt()),
+                    // Narrow enough that its lines fit inside the window where they sit.
+                    constraints = Constraints(maxWidth = (bounds.width * 0.6f).roundToInt()),
                 )
                 onDrawBehind {
                     over()
-                    drawCircle(vignette, radius)
+                    drawRect(vignette)
                     if (marked) {
                         drawPath(arrow, look.colors.ink)
                         drawPath(arrow, look.colors.arrowEdge, style = arrowEdge)
                     }
                     if (map() != null && creditAlpha.value > 0f) {
-                        drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, center.y + radius * 0.8f - credit.size.height), alpha = creditAlpha.value)
+                        drawText(credit, topLeft = Offset(center.x - credit.size.width / 2f, bounds.bottom - bounds.height * 0.1f - credit.size.height), alpha = creditAlpha.value)
                     }
-                    drawCircle(look.colors.rim.outer, radius - outer.width / 2, style = outer)
-                    drawCircle(look.colors.rim.inner, radius - outer.width, style = inner)
+                    drawPath(outerRim, look.colors.rim.outer, style = outer)
+                    drawPath(innerRim, look.colors.rim.inner, style = inner)
                 }
             },
         )
@@ -300,6 +361,7 @@ private fun Compass(look: HudLook, modifier: Modifier = Modifier) {
                 val mid = size.height / 2
                 val band = size.height * COMPASS_BAND
                 val bar = with(look) { compassBar(mid, band) }
+                val marks = mid + band * look.compassDrop
                 val line = Stroke(1.dp.toPx())
                 val markSide = COMPASS_MARK.roundToPx()
                 val tick = 3.dp.toPx()
@@ -326,11 +388,11 @@ private fun Compass(look: HudLook, modifier: Modifier = Modifier) {
                         val degrees = bearing.roundToInt()
                         if (degrees % 90 == 0) {
                             val text = if (degrees == 0) northLetter else letters[degrees / 90]
-                            drawText(text, topLeft = Offset(x(share) - text.size.width / 2f, mid - text.size.height / 2f), alpha = fading(share))
+                            drawText(text, topLeft = Offset(x(share) - text.size.width / 2f, marks - text.size.height / 2f), alpha = fading(share))
                         } else {
                             val half = if (degrees % 45 == 0) tick else tick / 2
                             val ink = look.colors.line.copy(alpha = look.colors.line.alpha * fading(share))
-                            drawLine(ink, Offset(x(share), mid - half), Offset(x(share), mid + half), line.width)
+                            drawLine(ink, Offset(x(share), marks - half), Offset(x(share), marks + half), line.width)
                         }
                     }
 
@@ -346,13 +408,13 @@ private fun Compass(look: HudLook, modifier: Modifier = Modifier) {
                     painted.icons.forEachIndexed { i, icon ->
                         val share = share(bearings[i])
                         if (abs(share) > 1f) return@forEachIndexed
-                        val at = Offset(x(share), mid)
+                        val at = Offset(x(share), marks)
                         drawCircle(look.colors.shade.copy(alpha = look.colors.shade.alpha * fading(share) * 0.5f), markSide * 0.55f, at)
                         drawIcon(icon.image, at, markSide, fading(share))
                     }
                     questBearing?.let { bearing ->
                         val share = share(bearing)
-                        if (abs(share) <= 1f) with(marker) { draw(Offset(x(share), mid), fading(share)) }
+                        if (abs(share) <= 1f) with(marker) { draw(Offset(x(share), marks), fading(share)) }
                     }
                 }
             },
@@ -406,6 +468,9 @@ private fun opensWorldMap(): Modifier {
         Modifier
     }
 }
+
+/** [point] moved the least way that puts it inside the rect. */
+private fun Rect.clamp(point: Offset) = Offset(point.x.coerceIn(left, right), point.y.coerceIn(top, bottom))
 
 /** [color] across the middle, fading out over the [fade] share of the width at each end. */
 internal fun fadedAtEnds(color: Color, fade: Float) = Brush.horizontalGradient(0f to Color.Transparent, fade to color, 1 - fade to color, 1f to Color.Transparent)

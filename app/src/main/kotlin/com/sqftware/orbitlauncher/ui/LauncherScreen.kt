@@ -1646,7 +1646,7 @@ fun LauncherScreen(
                                                         ) {
                                                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = clockShade }) {
                                                                 // In the clock's room, so the preview bar and the reorder switch take its place as they take the clock's.
-                                                                LocalThemeArt.current.HomeHeader(discovery, Modifier.padding(top = 12.dp))
+                                                                LocalThemeArt.current.HomeHeader(discovery, unread, Modifier.padding(top = 12.dp))
                                                                 HomeClock(
                                                                     face = clock,
                                                                     onTimeClick = onOpenClock,
@@ -1983,7 +1983,7 @@ fun LauncherScreen(
                 }
             }
             // The whole window, through the bars, which hide while it is up.
-            val worldMapStyle = theme.mapStyle
+            val worldMapStyle = theme.mapStyleAt(clock.minuteOfDay)
             if (worldMapShown && worldMapArt != null && worldMapStyle != null) {
                 // One visit's map, so the tiles it decoded go with it.
                 val worldMap = remember(worldMapStyle) { worldMaps(worldMapStyle) }

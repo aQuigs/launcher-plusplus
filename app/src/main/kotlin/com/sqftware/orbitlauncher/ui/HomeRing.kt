@@ -309,7 +309,9 @@ fun HomeRing(
                     } else {
                         Modifier.layoutId(Part.Held).alpha(0f)
                     }
-                    SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge, nameRoom(item))
+                    CompositionLocalProvider(LocalIconPlace provides if (openFolder != null) IconPlace.OpenFolder else IconPlace.Ring) {
+                        SlotIcon(item, icon, onLaunch, onOpenFolder, slot, appMenu, folderMenu, unread, rearrange?.drag(index), onClearBadge, nameRoom(item))
+                    }
                 }
             }
             // Only pictures of what is going: the ring stepping aside for an opening folder, and a closed folder's apps
@@ -628,6 +630,6 @@ private fun CentrePlanet(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        FolderFace(folder, icon, Modifier.fillMaxSize(CENTRE_PLANET).graphicsLayer(), inner = inner)
+        LocalThemeArt.current.OpenFolderFace(folder, icon, inner, Modifier.fillMaxSize(CENTRE_PLANET).graphicsLayer())
     }
 }

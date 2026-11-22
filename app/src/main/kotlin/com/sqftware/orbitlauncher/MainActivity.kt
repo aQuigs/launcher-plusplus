@@ -299,8 +299,10 @@ class MainActivity : ComponentActivity() {
                     repeatOnLifecycle(Lifecycle.State.STARTED) { changeWhereIAm(whereIAm.withGrant(location.isGranted())) }
                 }
                 // The map follows the user only while the launcher is visible, like the clock. The state outlives a change
-                // of key, so turning it off must drop the last map.
-                val liveStyle = shownTheme.mapStyle.takeIf { whereIAm == WhereIAm.Shown }
+                // of key, so turning it off must drop the last map. A theme whose map darkens with the sky is painted
+                // again as night falls and as it ends.
+                val mapStyle = shownTheme.mapStyleAt(clock.minuteOfDay)
+                val liveStyle = mapStyle.takeIf { whereIAm == WhereIAm.Shown }
                 val mapping = liveStyle != null
                 val minimap = produceState<PaintedMap<ImageBitmap>?>(null, liveStyle) {
                     value = null
@@ -312,7 +314,7 @@ class MainActivity : ComponentActivity() {
                 }
                 // Without where the user is, the map wanders made-up places instead, walking only while the screen's
                 // ambient motion moves in sight.
-                val wanderingStyle = shownTheme.mapStyle.takeIf { whereIAm != WhereIAm.Shown }
+                val wanderingStyle = mapStyle.takeIf { whereIAm != WhereIAm.Shown }
                 var ambientInSight by remember { mutableStateOf(false) }
                 val madeUpMap = produceState<PaintedMap<ImageBitmap>?>(null, wanderingStyle) {
                     value = null
