@@ -35,6 +35,8 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.em
 import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.RingItem
+import com.sqftware.orbitlauncher.domain.WHEEL_TILE_TALL
+import com.sqftware.orbitlauncher.domain.WHEEL_TILE_WIDE
 import com.sqftware.orbitlauncher.ui.theme.Condensed
 import com.sqftware.orbitlauncher.ui.theme.GtaHudColors
 import com.sqftware.orbitlauncher.ui.theme.HeadingDisc
@@ -46,7 +48,6 @@ import com.sqftware.orbitlauncher.ui.theme.WheelChip
 import com.sqftware.orbitlauncher.ui.theme.WheelChipEdge
 import com.sqftware.orbitlauncher.ui.theme.WheelPool
 import com.sqftware.orbitlauncher.ui.theme.WheelTile
-import com.sqftware.orbitlauncher.ui.theme.WheelTileEdge
 import com.sqftware.orbitlauncher.ui.theme.WheelVeil
 import com.sqftware.orbitlauncher.ui.theme.legible
 import com.sqftware.orbitlauncher.ui.theme.typographyIn
@@ -58,8 +59,6 @@ private const val MAP_ASPECT = 1.8f
 private const val MAP_CORNER = 0.16f
 
 /** A weapon wheel's tile round an app's disc: how much wider and taller than the disc it reaches. */
-private const val TILE_WIDE = 1.62f
-private const val TILE_TALL = 1.2f
 
 /** The most stars a wanted level has, as in the game. */
 private const val MAX_WANTED = 6
@@ -81,7 +80,7 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     override val scene: ThemeScene = Sunset
 
     /** The game blurs and darkens the world behind its weapon wheel. */
-    override val folderBackdrop = FolderBackdrop(blur = 10.dp, veil = WheelVeil)
+    override val folderBackdrop = FolderBackdrop(blur = 16.dp, veil = WheelVeil)
 
     /** No track: the game leaves its world clear, so the ring is drawn only as the place an app being dragged would land. */
     override fun CacheDrawScope.ringMarks(
@@ -261,11 +260,7 @@ private fun Modifier.wheelChip() = drawWithCache {
 
 /** A weapon wheel's tile, wider and a little taller than the disc it lies under. */
 private fun Modifier.wheelTile() = drawWithCache {
-    val tile = Size(size.width * TILE_WIDE, size.height * TILE_TALL)
-    val edge = Stroke(1.dp.toPx())
+    val tile = Size(size.width * WHEEL_TILE_WIDE, size.height * WHEEL_TILE_TALL)
     val topLeft = size.center - Offset(tile.width / 2, tile.height / 2)
-    onDrawBehind {
-        drawRect(WheelTile, topLeft, tile)
-        drawRect(WheelTileEdge, topLeft + Offset(edge.width / 2, edge.width / 2), Size(tile.width - edge.width, tile.height - edge.width), style = edge)
-    }
+    onDrawBehind { drawRect(WheelTile, topLeft, tile) }
 }
