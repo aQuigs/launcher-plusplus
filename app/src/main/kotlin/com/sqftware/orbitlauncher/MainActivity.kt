@@ -100,6 +100,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -345,12 +346,23 @@ class MainActivity : ComponentActivity() {
                 val heading = remember { mutableStateOf<Float?>(null) }
                 // Found again each time the minimap moves on with the user. The state outlives a change of key, so the
                 // route to a quest cleared, or in a theme that has none, is dropped.
-                val questToRoute = journal.quest.takeIf { shownTheme.routesToQuest }
-                val route = produceState<List<LatLon>?>(null, questToRoute) {
+                val guidedQuest = journal.quest.takeIf { shownTheme.guidesToQuest }
+                val route = produceState<List<LatLon>?>(null, guidedQuest) {
                     value = null
-                    questToRoute?.let { quest ->
+                    guidedQuest?.let { quest ->
                         val at = snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged()
                         questRoutes.routes(at, quest).collect { value = it }
+                    }
+                }
+                // The quest clears once the user gets there. Where they stood as it was set does not count, so one set
+                // close by stays until they move.
+                LaunchedEffect(guidedQuest) {
+                    if (guidedQuest == null) return@LaunchedEffect
+                    snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged().drop(1).collect { at ->
+                        journal.arriving(at)?.let {
+                            journal = it
+                            journalStore.save(it)
+                        }
                     }
                 }
                 val readRoute = remember { { route.value } }

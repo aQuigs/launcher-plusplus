@@ -10,6 +10,9 @@ private val ViceTeal = Color(0xFF3FE0C5)
 private val VicePink = Color(0xFFFF85BC)
 private val Ink = Color(0xFF111218)
 
+// The game's waypoint and the GPS route to it share one purple.
+private val WaypointPurple = Color(0xFFA44CF2)
+
 internal val GtaPalette = Palette(
     deep = Charcoal,
     accent = VicePink,
@@ -23,8 +26,8 @@ internal val GtaPalette = Palette(
 /**
  * GTA's heads-up display: the map's fog before it is painted, its edge a soft dark fading in under a white hairline,
  * white words, arrow and compass letters, the arrow edged in the game's dark, the compass a gray line with gray marks
- * over a faint shade, a discovered place named on the pause menu's charcoal, and the destination the user marked in the
- * game's teal, edged in its dark.
+ * over a faint shade, a discovered place named on the pause menu's charcoal, and the waypoint the user marked, and the
+ * route to it, in the game's waypoint purple, edged in its dark.
  */
 val GtaHudColors = HudColors(
     fog = Color(0xFF2B3A44),
@@ -35,7 +38,7 @@ val GtaHudColors = HudColors(
     line = Color(0xFF8A8D9C).copy(alpha = 0.85f),
     shade = Color.Black.copy(alpha = 0.3f),
     band = Charcoal.copy(alpha = 0.94f),
-    quest = ViceTeal,
+    quest = WaypointPurple,
     questEdge = Ink,
 )
 
