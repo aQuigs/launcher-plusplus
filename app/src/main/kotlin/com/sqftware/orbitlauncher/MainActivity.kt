@@ -23,6 +23,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.sqftware.orbitlauncher.apps.GeocoderPlaceSearch
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
+import com.sqftware.orbitlauncher.apps.QuestRoutes
 import com.sqftware.orbitlauncher.apps.NotificationBadges
 import com.sqftware.orbitlauncher.apps.OpenFreeMapTiles
 import com.sqftware.orbitlauncher.apps.OpenStreetMapLicence
@@ -82,6 +83,7 @@ import com.sqftware.orbitlauncher.domain.WhereIAm
 import com.sqftware.orbitlauncher.domain.easeHeading
 import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.minimap.MADE_UP_TOUR
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.suggestSetup
 import com.sqftware.orbitlauncher.domain.turnedPast
@@ -97,6 +99,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.runningReduce
@@ -172,6 +176,7 @@ class MainActivity : ComponentActivity() {
         val minimapArt = ResourceMinimapArt(this)
         val liveMinimap = LiveMinimap(location, mapTiles, minimapArt)
         val wanderingMinimap = WanderingMinimap(MADE_UP_TOUR, minimapArt)
+        val questRoutes = QuestRoutes(mapTiles)
         widgetHost = SystemWidgetHost(this, SharedPreferencesWidgetPageStore(this), onNoRoom = { toasts.show("No room for that widget here") })
         val widgetActions = { page: String ->
             WidgetActions(
@@ -338,6 +343,18 @@ class MainActivity : ComponentActivity() {
                 // The map turns with the phone only while it shows, as the map follows the user. Both are read where
                 // they are drawn, so a new map or a turn redraws the emblem alone.
                 val heading = remember { mutableStateOf<Float?>(null) }
+                // Found again each time the minimap moves on with the user. The state outlives a change of key, so the
+                // route to a quest cleared, or in a theme that has none, is dropped.
+                val questToRoute = journal.quest.takeIf { shownTheme.routesToQuest }
+                val route = produceState<List<LatLon>?>(null, questToRoute) {
+                    value = null
+                    questToRoute?.let { quest ->
+                        snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged().collectLatest {
+                            value = questRoutes.route(it, quest)
+                        }
+                    }
+                }
+                val readRoute = remember { { route.value } }
                 val readMinimap = remember { { minimap.value } }
                 val readMadeUpMap = remember { { madeUpMap.value } }
                 val readHeading = remember { { heading.value } }
@@ -512,6 +529,7 @@ class MainActivity : ComponentActivity() {
                     onShowWhereIAmChange = { on -> if (on) showWhereIAm() else changeWhereIAm(WhereIAm.Hidden) },
                     onOpenMapLicence = mapLicence::open,
                     minimap = readMinimap,
+                    route = readRoute,
                     madeUpMap = readMadeUpMap,
                     heading = readHeading,
                     journal = journal,

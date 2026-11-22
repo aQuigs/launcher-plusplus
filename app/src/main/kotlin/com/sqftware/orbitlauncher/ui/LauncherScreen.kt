@@ -325,6 +325,7 @@ fun LauncherScreen(
     onShowWhereIAmChange: (Boolean) -> Unit,
     onOpenMapLicence: () -> Unit,
     minimap: () -> PaintedMap<ImageBitmap>?,
+    route: () -> List<LatLon>?,
     madeUpMap: () -> PaintedMap<ImageBitmap>?,
     heading: () -> Float?,
     journal: Journal,
@@ -1468,6 +1469,7 @@ fun LauncherScreen(
         LocalMadeUpMap provides madeUpMap,
         LocalHeading provides heading,
         LocalQuest provides journal.quest,
+        LocalRoute provides route,
         LocalOpenWorldMap provides openWorldMap,
         LocalUnread provides remember(unread, apps) { unread.among(apps.orEmpty()) },
     ) {

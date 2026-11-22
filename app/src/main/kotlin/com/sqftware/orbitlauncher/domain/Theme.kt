@@ -7,7 +7,7 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
  * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
  * [iconStyle] it gives each place, and, if it has a [mapStyle], a map of where the user is in that style once they turn
  * it on, in its [nightMapStyle] after dark; one that [keepsJournal] marks the user's quest, by its [goal] name, and names
- * each place they discover.
+ * each place they discover, and one that [routesToQuest] lays the way there by road on its maps, as a game's GPS does.
  */
 enum class Theme(
     val label: String,
@@ -18,6 +18,7 @@ enum class Theme(
     val keepsJournal: Boolean = false,
     private val nightMapStyle: MapStyle? = mapStyle,
     val goal: String = "quest",
+    val routesToQuest: Boolean = false,
 ) {
     Space(
         "Space",
@@ -69,6 +70,7 @@ enum class Theme(
         keepsJournal = true,
         nightMapStyle = MapStyle.GtaNight,
         goal = "waypoint",
+        routesToQuest = true,
     ),
     ;
 

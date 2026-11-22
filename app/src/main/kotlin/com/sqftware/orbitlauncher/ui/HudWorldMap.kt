@@ -32,16 +32,21 @@ import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.toOffset
 import com.sqftware.orbitlauncher.domain.minimap.ICON_SPACING_PX
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.METRES_PER_PIXEL
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.ui.theme.Spacing
 import com.sqftware.orbitlauncher.ui.theme.legible
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** The player's arrow and the quest marker on the world map, from the middle of each to its tip. */
 private val PLAYER_HALF = 14.dp
 private val QUEST_HALF = 16.dp
+
+/** The thinnest the route is drawn, however far out the map is zoomed. */
+private val ROUTE_THINNEST = 4.dp
 
 /**
  * A place's icon on the world map, as wide as the compass shows it, and narrower when the map is zoomed out, to this
@@ -67,6 +72,23 @@ internal class HudWorldMap(private val look: HudLook, private val drift: Drift?)
             val at = origin + Offset(it.x, it.y) * scale
             if (at.x > -side && at.y > -side && at.x < size.width + side && at.y < size.height + side) drawIcon(it.image, at, side)
         }
+    }
+
+    /** The route to the quest, a lane wide on the ground and never thinner than a line, redrawn alone as the map pans. */
+    @Composable
+    override fun OnGround(view: () -> MapView) {
+        val route = LocalRoute.current
+        Spacer(
+            Modifier.fillMaxSize().graphicsLayer().drawWithCache {
+                val thinnest = ROUTE_THINNEST.toPx()
+                onDrawBehind {
+                    val way = route() ?: return@onDrawBehind
+                    val shown = view()
+                    val width = max(thinnest, (ROUTE_WIDTH_M / METRES_PER_PIXEL * shown.scale).toFloat())
+                    drawRoute(way.map(shown::spot), width, look.colors)
+                }
+            },
+        )
     }
 
     /** The player's arrow on [at], turned the way they face, placed and turned in a layer of its own so the map stays still under it. */

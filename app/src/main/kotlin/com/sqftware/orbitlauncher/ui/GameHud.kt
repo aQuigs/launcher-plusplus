@@ -39,6 +39,8 @@ import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
@@ -62,6 +64,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.METRES_PER_PIXEL
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.minimap.WebMercator
@@ -242,6 +245,7 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
     val shown = { map() ?: madeUp() }
     val heading = LocalHeading.current
     val quest = LocalQuest.current
+    val route = LocalRoute.current
     val mapShown by remember { derivedStateOf { map() != null } }
     val creditAlpha = mapCreditAlpha(mapShown)
     val measurer = rememberTextMeasurer()
@@ -255,7 +259,13 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                 .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                 .drawBehind {
                     val radius = window.reach(size)
-                    shown()?.let { drawIcon(it.ground, center, (2 * radius).roundToInt()) } ?: drawCircle(look.colors.fog, radius)
+                    val painted = shown() ?: return@drawBehind drawCircle(look.colors.fog, radius)
+                    drawIcon(painted.ground, center, (2 * radius).roundToInt())
+                    // Turned with the ground, under the icons, as the game lays its GPS line on the roads.
+                    if (painted === map()) route()?.let { way ->
+                        val scale = 2 * radius / MINIMAP_SIZE
+                        drawRoute(way.map { center + painted.centre.shiftTo(it).let { s -> Offset(s.x.toFloat(), s.y.toFloat()) } * scale }, (ROUTE_WIDTH_M / METRES_PER_PIXEL).toFloat() * scale, look.colors)
+                    }
                 },
         )
         Spacer(
@@ -522,6 +532,19 @@ internal fun DrawScope.drawIcon(image: ImageBitmap, center: Offset, side: Int, a
     alpha = alpha,
     filterQuality = FilterQuality.Medium,
 )
+
+/** The route through [points], [width] wide in the quest marker's color, edged in its dark so it reads on a pale road. */
+internal fun DrawScope.drawRoute(points: List<Offset>, width: Float, colors: HudColors) {
+    val path = Path().apply {
+        points.forEachIndexed { i, at -> if (i == 0) moveTo(at.x, at.y) else lineTo(at.x, at.y) }
+    }
+    val edge = (width * ROUTE_EDGE_SHARE).coerceAtLeast(1f)
+    drawPath(path, colors.questEdge, style = Stroke(width + 2 * edge, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    drawPath(path, colors.quest, style = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round))
+}
+
+/** A route's dark edge, either side, as a share of its width. */
+private const val ROUTE_EDGE_SHARE = 0.12f
 
 /** The player's arrow on the local map, pointing up the way they face, [half] from its middle to its tip, notched at its tail. */
 internal fun playerArrow(center: Offset, half: Float) = Path().apply {

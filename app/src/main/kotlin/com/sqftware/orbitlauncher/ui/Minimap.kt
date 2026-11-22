@@ -90,5 +90,14 @@ val LocalOpenWorldMap = staticCompositionLocalOf<() -> Unit> { {} }
 /** The spot the user's quest marker points to, if they have one, for a theme that keeps a journal. */
 val LocalQuest = compositionLocalOf<LatLon?> { null }
 
+/**
+ * The way by road from where the minimap last placed the user to their quest, for a theme that routes to it, or null
+ * without one. It changes as the user moves, so it is read where it is drawn.
+ */
+val LocalRoute = staticCompositionLocalOf<() -> List<LatLon>?> { { null } }
+
+/** How wide a route is drawn on the minimap, about a lane, in ground meters. */
+internal const val ROUTE_WIDTH_M = 6.0
+
 /** How many unread notifications each of the launcher's apps has, for a theme's art that shows it beyond the badges. */
 val LocalUnread = compositionLocalOf { UnreadCounts() }
