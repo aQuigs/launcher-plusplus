@@ -18,7 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -28,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.FolderLook
@@ -148,6 +151,32 @@ fun FolderNameDialog(name: String, onRename: (String) -> Unit, onDismiss: () -> 
 
 /** What a folder named [name] is called where a name must show: the name, or "Folder" for one with none. */
 fun folderTitle(name: String): String = name.ifEmpty { "Folder" }
+
+/**
+ * What lies behind a folder opened on the ring, for a theme that sets it apart: the wallpaper and the page's own things
+ * [blur]red by that much, under a [veil].
+ */
+class FolderBackdrop(val blur: Dp, val veil: Color)
+
+/** The [backdrop]'s veil, [shown] from 0 to 1, drawn under what this holds. */
+internal fun Modifier.veiledBehindFolder(backdrop: FolderBackdrop?, shown: () -> Float) =
+    if (backdrop == null) this else drawBehind { drawRect(backdrop.veil, alpha = shown()) }
+
+/** This, a thing on the page behind an open folder, blurred and dimmed by [shown] of the [backdrop]. */
+internal fun Modifier.blurredBehindFolder(backdrop: FolderBackdrop?, shown: () -> Float) =
+    if (backdrop == null) {
+        this
+    } else {
+        graphicsLayer {
+            val share = shown()
+            val radius = backdrop.blur.toPx() * share
+            renderEffect = if (radius > 0f) BlurEffect(radius, radius, TileMode.Decal) else null
+            alpha = 1f - share * BEHIND_FOLDER_DIM
+        }
+    }
+
+/** How much of a thing on the page fades behind an open folder, so the veil darkens it as it does the wallpaper. */
+private const val BEHIND_FOLDER_DIM = 0.45f
 
 /** How a folder named [name] holding [count] apps is read out. */
 fun folderDescription(name: String, count: Int): String =

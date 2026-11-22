@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -253,7 +254,7 @@ data class HomePress(val launcherInFront: Boolean)
  * dialog: how many rows it shows while compact, how many apps a built-in card works out, and when it names its apps,
  * each the card's own or the page's default. A long press on the home
  * page's empty space opens the launcher's own menu. Its first row shows the wallpaper alone: the launcher fades away and
- * the system bars hide ([onSystemBarsShownChange]) until the next touch, Back or HOME brings them back. Its other rows show whether the badges are enabled
+ * the system bars hide ([onSystemBarsShownChange]) until the next touch, Back or HOME brings them back. A theme's backdrop to an open folder blurs the wallpaper ([onWallpaperBlurChange]). Its other rows show whether the badges are enabled
  * ([badgesEnabled]) and open the system screen that decides it ([onOpenBadgeSettings]), show whether the clock is in 24
  * hours and flip it ([onTwentyFourHourChange]), show the [theme] shown, the one in use unless one is being tried on the
  * home page ([previewing]), and try others there ([onPreviewThemeChange]) until one is used ([onThemeChange]) or the try is
@@ -350,6 +351,7 @@ fun LauncherScreen(
     onRecentPlacesChange: (List<PlaceValue>) -> Unit,
     onOpenNotifications: () -> Unit,
     onSystemBarsShownChange: (Boolean) -> Unit,
+    onWallpaperBlurChange: (Int) -> Unit,
     onAmbientInSightChange: (Boolean) -> Unit,
     onSetWallpaper: (draw: () -> ImageBitmap) -> Unit,
     onRestart: () -> Unit,
@@ -663,6 +665,18 @@ fun LauncherScreen(
     }
     // A slot number outliving its folder would open a folder made later in that slot by itself.
     LaunchedEffect(open == null) { if (open == null) openFolder = null }
+    // What lies behind an open folder, as the theme has it: the page's things blurred under a veil, the wallpaper with them.
+    val folderBackdrop = LocalThemeArt.current.folderBackdrop
+    val backdropShown = remember { Animatable(0f) }
+    LaunchedEffect(folderBackdrop != null && open != null && ringInSight) {
+        backdropShown.animateTo(if (folderBackdrop != null && open != null && ringInSight) 1f else 0f)
+    }
+    val latestOnWallpaperBlurChange by rememberUpdatedState(onWallpaperBlurChange)
+    val density = LocalDensity.current
+    LaunchedEffect(folderBackdrop, density) {
+        val blur = with(density) { folderBackdrop?.blur?.toPx() ?: 0f }
+        snapshotFlow { (blur * backdropShown.value).roundToInt() }.collect { latestOnWallpaperBlurChange(it) }
+    }
 
     // The ring's and the dock's positions, so an app can be dragged from one home place to another. Each is registered as
     // it is built, below, with the drag handling that needs these.
@@ -1355,6 +1369,8 @@ fun LauncherScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
         if (homeOnReturn && !onErrand) {
             closeAll()
+            // Gone now, while no frame runs, rather than fading out over the closed folder on the way back.
+            scope.launch { backdropShown.snapTo(0f) }
             pagerState.requestScrollToPage(layout.homeIndex)
         }
     }
@@ -1465,6 +1481,8 @@ fun LauncherScreen(
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
                 Modifier
+                    // Under the system bars too, as the wallpaper's blur reaches them.
+                    .veiledBehindFolder(folderBackdrop) { backdropShown.value }
                     .windowInsetsPadding(insets)
                     .onGloballyPositioned {
                         origin = it.positionInRoot()
@@ -1630,6 +1648,7 @@ fun LauncherScreen(
                                     }
                                     val spin = rememberRingSpin(spun)
                                     CompositionLocalProvider(LocalFolderStyle provides pageStyle) {
+                                        val behindFolder = { if (active) backdropShown.value else 0f }
                                         Column(
                                             Modifier
                                                 .fillMaxSize()
@@ -1720,7 +1739,10 @@ fun LauncherScreen(
                                                                 )
                                                             }) else null,
                                                         ) {
-                                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = clockShade }) {
+                                                            Column(
+                                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                                modifier = Modifier.graphicsLayer { alpha = clockShade }.blurredBehindFolder(folderBackdrop, behindFolder),
+                                                            ) {
                                                                 // In the clock's room, so the preview bar and the reorder switch take its place as they take the clock's.
                                                                 LocalThemeArt.current.HomeHeader(discovery, Modifier.padding(top = 12.dp))
                                                                 HomeClock(
@@ -1774,7 +1796,8 @@ fun LauncherScreen(
                                                         icon = actions.icon,
                                                         onLaunch = launch,
                                                         onOpenFolder = { if (active) tapFolder(page.id, it.at) },
-                                                        modifier = Modifier.dropZone(page) { copy(dock = it) },
+                                                        modifier = Modifier.dropZone(page) { copy(dock = it) }
+                                                            .blurredBehindFolder(folderBackdrop) { if (open?.at?.holder == HomePlace.Dock) 0f else behindFolder() },
                                                         highlighted = page == inView && dropPlace == HomePlace.Dock,
                                                         menu = dockMenu.takeIf { active },
                                                         folderMenu = folderMenu.takeIf { active },

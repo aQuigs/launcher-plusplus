@@ -156,9 +156,19 @@ class UnreadTest {
     }
 
     @Test
-    fun `apps with something unread count once however many they have`() {
-        assertEquals(0, UnreadCounts().appsWithUnread)
-        assertEquals(2, UnreadCounts(mapOf(mail.packageName to 5, chat.packageName to 1)).appsWithUnread)
+    fun `apps with something in the shade count once however many they have`() {
+        assertEquals(0, UnreadCounts().appsInShade)
+        assertEquals(2, UnreadCounts(mapOf(mail.packageName to 5, chat.packageName to 1)).appsInShade)
+    }
+
+    @Test
+    fun `an app whose notifications were all dismissed is not in the shade though its badge keeps them`() {
+        val live = UnreadCounts(mapOf(mail.packageName to 1))
+        val kept = Kept(mapOf("k" to KeptNotification(chat.packageName, 2), "m" to KeptNotification(mail.packageName, 1))).counts
+        val counts = live + kept
+        assertEquals(1, counts.appsInShade)
+        assertEquals(2, counts[chat])
+        assertEquals(setOf(mail.packageName), (counts - setOf(chat.packageName)).inShade)
     }
 
     @Test

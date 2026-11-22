@@ -43,6 +43,7 @@ import com.sqftware.orbitlauncher.ui.theme.WantedUnlit
 import com.sqftware.orbitlauncher.ui.theme.WheelChip
 import com.sqftware.orbitlauncher.ui.theme.WheelChipEdge
 import com.sqftware.orbitlauncher.ui.theme.WheelTile
+import com.sqftware.orbitlauncher.ui.theme.WheelVeil
 import com.sqftware.orbitlauncher.ui.theme.legible
 import com.sqftware.orbitlauncher.ui.theme.typographyIn
 import kotlin.math.cos
@@ -75,6 +76,9 @@ private val STAR_GAP = 5.dp
 object GtaArt : HudArt(GtaHud, drift = null) {
     override val scene: ThemeScene = Sunset
 
+    /** The game blurs and darkens the world behind its weapon wheel. */
+    override val folderBackdrop = FolderBackdrop(blur = 10.dp, veil = WheelVeil)
+
     /** No track: the game leaves its world clear, so the ring is drawn only as the place an app being dragged would land. */
     override fun CacheDrawScope.ringMarks(
         centre: Offset,
@@ -101,10 +105,12 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     /** The wheel's middle: the folder's name, as the game names the weapon picked, coming in as its apps go out to their tiles. */
     @Composable
     override fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) {
+        // A folder the user never named has nothing to call it: the game's middle shows a name only when it has one.
+        if (folder.name.isBlank()) return
         val ink = GtaHudColors.ink
         Box(modifier.graphicsLayer { alpha = shown() }, contentAlignment = Alignment.Center) {
             Text(
-                folderTitle(folder.name).uppercase(),
+                folder.name.uppercase(),
                 Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleLarge.legible(ink),
                 color = ink,
@@ -120,7 +126,7 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     override fun HomeHeader(discovery: String?, modifier: Modifier) {
         Column(modifier.zIndex(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             HudHeader(GtaHud, discovery, Modifier)
-            WantedLevel(LocalUnread.current.appsWithUnread.coerceAtMost(MAX_WANTED), Modifier.fillMaxWidth(COMPASS_SPAN).padding(top = 4.dp))
+            WantedLevel(LocalUnread.current.appsInShade.coerceAtMost(MAX_WANTED), Modifier.fillMaxWidth(COMPASS_SPAN).padding(top = 4.dp))
         }
     }
 
