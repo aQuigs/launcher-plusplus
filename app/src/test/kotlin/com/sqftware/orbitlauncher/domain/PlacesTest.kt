@@ -19,15 +19,24 @@ class PlacesTest {
     }
 
     @Test
-    fun `combined searches keep each place once, in the searches' order`() {
+    fun `combined searches leave out a place an earlier search found, in the searches' order`() {
         val ferry = PlaceValue("Ferry Building", "1 Ferry Building, San Francisco", 37.7955, -122.3937)
         val sameFerry = PlaceValue("ferry building", "Ferry Building, San Francisco, CA", 37.7954, -122.3936)
         val otherFerry = PlaceValue("Ferry Building", "Ferry Building, Oakland", 37.79, -122.28)
+        val nextDoor = PlaceValue("Safeway", "1 Main St", 37.7700, -122.4000)
+        val nextDoorToo = PlaceValue("Safeway", "3 Main St", 37.7701, -122.4000)
         val typed = PlaceValue("Elm St", "Elm St")
 
         assertEquals(
-            listOf(ferry, otherFerry, typed),
-            combinedPlaces(listOf(listOf(ferry, otherFerry), listOf(sameFerry, typed, typed.copy()))),
+            listOf(ferry, otherFerry, nextDoor, nextDoorToo, typed),
+            combinedPlaces(listOf(listOf(ferry, otherFerry, nextDoor, nextDoorToo), listOf(sameFerry, typed), listOf(typed.copy()))),
         )
+    }
+
+    @Test
+    fun `an address written out is told from a name`() {
+        assertEquals(true, isWrittenAddress("Blue Bottle Coffee, 705 Market St, San Francisco"))
+        assertEquals(true, isWrittenAddress("705 Market St"))
+        assertEquals(false, isWrittenAddress("blue bottle coffee"))
     }
 }

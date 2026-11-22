@@ -168,7 +168,7 @@ class MainActivity : ComponentActivity() {
         val journalStore = SharedPreferencesJournalStore(this)
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
-        val placeSearch = SystemPlaceSearch(this, listOf(PhotonPlaceFinder(location::lastFix), GeocoderPlaceFinder(this)))
+        val placeSearch = SystemPlaceSearch(this, byName = PhotonPlaceFinder(location::lastFix), byAddress = GeocoderPlaceFinder(this))
         val headingSource = SensorHeadingSource(this, location)
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)

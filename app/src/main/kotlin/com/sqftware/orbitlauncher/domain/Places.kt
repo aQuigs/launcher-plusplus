@@ -1,6 +1,7 @@
 package com.sqftware.orbitlauncher.domain
 
-import kotlin.math.abs
+import com.sqftware.orbitlauncher.domain.minimap.LatLon
+import com.sqftware.orbitlauncher.domain.minimap.WebMercator
 
 /** How many places the prompt offers as recent. */
 const val RECENT_PLACES = 8
@@ -41,20 +42,31 @@ fun OsmPlace.toPlace(): PlaceValue? {
     return PlaceValue(label, address.ifEmpty { label }, latitude, longitude)
 }
 
-/** The places each search found, in the searches' order, leaving out one an earlier search found too. */
-fun combinedPlaces(found: List<List<PlaceValue>>): List<PlaceValue> =
-    found.flatten().fold(emptyList()) { kept, place -> if (kept.any { it.isSamePlace(place) }) kept else kept + place }
+/**
+ * The places each search found, in the searches' order, leaving out one an earlier search found too. Places one search
+ * found are all kept: two shops of a chain can be next door to each other.
+ */
+fun combinedPlaces(found: List<List<PlaceValue>>): List<PlaceValue> = buildList {
+    for (places in found) {
+        val earlier = toList()
+        addAll(places.filter { place -> earlier.none { it.isSamePlace(place) } })
+    }
+}
+
+/**
+ * Whether [query] is an address written out, such as a maps app shares or a user types: one with a comma, or starting
+ * with a house number. A search by name matches one loosely, so a geocoder's answer is the better one.
+ */
+fun isWrittenAddress(query: String): Boolean = ',' in query || query.trimStart().firstOrNull()?.isDigit() == true
 
 // Two searches name a place alike but put it a few meters apart, so the same name close by is the same place.
 private fun PlaceValue.isSamePlace(other: PlaceValue): Boolean {
     if (!label.equals(other.label, ignoreCase = true)) return false
-    val lat = latitude
-    val lon = longitude
-    val otherLat = other.latitude
-    val otherLon = other.longitude
-    if (lat == null || lon == null || otherLat == null || otherLon == null) return address.equals(other.address, ignoreCase = true)
-    return abs(lat - otherLat) < SAME_PLACE_DEGREES && abs(lon - otherLon) < SAME_PLACE_DEGREES
+    val here = latLon ?: return address.equals(other.address, ignoreCase = true)
+    val there = other.latLon ?: return address.equals(other.address, ignoreCase = true)
+    return WebMercator.groundDistance(here, there) < SAME_PLACE_M
 }
 
-// About 200 m north to south, and less east to west away from the equator.
-private const val SAME_PLACE_DEGREES = 0.002
+private val PlaceValue.latLon get() = latitude?.let { lat -> longitude?.let { LatLon(lat, it) } }
+
+private const val SAME_PLACE_M = 150.0
