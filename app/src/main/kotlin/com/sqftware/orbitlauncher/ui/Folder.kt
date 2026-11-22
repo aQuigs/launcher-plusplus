@@ -176,7 +176,7 @@ internal fun Modifier.blurredBehindFolder(backdrop: FolderBackdrop?, shown: () -
     }
 
 /** How much of a thing on the page fades behind an open folder, so the veil darkens it as it does the wallpaper. */
-private const val BEHIND_FOLDER_DIM = 0.45f
+private const val BEHIND_FOLDER_DIM = 0.25f
 
 /** How a folder named [name] holding [count] apps is read out. */
 fun folderDescription(name: String, count: Int): String =

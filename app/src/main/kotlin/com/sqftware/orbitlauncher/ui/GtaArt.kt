@@ -43,6 +43,7 @@ import com.sqftware.orbitlauncher.ui.theme.WantedUnlit
 import com.sqftware.orbitlauncher.ui.theme.WheelChip
 import com.sqftware.orbitlauncher.ui.theme.WheelChipEdge
 import com.sqftware.orbitlauncher.ui.theme.WheelTile
+import com.sqftware.orbitlauncher.ui.theme.WheelTileEdge
 import com.sqftware.orbitlauncher.ui.theme.WheelVeil
 import com.sqftware.orbitlauncher.ui.theme.legible
 import com.sqftware.orbitlauncher.ui.theme.typographyIn
@@ -253,6 +254,10 @@ private fun Modifier.wheelChip() = drawWithCache {
 /** A weapon wheel's tile, wider and a little taller than the disc it lies under. */
 private fun Modifier.wheelTile() = drawWithCache {
     val tile = Size(size.width * TILE_WIDE, size.height * TILE_TALL)
+    val edge = Stroke(1.dp.toPx())
     val topLeft = size.center - Offset(tile.width / 2, tile.height / 2)
-    onDrawBehind { drawRect(WheelTile, topLeft, tile) }
+    onDrawBehind {
+        drawRect(WheelTile, topLeft, tile)
+        drawRect(WheelTileEdge, topLeft + Offset(edge.width / 2, edge.width / 2), Size(tile.width - edge.width, tile.height - edge.width), style = edge)
+    }
 }
