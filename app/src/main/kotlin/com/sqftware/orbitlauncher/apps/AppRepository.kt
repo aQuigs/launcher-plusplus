@@ -25,14 +25,15 @@ interface AppRepository {
     suspend fun icon(app: AppEntry, style: IconStyle = IconStyle.Plain): ImageBitmap?
 
     /**
-     * Starts [app], the pinned shortcut, or the pair's two apps together in split screen. Does nothing if it has gone since
-     * the list was loaded.
+     * Starts [app], the pinned shortcut, the app straight to its intent, or the pair's two apps together in split screen.
+     * Does nothing if it has gone since the list was loaded, or it still [asks][com.sqftware.orbitlauncher.domain.asks]
+     * for an input.
      */
     fun launch(app: AppEntry)
 
     /**
-     * At most four of the app's shortcuts, manifest ones first. None for a pinned shortcut or a pair, or until the launcher is
-     * the home app.
+     * At most four of the app's shortcuts, manifest ones first, an intent icon's app's too. None for a pinned shortcut or a
+     * pair, or until the launcher is the home app.
      */
     suspend fun shortcuts(app: AppEntry): List<AppShortcut>
 

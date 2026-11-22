@@ -27,6 +27,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppOption
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.HomePlace
+import com.sqftware.orbitlauncher.domain.intentBase
 import com.sqftware.orbitlauncher.domain.Unread
 import com.sqftware.orbitlauncher.domain.title
 
@@ -139,6 +140,7 @@ private val AppOption.label
             HomePlace.Dock -> "Add to the dock"
         }
         AppOption.SplitWith -> "Split with…"
+        is AppOption.OpenWith -> listOfNotNull("Open", member?.intentBase?.label, "with intent…").joinToString(" ")
         AppOption.Flip -> "Flip order"
         is AppOption.Badge -> listOfNotNull(if (isOff) "Show" else "Hide", member?.label, "badge").joinToString(" ")
         is AppOption.BuiltInCards -> if (isOff) "Show in New & Most Used" else "Hide from New & Most Used"
@@ -154,6 +156,7 @@ private val AppOption.icon
         is AppOption.RemoveFromCard, is AppOption.RemoveFromGrid -> Icons.Default.Close
         is AppOption.AddTo -> Icons.Default.Add
         AppOption.SplitWith -> SplitGlyph
+        is AppOption.OpenWith -> IntentGlyph
         AppOption.Flip -> SwapGlyph
         is AppOption.Badge -> Icons.Default.Notifications
         is AppOption.BuiltInCards -> if (isOff) ShownGlyph else HiddenGlyph

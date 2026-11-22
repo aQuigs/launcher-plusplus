@@ -40,7 +40,7 @@ class SystemDefaultAppFinder(private val context: Context) : DefaultAppFinder {
         AppRole.Browser -> Intent(Intent.ACTION_VIEW, "https://".toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         AppRole.Camera -> Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
         AppRole.Email -> Intent(Intent.ACTION_SENDTO, "mailto:".toUri())
-        AppRole.Maps -> Intent(Intent.ACTION_VIEW, "geo:0,0".toUri())
+        AppRole.Maps -> mapsIntent()
         AppRole.Photos -> Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_GALLERY)
         AppRole.Calendar -> Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR)
         AppRole.Store -> Intent(Intent.ACTION_VIEW, "market://details?id=${context.packageName}".toUri())
@@ -65,3 +65,6 @@ class SystemDefaultAppFinder(private val context: Context) : DefaultAppFinder {
         return activityKey(launched.packageName, launched.className)
     }
 }
+
+/** What opens the maps app the user chose, with no place in particular. */
+internal fun mapsIntent() = Intent(Intent.ACTION_VIEW, "geo:0,0".toUri())

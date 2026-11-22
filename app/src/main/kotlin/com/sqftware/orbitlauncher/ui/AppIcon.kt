@@ -167,12 +167,16 @@ fun IconDisc(
 internal fun Modifier.ripples(presses: InteractionSource?, bounded: Boolean = true) =
     if (presses == null) this else indication(presses, ripple(bounded = bounded))
 
-/** An app's image on its [IconDisc], rippling for [presses], and over the disc's corner the [WorkMark] of a work app. */
+/**
+ * An app's image on its [IconDisc], rippling for [presses], and over the disc's corner the [WorkMark] of a work app or the
+ * [IntentMark] of one opened to an intent.
+ */
 @Composable
 fun AppFace(app: AppEntry, icon: IconLoader, modifier: Modifier = Modifier, presses: InteractionSource? = null) {
     Box(modifier) {
         IconDisc(presses, Modifier.fillMaxSize()) { AppImage(app, icon, Modifier.fillMaxSize()) }
         WorkMark(app)
+        IntentMark(app)
     }
 }
 

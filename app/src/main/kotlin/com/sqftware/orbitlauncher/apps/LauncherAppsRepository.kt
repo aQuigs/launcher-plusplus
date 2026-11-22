@@ -25,11 +25,13 @@ import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.net.toUri
 import com.sqftware.orbitlauncher.domain.AppCategory
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.EntryKind
 import com.sqftware.orbitlauncher.domain.IconStyle
+import com.sqftware.orbitlauncher.domain.request
 import com.sqftware.orbitlauncher.domain.ITEM_LAYER_SIZE
 import com.sqftware.orbitlauncher.domain.itemMark
 import com.sqftware.orbitlauncher.domain.itemSprite
@@ -145,19 +147,23 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
 
     private val AppEntry.user: UserHandle? get() = userOf(workProfile)
 
+    // An icon opened with an intent wears its app's, which it shares with it rather than draw it again.
     override suspend fun icon(app: AppEntry, style: IconStyle): ImageBitmap? {
-        val key = if (style == IconStyle.Plain) app.key else "$style:${app.key}"
-        return icons[key] ?: icons.keep(app, key) {
+        val drawn = (app.kind as? EntryKind.Intent)?.app ?: app
+        val key = if (style == IconStyle.Plain) drawn.key else "$style:${drawn.key}"
+        return icons[key] ?: icons.keep(drawn, key) {
             when (style) {
-                IconStyle.Plain -> draw(app.key) { density -> entryIcon(app, density) }
-                is IconStyle.Item -> marks[app]?.let { withContext(Dispatchers.IO) { itemSprite(it, style.size).toImageBitmap() } }
+                IconStyle.Plain -> draw(drawn.key) { density -> entryIcon(drawn, density) }
+                is IconStyle.Item -> marks[drawn]?.let { withContext(Dispatchers.IO) { itemSprite(it, style.size).toImageBitmap() } }
             }
         }
     }
 
-    // A pair has no icon of its own: the screen draws its apps' together.
+    // A pair has no icon of its own: the screen draws its apps' together. An icon opened with an intent wears its app's,
+    // which it shares with it rather than draw it again.
     private fun entryIcon(app: AppEntry, density: Int): Drawable? = when (val kind = app.kind) {
         EntryKind.App -> activityIcon(app, density)
+        is EntryKind.Intent -> activityIcon(kind.app, density)
         is EntryKind.Shortcut -> pinnedIcon(shortcutInfo(app.packageName, kind.id, ShortcutQuery.FLAG_MATCH_PINNED, ownUser), app, density)
         is EntryKind.AppPair -> null
     }
@@ -186,14 +192,25 @@ class LauncherAppsRepository(private val context: Context) : AppRepository {
                 }
             }
             is EntryKind.Shortcut -> launcherApps.startShortcut(app.packageName, kind.id, null, null, ownUser)
-            is EntryKind.AppPair -> context.startActivity(SplitScreenActivity.intent(context, kind.first.component, kind.second.component))
+            is EntryKind.Intent -> opening(app)?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            is EntryKind.AppPair -> {
+                val first = opening(kind.first) ?: return@startOrLog
+                val second = opening(kind.second) ?: return@startOrLog
+                context.startActivity(SplitScreenActivity.intent(context, first, second))
+            }
         }
     }
 
+    // What starts an app at its start screen, or straight to the intent it is opened with.
+    private fun opening(app: AppEntry): Intent? = when (val kind = app.kind) {
+        is EntryKind.Intent -> kind.request()?.let { Intent(it.action, it.data?.toUri()).setPackage(it.packageName) }
+        else -> Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(app.component)
+    }
+
     override suspend fun shortcuts(app: AppEntry): List<AppShortcut> = withContext(Dispatchers.IO) {
-        val user = app.user
-        if (!app.isApp || user == null) return@withContext emptyList()
-        query(shortcutQuery(app.packageName).setActivity(app.component), app.key, user)
+        val own = app.ownApp ?: return@withContext emptyList()
+        val user = own.user ?: return@withContext emptyList()
+        query(shortcutQuery(own.packageName).setActivity(own.component), own.key, user)
             .filter { it.isEnabled }
             .sortedWith(compareBy({ !it.isDeclaredInManifest }, { it.rank }))
             .take(MAX_SHORTCUTS)

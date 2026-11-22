@@ -84,6 +84,17 @@ import com.sqftware.orbitlauncher.domain.AppSettings
 import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppsByKey
+import com.sqftware.orbitlauncher.domain.InputKind
+import com.sqftware.orbitlauncher.domain.InputQuestion
+import com.sqftware.orbitlauncher.domain.InputValue
+import com.sqftware.orbitlauncher.domain.OpenChoice
+import com.sqftware.orbitlauncher.domain.PlaceValue
+import com.sqftware.orbitlauncher.domain.answered
+import com.sqftware.orbitlauncher.domain.asks
+import com.sqftware.orbitlauncher.domain.openedAs
+import com.sqftware.orbitlauncher.domain.placeQueryFromShare
+import com.sqftware.orbitlauncher.domain.withMember
+import com.sqftware.orbitlauncher.domain.withRecent
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.Cell
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -134,6 +145,7 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.pairOf
+import com.sqftware.orbitlauncher.domain.partnerOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
@@ -233,7 +245,11 @@ data class HomePress(val launcherInFront: Boolean)
  * it back, as the [appSettings] say ([onAppSettingsChange]), opens its Play Store page, and in the drawer or on a card
  * adds it to the ring or the dock; on a hand-picked card it also takes the app off the card. It also splits the app with
  * another, which the drawer then picks: the pair, one icon that opens both in split screen, goes at the end of the ring,
- * dock, folder or hand-picked card the app was pressed on, or else of the ring. A card's gear opens its settings in a
+ * dock, folder or hand-picked card the app was pressed on, or else of the ring. An app with intents in the catalog, or
+ * a pair's app, can be set to open straight to one: the icon changes where it was pressed, or a new one goes on the
+ * ring. One whose intent asks for an input, such as a place, prompts for it as it opens, once for both apps of a pair if one shares the other's,
+ * offering the [recentPlaces] ([onRecentPlacesChange]); a place shared to the launcher ([sharedPlaces]) fills the open
+ * prompt, else joins the recent places. A card's gear opens its settings in a
  * dialog: how many rows it shows while compact, how many apps a built-in card works out, and when it names its apps,
  * each the card's own or the page's default. A long press on the home
  * page's empty space opens the launcher's own menu. Its first row shows the wallpaper alone: the launcher fades away and
@@ -264,6 +280,7 @@ fun LauncherScreen(
     onLayoutChange: (PageLayout) -> Unit,
     homePresses: Flow<HomePress>,
     pinRequests: Flow<PinRequest>,
+    sharedPlaces: Flow<String>,
     apps: List<AppEntry>?,
     pinnedShortcuts: List<AppEntry>?,
     ringPages: RingPages,
@@ -329,6 +346,8 @@ fun LauncherScreen(
     onOpenBadgeSettings: () -> Unit,
     appSettings: AppSettings,
     onAppSettingsChange: (AppSettings) -> Unit,
+    recentPlaces: List<PlaceValue>,
+    onRecentPlacesChange: (List<PlaceValue>) -> Unit,
     onOpenNotifications: () -> Unit,
     onSystemBarsShownChange: (Boolean) -> Unit,
     onAmbientInSightChange: (Boolean) -> Unit,
@@ -570,7 +589,8 @@ fun LauncherScreen(
     var query by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
     val splittingKey = (picking as? DrawerPick.Partner)?.app
-    val splitting = remember(apps, splittingKey) { splittingKey?.let { key -> apps?.find { it.key == key } } }
+    // Resolved as a stored key is, as the app to split may be one opened to an intent, which the app list does not hold.
+    val splitting = remember(apps, splittingKey) { splittingKey?.let { key -> apps?.let(::AppsByKey)?.get(key) } }
     val drawerSettledClosed = drawerState.currentValue == SheetValue.PartiallyExpanded && !drawerOpen && dragged == null
     LaunchedEffect(drawerSettledClosed) {
         if (drawerSettledClosed) {
@@ -791,6 +811,8 @@ fun LauncherScreen(
     var confirmingReset by rememberSaveable { mutableStateOf(false) }
     var confirmingScene by rememberSaveable { mutableStateOf(false) }
     var confirmingPin by remember { mutableStateOf<PinRequest?>(null) }
+    var choosingOpen by remember { mutableStateOf<ChoosingOpen?>(null) }
+    var asking by remember { mutableStateOf<Asking?>(null) }
     var choosingLook by rememberSaveable { mutableStateOf(false) }
     var showingSpinStats by rememberSaveable { mutableStateOf(false) }
     var choosingPlanet by rememberSaveable { mutableStateOf<HomePlace.Folder?>(null) }
@@ -844,6 +866,17 @@ fun LauncherScreen(
 
     fun pickPartner(app: AppEntry, spot: AppSpot) = pick(DrawerPick.Partner(app.key, spot))
 
+    // Puts [with] in [app]'s place where it was pressed, and says whether it could: in a slot, a folder or a hand-picked card.
+    fun replaceAt(spot: AppSpot, app: AppEntry, with: AppEntry): Boolean {
+        val card = (spot as? AppSpot.Card)?.kind as? CollectionKind.HandPicked
+        when {
+            spot is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, app, with, shown) } }
+            card != null -> changeCollections { replaceApp(card, app, with) }
+            else -> return false
+        }
+        return true
+    }
+
     // Where the first app was pressed, if the user fills that place, else at the end of the ring: the apps in the drawer
     // and on the built-in cards are the system's. The pair is seen landing, as a pinned shortcut is; a card is on the page
     // the pick was made from.
@@ -857,6 +890,34 @@ fun LauncherScreen(
             showRingPage()
         }
         closeDrawer()
+    }
+
+    // Asks each of [questions] in turn, then hands all the answers to [then].
+    fun ask(
+        questions: List<InputQuestion>,
+        answers: Map<InputQuestion, InputValue> = emptyMap(),
+        then: (Map<InputQuestion, InputValue>) -> Unit,
+    ) {
+        val question = questions.firstOrNull() ?: return then(answers)
+        asking = Asking(question) { value -> ask(questions.drop(1), answers + (question to value), then) }
+    }
+
+    val launch: (AppEntry) -> Unit = remember(actions) { { app -> ask(app.asks) { app.answered(it)?.let(actions.launch) } } }
+
+    // Where the icon was pressed it changes; from the drawer or a card the system fills, the new one goes on the ring, as
+    // a pair does.
+    fun openAs(choosing: ChoosingOpen, choice: OpenChoice) {
+        fun put(saved: InputValue?) {
+            val replacement = openedAs(choosing.member, choice, saved) ?: return
+            val changed = choosing.app.withMember(choosing.member, replacement)?.takeIf { it != choosing.app } ?: return
+            if (!replaceAt(choosing.spot, choosing.app, changed)) {
+                changeHomeApps { add(HomePlace.Ring, changed) }
+                showRingPage()
+            }
+        }
+
+        val question = (choice as? OpenChoice.Intent)?.takeUnless { it.asks }?.intent?.input?.let { InputQuestion(it, listOf(choosing.member)) }
+        ask(listOfNotNull(question)) { put(question?.let(it::get)) }
     }
 
     // A menu still loading its shortcuts is cancelled too, or HOME pressed meanwhile would not stop it opening afterwards.
@@ -912,13 +973,8 @@ fun LauncherScreen(
                             }
                             is AppOption.AddTo -> changeHomeApps { add(option.place, app) }
                             AppOption.SplitWith -> pickPartner(app, spot)
-                            AppOption.Flip -> app.flipped()?.let { flipped ->
-                                when (spot) {
-                                    is AppSpot.Home -> latestShown?.let { shown -> changeHomeApps { replace(spot.place, app, flipped, shown) } }
-                                    is AppSpot.Card -> changeCollections { replaceApp(spot.kind, app, flipped) }
-                                    AppSpot.Drawer, AppSpot.MostUsedRow, is AppSpot.Grid -> Unit
-                                }
-                            }
+                            is AppOption.OpenWith -> choosingOpen = ChoosingOpen(app, option.member ?: app, spot)
+                            AppOption.Flip -> app.flipped()?.let { replaceAt(spot, app, it) }
                             is AppOption.Badge -> latestOnAppSettingsChange(latestAppSettings.toggleBadge(option.member ?: app))
                             is AppOption.BuiltInCards -> latestOnAppSettingsChange(latestAppSettings.toggleBuiltInCards(app))
                             AppOption.PlayStore -> errand { actions.openStorePage(app) }
@@ -1283,6 +1339,8 @@ fun LauncherScreen(
         confirmingReset = false
         confirmingScene = false
         confirmingPin = null
+        choosingOpen = null
+        asking = null
         latestOnPreviewThemeChange(null)
         choosingLook = false
         showingSpinStats = false
@@ -1316,6 +1374,23 @@ fun LauncherScreen(
             closeAll()
             showClockRing()
             confirmingPin = request
+        }
+    }
+    // A place found in a maps app comes back shared: into the prompt waiting for one, else to the top of the recent ones.
+    val latestActions by rememberUpdatedState(actions)
+    val latestRecentPlaces by rememberUpdatedState(recentPlaces)
+    val latestOnRecentPlacesChange by rememberUpdatedState(onRecentPlacesChange)
+    val latestOnToast by rememberUpdatedState(onToast)
+    LaunchedEffect(sharedPlaces) {
+        sharedPlaces.collect { text ->
+            val query = placeQueryFromShare(text.take(MAX_SHARED_PLACE)) ?: return@collect
+            if (asking?.question?.kind == InputKind.Place) {
+                asking = asking?.copy(query = query)
+            } else {
+                val place = latestActions.findPlaces(query).firstOrNull() ?: PlaceValue(query, query)
+                latestOnRecentPlacesChange(latestRecentPlaces.withRecent(place))
+                latestOnToast("${place.label} is in your recent places")
+            }
         }
     }
     // One handler with the order spelled out, instead of one per dismissable relying on composition order. A search is
@@ -1453,7 +1528,7 @@ fun LauncherScreen(
                                 AppDrawer(
                                     apps = apps.orEmpty(),
                                     icon = actions.icon,
-                                    onLaunch = actions.launch,
+                                    onLaunch = launch,
                                     menu = drawerMenu,
                                     mostUsedMenu = mostUsedMenu,
                                     drag = dragFromDrawer,
@@ -1589,7 +1664,7 @@ fun LauncherScreen(
                                                         ring = pageRing,
                                                         hint = hint,
                                                         icon = actions.icon,
-                                                        onLaunch = actions.launch,
+                                                        onLaunch = launch,
                                                         onOpenFolder = { if (active) tapFolder(page.id, it.at) },
                                                         onCloseFolder = { if (active) openFolder = null },
                                                         onEdit = {
@@ -1697,7 +1772,7 @@ fun LauncherScreen(
                                                     Dock(
                                                         items = dock,
                                                         icon = actions.icon,
-                                                        onLaunch = actions.launch,
+                                                        onLaunch = launch,
                                                         onOpenFolder = { if (active) tapFolder(page.id, it.at) },
                                                         modifier = Modifier.dropZone(page) { copy(dock = it) },
                                                         highlighted = page == inView && dropPlace == HomePlace.Dock,
@@ -1751,7 +1826,7 @@ fun LauncherScreen(
                                                         block = block,
                                                         item = item,
                                                         icon = actions.icon,
-                                                        onLaunch = actions.launch,
+                                                        onLaunch = launch,
                                                         onOpen = { openGridFolder = spot },
                                                         menu = gridMenu(spot).takeIf { active },
                                                         folderMenu = gridFolderMenu(spot).takeIf { active },
@@ -1777,7 +1852,7 @@ fun LauncherScreen(
                                         builtInApps = builtInApps,
                                         foregroundTime = foregroundTime,
                                         icon = actions.icon,
-                                        onLaunch = actions.launch,
+                                        onLaunch = launch,
                                         onToggleExpanded = { kind -> changeCollections(page) { toggleExpanded(kind) } },
                                         onSettings = { settingCard = it.name },
                                         onMove = { from, to -> changeCollections(page) { move(from, to) } },
@@ -1900,7 +1975,7 @@ fun LauncherScreen(
                         GridFolderDialog(
                             folder = folder,
                             icon = actions.icon,
-                            onLaunch = actions.launch,
+                            onLaunch = launch,
                             menu = gridMenu(spot.copy(inFolder = true)),
                             unread = unread,
                             onClearBadge = actions.clearBadge,
@@ -1953,6 +2028,35 @@ fun LauncherScreen(
                             onReset()
                         },
                         onDismiss = { confirmingReset = false },
+                    )
+                }
+                choosingOpen?.let { choosing ->
+                    OpenWithDialog(
+                        app = choosing.member,
+                        partner = choosing.app.partnerOf(choosing.member),
+                        onChoose = { choice ->
+                            choosingOpen = null
+                            openAs(choosing, choice)
+                        },
+                        onDismiss = { choosingOpen = null },
+                    )
+                }
+                asking?.let { prompt ->
+                    InputPrompt(
+                        question = prompt.question,
+                        query = prompt.query,
+                        onQueryChange = { asking = prompt.copy(query = it) },
+                        sources = InputSources(
+                            recentPlaces = recentPlaces,
+                            onPlacePicked = { onRecentPlacesChange(recentPlaces.withRecent(it)) },
+                            findPlaces = actions.findPlaces,
+                            openMaps = { if (actions.openMaps()) onErrand = true },
+                        ),
+                        onAnswer = { value ->
+                            asking = null
+                            prompt.then(value)
+                        },
+                        onDismiss = { asking = null },
                     )
                 }
                 confirmingPin?.let { request ->
@@ -2060,6 +2164,15 @@ private sealed interface Drag {
         override val folderApps: List<AppEntry>? get() = (item as? GridItem.Folder)?.apps
     }
 }
+
+/** The most of a shared text read for a place: any app can share text, and a place's name and address are short. */
+private const val MAX_SHARED_PLACE = 500
+
+/** The icon [app], pressed at [spot], whose way of opening is being chosen: for a pair, its app [member]'s. */
+private class ChoosingOpen(val app: AppEntry, val member: AppEntry, val spot: AppSpot)
+
+/** A prompt showing [question], searching for the [query] typed, and what is done with the answer. */
+private data class Asking(val question: InputQuestion, val query: String = "", val then: (InputValue) -> Unit)
 
 /** The folder open [at] its place and slot on the ring page [page]. */
 private data class PageFolder(val page: String, val at: HomePlace.Folder)

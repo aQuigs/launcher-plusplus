@@ -1,7 +1,6 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.app.Activity
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -17,8 +16,8 @@ private const val SECOND = "second"
 private const val SECOND_APP_DELAY_MILLIS = 300L
 
 /**
- * Opens a pair of apps in split screen, the first on top. The system has no call for a launcher to do that, but an app
- * started with [Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT] beside another's task enters split screen with it, only if an
+ * Opens a pair of apps in split screen, the first on top, each at its start screen or straight to an intent. The system
+ * has no call for a launcher to do that, but an app started with [Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT] beside another's task enters split screen with it, only if an
  * activity starts it: from a service or the application context the flag is ignored and the app opens full screen. So
  * this starts the first app, then the second beside it once the first is in front, and goes. It draws nothing, but
  * cannot have no display at all, as that must finish before it resumes, and it must wait for the second start.
@@ -28,21 +27,21 @@ class SplitScreenActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val first = IntentCompat.getParcelableExtra(intent, FIRST, ComponentName::class.java)
-        val second = IntentCompat.getParcelableExtra(intent, SECOND, ComponentName::class.java)
+        val first = IntentCompat.getParcelableExtra(intent, FIRST, Intent::class.java)
+        val second = IntentCompat.getParcelableExtra(intent, SECOND, Intent::class.java)
         if (first == null || second == null) {
             finish()
             return
         }
 
         // Alone, the second app would open full screen: nothing to split with.
-        if (!started(TAG, first.flattenToShortString()) { startActivity(launcher(first).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }) {
+        if (!started(TAG, first.logName) { startActivity(first.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }) {
             finish()
             return
         }
         handler.postDelayed({
-            startOrLog(TAG, second.flattenToShortString()) {
-                startActivity(launcher(second).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT))
+            startOrLog(TAG, second.logName) {
+                startActivity(second.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT))
             }
             finish()
         }, SECOND_APP_DELAY_MILLIS)
@@ -53,15 +52,15 @@ class SplitScreenActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun launcher(component: ComponentName) =
-        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(component)
+    private val Intent.logName get() = component?.flattenToShortString() ?: `package`.orEmpty()
 
     companion object {
         /**
-         * What opens [first] and [second] in split screen, started from [context]. Each start gets a task of its own, so a
-         * second pair tapped while the first one's is still waiting is not handed to that one and lost.
+         * What opens [first] and [second], each an app's start screen or an intent of its, in split screen, started from
+         * [context]. Each start gets a task of its own, so a second pair tapped while the first one's is still waiting is
+         * not handed to that one and lost.
          */
-        fun intent(context: Context, first: ComponentName, second: ComponentName): Intent =
+        fun intent(context: Context, first: Intent, second: Intent): Intent =
             Intent(context, SplitScreenActivity::class.java)
                 .putExtra(FIRST, first)
                 .putExtra(SECOND, second)

@@ -39,6 +39,12 @@ sealed interface AppOption {
     /** Picks a second app to pair the app with in split screen. */
     data object SplitWith : AppOption
 
+    /**
+     * Chooses how the app opens, as usual or straight to one of its intents, which changes the icon where it is, or adds
+     * one to the ring from the drawer; on a pair, how its app [member] opens.
+     */
+    data class OpenWith(val member: AppEntry? = null) : AppOption
+
     /** Swaps which of a pair's apps opens on top. */
     data object Flip : AppOption
 
@@ -59,9 +65,10 @@ sealed interface AppOption {
  * The options for [app] long-pressed at [spot], in menu order, given the [home] apps, the [settings] made for apps,
  * whether the badges are enabled and whether the app [hasStorePage]. A home place takes the app off it, and the ring and
  * the dock start a folder in its slot; a hand-picked card or a grid page takes it off. Anywhere but home, the menu adds the app
- * to the ring or the dock where it has no slot of its own yet. A plain app of the user's own can be split with another. A pinned shortcut
+ * to the ring or the dock where it has no slot of its own yet. An app of the user's own can be split with another, and one
+ * with intents in the catalog opened straight to one, anywhere but a grid page, which keeps its apps as they are. A pinned shortcut
  * wears no badge and is on no card, so offers neither setting. A pair belongs to no one app, so offers only where it is,
- * flipping its order there, and each of its apps' badge, which the pair's own adds up.
+ * flipping its order there and how each of its apps opens, and each of its apps' badge, which the pair's own adds up.
  */
 fun appOptions(
     app: AppEntry,
@@ -78,13 +85,18 @@ fun appOptions(
     if (card is CollectionKind.HandPicked) add(AppOption.RemoveFromCard(card))
     if (spot is AppSpot.Grid) add(AppOption.RemoveFromGrid(spot.inFolder))
     if (place == null) listOf(HomePlace.Ring, HomePlace.Dock).filter { app !in home[it] }.forEach { add(AppOption.AddTo(it)) }
-    if (app.isApp) {
-        if (app.isPairable && spot !is AppSpot.Grid) add(AppOption.SplitWith)
+    val inPlace = place != null || card is CollectionKind.HandPicked
+    if (app.isPairable && spot !is AppSpot.Grid) add(AppOption.SplitWith)
+    if (spot !is AppSpot.Grid && openChoices(app).isNotEmpty()) add(AppOption.OpenWith())
+    if (app.ownApp != null) {
         if (badgesEnabled) add(AppOption.Badge(settings.isBadgeOff(app)))
         add(AppOption.BuiltInCards(settings.isOffBuiltInCards(app)))
     }
     if (app.kind is EntryKind.AppPair) {
-        if (place != null || card is CollectionKind.HandPicked) add(AppOption.Flip)
+        if (inPlace) {
+            add(AppOption.Flip)
+            app.opens.filter { openChoices(it).isNotEmpty() }.forEach { add(AppOption.OpenWith(it)) }
+        }
         if (badgesEnabled) app.opens.forEach { add(AppOption.Badge(settings.isBadgeOff(it), it)) }
     } else {
         if (hasStorePage) add(AppOption.PlayStore)
