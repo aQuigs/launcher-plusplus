@@ -129,6 +129,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -2385,6 +2386,15 @@ class LauncherScreenTest {
             assertTrue(quest.lat > bryantPark.lat)
             assertEquals(bryantPark.lon, quest.lon, 1e-6)
         }
+
+        // A finger that rests before it pans is not a hold.
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis * 2)
+            moveBy(Offset(0f, 300f))
+            up()
+        }
+        compose.runOnIdle { assertNotNull(journal.quest) }
 
         compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { longClick(Offset(centerX, centerY - 200f)) }
 

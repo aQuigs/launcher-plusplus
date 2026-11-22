@@ -3,7 +3,6 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -81,9 +81,9 @@ interface WorldMapArt {
     @Composable
     fun Over(view: () -> MapView, moving: Boolean) = Unit
 
-    /** A line over the credit telling the user a tap on the map marks a place and a long press clears it, where they do: by default none. */
+    /** Lays [text], telling the user what a tap on the map does, over the credit: by default not at all. */
     @Composable
-    fun PickHint(modifier: Modifier) = Unit
+    fun PickHint(text: String, modifier: Modifier) = Unit
 
     /** What closes the map with [onClose]. */
     @Composable
@@ -94,13 +94,19 @@ interface WorldMapArt {
 internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width / 2.0 + it.x).toFloat(), (height / 2.0 + it.y).toFloat()) }
 
 /**
+ * What a tap on the world map does: [onPick] takes the place tapped, or null from a press held and lifted without
+ * panning, which clears the pick. The map shows the [hint], and offers both to accessibility as [pickLabel], for the
+ * middle of the map, and [clearLabel].
+ */
+data class MapPick(val hint: String, val pickLabel: String, val clearLabel: String, val onPick: (LatLon?) -> Unit)
+
+/**
  * The world map over the whole screen, as a game opens it: the ground round [here], where the minimap last placed the
  * user, painted by [map] north up and drawn in the theme's [art], still unless [moving]. A drag pans it and a pinch
- * zooms it, settling on the nearest of the zoom steps, and, given [onPick], a tap on the ground hands it the place
- * tapped, as the [pickLabel] action does the middle of the map; given [onClear], a long press calls it, as the
- * [clearLabel] action does. A new stretch is painted round the view as it nears the edge of the last, which stays until
- * it comes. The art's close, or [onClose] otherwise, closes it, as it closes itself when there is nowhere to open it
- * round, as on a return to a launcher the system had ended.
+ * zooms it, settling on the nearest of the zoom steps, and, given a [pick], a tap or a hold picks. A new stretch is
+ * painted round the view as it nears the edge of the last, which stays until it comes. The art's close, or [onClose]
+ * otherwise, closes it, as it closes itself when there is nowhere to open it round, as on a return to a launcher the
+ * system had ended.
  */
 @Composable
 fun WorldMapScreen(
@@ -108,10 +114,7 @@ fun WorldMapScreen(
     map: WorldMap,
     art: WorldMapArt,
     moving: Boolean,
-    onPick: ((LatLon) -> Unit)?,
-    pickLabel: String,
-    onClear: (() -> Unit)?,
-    clearLabel: String,
+    pick: MapPick?,
     onClose: () -> Unit,
 ) {
     val start = remember { here() }
@@ -124,8 +127,7 @@ fun WorldMapScreen(
     var view by remember { mutableStateOf(MapView(start, px.toDouble(), 0, 0)) }
     var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
     var unreachable by remember { mutableStateOf(false) }
-    // A touch that only stops the zoom gliding to its step picks nothing.
-    var stoppedGlide by remember { mutableStateOf(false) }
+    val latestPick by rememberUpdatedState(pick)
 
     // A fold changes the game's pixel, and so the steps, without starting the activity again.
     LaunchedEffect(steps) { view = view.copy(scale = steps.nearest(view.scale).toDouble()) }
@@ -156,16 +158,11 @@ fun WorldMapScreen(
             .clipToBounds()
             .background(art.void)
             .onSizeChanged { view = view.copy(width = it.width, height = it.height) }
-            .then(
-                if (onPick == null) Modifier else Modifier.pointerInput(onPick, onClear) {
-                    detectTapGestures(onLongPress = onClear?.let { clear -> { if (!stoppedGlide) clear() } }) { at ->
-                        if (painted != null && !stoppedGlide) onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
-                    }
-                },
-            )
             .pointerInput(steps) {
                 coroutineScope {
                     var settling: Job? = null
+                    // A touch that only stops the zoom gliding to its step picks nothing.
+                    var stoppedGlide = false
                     // Kept past the gesture, so a tap that stops a glide starts it again about the same spot.
                     var anchor = Offset.Zero
                     detectPinchPan(
@@ -190,6 +187,13 @@ fun WorldMapScreen(
                                 }
                             }
                         },
+                        onStill = { at, held ->
+                            val pick = latestPick
+                            if (pick != null && !stoppedGlide) {
+                                if (held) pick.onPick(null)
+                                else if (painted != null) pick.onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
+                            }
+                        },
                     )
                 }
             }
@@ -205,15 +209,13 @@ fun WorldMapScreen(
             }
             .semantics {
                 contentDescription = "Map of where you are"
-                if (onPick != null) {
-                    onClick(pickLabel) {
-                        onPick(view.centre)
+                pick?.let {
+                    onClick(it.pickLabel) {
+                        it.onPick(view.centre)
                         true
                     }
-                }
-                if (onClear != null) {
-                    onLongClick(clearLabel) {
-                        onClear()
+                    onLongClick(it.clearLabel) {
+                        it.onPick(null)
                         true
                     }
                 }
@@ -232,7 +234,7 @@ fun WorldMapScreen(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = Spacing.Tight),
                 verticalArrangement = Arrangement.spacedBy(Spacing.Tight),
             ) {
-                if (onPick != null) art.PickHint(Modifier.fillMaxWidth())
+                pick?.let { art.PickHint(it.hint, Modifier.fillMaxWidth()) }
                 Text(MAP_CREDIT, color = art.ink, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
             art.Close(onClose, Modifier.align(Alignment.TopEnd).padding(Spacing.Tight))
