@@ -19,18 +19,23 @@ data class Unread(val count: Int, val dismissed: Boolean = false) {
 /**
  * How many unread notifications each package has, which an entry's badge counts for its [AppEntry.badgePackages]: a pair
  * counts its two apps', as an app kept only in a pair has no other icon on home to show them. A package with none is
- * absent. [dismissed] holds the packages whose count includes notifications the user dismissed unread.
+ * absent. [dismissed] holds the packages whose count includes notifications the user dismissed unread, and [inShade]
+ * those with some still in the notification shade.
  */
-data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismissed: Set<String> = emptySet()) {
+data class UnreadCounts(
+    val byPackage: Map<String, Int> = emptyMap(),
+    val dismissed: Set<String> = emptySet(),
+    val inShade: Set<String> = byPackage.keys - dismissed,
+) {
     operator fun get(app: AppEntry): Int = app.badgePackages.sumOf { byPackage[it] ?: 0 }
 
-    /** How many apps have something unread. */
-    val appsWithUnread: Int get() = byPackage.count { it.value > 0 }
+    /** How many apps have something unread still in the shade, so dismissing their notifications takes them off. */
+    val appsInShade: Int get() = inShade.size
 
     /** These counts of [apps]' packages alone. */
     fun among(apps: List<AppEntry>): UnreadCounts {
         val packages = apps.flatMapTo(HashSet()) { it.badgePackages }
-        return UnreadCounts(byPackage.filterKeys { it in packages }, dismissed intersect packages)
+        return UnreadCounts(byPackage.filterKeys { it in packages }, dismissed intersect packages, inShade intersect packages)
     }
 
     fun badge(app: AppEntry) = badge(listOf(app))
@@ -44,9 +49,10 @@ data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismis
     operator fun plus(other: UnreadCounts) = UnreadCounts(
         (byPackage.keys + other.byPackage.keys).associateWith { (byPackage[it] ?: 0) + (other.byPackage[it] ?: 0) },
         dismissed + other.dismissed,
+        inShade + other.inShade,
     )
 
-    operator fun minus(packages: Set<String>) = UnreadCounts(byPackage - packages, dismissed - packages)
+    operator fun minus(packages: Set<String>) = UnreadCounts(byPackage - packages, dismissed - packages, inShade - packages)
 }
 
 /**

@@ -63,6 +63,7 @@ import com.sqftware.orbitlauncher.apps.SystemWidgetHost
 import com.sqftware.orbitlauncher.apps.TiledWorldMap
 import com.sqftware.orbitlauncher.apps.WanderingMinimap
 import com.sqftware.orbitlauncher.apps.WindowSystemBars
+import com.sqftware.orbitlauncher.apps.WindowWallpaperBlur
 import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
 import com.sqftware.orbitlauncher.domain.AppEntry
@@ -160,6 +161,7 @@ class MainActivity : ComponentActivity() {
         val shade = StatusBarNotificationShade(this)
         val toasts = SystemToasts(this)
         val systemBars = WindowSystemBars(window)
+        val wallpaperBlur = WindowWallpaperBlur(window)
         val relauncher = SystemRelauncher(this)
         val whereIAmStore = SharedPreferencesWhereIAmStore(this)
         val journalStore = SharedPreferencesJournalStore(this)
@@ -543,6 +545,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenNotifications = shade::open,
                     onSystemBarsShownChange = systemBars::setShown,
+                    onWallpaperBlurChange = wallpaperBlur::blur,
                     onAmbientInSightChange = { ambientInSight = it },
                     onSetWallpaper = { draw -> scope.launch(Dispatchers.IO) { wallpaper.set(draw().asAndroidBitmap()) } },
                     onRestart = relauncher::restart,

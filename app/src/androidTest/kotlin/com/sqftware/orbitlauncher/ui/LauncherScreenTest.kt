@@ -368,6 +368,7 @@ class LauncherScreenTest {
             onRecentPlacesChange = { recentPlaces = it },
             onOpenNotifications = { notificationsOpened++ },
             onSystemBarsShownChange = { barsShown += it },
+            onWallpaperBlurChange = {},
             onAmbientInSightChange = {},
             onSetWallpaper = { wallpapersSet += it() },
             onRestart = { restarts++ },

@@ -238,6 +238,9 @@ interface ThemeArt {
     @Composable
     fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) = Unit
 
+    /** What lies behind a folder opened on the ring: by default the page as it is. */
+    val folderBackdrop: FolderBackdrop? get() = null
+
     /** Whether an open folder's apps go round the emblem, which a tap then closes, rather than round the folder's own face. */
     val foldersOpenRoundEmblem: Boolean
         get() = false

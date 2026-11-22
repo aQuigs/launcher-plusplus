@@ -48,6 +48,7 @@ val WantedUnlit = Color.Black.copy(alpha = 0.2f)
 
 /** A weapon wheel's tile, the dark glass the game sets each weapon on, and a folder's chip, closed, with its hairline. */
 val WheelTile = Color(0xFF26272F).copy(alpha = 0.72f)
+val WheelVeil = Color(0xFF080910).copy(alpha = 0.5f)
 val WheelChip = Color(0xFF1C1D28)
 val WheelChipEdge = Color.White.copy(alpha = 0.35f)
 
