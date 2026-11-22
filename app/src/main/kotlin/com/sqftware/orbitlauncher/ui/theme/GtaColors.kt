@@ -1,5 +1,6 @@
 package com.sqftware.orbitlauncher.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // GTA's pause menu: a navy charcoal ground, its pink for what is picked and its teal for the way to go, white type,
@@ -50,6 +51,7 @@ val WantedUnlit = Color.Black.copy(alpha = 0.2f)
 val WheelTile = Color(0xFF4A4C5A).copy(alpha = 0.6f)
 val WheelTileEdge = Color.White.copy(alpha = 0.3f)
 val WheelVeil = Color(0xFF080910).copy(alpha = 0.28f)
+val WheelPool = Brush.radialGradient(listOf(Color(0xFF080910).copy(alpha = 0.5f), Color(0xFF080910).copy(alpha = 0f)))
 val WheelChip = Color(0xFF1C1D28)
 val WheelChipEdge = Color.White.copy(alpha = 0.35f)
 

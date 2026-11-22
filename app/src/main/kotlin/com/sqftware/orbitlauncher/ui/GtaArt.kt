@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -43,6 +44,7 @@ import com.sqftware.orbitlauncher.ui.theme.WantedLit
 import com.sqftware.orbitlauncher.ui.theme.WantedUnlit
 import com.sqftware.orbitlauncher.ui.theme.WheelChip
 import com.sqftware.orbitlauncher.ui.theme.WheelChipEdge
+import com.sqftware.orbitlauncher.ui.theme.WheelPool
 import com.sqftware.orbitlauncher.ui.theme.WheelTile
 import com.sqftware.orbitlauncher.ui.theme.WheelTileEdge
 import com.sqftware.orbitlauncher.ui.theme.WheelVeil
@@ -108,11 +110,15 @@ object GtaArt : HudArt(GtaHud, drift = null) {
     /** The wheel's middle: the folder's name, as the game names the weapon picked, coming in as its apps go out to their tiles. */
     @Composable
     override fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) {
-        // A folder the user never named has nothing to call it: the game's middle shows a name only when it has one.
-        if (folder.name.isBlank()) return
         val ink = GtaHudColors.ink
-        Box(modifier.graphicsLayer { alpha = shown() }, contentAlignment = Alignment.Center) {
-            Text(
+        // The shade deepens toward the wheel's middle, as the game's does, so the name reads on a pale wallpaper and an
+        // unnamed folder's middle still shows where a tap closes it.
+        Box(
+            modifier.graphicsLayer { alpha = shown() }.drawBehind { drawCircle(WheelPool) },
+            contentAlignment = Alignment.Center,
+        ) {
+            // A folder the user never named has nothing to call it: the game's middle shows a name only when it has one.
+            if (folder.name.isNotBlank()) Text(
                 folder.name.uppercase(),
                 Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold).legible(ink),

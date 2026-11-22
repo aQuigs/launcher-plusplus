@@ -198,7 +198,8 @@ class FolderWear(
 /**
  * [folder] in the look of [LocalFolderStyle], filling the item: up to four previews of its apps, laid out the same in
  * every theme and look, on the disc and in what the theme's [ThemeArt.folderWear] gives it. [inner] fades the previews,
- * as when the folder takes the ring's centre and its apps are round it instead; [presses] ripple its disc. Give it a
+ * or the whole face for a look that [fades open][FolderWear.fadesOpen], as when the folder takes the ring's centre and its
+ * apps are round it instead; [presses] ripple its disc. Give it a
  * layer of its own, so what turns with the sky redraws only the folder, not the page round it.
  */
 @Composable
@@ -214,11 +215,11 @@ fun FolderFace(
     if (style.look == FolderLook.Orbit) return OrbitFace(folder, icon, style.minutes, inner, modifier)
 
     val wear = LocalThemeArt.current.folderWear(folder)
-    Box(modifier) {
-        // A look that fades open takes its disc with the previews; any other keeps it round them.
-        val opening = Modifier.graphicsLayer { alpha = inner() }
-        Spacer(Modifier.matchParentSize().then(if (wear.fadesOpen) opening else Modifier).then(wear.behind))
-        IconDisc(presses, Modifier.matchParentSize().then(if (wear.fadesOpen) opening else Modifier), wear.disc) {
+    // A look that fades open goes as one image, its wear and disc with the previews; any other keeps them round them.
+    val opening = Modifier.graphicsLayer { alpha = inner() }
+    Box(if (wear.fadesOpen) modifier.then(opening) else modifier) {
+        Spacer(Modifier.matchParentSize().then(wear.behind))
+        IconDisc(presses, Modifier.matchParentSize(), wear.disc) {
             FolderPreviews(folder.apps, icon, if (wear.fadesOpen) Modifier else opening)
             Spacer(Modifier.fillMaxSize(wear.disc).then(wear.over))
         }
