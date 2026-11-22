@@ -6,6 +6,7 @@ import com.sqftware.orbitlauncher.domain.lerpRgb
 import com.sqftware.orbitlauncher.domain.opaque
 import com.sqftware.orbitlauncher.domain.red
 import com.sqftware.orbitlauncher.domain.rgb
+import kotlin.math.roundToInt
 
 /**
  * The colors, as RGB, of a map painted flat: the [land] and the [water], the [park]s and [sand], the [road]s and the
@@ -56,21 +57,9 @@ internal fun paintFlat(layout: GroundLayout, into: IntArray, ground: FlatGround)
     val h = layout.height
     val flat = IntArray(w * h) { i -> if (layout.rails[i]) opaque(ground.road) else ground.colours[layout.ground[i].ordinal] }
 
-    // Softened by a 3 by 3 binomial blur, its weights summing to 16, edges held, so an edge drawn scaled is not stepped.
-    val weights = intArrayOf(1, 2, 1)
-    for (i in 0 until w * h) {
-        val x = i % w
-        val y = i / w
-        var r = 0
-        var g = 0
-        var b = 0
-        for (dy in -1..1) for (dx in -1..1) {
-            val c = flat[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)]
-            val weight = weights[dx + 1] * weights[dy + 1]
-            r += red(c) * weight
-            g += green(c) * weight
-            b += blue(c) * weight
-        }
-        into[i] = rgb(r / 16, g / 16, b / 16)
-    }
+    // Softened, so an edge drawn scaled is not stepped.
+    val r = softened(w, h, DoubleArray(w * h) { red(flat[it]).toDouble() })
+    val g = softened(w, h, DoubleArray(w * h) { green(flat[it]).toDouble() })
+    val b = softened(w, h, DoubleArray(w * h) { blue(flat[it]).toDouble() })
+    for (i in 0 until w * h) into[i] = rgb(r[i].roundToInt(), g[i].roundToInt(), b[i].roundToInt())
 }

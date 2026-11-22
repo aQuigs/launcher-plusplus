@@ -156,9 +156,8 @@ class UnreadTest {
     }
 
     @Test
-    fun `the wanted level is a star for each app with something unread, up to six`() {
-        assertEquals(0, UnreadCounts().wantedLevel)
-        assertEquals(2, UnreadCounts(mapOf(mail.packageName to 5, chat.packageName to 1)).wantedLevel)
-        assertEquals(MAX_WANTED, UnreadCounts((1..9).associate { "app$it" to 1 }).wantedLevel)
+    fun `apps with something unread count once however many they have`() {
+        assertEquals(0, UnreadCounts().appsWithUnread)
+        assertEquals(2, UnreadCounts(mapOf(mail.packageName to 5, chat.packageName to 1)).appsWithUnread)
     }
 }

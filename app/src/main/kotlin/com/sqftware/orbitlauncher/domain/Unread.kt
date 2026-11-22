@@ -1,8 +1,5 @@
 package com.sqftware.orbitlauncher.domain
 
-/** The most stars a wanted level has, as in the game. */
-const val MAX_WANTED = 6
-
 /** One notification as the badges see it, from its app's [packageKey]. [number] is the count the app put on it, or 0. */
 data class PostedNotification(
     val packageKey: String,
@@ -27,8 +24,8 @@ data class Unread(val count: Int, val dismissed: Boolean = false) {
 data class UnreadCounts(val byPackage: Map<String, Int> = emptyMap(), val dismissed: Set<String> = emptySet()) {
     operator fun get(app: AppEntry): Int = app.badgePackages.sumOf { byPackage[it] ?: 0 }
 
-    /** A game's wanted level of these: a star for each app with something unread, up to the game's [MAX_WANTED]. */
-    val wantedLevel: Int get() = byPackage.count { it.value > 0 }.coerceAtMost(MAX_WANTED)
+    /** How many apps have something unread. */
+    val appsWithUnread: Int get() = byPackage.count { it.value > 0 }
 
     fun badge(app: AppEntry) = badge(listOf(app))
 

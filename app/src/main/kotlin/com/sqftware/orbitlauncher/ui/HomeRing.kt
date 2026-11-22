@@ -630,6 +630,7 @@ private fun CentrePlanet(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        LocalThemeArt.current.OpenFolderFace(folder, icon, inner, Modifier.fillMaxSize(CENTRE_PLANET).graphicsLayer())
+        FolderFace(folder, icon, Modifier.fillMaxSize(CENTRE_PLANET).graphicsLayer(), inner = inner)
+        LocalThemeArt.current.OpenFolderOver(folder, { 1f - inner() }, Modifier.fillMaxSize(CENTRE_PLANET).graphicsLayer())
     }
 }

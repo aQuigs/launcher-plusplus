@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
@@ -67,7 +66,6 @@ import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.minimap.WebMercator
 import com.sqftware.orbitlauncher.domain.minimap.bearingTo
 import com.sqftware.orbitlauncher.domain.minimap.shiftTo
-import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.turnBetween
 import com.sqftware.orbitlauncher.ui.theme.HudColors
 import kotlin.math.abs
@@ -132,8 +130,8 @@ internal interface HudLook {
     /** The quest marker's outline round its middle, [half] from it to its tip, which points down at the spot. */
     fun questShape(half: Float): Path
 
-    /** Builds the marks on the local map's rim, on a circle of [radius] round [center], north first: turned with the map. A window that is no disc has none. */
-    fun CacheDrawScope.rimMarks(center: Offset, radius: Float): DrawScope.() -> Unit
+    /** Builds the marks on the local map's rim, on a circle of [radius] round [center], north first: turned with the map. By default none. */
+    fun CacheDrawScope.rimMarks(center: Offset, radius: Float): DrawScope.() -> Unit = {}
 
     /** Builds what lies over the local map and the world map, above the ground and its icons: by default nothing. */
     fun CacheDrawScope.screenOver(): DrawScope.() -> Unit = {}
@@ -165,7 +163,7 @@ abstract class HudArt internal constructor(private val hud: HudLook, private val
     override fun emblemBox(edge: Color): Modifier = Modifier.clip(hud.window)
 
     @Composable
-    override fun HomeHeader(discovery: String?, unread: UnreadCounts, modifier: Modifier) = HudHeader(hud, discovery, modifier)
+    override fun HomeHeader(discovery: String?, modifier: Modifier) = HudHeader(hud, discovery, modifier)
 
     @Composable
     override fun Weather(turn: () -> Float, modifier: Modifier) {
@@ -184,22 +182,24 @@ abstract class HudArt internal constructor(private val hud: HudLook, private val
 internal class MapWindow(private val aspect: Float, private val corner: Float) : Shape {
     /** The window in a cell of [size], drawn [inset] inside its edge. */
     fun outline(size: Size, inset: Float = 0f): RoundRect {
-        val bounds = bounds(size).deflate(inset)
-        val round = (bounds(size).height * corner - inset).coerceAtLeast(0f)
-        return RoundRect(bounds, CornerRadius(round))
+        val bounds = bounds(size)
+        return RoundRect(bounds.deflate(inset), CornerRadius((round(bounds) - inset).coerceAtLeast(0f)))
     }
 
     fun bounds(size: Size): Rect {
-        val half = size.emblemRadius
-        return Rect(size.center, half).let { Rect(it.left, size.center.y - half / aspect, it.right, size.center.y + half / aspect) }
+        val halfWide = size.emblemRadius
+        val halfTall = halfWide / aspect
+        return Rect(size.center.x - halfWide, size.center.y - halfTall, size.center.x + halfWide, size.center.y + halfTall)
     }
 
     /** How far from the middle the window's farthest point lies: the radius of the map disc that covers it. */
     fun reach(size: Size): Float {
         val bounds = bounds(size)
-        val round = bounds.height * corner
+        val round = round(bounds)
         return hypot(bounds.width / 2 - round, bounds.height / 2 - round) + round
     }
+
+    private fun round(bounds: Rect) = bounds.height * corner
 
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) = Outline.Rounded(outline(size))
 
@@ -228,8 +228,8 @@ internal class QuestMarker(look: HudLook, val half: Float) {
 /**
  * The local map of where the user is in [look], else of a made-up place, or fog until there is one, turned with the
  * phone, its icons kept upright, darkening into a rimmed edge, with the player's arrow at the middle unless [marked] is
- * false because a hint lies over it, all inside the look's window. What turns is a layer of its own, so a turn moves it
- * without drawing the rest again.
+ * false because a hint lies over it, all inside the look's window, which the emblem's box clips it to. What turns is a
+ * layer of its own, so a turn moves it without drawing the rest again.
  */
 @Composable
 internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) {
@@ -243,7 +243,7 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
     val measurer = rememberTextMeasurer()
     val creditStyle = MaterialTheme.typography.labelSmall.copy(color = look.colors.ink, textAlign = TextAlign.Center)
     val window = look.window
-    Box(modifier.clip(window)) {
+    Box(modifier) {
         Spacer(
             Modifier
                 .matchParentSize()

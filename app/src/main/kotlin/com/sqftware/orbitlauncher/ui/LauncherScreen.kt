@@ -1385,6 +1385,7 @@ fun LauncherScreen(
         LocalHeading provides heading,
         LocalQuest provides journal.quest,
         LocalOpenWorldMap provides openWorldMap,
+        LocalUnread provides unread,
     ) {
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
@@ -1646,7 +1647,7 @@ fun LauncherScreen(
                                                         ) {
                                                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = clockShade }) {
                                                                 // In the clock's room, so the preview bar and the reorder switch take its place as they take the clock's.
-                                                                LocalThemeArt.current.HomeHeader(discovery, unread, Modifier.padding(top = 12.dp))
+                                                                LocalThemeArt.current.HomeHeader(discovery, Modifier.padding(top = 12.dp))
                                                                 HomeClock(
                                                                     face = clock,
                                                                     onTimeClick = onOpenClock,

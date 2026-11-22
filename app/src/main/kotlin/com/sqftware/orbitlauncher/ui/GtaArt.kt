@@ -3,7 +3,6 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,11 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -32,9 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.sqftware.orbitlauncher.domain.IconPlace
-import com.sqftware.orbitlauncher.domain.MAX_WANTED
 import com.sqftware.orbitlauncher.domain.RingItem
-import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.ui.theme.Condensed
 import com.sqftware.orbitlauncher.ui.theme.GtaHudColors
 import com.sqftware.orbitlauncher.ui.theme.HeadingDisc
@@ -57,6 +54,9 @@ private const val MAP_CORNER = 0.16f
 /** A weapon wheel's tile round an app's disc: how much wider and taller than the disc it reaches. */
 private const val TILE_WIDE = 1.62f
 private const val TILE_TALL = 1.2f
+
+/** The most stars a wanted level has, as in the game. */
+private const val MAX_WANTED = 6
 
 /** How tall a wanted star is, and the room between two. */
 private val STAR = 18.dp
@@ -97,18 +97,14 @@ object GtaArt : HudArt(GtaHud, drift = null) {
         return if (LocalIconPlace.current == IconPlace.OpenFolder) Modifier.wheelTile().then(disc) else disc
     }
 
-    /**
-     * The wheel's middle: the folder's name, as the game names the weapon picked, coming in as the folder's previews go
-     * out to their tiles.
-     */
+    /** The wheel's middle: the folder's name, as the game names the weapon picked, coming in as its apps go out to their tiles. */
     @Composable
-    override fun OpenFolderFace(folder: RingItem.Folder, icon: IconLoader, inner: () -> Float, modifier: Modifier) {
+    override fun OpenFolderOver(folder: RingItem.Folder, shown: () -> Float, modifier: Modifier) {
         val ink = GtaHudColors.ink
-        Box(modifier, contentAlignment = Alignment.Center) {
-            FolderFace(folder, icon, Modifier.fillMaxSize().graphicsLayer { alpha = inner() }, inner = inner)
+        Box(modifier.graphicsLayer { alpha = shown() }, contentAlignment = Alignment.Center) {
             Text(
                 folderTitle(folder.name).uppercase(),
-                Modifier.fillMaxWidth().graphicsLayer { alpha = 1f - inner() },
+                Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleLarge.legible(ink),
                 color = ink,
                 textAlign = TextAlign.Center,
@@ -120,10 +116,10 @@ object GtaArt : HudArt(GtaHud, drift = null) {
 
     /** The compass along the top, and under it, at its right, the wanted level. */
     @Composable
-    override fun HomeHeader(discovery: String?, unread: UnreadCounts, modifier: Modifier) {
+    override fun HomeHeader(discovery: String?, modifier: Modifier) {
         Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
             HudHeader(GtaHud, discovery, Modifier)
-            WantedLevel(unread.wantedLevel, Modifier.fillMaxWidth(COMPASS_SPAN).padding(top = 4.dp))
+            WantedLevel(LocalUnread.current.appsWithUnread.coerceAtMost(MAX_WANTED), Modifier.fillMaxWidth(COMPASS_SPAN).padding(top = 4.dp))
         }
     }
 
@@ -135,17 +131,14 @@ object GtaArt : HudArt(GtaHud, drift = null) {
 }
 
 // The game sets its headings, hints and labels in a condensed type and its body and clock in a plain geometric one.
-private val GtaTypography = typographyIn(Condensed, display = 0f, heading = 0.02f, body = 0f, label = 0.06f).let { condensed ->
-    val plain = Typography()
-    condensed.copy(
-        displayLarge = plain.displayLarge,
-        displayMedium = plain.displayMedium,
-        displaySmall = plain.displaySmall,
-        bodyLarge = plain.bodyLarge,
-        bodyMedium = plain.bodyMedium,
-        bodySmall = plain.bodySmall,
-    )
-}
+private val GtaTypography = typographyIn(Condensed, display = 0f, heading = 0.02f, body = 0f, label = 0.06f).copy(
+    displayLarge = MaterialTypography.displayLarge,
+    displayMedium = MaterialTypography.displayMedium,
+    displaySmall = MaterialTypography.displaySmall,
+    bodyLarge = MaterialTypography.bodyLarge,
+    bodyMedium = MaterialTypography.bodyMedium,
+    bodySmall = MaterialTypography.bodySmall,
+)
 
 /**
  * The game's view of where the user is: its pastel minimap on a wide screen with a hairline round it, the compass a thin
@@ -169,8 +162,6 @@ private object GtaHud : HudLook {
         cubicTo(head, middle + head * 0.75f, head * 0.5f, half * 0.45f, 0f, half)
         close()
     }
-
-    override fun CacheDrawScope.rimMarks(center: Offset, radius: Float): DrawScope.() -> Unit = {}
 
     // A thin gray line across, and where the user faces the player's dark disc, ringed in white with its white arrow.
     override fun CacheDrawScope.compassBar(mid: Float, band: Float): CompassBar {
@@ -243,14 +234,18 @@ private fun starPath(radius: Float) = Path().apply {
 }
 
 /** A closed folder's dark chip and its hairline, drawn on the whole item. */
-private fun Modifier.wheelChip() = drawBehind {
+private fun Modifier.wheelChip() = drawWithCache {
     val radius = size.minDimension / 2
-    drawCircle(WheelChip, radius)
-    drawCircle(WheelChipEdge, radius - 0.5.dp.toPx(), style = Stroke(1.dp.toPx()))
+    val edge = Stroke(1.dp.toPx())
+    onDrawBehind {
+        drawCircle(WheelChip, radius)
+        drawCircle(WheelChipEdge, radius - edge.width / 2, style = edge)
+    }
 }
 
 /** A weapon wheel's tile, wider and a little taller than the disc it lies under. */
-private fun Modifier.wheelTile() = drawBehind {
+private fun Modifier.wheelTile() = drawWithCache {
     val tile = Size(size.width * TILE_WIDE, size.height * TILE_TALL)
-    drawRect(WheelTile, center - Offset(tile.width / 2, tile.height / 2), tile)
+    val topLeft = size.center - Offset(tile.width / 2, tile.height / 2)
+    onDrawBehind { drawRect(WheelTile, topLeft, tile) }
 }
