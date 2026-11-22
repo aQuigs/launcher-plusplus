@@ -1475,6 +1475,8 @@ fun LauncherScreen(
         WallpaperShowcase(showing = showingWallpaper, onDone = { showingWallpaper = false }, modifier = modifier.fillMaxSize()) {
             Box(
                 Modifier
+                    // Under the system bars too, as the wallpaper's blur reaches them.
+                    .veiledBehindFolder(folderBackdrop) { backdropShown.value }
                     .windowInsetsPadding(insets)
                     .onGloballyPositioned {
                         origin = it.positionInRoot()
@@ -1644,7 +1646,6 @@ fun LauncherScreen(
                                         Column(
                                             Modifier
                                                 .fillMaxSize()
-                                                .veiledBehindFolder(folderBackdrop, behindFolder)
                                                 .onPlaced { ringPageCoordinates[page.id] = it }
                                                 .verticalSwipe(onDown = onOpenNotifications, onUp = { openDrawer() }),
                                         ) {
