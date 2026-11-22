@@ -201,7 +201,7 @@ private fun HangingNames.room(index: Int, places: List<Pair<Float, Float>>, size
 }
 
 /** The first point from [from] toward [to] where [reached] holds, as it does from there on, or [to] if it never does. */
-private fun meeting(from: Float, to: Float, reached: (Float) -> Boolean): Float {
+internal fun meeting(from: Float, to: Float, reached: (Float) -> Boolean): Float {
     var before = from
     var after = to
     repeat(16) {

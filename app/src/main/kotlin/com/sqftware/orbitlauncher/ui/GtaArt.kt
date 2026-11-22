@@ -178,6 +178,9 @@ private object GtaHud : HudLook {
         close()
     }
 
+    // At the window's edge, as the game's radar pins a blip out of sight to it.
+    override val questInset = 0f
+
     // A thin gray line across, and where the user faces the player's dark disc, ringed in white with its white arrow.
     override fun CacheDrawScope.compassBar(mid: Float, band: Float): CompassBar {
         val line = Stroke(2.dp.toPx())
