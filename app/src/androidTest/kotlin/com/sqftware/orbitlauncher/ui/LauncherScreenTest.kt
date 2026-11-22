@@ -2387,16 +2387,19 @@ class LauncherScreenTest {
             assertEquals(bryantPark.lon, quest.lon, 1e-6)
         }
 
-        // A finger that rests before it pans is not a hold.
+        // A press too short to be a hold, though it rests, is a tap.
         compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput {
             down(center)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis * 2)
-            moveBy(Offset(0f, 300f))
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis / 2)
             up()
         }
         compose.runOnIdle { assertNotNull(journal.quest) }
 
-        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { longClick(Offset(centerX, centerY - 200f)) }
+        // A hold clears it with the finger still down.
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { down(Offset(centerX, centerY - 200f)) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.runOnIdle { assertEquals(null, journal.quest) }
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { up() }
 
         compose.runOnIdle { assertEquals(null, journal.quest) }
         compose.onNodeWithContentDescription("Close").performClick()

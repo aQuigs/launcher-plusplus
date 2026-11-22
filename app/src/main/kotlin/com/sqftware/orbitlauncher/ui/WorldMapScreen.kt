@@ -31,8 +31,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -95,7 +97,7 @@ internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width
 
 /**
  * What a tap on the world map does: [onPick] takes the place tapped, or, given a [clearLabel] as there is a pick to
- * clear, null from a press held and lifted without panning. The map shows the [hint], and offers both to accessibility
+ * clear, null as soon as a press has been held without panning, the finger still down. The map shows the [hint], and offers both to accessibility
  * as [pickLabel], for the middle of the map, and [clearLabel].
  */
 data class MapPick(val hint: String, val pickLabel: String, val clearLabel: String?, val onPick: (LatLon?) -> Unit)
@@ -128,6 +130,7 @@ fun WorldMapScreen(
     var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
     var unreachable by remember { mutableStateOf(false) }
     val latestPick by rememberUpdatedState(pick)
+    val haptics = LocalHapticFeedback.current
 
     // A fold changes the game's pixel, and so the steps, without starting the activity again.
     LaunchedEffect(steps) { view = view.copy(scale = steps.nearest(view.scale).toDouble()) }
@@ -187,11 +190,15 @@ fun WorldMapScreen(
                                 }
                             }
                         },
-                        onStill = { at, held ->
+                        onTap = { at ->
                             val pick = latestPick
-                            if (pick != null && !stoppedGlide) {
-                                if (held) pick.clearLabel?.let { pick.onPick(null) }
-                                else if (painted != null) pick.onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
+                            if (pick != null && !stoppedGlide && painted != null) pick.onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
+                        },
+                        onHold = {
+                            val pick = latestPick
+                            if (pick?.clearLabel != null && !stoppedGlide) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pick.onPick(null)
                             }
                         },
                     )
