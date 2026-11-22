@@ -1170,7 +1170,7 @@ class LauncherScreenTest {
         compose.onNodeWithText("Open with intent…").performClick()
         compose.onNodeWithText("Ride to a place you pick now").performClick()
         compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("1 Main")
-        compose.waitUntil { compose.onAllNodesWithText("Work").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithText("Work").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Work").performClick()
 
         val saved = openedAs(uber, openChoices(uber)[1], found)!!
