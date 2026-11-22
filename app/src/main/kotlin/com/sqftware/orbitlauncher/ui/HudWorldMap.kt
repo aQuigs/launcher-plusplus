@@ -122,7 +122,7 @@ internal class HudWorldMap(private val look: HudLook, private val drift: Drift?)
     @Composable
     override fun PickHint(modifier: Modifier) {
         Text(
-            "Tap the map to mark your quest",
+            "Tap the map to mark your quest, hold to clear it",
             style = MaterialTheme.typography.labelLarge.legible(look.colors.ink),
             color = look.colors.ink,
             textAlign = TextAlign.Center,

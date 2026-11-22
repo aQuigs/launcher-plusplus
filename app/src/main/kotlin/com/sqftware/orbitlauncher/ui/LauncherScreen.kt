@@ -1319,11 +1319,6 @@ fun LauncherScreen(
                                 toggleRow(SHOW_WHERE_I_AM, latestWhereIAm == WhereIAm.Shown) { latestOnShowWhereIAmChange(it) }.takeIf { latestTheme.mapsWhereIAm },
                                 // The map shows its credit only for a moment, so the licence is always a tap away here.
                                 MenuRow(MAP_DATA_CREDIT) { latestOnOpenMapLicence() }.takeIf { latestTheme.mapsWhereIAm },
-                                minimap()?.takeIf { latestTheme.keepsJournal }?.let { map ->
-                                    MenuRow(MARK_QUEST) { latestOnJournalChange(latestJournal.copy(quest = map.centre)) }
-                                },
-                                MenuRow(CLEAR_QUEST) { latestOnJournalChange(latestJournal.copy(quest = null)) }
-                                    .takeIf { latestTheme.keepsJournal && latestJournal.quest != null },
                                 toggleRow("Check for updates", latestCheckForUpdates) { latestOnCheckForUpdatesChange(it) },
                             ),
                             listOf(
@@ -1470,6 +1465,7 @@ fun LauncherScreen(
     val insets = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout)
     val openWorldMap = remember { { showingWorldMap = true } }
     val markQuest = remember { { at: LatLon -> latestOnJournalChange(latestJournal.copy(quest = at)) } }
+    val clearQuest = remember { { latestOnJournalChange(latestJournal.copy(quest = null)) } }
     CompositionLocalProvider(
         LocalMinimap provides minimap,
         LocalMadeUpMap provides madeUpMap,
@@ -2122,6 +2118,8 @@ fun LauncherScreen(
                     moving = ambientMotion,
                     onPick = markQuest.takeIf { theme.keepsJournal },
                     pickLabel = MARK_QUEST,
+                    onClear = clearQuest.takeIf { theme.keepsJournal && journal.quest != null },
+                    clearLabel = CLEAR_QUEST,
                     onClose = { showingWorldMap = false },
                 )
             }

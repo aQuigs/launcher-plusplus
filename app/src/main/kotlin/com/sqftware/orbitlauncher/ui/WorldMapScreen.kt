@@ -36,6 +36,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -80,7 +81,7 @@ interface WorldMapArt {
     @Composable
     fun Over(view: () -> MapView, moving: Boolean) = Unit
 
-    /** A line over the credit telling the user a tap on the map marks a place, where one does: by default none. */
+    /** A line over the credit telling the user a tap on the map marks a place and a long press clears it, where they do: by default none. */
     @Composable
     fun PickHint(modifier: Modifier) = Unit
 
@@ -96,9 +97,10 @@ internal fun MapView.spot(at: LatLon): Offset = onScreen(at).let { Offset((width
  * The world map over the whole screen, as a game opens it: the ground round [here], where the minimap last placed the
  * user, painted by [map] north up and drawn in the theme's [art], still unless [moving]. A drag pans it and a pinch
  * zooms it, settling on the nearest of the zoom steps, and, given [onPick], a tap on the ground hands it the place
- * tapped, as the [pickLabel] action does the middle of the map. A new stretch is painted round the view as it nears the
- * edge of the last, which stays until it comes. The art's close, or [onClose] otherwise, closes it, as it closes itself
- * when there is nowhere to open it round, as on a return to a launcher the system had ended.
+ * tapped, as the [pickLabel] action does the middle of the map; given [onClear], a long press calls it, as the
+ * [clearLabel] action does. A new stretch is painted round the view as it nears the edge of the last, which stays until
+ * it comes. The art's close, or [onClose] otherwise, closes it, as it closes itself when there is nowhere to open it
+ * round, as on a return to a launcher the system had ended.
  */
 @Composable
 fun WorldMapScreen(
@@ -108,6 +110,8 @@ fun WorldMapScreen(
     moving: Boolean,
     onPick: ((LatLon) -> Unit)?,
     pickLabel: String,
+    onClear: (() -> Unit)?,
+    clearLabel: String,
     onClose: () -> Unit,
 ) {
     val start = remember { here() }
@@ -153,8 +157,8 @@ fun WorldMapScreen(
             .background(art.void)
             .onSizeChanged { view = view.copy(width = it.width, height = it.height) }
             .then(
-                if (onPick == null) Modifier else Modifier.pointerInput(onPick) {
-                    detectTapGestures { at ->
+                if (onPick == null) Modifier else Modifier.pointerInput(onPick, onClear) {
+                    detectTapGestures(onLongPress = onClear?.let { clear -> { if (!stoppedGlide) clear() } }) { at ->
                         if (painted != null && !stoppedGlide) onPick(view.at(at.x - view.width / 2.0, at.y - view.height / 2.0))
                     }
                 },
@@ -204,6 +208,12 @@ fun WorldMapScreen(
                 if (onPick != null) {
                     onClick(pickLabel) {
                         onPick(view.centre)
+                        true
+                    }
+                }
+                if (onClear != null) {
+                    onLongClick(clearLabel) {
+                        onClear()
                         true
                     }
                 }

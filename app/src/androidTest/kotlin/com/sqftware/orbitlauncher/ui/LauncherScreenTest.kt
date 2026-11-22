@@ -2367,25 +2367,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun theLauncherMenuMarksAQuestWhereTheUserIsAndClearsIt() {
-        val bryantPark = LatLon(40.7536, -73.9832)
-        theme = Theme.Skyrim
-        whereIAm = WhereIAm.Shown
-        shownMinimap = PaintedMap(bryantPark, ImageBitmap(MINIMAP_SIZE, MINIMAP_SIZE), emptyList())
-        show()
-        compose.longPressEmptyHomeSpace()
-        compose.onNodeWithText(CLEAR_QUEST).assertDoesNotExist()
-
-        compose.onNodeWithText(MARK_QUEST).performClick()
-
-        compose.runOnIdle { assertEquals(bryantPark, journal.quest) }
-        compose.longPressEmptyHomeSpace()
-        compose.onNodeWithText(CLEAR_QUEST).performClick()
-        compose.runOnIdle { assertEquals(null, journal.quest) }
-    }
-
-    @Test
-    fun skyrimsCompassOpensTheWorldMapWhereATapMarksTheQuest() {
+    fun skyrimsCompassOpensTheWorldMapWhereATapMarksTheQuestAndALongPressClearsIt() {
         val bryantPark = LatLon(40.7536, -73.9832)
         theme = Theme.Skyrim
         art = SkyrimArt
@@ -2403,6 +2385,10 @@ class LauncherScreenTest {
             assertTrue(quest.lat > bryantPark.lat)
             assertEquals(bryantPark.lon, quest.lon, 1e-6)
         }
+
+        compose.onNodeWithTag(WorldMapTags.MAP).performTouchInput { longClick(Offset(centerX, centerY - 200f)) }
+
+        compose.runOnIdle { assertEquals(null, journal.quest) }
         compose.onNodeWithContentDescription("Close").performClick()
         compose.onNodeWithTag(WorldMapTags.MAP).assertDoesNotExist()
     }
