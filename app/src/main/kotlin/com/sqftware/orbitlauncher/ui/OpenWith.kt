@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.InputKind
+import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.OpenChoice
 import com.sqftware.orbitlauncher.domain.PlaceValue
@@ -20,14 +21,17 @@ object OpenWithTags {
     const val FIELD = "input_prompt_field"
 }
 
-/** Asks how [app] opens: as usual, or straight to one of its intents, with what it is opened as now marked. */
+/**
+ * Asks how [app], beside [partner] if it is one of a pair, opens: as usual, or straight to one of its intents, with what
+ * it is opened as now marked.
+ */
 @Composable
-fun OpenWithDialog(app: AppEntry, onChoose: (OpenChoice) -> Unit, onDismiss: () -> Unit) {
+fun OpenWithDialog(app: AppEntry, partner: AppEntry?, onChoose: (OpenChoice) -> Unit, onDismiss: () -> Unit) {
     val base = app.intentBase ?: return
     ChoiceDialog(
         title = "How ${base.label} opens",
-        choices = openChoices(app),
-        chosen = currentChoice(app),
+        choices = openChoices(app, partner),
+        chosen = currentChoice(app, partner),
         label = ::openChoiceLabel,
         onChoose = onChoose,
         onDismiss = onDismiss,
@@ -47,29 +51,30 @@ class InputSources(
 )
 
 /**
- * Asks for an input of [kind] from [sources], searching for the [query] typed, and hands the one picked to [onAnswer].
- * Each kind has a prompt of its own, so a new one does not compile until it has one.
+ * Asks [question] from [sources], searching for the [query] typed, and hands the input picked to [onAnswer]. Each kind
+ * of input has a prompt of its own, so a new one does not compile until it has one.
  */
 @Composable
 fun InputPrompt(
-    kind: InputKind,
+    question: InputQuestion,
     query: String,
     onQueryChange: (String) -> Unit,
     sources: InputSources,
     onAnswer: (InputValue) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    when (kind) {
-        InputKind.Place -> PlacePrompt(query, onQueryChange, sources, onAnswer, onDismiss)
+    when (question.kind) {
+        InputKind.Place -> PlacePrompt(question.forWhom, query, onQueryChange, sources, onAnswer, onDismiss)
     }
 }
 
 /**
  * The recent places while nothing is typed, else the places the search finds and, last, what was typed as it is, for an
- * app to look up itself. A place found in the maps app comes back shared, into the field.
+ * app to look up itself, picked [forWhom]. A place found in the maps app comes back shared, into the field.
  */
 @Composable
 private fun PlacePrompt(
+    forWhom: String,
     query: String,
     onQueryChange: (String) -> Unit,
     sources: InputSources,
@@ -77,7 +82,7 @@ private fun PlacePrompt(
     onDismiss: () -> Unit,
 ) {
     SearchDialog(
-        title = "Pick a place",
+        title = "Pick a place for $forWhom",
         fieldLabel = "Address or place",
         query = query,
         onQueryChange = onQueryChange,

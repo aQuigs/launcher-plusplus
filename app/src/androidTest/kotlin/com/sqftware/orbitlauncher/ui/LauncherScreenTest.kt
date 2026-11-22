@@ -119,6 +119,7 @@ import com.sqftware.orbitlauncher.domain.WidgetSizing
 import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.answered
+import com.sqftware.orbitlauncher.domain.asks
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import com.sqftware.orbitlauncher.domain.openChoices
 import com.sqftware.orbitlauncher.domain.openedAs
@@ -1112,7 +1113,7 @@ class LauncherScreenTest {
     }
 
     @Test
-    fun aPairWhoseAppsBothAskForAPlaceAsksOnceAndOpensBothWithTheAnswer() {
+    fun aPairWhoseAppSharesTheOthersPromptAsksOnceAndOpensBothWithTheAnswer() {
         val uber = AppEntry("Uber", "com.ubercab", "com.ubercab.Main")
         val lyft = AppEntry("Lyft", "me.lyft.android", "me.lyft.android.Main")
         val home = PlaceValue("Home", "2 Elm St", 37.0, -122.0)
@@ -1121,24 +1122,24 @@ class LauncherScreenTest {
         homeApps = HomeApps(ring = ringOf(pairOf(uber, lyft)!!))
         show()
 
-        val asking = { app: AppEntry -> openedAs(app, openChoices(app).last())!! }
+        val uberAsking = openedAs(uber, openChoices(uber).last())!!
         compose.ringSlot(pairOf(uber, lyft)!!).performTouchInput { longClick() }
         compose.onNodeWithText("Open Uber with intent…").performClick()
         compose.onNodeWithText("Ride to a place you pick each time").performClick()
-        compose.ringSlot(pairOf(asking(uber), lyft)!!).performTouchInput { longClick() }
+        compose.ringSlot(pairOf(uberAsking, lyft)!!).performTouchInput { longClick() }
         compose.onNodeWithText("Open Lyft with intent…").performClick()
-        compose.onNodeWithText("Ride to a place you pick each time").performClick()
+        compose.onNodeWithText("Ride to a place you pick for Uber").performClick()
 
-        val both = pairOf(asking(uber), asking(lyft))!!
+        val both = pairOf(uberAsking, openedAs(lyft, openChoices(lyft, uberAsking).last())!!)!!
         compose.runOnIdle { assertEquals(HomeApps(ring = ringOf(both)), homeApps) }
         compose.ringSlot(both).performClick()
-        compose.onNodeWithTag(OpenWithTags.PROMPT).assertIsDisplayed()
+        compose.onNodeWithText("Pick a place for Uber and Lyft").assertIsDisplayed()
         compose.runOnIdle { assertEquals(emptyList<AppEntry>(), launched) }
         compose.onNodeWithText("Home").performClick()
 
         compose.onNodeWithTag(OpenWithTags.PROMPT).assertDoesNotExist()
         compose.runOnIdle {
-            assertEquals(listOf(both.answered(mapOf(InputKind.Place to home))), launched)
+            assertEquals(listOf(both.answered(mapOf(both.asks.single() to home))), launched)
             assertEquals(listOf(home, found), recentPlaces)
         }
     }

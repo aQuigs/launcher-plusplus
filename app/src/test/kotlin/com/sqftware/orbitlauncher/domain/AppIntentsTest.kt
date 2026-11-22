@@ -55,12 +55,36 @@ class AppIntentsTest {
     }
 
     @Test
-    fun `a pair of intent icons resolves by key and asks for a place once`() {
-        val pair = pairOf(openedAs(uber, OpenChoice.Intent(ride, true))!!, openedAs(lyft, OpenChoice.Intent(lyftRide, true))!!)!!
+    fun `a pair of intent icons resolves by key and asks for each app's place on its own`() {
+        val uberAsking = openedAs(uber, OpenChoice.Intent(ride, true))!!
+        val lyftAsking = openedAs(lyft, OpenChoice.Intent(lyftRide, true))!!
+        val pair = pairOf(uberAsking, lyftAsking)!!
 
         assertEquals(pair, AppsByKey(listOf(uber, lyft))[pair.key])
-        assertEquals(listOf(InputKind.Place), pair.asks)
-        assertEquals(emptyList<InputKind>(), pairOf(uber, lyft)!!.asks)
+        assertEquals(listOf(InputQuestion(InputKind.Place, listOf(uberAsking)), InputQuestion(InputKind.Place, listOf(lyftAsking))), pair.asks)
+        assertEquals(emptyList<InputQuestion>(), pairOf(uber, lyft)!!.asks)
+    }
+
+    @Test
+    fun `one of a pair can share the other's prompt, only while that asks for the same kind of input itself`() {
+        val uberAsking = openedAs(uber, OpenChoice.Intent(ride, true))!!
+        val sharing = OpenChoice.Intent(lyftRide, asks = true, sharedWith = uber)
+        val lyftSharing = openedAs(lyft, sharing)!!
+        val pair = pairOf(uberAsking, lyftSharing)!!
+
+        assertEquals("Ride to a place you pick for Uber", openChoiceLabel(openChoices(lyft, uberAsking).last()))
+        assertEquals(sharing, openChoices(lyft, uberAsking).last())
+        assertEquals(3, openChoices(lyft, uber).size)
+        assertEquals(sharing, currentChoice(lyftSharing, uberAsking))
+        assertEquals(pair, AppsByKey(listOf(uber, lyft))[pair.key])
+
+        val question = pair.asks.single()
+        assertEquals("Uber and Lyft", question.forWhom)
+        assertEquals(
+            pairOf(openedAs(uber, OpenChoice.Intent(ride, false), work)!!, openedAs(lyft, OpenChoice.Intent(lyftRide, false), work)!!),
+            pair.answered(mapOf(question to work)),
+        )
+        assertEquals(listOf(InputQuestion(InputKind.Place, listOf(lyftSharing))), pairOf(uber, lyftSharing)!!.asks)
     }
 
     @Test
@@ -75,7 +99,7 @@ class AppIntentsTest {
     @Test
     fun `the ride links carry the destination, encoded, and the asked place only when answered`() {
         val asking = openedAs(uber, OpenChoice.Intent(ride, true))!!
-        val answered = asking.answered(mapOf(InputKind.Place to work))!!
+        val answered = asking.answered(mapOf(asking.asks.single() to work))!!
 
         assertNull((asking.kind as EntryKind.Intent).request())
         assertNull(asking.answered(emptyMap()))

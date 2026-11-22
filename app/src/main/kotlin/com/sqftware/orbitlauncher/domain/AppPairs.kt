@@ -38,5 +38,14 @@ fun AppEntry.withMember(member: AppEntry, replacement: AppEntry): AppEntry? = wh
     else -> replacement
 }
 
+/** The app beside [member] in [this] pair, or null if it is not one of the pair. */
+fun AppEntry.partnerOf(member: AppEntry): AppEntry? = (kind as? EntryKind.AppPair)?.let {
+    when (member) {
+        it.first -> it.second
+        it.second -> it.first
+        else -> null
+    }
+}
+
 /** This pair the other way round, so the app below opens on top, or null if it is not a pair. */
 fun AppEntry.flipped(): AppEntry? = (kind as? EntryKind.AppPair)?.let { pairOf(it.second, it.first) }

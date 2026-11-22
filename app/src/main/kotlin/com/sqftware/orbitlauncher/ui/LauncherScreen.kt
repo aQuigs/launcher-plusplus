@@ -85,6 +85,7 @@ import com.sqftware.orbitlauncher.domain.AppShortcut
 import com.sqftware.orbitlauncher.domain.AppSpot
 import com.sqftware.orbitlauncher.domain.AppsByKey
 import com.sqftware.orbitlauncher.domain.InputKind
+import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.OpenChoice
 import com.sqftware.orbitlauncher.domain.PlaceValue
@@ -144,6 +145,7 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.domain.moves
 import com.sqftware.orbitlauncher.domain.pairOf
+import com.sqftware.orbitlauncher.domain.partnerOf
 import com.sqftware.orbitlauncher.domain.planetsOf
 import com.sqftware.orbitlauncher.domain.seedCategory
 import com.sqftware.orbitlauncher.domain.title
@@ -245,7 +247,7 @@ data class HomePress(val launcherInFront: Boolean)
  * another, which the drawer then picks: the pair, one icon that opens both in split screen, goes at the end of the ring,
  * dock, folder or hand-picked card the app was pressed on, or else of the ring. An app with intents in the catalog, or
  * a pair's app, can be set to open straight to one: the icon changes where it was pressed, or a new one goes on the
- * ring. One whose intent asks for an input, such as a place, prompts for it as it opens, once for both apps of a pair,
+ * ring. One whose intent asks for an input, such as a place, prompts for it as it opens, once for both apps of a pair if one shares the other's,
  * offering the [recentPlaces] ([onRecentPlacesChange]); a place shared to the launcher ([sharedPlaces]) fills the open
  * prompt, else joins the recent places. A card's gear opens its settings in a
  * dialog: how many rows it shows while compact, how many apps a built-in card works out, and when it names its apps,
@@ -890,10 +892,14 @@ fun LauncherScreen(
         closeDrawer()
     }
 
-    // Asks for each of [kinds] in turn, then hands all the answers to [then].
-    fun ask(kinds: List<InputKind>, answers: Map<InputKind, InputValue> = emptyMap(), then: (Map<InputKind, InputValue>) -> Unit) {
-        val kind = kinds.firstOrNull() ?: return then(answers)
-        asking = Asking(kind) { value -> ask(kinds.drop(1), answers + (kind to value), then) }
+    // Asks each of [questions] in turn, then hands all the answers to [then].
+    fun ask(
+        questions: List<InputQuestion>,
+        answers: Map<InputQuestion, InputValue> = emptyMap(),
+        then: (Map<InputQuestion, InputValue>) -> Unit,
+    ) {
+        val question = questions.firstOrNull() ?: return then(answers)
+        asking = Asking(question) { value -> ask(questions.drop(1), answers + (question to value), then) }
     }
 
     val launch: (AppEntry) -> Unit = remember(actions) { { app -> ask(app.asks) { app.answered(it)?.let(actions.launch) } } }
@@ -910,8 +916,8 @@ fun LauncherScreen(
             }
         }
 
-        val input = (choice as? OpenChoice.Intent)?.takeUnless { it.asks }?.intent?.input
-        ask(listOfNotNull(input)) { put(input?.let(it::get)) }
+        val question = (choice as? OpenChoice.Intent)?.takeUnless { it.asks }?.intent?.input?.let { InputQuestion(it, listOf(choosing.member)) }
+        ask(listOfNotNull(question)) { put(question?.let(it::get)) }
     }
 
     // A menu still loading its shortcuts is cancelled too, or HOME pressed meanwhile would not stop it opening afterwards.
@@ -1378,7 +1384,7 @@ fun LauncherScreen(
     LaunchedEffect(sharedPlaces) {
         sharedPlaces.collect { text ->
             val query = placeQueryFromShare(text.take(MAX_SHARED_PLACE)) ?: return@collect
-            if (asking?.kind == InputKind.Place) {
+            if (asking?.question?.kind == InputKind.Place) {
                 asking = asking?.copy(query = query)
             } else {
                 val place = latestActions.findPlaces(query).firstOrNull() ?: PlaceValue(query, query)
@@ -2026,6 +2032,7 @@ fun LauncherScreen(
                 choosingOpen?.let { choosing ->
                     OpenWithDialog(
                         app = choosing.member,
+                        partner = choosing.app.partnerOf(choosing.member),
                         onChoose = { choice ->
                             choosingOpen = null
                             openAs(choosing, choice)
@@ -2035,7 +2042,7 @@ fun LauncherScreen(
                 }
                 asking?.let { prompt ->
                     InputPrompt(
-                        kind = prompt.kind,
+                        question = prompt.question,
                         query = prompt.query,
                         onQueryChange = { asking = prompt.copy(query = it) },
                         sources = InputSources(
@@ -2163,8 +2170,8 @@ private const val MAX_SHARED_PLACE = 500
 /** The icon [app], pressed at [spot], whose way of opening is being chosen: for a pair, its app [member]'s. */
 private class ChoosingOpen(val app: AppEntry, val member: AppEntry, val spot: AppSpot)
 
-/** A prompt waiting on an input of [kind], searching for the [query] typed, and what is done with the answer. */
-private data class Asking(val kind: InputKind, val query: String = "", val then: (InputValue) -> Unit)
+/** A prompt showing [question], searching for the [query] typed, and what is done with the answer. */
+private data class Asking(val question: InputQuestion, val query: String = "", val then: (InputValue) -> Unit)
 
 /** The folder open [at] its place and slot on the ring page [page]. */
 private data class PageFolder(val page: String, val at: HomePlace.Folder)

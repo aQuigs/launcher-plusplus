@@ -79,6 +79,12 @@ sealed interface InputSource {
 
     /** Asked for each time the icon is opened. */
     data object Ask : InputSource
+
+    /**
+     * Asked for each time the icon is opened, by the prompt of the app beside it in a pair when that app asks for the same
+     * kind of input with a prompt of its own, else by its own.
+     */
+    data object Shared : InputSource
 }
 
 /** One way to have an app's icon open it, as the list to choose from offers them. */
@@ -86,8 +92,11 @@ sealed interface OpenChoice {
     /** Its start screen, as an icon of the app's own does. */
     data object Usual : OpenChoice
 
-    /** Straight to [intent], asking for its input each time if it [asks], else with the input chosen now. */
-    data class Intent(val intent: AppIntent, val asks: Boolean) : OpenChoice
+    /**
+     * Straight to [intent], asking for its input each time if it [asks], else with the input chosen now; asked for with
+     * the prompt of the app it is [sharedWith] in a pair, if any.
+     */
+    data class Intent(val intent: AppIntent, val asks: Boolean, val sharedWith: AppEntry? = null) : OpenChoice
 }
 
 /** How the list names [choice]. */
@@ -95,6 +104,7 @@ fun openChoiceLabel(choice: OpenChoice): String = when (choice) {
     OpenChoice.Usual -> "Open as usual"
     is OpenChoice.Intent -> when {
         choice.intent.input == null -> choice.intent.label
+        choice.sharedWith != null -> "${choice.intent.label} you pick for ${choice.sharedWith.label}"
         choice.asks -> "${choice.intent.label} you pick each time"
         else -> "${choice.intent.label} you pick now"
     }
@@ -102,21 +112,37 @@ fun openChoiceLabel(choice: OpenChoice): String = when (choice) {
 
 /**
  * The ways [app] can open, for an icon of a plain app or of one made with an intent: as usual, then each intent the
- * catalog has for it, twice over for one that takes an input, picked now or each time. None for an app with no intents.
+ * catalog has for it, twice over for one that takes an input, picked now or each time, and a third time, picked with
+ * its [partner]'s prompt, when [app] is one of a pair whose other app asks for the same kind of input with a prompt of
+ * its own. None for an app with no intents.
  */
-fun openChoices(app: AppEntry): List<OpenChoice> {
+fun openChoices(app: AppEntry, partner: AppEntry? = null): List<OpenChoice> {
     val base = app.intentBase ?: return emptyList()
     val intents = IntentCatalog.forPackage(base.packageName)
     if (intents.isEmpty()) return emptyList()
+    val partnerAsks = partner?.ownPromptFor
     return listOf(OpenChoice.Usual) + intents.flatMap { intent ->
-        if (intent.input == null) listOf(OpenChoice.Intent(intent, asks = false))
-        else listOf(OpenChoice.Intent(intent, asks = false), OpenChoice.Intent(intent, asks = true))
+        when (intent.input) {
+            null -> listOf(OpenChoice.Intent(intent, asks = false))
+            else -> listOfNotNull(
+                OpenChoice.Intent(intent, asks = false),
+                OpenChoice.Intent(intent, asks = true),
+                partner?.intentBase?.takeIf { partnerAsks == intent.input }?.let { OpenChoice.Intent(intent, asks = true, sharedWith = it) },
+            )
+        }
     }
 }
 
-/** What [app] opens as now, of [openChoices]: null for one that saved an input, as picking it again asks anew. */
-fun currentChoice(app: AppEntry): OpenChoice? = when (val kind = app.kind) {
-    is EntryKind.Intent -> if (kind.source is InputSource.Saved) null else OpenChoice.Intent(kind.intent, kind.source == InputSource.Ask)
+/**
+ * What [app], beside [partner] in a pair if it is one of one, opens as now, of [openChoices]: null for one that saved an
+ * input, as picking it again asks anew.
+ */
+fun currentChoice(app: AppEntry, partner: AppEntry? = null): OpenChoice? = when (val kind = app.kind) {
+    is EntryKind.Intent -> when (kind.source) {
+        is InputSource.Saved -> null
+        InputSource.Shared -> OpenChoice.Intent(kind.intent, asks = true, sharedWith = partner?.takeIf { it.ownPromptFor == kind.intent.input }?.intentBase)
+        else -> OpenChoice.Intent(kind.intent, asks = kind.source == InputSource.Ask)
+    }
     else -> OpenChoice.Usual
 }
 
@@ -132,7 +158,7 @@ fun intentEntryOf(app: AppEntry, intent: AppIntent, source: InputSource?): AppEn
     if (app.intentBase != app || app.packageName != intent.packageName) return null
     val fits = when (source) {
         null -> intent.input == null
-        InputSource.Ask -> intent.input != null
+        InputSource.Ask, InputSource.Shared -> intent.input != null
         is InputSource.Saved -> source.value.kind == intent.input
     }
     if (!fits) return null
@@ -152,6 +178,7 @@ fun openedAs(app: AppEntry, choice: OpenChoice, saved: InputValue? = null): AppE
         is OpenChoice.Intent -> {
             val source = when {
                 choice.intent.input == null -> null
+                choice.sharedWith != null -> InputSource.Shared
                 choice.asks -> InputSource.Ask
                 else -> InputSource.Saved(saved ?: return null)
             }
@@ -160,26 +187,56 @@ fun openedAs(app: AppEntry, choice: OpenChoice, saved: InputValue? = null): AppE
     }
 }
 
-/** The kinds of input opening [app] asks for, once each, so a pair whose apps both ask for a place asks once. */
-val AppEntry.asks: List<InputKind>
-    get() = opens.mapNotNull { (it.kind as? EntryKind.Intent)?.takeIf { kind -> kind.source == InputSource.Ask }?.intent?.input }.distinct()
+/** A prompt for an input of [kind] that opening an icon shows, for its [apps]: both of a pair when one shares the other's. */
+data class InputQuestion(val kind: InputKind, val apps: List<AppEntry>) {
+    /** Who it asks for, by their apps' names: "Uber and Lyft". */
+    val forWhom: String get() = apps.mapNotNull { it.ownApp?.label }.joinToString(" and ")
+}
+
+/** The prompts opening [this] shows, one per app that asks for an input, except one that shares its partner's. */
+val AppEntry.asks: List<InputQuestion>
+    get() {
+        val asking = opens.filter { it.asksFor != null }
+        val joining = asking.associateWith { it.sharedPrompt(asking) }
+        return asking.filter { joining[it] == null }.mapNotNull { owner ->
+            owner.asksFor?.let { InputQuestion(it, listOf(owner) + asking.filter { app -> joining[app] == owner }) }
+        }
+    }
 
 /**
  * [this] with each of its apps that [asks] for an input opened with the answer from [answers] instead, so it opens
  * straight away; null if an answer is missing.
  */
-fun AppEntry.answered(answers: Map<InputKind, InputValue>): AppEntry? = when (val kind = kind) {
-    is EntryKind.AppPair -> pairOf(kind.first.answered(answers) ?: return null, kind.second.answered(answers) ?: return null)
-    is EntryKind.Intent -> if (kind.source != InputSource.Ask) this else {
-        intentEntryOf(kind.app, kind.intent, InputSource.Saved(answers[kind.intent.input] ?: return null))
+fun AppEntry.answered(answers: Map<InputQuestion, InputValue>): AppEntry? {
+    fun answer(app: AppEntry): AppEntry? {
+        val kind = app.kind as? EntryKind.Intent ?: return app
+        if (app.asksFor == null) return app
+        val value = answers.entries.firstOrNull { app in it.key.apps }?.value ?: return null
+        return intentEntryOf(kind.app, kind.intent, InputSource.Saved(value))
     }
-    else -> this
+    return when (val kind = kind) {
+        is EntryKind.AppPair -> pairOf(answer(kind.first) ?: return null, answer(kind.second) ?: return null)
+        else -> answer(this)
+    }
 }
+
+// The input this asks for as it opens, with a prompt of its own or its partner's.
+private val AppEntry.asksFor: InputKind?
+    get() = (kind as? EntryKind.Intent)?.takeIf { it.source == InputSource.Ask || it.source == InputSource.Shared }?.intent?.input
+
+// The input this asks for with a prompt of its own, which the other app of its pair may share.
+private val AppEntry.ownPromptFor: InputKind?
+    get() = (kind as? EntryKind.Intent)?.takeIf { it.source == InputSource.Ask }?.intent?.input
+
+// The app among the [asking] ones of its pair whose prompt this shares, if it shares one and that app asks for the same.
+private fun AppEntry.sharedPrompt(asking: List<AppEntry>): AppEntry? =
+    if ((kind as? EntryKind.Intent)?.source != InputSource.Shared) null
+    else asking.firstOrNull { it != this && it.ownPromptFor == asksFor }
 
 /** What opens [this] intent's app straight to it, or null while it still [asks] for its input. */
 fun EntryKind.Intent.request(): IntentRequest? = when (source) {
     null -> intent.request(null)
-    InputSource.Ask -> null
+    InputSource.Ask, InputSource.Shared -> null
     is InputSource.Saved -> intent.request(source.value)
 }
 
@@ -193,6 +250,7 @@ fun intentKey(intentId: String, source: InputSource?, appKey: String): String {
     val sourceText = when (source) {
         null -> NO_INPUT
         InputSource.Ask -> ASK
+        InputSource.Shared -> SHARED
         is InputSource.Saved -> SAVED + source.value.encode()
     }
     return INTENT + listOf(intentId, sourceText, appKey).joinToString(INTENT) { URLEncoder.encode(it, "UTF-8") }
@@ -208,6 +266,7 @@ internal fun intentEntryFor(key: String, app: (String) -> AppEntry?): AppEntry? 
     val source = when {
         sourceText == NO_INPUT -> null
         sourceText == ASK -> InputSource.Ask
+        sourceText == SHARED -> InputSource.Shared
         sourceText.startsWith(SAVED) -> InputSource.Saved(intent.input?.decode(sourceText.removePrefix(SAVED)) ?: return null)
         else -> return null
     }
@@ -217,4 +276,5 @@ internal fun intentEntryFor(key: String, app: (String) -> AppEntry?): AppEntry? 
 private const val INTENT = "!"
 private const val NO_INPUT = "none"
 private const val ASK = "ask"
+private const val SHARED = "shared"
 private const val SAVED = "saved:"
