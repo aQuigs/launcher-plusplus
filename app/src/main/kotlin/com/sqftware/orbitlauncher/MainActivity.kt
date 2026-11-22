@@ -20,7 +20,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.sqftware.orbitlauncher.apps.GeocoderPlaceSearch
+import com.sqftware.orbitlauncher.apps.GeocoderPlaceFinder
+import com.sqftware.orbitlauncher.apps.PhotonPlaceFinder
+import com.sqftware.orbitlauncher.apps.SystemPlaceSearch
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
 import com.sqftware.orbitlauncher.apps.LiveMinimap
 import com.sqftware.orbitlauncher.apps.NotificationBadges
@@ -155,7 +157,6 @@ class MainActivity : ComponentActivity() {
         val gridPagesStore = SharedPreferencesGridPagesStore(this)
         val appSettingsStore = SharedPreferencesAppSettingsStore(this)
         val recentPlacesStore = SharedPreferencesRecentPlacesStore(this)
-        val placeSearch = GeocoderPlaceSearch(this)
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
@@ -167,6 +168,7 @@ class MainActivity : ComponentActivity() {
         val journalStore = SharedPreferencesJournalStore(this)
         val mapLicence = OpenStreetMapLicence(this)
         val location = PlatformLocationSource(this, activityResultRegistry)
+        val placeSearch = SystemPlaceSearch(this, byName = PhotonPlaceFinder(location::lastFix), byAddress = GeocoderPlaceFinder(this))
         val headingSource = SensorHeadingSource(this, location)
         val mapTiles = OpenFreeMapTiles(this)
         val minimapArt = ResourceMinimapArt(this)

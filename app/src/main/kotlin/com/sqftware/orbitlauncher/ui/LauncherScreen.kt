@@ -889,6 +889,13 @@ fun LauncherScreen(
         return true
     }
 
+    // An icon made from a pick, such as a pair, is seen landing: the drawer it was picked in closes over the ring page.
+    fun landOnHome(place: HomePlace, app: AppEntry) {
+        changeHomeApps { add(place, app) }
+        showRingPage()
+        closeDrawer()
+    }
+
     // Where the first app was pressed, if the user fills that place, else at the end of the ring: the apps in the drawer
     // and on the built-in cards are the system's. The pair is seen landing, as a pinned shortcut is; a card is on the page
     // the pick was made from.
@@ -897,11 +904,10 @@ fun LauncherScreen(
         val card = (spot as? AppSpot.Card)?.kind as? CollectionKind.HandPicked
         if (card != null) {
             changeCollections { addApp(card, pair) }
+            closeDrawer()
         } else {
-            changeHomeApps { add((spot as? AppSpot.Home)?.place ?: HomePlace.Ring, pair) }
-            showRingPage()
+            landOnHome((spot as? AppSpot.Home)?.place ?: HomePlace.Ring, pair)
         }
-        closeDrawer()
     }
 
     // Asks each of [questions] in turn, then hands all the answers to [then].
@@ -922,10 +928,7 @@ fun LauncherScreen(
         fun put(saved: InputValue?) {
             val replacement = openedAs(choosing.member, choice, saved) ?: return
             val changed = choosing.app.withMember(choosing.member, replacement)?.takeIf { it != choosing.app } ?: return
-            if (!replaceAt(choosing.spot, choosing.app, changed)) {
-                changeHomeApps { add(HomePlace.Ring, changed) }
-                showRingPage()
-            }
+            if (!replaceAt(choosing.spot, choosing.app, changed)) landOnHome(HomePlace.Ring, changed)
         }
 
         val question = (choice as? OpenChoice.Intent)?.takeUnless { it.asks }?.intent?.input?.let { InputQuestion(it, listOf(choosing.member)) }

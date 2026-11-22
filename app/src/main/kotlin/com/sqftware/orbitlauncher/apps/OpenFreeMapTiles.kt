@@ -13,15 +13,11 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
 
 private const val TAG = "OpenFreeMapTiles"
 private const val TILE_JSON = "https://tiles.openfreemap.org/planet"
 private const val TIMEOUT_MILLIS = 15_000
 private const val KEPT_TILES = 64
-
-// The tile server turns away some generic clients; this one names itself.
-private const val USER_AGENT = "OrbitLauncher (Android)"
 
 /**
  * OpenFreeMap's planet tiles: free, keyless, and in the OpenMapTiles schema. A tile once fetched is kept in the cache
@@ -85,20 +81,7 @@ class OpenFreeMapTiles(context: Context) : MapTiles {
         return JSONObject(String(body)).getJSONArray("tiles").getString(0).also { template = it }
     }
 
-    // HttpURLConnection asks for gzip and inflates it on its own.
-    private fun get(url: String): Pair<Int, ByteArray> {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.connectTimeout = TIMEOUT_MILLIS
-            connection.readTimeout = TIMEOUT_MILLIS
-            connection.setRequestProperty("User-Agent", USER_AGENT)
-            val code = connection.responseCode
-            val body = if (code == HttpURLConnection.HTTP_OK) connection.inputStream.use { it.readBytes() } else ByteArray(0)
-            return code to body
-        } finally {
-            connection.disconnect()
-        }
-    }
+    private fun get(url: String) = getRequest(url, TIMEOUT_MILLIS).response()
 
     // The system clears the cache directory when space runs short, but a commuter's tiles would pile up until then.
     private fun prune() {
