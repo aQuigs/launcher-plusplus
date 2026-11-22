@@ -6,8 +6,8 @@ import com.sqftware.orbitlauncher.domain.minimap.MapStyle
  * How the whole launcher looks, a launcher-wide setting: every surface a theme owns (CLAUDE.md lists them) drawn its way,
  * with its own [folderLooks] and [colourways] to pick from, the first of each until the user picks, apps' icons in the
  * [iconStyle] it gives each place, and, if it has a [mapStyle], a map of where the user is in that style once they turn
- * it on, in its [nightMapStyle] after dark; one that [keepsJournal] marks the user's quest and names each place they
- * discover.
+ * it on, in its [nightMapStyle] after dark; one that [keepsJournal] marks the user's quest, by its [goal] name, and names
+ * each place they discover.
  */
 enum class Theme(
     val label: String,
@@ -17,6 +17,7 @@ enum class Theme(
     val mapStyle: MapStyle? = null,
     val keepsJournal: Boolean = false,
     private val nightMapStyle: MapStyle? = mapStyle,
+    val goal: String = "quest",
 ) {
     Space(
         "Space",
@@ -67,6 +68,7 @@ enum class Theme(
         mapStyle = MapStyle.Gta,
         keepsJournal = true,
         nightMapStyle = MapStyle.GtaNight,
+        goal = "waypoint",
     ),
     ;
 
