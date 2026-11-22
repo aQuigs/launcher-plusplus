@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.sqftware.orbitlauncher.domain.meeting
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
 import com.sqftware.orbitlauncher.domain.minimap.MINIMAP_SIZE
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
@@ -71,11 +72,9 @@ import com.sqftware.orbitlauncher.domain.turnBetween
 import com.sqftware.orbitlauncher.ui.theme.HudColors
 import kotlin.math.abs
 import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 /** The map's icons, as a share of the map disc's diameter, and the player's arrow, as a share of its radius. */
 private const val MAP_ICON_SHARE = 0.09f
@@ -97,7 +96,7 @@ internal const val COMPASS_SPAN = 0.9f
 private const val QUEST_ON_COMPASS = 0.45f
 private const val QUEST_ON_MAP = 0.11f
 
-/** How far out the map marks a quest beyond it, at its edge, as a share of its radius, so the whole marker shows. */
+/** How far out the map marks a quest by default, as a share of its radius, so the marker stays clear of its darkened rim. */
 private const val QUEST_REACH = 0.62f
 
 /** Closer than this, in meters, the user stands at their quest, which the compass then has no way to point. */
@@ -130,6 +129,12 @@ internal interface HudLook {
 
     /** The quest marker's outline round its middle, [half] from it to its tip, which points down at the spot. */
     fun questShape(half: Float): Path
+
+    /**
+     * How far inside the window's edge the local map marks a quest, as a share of the map's radius: a quest past it is
+     * marked there, toward the quest, however the map turns. By default clear of the map's darkened rim.
+     */
+    val questInset: Float get() = 1 - QUEST_REACH
 
     /** Builds the marks on the local map's rim, on a circle of [radius] round [center], north first: turned with the map. By default none. */
     fun CacheDrawScope.rimMarks(center: Offset, radius: Float): DrawScope.() -> Unit = {}
@@ -185,6 +190,22 @@ internal class MapWindow(private val aspect: Float, private val corner: Float) :
     fun outline(size: Size, inset: Float = 0f): RoundRect {
         val bounds = bounds(size)
         return RoundRect(bounds.deflate(inset), CornerRadius((round(bounds) - inset).coerceAtLeast(0f)))
+    }
+
+    /**
+     * Where in a cell of [size] the tip of a marker [half] from its middle to its tip, standing up from it, may go: [inset]
+     * inside the window's edge, and never so near that the marker reaches past it.
+     */
+    fun markerRoom(size: Size, inset: Float, half: Float): RoundRect {
+        val window = outline(size)
+        val side = maxOf(inset, half)
+        return RoundRect(
+            window.left + side,
+            window.top + maxOf(inset, 2 * half),
+            window.right - side,
+            window.bottom - maxOf(inset, half / 2),
+            CornerRadius((window.topLeftCornerRadius.x - side).coerceAtLeast(0f)),
+        )
     }
 
     fun bounds(size: Size): Rect {
@@ -264,10 +285,7 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                 val scale = 2 * radius / MINIMAP_SIZE
                 val iconSide = (2 * radius * MAP_ICON_SHARE).roundToInt()
                 val marker = QuestMarker(look, radius * QUEST_ON_MAP)
-                // A marker at the edge stays whole inside the window and clear of its rim, its tip on the spot.
-                val markerRoom = window.bounds(size).let {
-                    Rect(it.left + marker.half, it.top + 2 * marker.half, it.right - marker.half, it.bottom - marker.half / 2)
-                }
+                val room = window.markerRoom(size, look.questInset * radius, marker.half)
                 // Where the quest lies on a map, worked out once for each map rather than on each turn of the phone.
                 var spotOf: PaintedMap<ImageBitmap>? = null
                 var spot: Offset? = null
@@ -280,7 +298,7 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                         spot = quest?.takeIf { painted === map() }?.let { questSpot(painted, it) }
                     }
                     // Its tip on the spot, as a pin's.
-                    spot?.let { with(marker) { draw(markerRoom.towards(center, center + (it * scale).turnedWith(facing)) - Offset(0f, marker.half)) } }
+                    spot?.let { with(marker) { draw(room.towards(center, center + (it * scale).turnedWith(facing)) - Offset(0f, marker.half)) } }
                 }
             },
         )
@@ -476,17 +494,11 @@ private fun opensWorldMap(): Modifier {
     }
 }
 
-/** [point] moved the least way that puts it inside the rect. */
 /** [point], or where the line to it from [middle], which lies inside this, leaves this: so it keeps its bearing. */
-private fun Rect.towards(middle: Offset, point: Offset): Offset {
+internal fun RoundRect.towards(middle: Offset, point: Offset): Offset {
+    if (contains(point)) return point
     val way = point - middle
-    fun share(to: Float, from: Float, along: Float) = if (along == 0f) 1f else (to - from) / along
-    val reach = minOf(
-        1f,
-        share(if (way.x < 0) left else right, middle.x, way.x),
-        share(if (way.y < 0) top else bottom, middle.y, way.y),
-    )
-    return middle + way * reach
+    return middle + way * meeting(0f, 1f) { !contains(middle + way * it) }
 }
 
 /** [color] across the middle, fading out over the [fade] share of the width at each end. */
@@ -494,15 +506,13 @@ internal fun fadedAtEnds(color: Color, fade: Float) = Brush.horizontalGradient(0
 
 /**
  * Where [quest] lies from the middle of the map [painted], in its pixels east and south: where it is if the map reaches
- * it, else as far out as the map marks a quest, along the way the compass points to it.
+ * it, else past the map's edge, along the way the compass points to it.
  */
 private fun questSpot(painted: PaintedMap<ImageBitmap>, quest: LatLon): Offset {
-    val far = MINIMAP_SIZE / 2 * QUEST_REACH
     val shift = painted.centre.shiftTo(quest)
     val spot = Offset(shift.x.toFloat(), shift.y.toFloat())
-    if (spot.getDistance() <= far) return spot
-    val bearing = Math.toRadians(painted.centre.bearingTo(quest))
-    return Offset(sin(bearing).toFloat(), -cos(bearing).toFloat()) * far
+    if (spot.getDistance() <= MINIMAP_SIZE / 2) return spot
+    return direction(painted.centre.bearingTo(quest).toFloat()) * MINIMAP_SIZE.toFloat()
 }
 
 /** The bearing of each of [painted]'s places from its middle, which the map is centered on, in degrees clockwise from north. */
