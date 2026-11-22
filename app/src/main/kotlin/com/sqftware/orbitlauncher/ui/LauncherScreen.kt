@@ -174,8 +174,6 @@ object LauncherTags {
 const val AUTO_SET_UP = "Auto set up"
 const val SHOW_WHERE_I_AM = "Show where I am"
 const val MAP_DATA_CREDIT = "Map data © OpenStreetMap"
-private const val MARK_QUEST = "Mark quest here"
-private const val CLEAR_QUEST = "Clear quest marker"
 
 /** How long a place the user discovers is named before it fades. */
 private const val DISCOVERY_MILLIS = 4_500L
@@ -2116,9 +2114,9 @@ fun LauncherScreen(
                     art = worldMapArt,
                     moving = ambientMotion,
                     pick = MapPick(
-                        hint = if (journal.quest == null) "Tap the map to mark your quest" else "Tap the map to move your quest, hold to clear it",
-                        pickLabel = MARK_QUEST,
-                        clearLabel = CLEAR_QUEST.takeIf { journal.quest != null },
+                        hint = if (journal.quest == null) "Tap the map to mark your ${theme.goal}" else "Tap the map to move your ${theme.goal}, hold to clear it",
+                        pickLabel = "Mark ${theme.goal} here",
+                        clearLabel = "Clear ${theme.goal} marker".takeIf { journal.quest != null },
                         onPick = markQuest,
                     ).takeIf { theme.keepsJournal },
                     onClose = { showingWorldMap = false },
