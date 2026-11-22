@@ -57,26 +57,40 @@ class RoadRouteTest {
     private fun road(vararg points: TilePoint, brunnel: String? = null) =
         VectorFeature(GeometryType.Line, listOfNotNull("class" to "minor", brunnel?.let { "brunnel" to it }).toMap(), listOf(points.toList()))
 
-    // A street running south, and a road crossing it east to west, on a bridge or not; the user is at the street's top and
-    // the quest at the far end of the crossing road.
-    private fun crossing(brunnel: String?): List<Int>? {
-        val from = at(2048, 1500)
-        val to = at(2600, 2048)
-        val grid = RoadGrid.around(from, to)
-        val street = road(TilePoint(2048, 1500), TilePoint(2048, 2600))
-        val crossing = road(TilePoint(1500, 2048), TilePoint(2600, 2048), brunnel = brunnel)
-        grid.lay(tile, VectorLayer("transportation", EXTENT, listOf(street, crossing)))
-        return grid.path(grid.cellOf(from), grid.cellOf(to))
+    private fun path(from: TilePoint, to: TilePoint, vararg roads: VectorFeature): List<Int>? {
+        val grid = RoadGrid.around(at(from.x, from.y), at(to.x, to.y))
+        grid.lay(mapOf(tile to VectorLayer("transportation", EXTENT, roads.toList())))
+        return grid.path(grid.cellOf(at(from.x, from.y)), grid.cellOf(at(to.x, to.y)))
     }
+
+    // A street running south from the user, and a road crossing it east to the quest.
+    private val user = TilePoint(2048, 1500)
+    private val quest = TilePoint(2600, 2048)
+    private val street = road(user, TilePoint(2048, 2600))
 
     @Test
     fun turnsWhereRoadsMeet() {
-        assertNotNull(crossing(brunnel = null))
+        assertNotNull(path(user, quest, street, road(TilePoint(1500, 2048), quest)))
     }
 
     @Test
     fun neverTurnsOntoABridgeOverTheRoad() {
-        assertNull(crossing(brunnel = "bridge"))
+        assertNull(path(user, quest, street, road(TilePoint(1500, 2048), quest, brunnel = "bridge")))
+    }
+
+    @Test
+    fun neverLeavesABridgeWhereItCarriesOnAsAnotherWay() {
+        val west = road(TilePoint(1500, 2048), TilePoint(2048, 2048), brunnel = "bridge")
+        val east = road(TilePoint(2048, 2048), quest, brunnel = "bridge")
+
+        assertNull(path(user, quest, street, west, east))
+    }
+
+    @Test
+    fun goesOntoABridgeFromTheRoadItCarriesOn() {
+        val approach = road(TilePoint(1000, 2048), TilePoint(1500, 2048))
+
+        assertNotNull(path(TilePoint(1000, 2048), quest, approach, road(TilePoint(1500, 2048), quest, brunnel = "bridge")))
     }
 
     @Test

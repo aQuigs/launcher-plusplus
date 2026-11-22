@@ -349,9 +349,8 @@ class MainActivity : ComponentActivity() {
                 val route = produceState<List<LatLon>?>(null, questToRoute) {
                     value = null
                     questToRoute?.let { quest ->
-                        snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged().collectLatest {
-                            value = questRoutes.route(it, quest)
-                        }
+                        val at = snapshotFlow { minimap.value?.centre }.filterNotNull().distinctUntilChanged()
+                        questRoutes.routes(at, quest).collect { value = it }
                     }
                 }
                 val readRoute = remember { { route.value } }

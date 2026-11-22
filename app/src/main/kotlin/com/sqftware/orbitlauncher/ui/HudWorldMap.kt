@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.toOffset
 import com.sqftware.orbitlauncher.domain.minimap.ICON_SPACING_PX
 import com.sqftware.orbitlauncher.domain.minimap.LatLon
-import com.sqftware.orbitlauncher.domain.minimap.METRES_PER_PIXEL
 import com.sqftware.orbitlauncher.domain.minimap.MapView
 import com.sqftware.orbitlauncher.domain.minimap.PaintedMap
 import com.sqftware.orbitlauncher.ui.theme.Spacing
@@ -84,7 +83,7 @@ internal class HudWorldMap(private val look: HudLook, private val drift: Drift?)
                 onDrawBehind {
                     val way = route() ?: return@onDrawBehind
                     val shown = view()
-                    val width = max(thinnest, (ROUTE_WIDTH_M / METRES_PER_PIXEL * shown.scale).toFloat())
+                    val width = max(thinnest, ROUTE_WIDTH_PX * shown.scale.toFloat())
                     drawRoute(way.map(shown::spot), width, look.colors)
                 }
             },

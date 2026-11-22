@@ -259,12 +259,13 @@ internal fun LocalMapEmblem(look: HudLook, marked: Boolean, modifier: Modifier) 
                 .graphicsLayer { rotationZ = -(heading() ?: 0f) }
                 .drawBehind {
                     val radius = window.reach(size)
-                    val painted = shown() ?: return@drawBehind drawCircle(look.colors.fog, radius)
+                    val live = map()
+                    val painted = live ?: madeUp() ?: return@drawBehind drawCircle(look.colors.fog, radius)
                     drawIcon(painted.ground, center, (2 * radius).roundToInt())
                     // Turned with the ground, under the icons, as the game lays its GPS line on the roads.
-                    if (painted === map()) route()?.let { way ->
+                    if (painted === live) route()?.let { way ->
                         val scale = 2 * radius / MINIMAP_SIZE
-                        drawRoute(way.map { center + painted.centre.shiftTo(it).let { s -> Offset(s.x.toFloat(), s.y.toFloat()) } * scale }, (ROUTE_WIDTH_M / METRES_PER_PIXEL).toFloat() * scale, look.colors)
+                        drawRoute(way.map { center + painted.offsetTo(it) * scale }, ROUTE_WIDTH_PX * scale, look.colors)
                     }
                 },
         )
@@ -506,10 +507,12 @@ internal fun fadedAtEnds(color: Color, fade: Float) = Brush.horizontalGradient(0
  * Where [quest] lies from the middle of the map [painted], in its pixels east and south: where it is if the map reaches
  * it, else as far out as the map marks a quest, along the way the compass points to it.
  */
+/** Where [at] lies from the middle of this map, in its pixels east and south. */
+private fun PaintedMap<ImageBitmap>.offsetTo(at: LatLon): Offset = centre.shiftTo(at).let { Offset(it.x.toFloat(), it.y.toFloat()) }
+
 private fun questSpot(painted: PaintedMap<ImageBitmap>, quest: LatLon): Offset {
     val far = MINIMAP_SIZE / 2 * QUEST_REACH
-    val shift = painted.centre.shiftTo(quest)
-    val spot = Offset(shift.x.toFloat(), shift.y.toFloat())
+    val spot = painted.offsetTo(quest)
     if (spot.getDistance() <= far) return spot
     val bearing = Math.toRadians(painted.centre.bearingTo(quest))
     return Offset(sin(bearing).toFloat(), -cos(bearing).toFloat()) * far
@@ -543,7 +546,8 @@ internal fun DrawScope.drawRoute(points: List<Offset>, width: Float, colors: Hud
     drawPath(path, colors.quest, style = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round))
 }
 
-/** A route's dark edge, either side, as a share of its width. */
+/** How wide a route is drawn, about a lane, in map pixels; and its dark edge, either side, as a share of that. */
+internal const val ROUTE_WIDTH_PX = (6.0 / METRES_PER_PIXEL).toFloat()
 private const val ROUTE_EDGE_SHARE = 0.12f
 
 /** The player's arrow on the local map, pointing up the way they face, [half] from its middle to its tip, notched at its tail. */

@@ -156,6 +156,9 @@ object OpenMapTiles {
     )
     private val RAILS = setOf("rail", "tram", "light_rail")
 
+    /** Whether [feature], of the transportation layer, is a road the map draws as one: a street, not a parking aisle or a path. */
+    internal fun isRoad(feature: VectorFeature) = wayOf(feature)?.first == WayKind.Road
+
     private fun wayOf(feature: VectorFeature): Pair<WayKind, Double>? {
         val cls = feature.string("class")
         val subclass = feature.string("subclass")

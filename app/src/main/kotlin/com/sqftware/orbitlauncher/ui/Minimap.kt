@@ -96,8 +96,5 @@ val LocalQuest = compositionLocalOf<LatLon?> { null }
  */
 val LocalRoute = staticCompositionLocalOf<() -> List<LatLon>?> { { null } }
 
-/** How wide a route is drawn on the minimap, about a lane, in ground meters. */
-internal const val ROUTE_WIDTH_M = 6.0
-
 /** How many unread notifications each of the launcher's apps has, for a theme's art that shows it beyond the badges. */
 val LocalUnread = compositionLocalOf { UnreadCounts() }
