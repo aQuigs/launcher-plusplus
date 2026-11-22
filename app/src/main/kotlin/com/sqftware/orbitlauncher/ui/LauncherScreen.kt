@@ -925,6 +925,7 @@ fun LauncherScreen(
             if (!replaceAt(choosing.spot, choosing.app, changed)) {
                 changeHomeApps { add(HomePlace.Ring, changed) }
                 showRingPage()
+                closeDrawer()
             }
         }
 

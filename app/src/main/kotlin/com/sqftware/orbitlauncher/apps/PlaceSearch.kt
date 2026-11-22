@@ -7,7 +7,11 @@ import android.location.Geocoder
 import android.os.Build
 import android.util.Log
 import com.sqftware.orbitlauncher.domain.PlaceValue
+import com.sqftware.orbitlauncher.domain.combinedPlaces
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -25,12 +29,30 @@ interface PlaceSearch {
     fun openMaps(): Boolean
 }
 
-/** [PlaceSearch] through the system's geocoder, which needs no key of the launcher's own. */
-class GeocoderPlaceSearch(private val context: Context) : PlaceSearch {
+/** One way of finding places, which a [PlaceSearch] gathers with others. */
+fun interface PlaceFinder {
+    /** The places [query] names, best first; none when it names none or the search cannot be made. */
+    suspend fun find(query: String): List<PlaceValue>
+}
+
+/** [PlaceSearch] asking each of [finders] at once and listing their places in that order, each place once. */
+class SystemPlaceSearch(private val context: Context, private val finders: List<PlaceFinder>) : PlaceSearch {
+    override suspend fun find(query: String): List<PlaceValue> {
+        if (query.isBlank()) return emptyList()
+        return coroutineScope { combinedPlaces(finders.map { async { it.find(query) } }.awaitAll()) }
+    }
+
+    override fun openMaps() = started(TAG, "maps") {
+        context.startActivity(mapsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
+/** [PlaceFinder] through the system's geocoder, which needs no key of the launcher's own. */
+class GeocoderPlaceFinder(context: Context) : PlaceFinder {
     private val geocoder = Geocoder(context)
 
     override suspend fun find(query: String): List<PlaceValue> {
-        if (query.isBlank() || !Geocoder.isPresent()) return emptyList()
+        if (!Geocoder.isPresent()) return emptyList()
         return addresses(query).map { it.toPlace() }
     }
 
@@ -72,9 +94,5 @@ class GeocoderPlaceSearch(private val context: Context) : PlaceSearch {
             latitude = latitude.takeIf { hasLatitude() },
             longitude = longitude.takeIf { hasLongitude() },
         )
-    }
-
-    override fun openMaps() = started(TAG, "maps") {
-        context.startActivity(mapsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
