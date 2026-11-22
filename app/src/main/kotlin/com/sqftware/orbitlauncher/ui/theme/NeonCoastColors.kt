@@ -32,30 +32,20 @@ internal val NeonCoastLagoon = Palette(
 )
 
 /** The sunset: the sky from its top down to the horizon, the sun's gold and pink, its halo, and the stars coming out. */
-val SkyTop = Color(0xFF12082E)
-val SkyHigh = Color(0xFF4A1462)
-val SkyLow = Color(0xFFD63C7E)
-val SkyHorizon = Color(0xFFFF9A4D)
+val SunsetSky = listOf(Color(0xFF12082E), Color(0xFF4A1462), Color(0xFFD63C7E), Color(0xFFFF9A4D))
 val SunGold = Color(0xFFFFE066)
 val SunPink = Color(0xFFFF3D8B)
 val SunHalo = Color(0xFFFF5C9A).copy(alpha = 0.35f)
 val StarGlint = Color(0xFFFFF4FA).copy(alpha = 0.7f)
 
-/** The sea, far by the horizon and near, the sun's glitter on it, and the palms and shore black against it all. */
-val SeaFar = Color(0xFF3A1258)
-val SeaNear = Color(0xFF080318)
+/** The sea from the horizon in, the sun's glitter on it, and the palms and shore black against it all. */
+val SunsetSea = listOf(Color(0xFF3A1258), Color(0xFF080318))
 val SunGlitter = Color(0xFFFF7AA8)
-val PalmShadow = Color(0xFF0B0416)
+val PalmShadow = Dusk
 
-/** The city on the horizon and the colours its windows are lit in. */
+/** The city on the horizon and the neon its windows are lit in. */
 val Skyline = Color(0xFF1E0B36)
-val CityWindows = listOf(Color(0xFFFF6FB8), Color(0xFF6CEEFF), Color(0xFFFFD36B))
-
-/** A neon sign: its dark backing, its pink tube, the cyan tube inside it, and the glow round them. */
-val SignBacking = Dusk.copy(alpha = 0.85f)
-val NeonPink = HotPink
-val NeonCyan = ElectricCyan
-val NeonHaze = HotPink.copy(alpha = 0.3f)
+val CityWindows = listOf(HotPink, ElectricCyan, SunGold).map { it.copy(alpha = 0.85f) }
 
 /** The edge of a sunset folder, which has to show on any patch of the wallpaper: dusk round a pale pink line. */
 val SunsetEdge = DiscEdge(outer = Dusk.copy(alpha = 0.7f), inner = Color(0xFFFFC2DE))
