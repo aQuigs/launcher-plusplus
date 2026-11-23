@@ -12,6 +12,7 @@ class AppIntentsTest {
     private val mail = app("Mail")
     private val ride = IntentCatalog.forPackage(uber.packageName).single()
     private val lyftRide = IntentCatalog.forPackage(lyft.packageName).single()
+    private val waymoRide = IntentCatalog.forPackage("com.waymo.carapp").single()
     private val work = PlaceValue("Work | Office!", "1 Main St, Springfield", 37.5, -122.25)
 
     @Test
@@ -115,6 +116,17 @@ class AppIntentsTest {
         assertEquals(
             "lyft://ridetype?id=lyft&destination[address]=Elm%20St",
             lyftRide.request(PlaceValue("Elm St", "Elm St")).data,
+        )
+        assertEquals(
+            IntentRequest(
+                "com.waymo.carapp",
+                "https://app.waymo.com/route/trip/create?pickup=my_location&dropoff_latitude=37.5&dropoff_longitude=-122.25",
+            ),
+            waymoRide.request(work),
+        )
+        assertEquals(
+            "https://app.waymo.com/route/trip/create?pickup=my_location",
+            waymoRide.request(PlaceValue("Elm St", "Elm St")).data,
         )
     }
 
