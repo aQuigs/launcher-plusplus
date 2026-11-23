@@ -30,8 +30,8 @@ object IntentCatalog {
                 "destination[address]" to place.address,
             )
         },
-        // Undocumented; read from the app's own link handling (v26102604). It takes coordinates only, so a typed address
-        // without them opens the trip planner from here, to fill in the destination there.
+        // Undocumented; read from the app's own link handling (v26102604). It takes the destination as coordinates only,
+        // so a typed address without them plans a trip from here and leaves the destination to be filled in there.
         PlaceIntent("waymo.ride", "com.waymo.carapp", "ride", "Ride to a place") { place ->
             link(
                 "https://app.waymo.com/route/trip/create",

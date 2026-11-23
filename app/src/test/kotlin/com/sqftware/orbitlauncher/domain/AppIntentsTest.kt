@@ -124,6 +124,10 @@ class AppIntentsTest {
             ),
             waymoRide.request(work),
         )
+        assertEquals(
+            "https://app.waymo.com/route/trip/create?pickup=my_location",
+            waymoRide.request(PlaceValue("Elm St", "Elm St")).data,
+        )
     }
 
     @Test
