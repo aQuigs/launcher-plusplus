@@ -131,6 +131,36 @@ class AppIntentsTest {
     }
 
     @Test
+    fun `the directions links go to the place's coordinates, or its address when they are unknown`() {
+        val elm = PlaceValue("Elm St", "Elm St")
+        val mapsDrive = IntentCatalog.byId("maps.drive")!!
+        val waze = IntentCatalog.forPackage("com.waze").single()
+        val citymapper = IntentCatalog.forPackage("com.citymapper.app.release").single()
+
+        assertEquals(
+            listOf("Drive to a place", "Walk to a place", "Take transit to a place"),
+            IntentCatalog.forPackage("com.google.android.apps.maps").map { it.label },
+        )
+        assertEquals(
+            IntentRequest(
+                "com.google.android.apps.maps",
+                "https://www.google.com/maps/dir/?api=1&destination=37.5%2C-122.25&travelmode=driving&dir_action=navigate",
+            ),
+            mapsDrive.request(work),
+        )
+        assertEquals(
+            "https://www.google.com/maps/dir/?api=1&destination=Elm%20St&travelmode=driving&dir_action=navigate",
+            mapsDrive.request(elm).data,
+        )
+        assertEquals("https://waze.com/ul?ll=37.5%2C-122.25&navigate=yes", waze.request(work).data)
+        assertEquals("https://waze.com/ul?q=Elm%20St&navigate=yes", waze.request(elm).data)
+        assertEquals(
+            "citymapper://directions?endcoord=37.5%2C-122.25&endname=Work%20%7C%20Office%21&endaddress=1%20Main%20St%2C%20Springfield",
+            citymapper.request(work).data,
+        )
+    }
+
+    @Test
     fun `a place shared from a maps app searches by its name and address, not its link`() {
         assertEquals(
             "Ferry Building, 1 Ferry Building, San Francisco, CA",

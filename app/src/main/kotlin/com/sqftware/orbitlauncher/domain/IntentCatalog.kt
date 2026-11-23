@@ -40,6 +40,27 @@ object IntentCatalog {
                 "dropoff_longitude" to place.longitude?.toString(),
             )
         },
+        mapsDirections("maps.drive", "drive", "Drive to a place", "driving"),
+        mapsDirections("maps.walk", "walk", "Walk to a place", "walking"),
+        mapsDirections("maps.transit", "transit", "Take transit to a place", "transit"),
+        // https://developers.google.com/waze/deeplinks
+        PlaceIntent("waze.drive", "com.waze", "drive", "Drive to a place") { place ->
+            link(
+                "https://waze.com/ul",
+                "ll" to place.coordinates,
+                "q" to place.address.takeIf { place.coordinates == null },
+                "navigate" to "yes",
+            )
+        },
+        // https://citymapper.com/tools/1053/launch-citymapper-for-directions
+        PlaceIntent("citymapper.directions", "com.citymapper.app.release", "directions", "Directions to a place") { place ->
+            link(
+                "citymapper://directions",
+                "endcoord" to place.coordinates,
+                "endname" to place.label,
+                "endaddress" to place.address,
+            )
+        },
     )
 
     private val byId = all.associateBy { it.id }
@@ -61,6 +82,25 @@ private class PlaceIntent(
 
     override fun request(value: InputValue?) = IntentRequest(packageName, link(value as PlaceValue))
 }
+
+/**
+ * Google Maps directions from here to a place by [travelMode], starting navigation where the mode has it:
+ * https://developers.google.com/maps/documentation/urls/get-started#directions-action
+ */
+private fun mapsDirections(id: String, name: String, label: String, travelMode: String) =
+    PlaceIntent(id, "com.google.android.apps.maps", name, label) { place ->
+        link(
+            "https://www.google.com/maps/dir/",
+            "api" to "1",
+            "destination" to (place.coordinates ?: place.address),
+            "travelmode" to travelMode,
+            "dir_action" to "navigate",
+        )
+    }
+
+/** "latitude,longitude", when both are known. */
+private val PlaceValue.coordinates: String?
+    get() = if (latitude != null && longitude != null) "$latitude,$longitude" else null
 
 /** [base] with a query of the [params] that have a value, each URL-encoded; the apps read their brackets unencoded. */
 private fun link(base: String, vararg params: Pair<String, String?>): String =
