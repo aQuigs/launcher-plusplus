@@ -62,7 +62,7 @@ data class AppEntry(
     }
 
     /** The label as a search sees it: lower case, without accents. Made once here rather than on every keystroke. */
-    val searchableLabel: String = label.unaccented().lowercase()
+    val searchableLabel: String = label.searchable()
 }
 
 /** What an [AppEntry] starts. */

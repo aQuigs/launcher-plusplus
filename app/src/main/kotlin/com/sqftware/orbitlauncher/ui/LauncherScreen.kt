@@ -98,6 +98,8 @@ import com.sqftware.orbitlauncher.domain.placeQueryFromShare
 import com.sqftware.orbitlauncher.domain.withMember
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.Cell
+import com.sqftware.orbitlauncher.domain.ChatApp
+import com.sqftware.orbitlauncher.domain.ChatValue
 import com.sqftware.orbitlauncher.domain.ClockFace
 import com.sqftware.orbitlauncher.domain.CollectionCard
 import com.sqftware.orbitlauncher.domain.CollectionKind
@@ -247,7 +249,7 @@ data class HomePress(val launcherInFront: Boolean)
  * dock, folder or hand-picked card the app was pressed on, or else of the ring. An app with intents in the catalog, or
  * a pair's app, can be set to open straight to one: the icon changes where it was pressed, or a new one goes on the
  * ring. One whose intent asks for an input, such as a place, prompts for it as it opens, once for both apps of a pair if one shares the other's,
- * offering the [places] kept ([onPlacesChange]); a place shared to the launcher ([sharedPlaces]) fills the open
+ * offering the [places] kept ([onPlacesChange]) or the app's [chats] ([onChatsChange]); a place shared to the launcher ([sharedPlaces]) fills the open
  * prompt, else is kept as one picked in it. A card's gear opens its settings in a
  * dialog: how many rows it shows while compact, how many apps a built-in card works out, and when it names its apps,
  * each the card's own or the page's default. A long press on the home
@@ -348,6 +350,8 @@ fun LauncherScreen(
     onAppSettingsChange: (AppSettings) -> Unit,
     places: KeptInputs<PlaceValue>,
     onPlacesChange: (KeptInputs<PlaceValue>) -> Unit,
+    chats: Map<ChatApp, KeptInputs<ChatValue>>,
+    onChatsChange: (ChatApp, KeptInputs<ChatValue>) -> Unit,
     onOpenNotifications: () -> Unit,
     onSystemBarsShownChange: (Boolean) -> Unit,
     onWallpaperBlurChange: (Int) -> Unit,
@@ -2072,6 +2076,10 @@ fun LauncherScreen(
                             onPlacesChange = onPlacesChange,
                             findPlaces = actions.findPlaces,
                             openMaps = { if (actions.openMaps()) onErrand = true },
+                            chats = chats,
+                            onChatsChange = onChatsChange,
+                            findChat = actions.findChat,
+                            pasted = actions.pasted,
                         ),
                         onAnswer = { value ->
                             asking = null

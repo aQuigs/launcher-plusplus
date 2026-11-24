@@ -270,6 +270,8 @@ class LauncherScreenTest {
         uninstall = uninstalled::add,
         findPlaces = { listOf(found) },
         openMaps = { false },
+        findChat = { _, _ -> null },
+        pasted = { null },
     )
 
     // The screen's own, so a test can take the launcher out of sight and back without the activity.
@@ -369,6 +371,8 @@ class LauncherScreenTest {
             onAppSettingsChange = { appSettings = it },
             places = places,
             onPlacesChange = { places = it },
+            chats = emptyMap(),
+            onChatsChange = { _, _ -> },
             onOpenNotifications = { notificationsOpened++ },
             onSystemBarsShownChange = { barsShown += it },
             onWallpaperBlurChange = {},
