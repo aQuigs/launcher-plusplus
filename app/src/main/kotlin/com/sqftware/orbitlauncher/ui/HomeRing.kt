@@ -373,7 +373,7 @@ fun HomeRing(
                 }
 
                 // An app on its way in from another place makes way for itself among the ring's.
-                val ringMarks = marksFor(making ?: ring) { index, count -> ringSlotOffset(index, count) }
+                val ringMarks = marksFor(making ?: ring, ::ringSlotOffset)
                 val folderMarks = centred?.apps?.let { marksFor(it.map(RingItem::App), ::folderSlotOffset) }
                 // In the order shown, which a drag rearranges, as the names are.
                 val nameHoles = if (names && centred == null) nameHoles(making ?: moving.shown(ring)) else null

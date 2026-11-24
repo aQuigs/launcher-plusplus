@@ -22,6 +22,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -41,7 +42,7 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
-import kotlin.math.atan2
+import com.sqftware.orbitlauncher.domain.turnBetween
 import kotlin.math.min
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -313,24 +314,28 @@ class HomeRingTest {
     }
 
     @Test
-    fun everyThemeAndLookOpensAFolderWithItsAppsTheSameWaysFromTheCenter() {
+    fun everyThemeAndLookOpensAFolderWithItsAppsWhereItsPreviewsShowThem() {
         val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail) + alphabet.take(3))
         showItems(listOf(RingItem.App(clock), work))
-        openFolder = work
-        fun ways(): List<Float> {
-            val center = compose.closeFolder().getUnclippedBoundsInRoot().middle
-            return work.apps.map { app ->
-                val (x, y) = compose.ringSlot(app).getUnclippedBoundsInRoot().middle - center
-                atan2(y, x)
-            }
-        }
-        val reference = ways()
 
         Theme.entries.forEach { shown ->
-            shown.folderLooks.forEach { look ->
+            // Orbit has no previews: every app circles the planet as a moon.
+            shown.folderLooks.filter { it != FolderLook.Orbit }.forEach { look ->
                 theme = shown
                 folderLook = look
-                ways().zip(reference).forEach { (way, expected) -> assertEquals("$shown, $look", expected, way, 0.02f) }
+                openFolder = null
+                val planet = compose.folderSlot(1).getUnclippedBoundsInRoot().middle
+                val previews = work.apps.indices.map { index ->
+                    compose.onNodeWithTag(FolderTags.preview(index), useUnmergedTree = true).getUnclippedBoundsInRoot().middle - planet
+                }
+
+                openFolder = work
+                val center = compose.closeFolder().getUnclippedBoundsInRoot().middle
+
+                work.apps.zip(previews).forEach { (app, preview) ->
+                    val slot = compose.ringSlot(app).getUnclippedBoundsInRoot().middle - center
+                    assertEquals("$shown, $look, ${app.label}", 0f, turnBetween(preview.x, preview.y, slot.x, slot.y), 0.03f)
+                }
             }
         }
     }
