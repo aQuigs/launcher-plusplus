@@ -270,13 +270,6 @@ class RingGeometryTest {
     }
 
     @Test
-    fun `a weapon wheel opens on the compass points, other looks where their previews were`() {
-        assertOffset(0f to -1f, openFolderSlotOffset(FolderLook.WeaponWheel, 0, 8))
-        assertOffset(1f to 0f, openFolderSlotOffset(FolderLook.WeaponWheel, 2, 8))
-        assertOffset(folderSlotOffset(0, 8), openFolderSlotOffset(FolderLook.Plain, 0, 8))
-    }
-
-    @Test
     fun `a weapon wheel reaches as wide as the game's, its tiles inside the box`() {
         assertEquals(344f, openFolderRadius(FolderLook.WeaponWheel, 260f, 133f, 1000f, 1000f), 0.5f)
         assertEquals(400f - 133f * WHEEL_TILE_TALL / 2, openFolderRadius(FolderLook.WeaponWheel, 260f, 133f, 1000f, 800f), 0.5f)

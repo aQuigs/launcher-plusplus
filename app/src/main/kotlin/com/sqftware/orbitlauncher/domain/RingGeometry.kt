@@ -35,18 +35,10 @@ fun ringSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Floa
 /**
  * Where slot [index] of a folder of [count] apps sits, as [ringSlotOffset] gives it turned back half a slot, plus [turn]:
  * the first two either side of the top, or a lone app on top, so two sit side by side, three make a triangle on its point and four a square.
- * The closed folder's previews and the open folder's ring both place apps here, so each app opens where it was shown.
+ * The closed folder's previews and the open folder's ring both place apps here in every theme, so up to four apps open where they were shown.
  */
 fun folderSlotOffset(index: Int, count: Int, turn: Double = 0.0): Pair<Float, Float> =
     ringSlotOffset(index, count, if (count > 1) turn - PI / count else turn)
-
-/**
- * Where slot [index] of an open folder of [count] apps in [look] sits, plus [turn]: a weapon wheel's on the compass points
- * from the top, one straight above the middle, as the game lays its wheel out; any other look's where [folderSlotOffset]
- * puts it, where its previews showed it.
- */
-fun openFolderSlotOffset(look: FolderLook, index: Int, count: Int, turn: Double = 0.0): Pair<Float, Float> =
-    if (look == FolderLook.WeaponWheel) ringSlotOffset(index, count, turn) else folderSlotOffset(index, count, turn)
 
 /** How much wider and taller than its icon a weapon wheel's tile is. */
 const val WHEEL_TILE_WIDE = 1.62f
