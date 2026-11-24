@@ -2,6 +2,7 @@ package com.sqftware.orbitlauncher.ui
 
 import android.view.ViewConfiguration
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.TouchInjectionScope
@@ -206,3 +207,7 @@ fun SemanticsNodeInteractionsProvider.drawerRow(label: String) =
 
 // The kind's title is a page's label in the editor behind the dialog too.
 fun SemanticsNodeInteractionsProvider.addPageOf(kind: PageKind) = onNode(hasText(kind.title) and hasAnyAncestor(isDialog())).performClick()
+
+/** Waits until the row labeled [label] of a prompt has settled, so it takes taps. */
+fun ComposeTestRule.awaitSettled(label: String) =
+    waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText(label) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }

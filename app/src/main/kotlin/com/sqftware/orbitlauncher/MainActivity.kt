@@ -45,7 +45,6 @@ import com.sqftware.orbitlauncher.apps.SharedPreferencesHourStyleStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesJournalStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPageLayoutStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesPickTipStore
-import com.sqftware.orbitlauncher.apps.SharedPreferencesRecentPlacesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesReorderModeStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingPagesStore
 import com.sqftware.orbitlauncher.apps.SharedPreferencesRingSpinStore
@@ -69,6 +68,7 @@ import com.sqftware.orbitlauncher.apps.WindowSystemBars
 import com.sqftware.orbitlauncher.apps.WindowWallpaperBlur
 import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
+import com.sqftware.orbitlauncher.apps.placesStore
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
         val collectionsStore = SharedPreferencesCollectionsStore(this)
         val gridPagesStore = SharedPreferencesGridPagesStore(this)
         val appSettingsStore = SharedPreferencesAppSettingsStore(this)
-        val recentPlacesStore = SharedPreferencesRecentPlacesStore(this)
+        val placesStore = placesStore(this)
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
@@ -249,7 +249,7 @@ class MainActivity : ComponentActivity() {
                 var drawerStyle by remember { mutableStateOf(drawerStyleStore.load()) }
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
-                var recentPlaces by remember { mutableStateOf(recentPlacesStore.load()) }
+                var places by remember { mutableStateOf(placesStore.load()) }
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
                 var journal by remember { mutableStateOf(journalStore.load()) }
@@ -569,10 +569,10 @@ class MainActivity : ComponentActivity() {
                         appSettings = it
                         appSettingsStore.save(it)
                     },
-                    recentPlaces = recentPlaces,
-                    onRecentPlacesChange = {
-                        recentPlaces = it
-                        recentPlacesStore.save(it)
+                    places = places,
+                    onPlacesChange = {
+                        places = it
+                        placesStore.save(it)
                     },
                     onOpenNotifications = shade::open,
                     onSystemBarsShownChange = systemBars::setShown,

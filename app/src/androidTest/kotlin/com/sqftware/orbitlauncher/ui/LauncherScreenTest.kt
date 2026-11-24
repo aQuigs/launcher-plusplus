@@ -120,6 +120,7 @@ import com.sqftware.orbitlauncher.domain.feats
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.answered
 import com.sqftware.orbitlauncher.domain.asks
+import com.sqftware.orbitlauncher.domain.KeptInputs
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import com.sqftware.orbitlauncher.domain.openChoices
 import com.sqftware.orbitlauncher.domain.openedAs
@@ -203,7 +204,7 @@ class LauncherScreenTest {
     private var homeRequests = 0
     private val opened = mutableListOf<String>()
     private val launched = mutableListOf<AppEntry>()
-    private var recentPlaces by mutableStateOf(emptyList<PlaceValue>())
+    private var places by mutableStateOf(KeptInputs<PlaceValue>())
     private val found = PlaceValue("Work", "1 Main St, Springfield", 37.5, -122.25)
     private val composeMail = AppShortcut(mail.packageName, "compose", "Compose")
     private val started = mutableListOf<AppShortcut>()
@@ -366,8 +367,8 @@ class LauncherScreenTest {
             onOpenBadgeSettings = { badgeSettingsOpened++ },
             appSettings = appSettings,
             onAppSettingsChange = { appSettings = it },
-            recentPlaces = recentPlaces,
-            onRecentPlacesChange = { recentPlaces = it },
+            places = places,
+            onPlacesChange = { places = it },
             onOpenNotifications = { notificationsOpened++ },
             onSystemBarsShownChange = { barsShown += it },
             onWallpaperBlurChange = {},
@@ -1121,7 +1122,7 @@ class LauncherScreenTest {
         val lyft = AppEntry("Lyft", "me.lyft.android", "me.lyft.android.Main")
         val home = PlaceValue("Home", "2 Elm St", 37.0, -122.0)
         apps = listOf(clock, mail, uber, lyft)
-        recentPlaces = listOf(found, home)
+        places = KeptInputs(recent = listOf(found, home))
         homeApps = HomeApps(ring = ringOf(pairOf(uber, lyft)!!))
         show()
 
@@ -1138,12 +1139,13 @@ class LauncherScreenTest {
         compose.ringSlot(both).performClick()
         compose.onNodeWithText("Pick a place for Uber and Lyft").assertIsDisplayed()
         compose.runOnIdle { assertEquals(emptyList<AppEntry>(), launched) }
+        compose.awaitSettled("Home")
         compose.onNodeWithText("Home").performClick()
 
         compose.onNodeWithTag(OpenWithTags.PROMPT).assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(listOf(both.answered(mapOf(both.asks.single() to home))), launched)
-            assertEquals(listOf(home, found), recentPlaces)
+            assertEquals(KeptInputs(recent = listOf(home, found)), places)
         }
     }
 
@@ -1174,7 +1176,7 @@ class LauncherScreenTest {
         compose.onNodeWithText("Open with intent…").performClick()
         compose.onNodeWithText("Ride to a place you pick now").performClick()
         compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("1 Main")
-        compose.waitUntil(timeoutMillis = 5_000) { compose.onAllNodesWithText("Work").fetchSemanticsNodes().isNotEmpty() }
+        compose.awaitSettled("Work")
         compose.onNodeWithText("Work").performClick()
 
         val saved = openedAs(uber, openChoices(uber)[1], found)!!

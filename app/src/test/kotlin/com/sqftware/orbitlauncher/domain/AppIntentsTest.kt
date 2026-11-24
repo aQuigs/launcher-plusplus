@@ -182,13 +182,4 @@ class AppIntentsTest {
         )
         assertNull(placeQueryFromShare("https://maps.app.goo.gl/abc"))
     }
-
-    @Test
-    fun `a place picked goes to the top of the recent ones, once`() {
-        val home = PlaceValue("Home", "2 Elm St")
-        val recent = List(RECENT_PLACES) { PlaceValue("$it", "$it Oak St") }
-
-        assertEquals(listOf(home) + recent.dropLast(1), recent.withRecent(home))
-        assertEquals(listOf(home, work), listOf(work, home).withRecent(home))
-    }
 }
