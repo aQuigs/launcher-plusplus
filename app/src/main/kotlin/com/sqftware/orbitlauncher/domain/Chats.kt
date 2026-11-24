@@ -24,7 +24,7 @@ sealed interface FoundChat {
 
 /**
  * A chat app that a link opens straight to one of its chats. Each is a kind of input of its own, as no app opens
- * another's chats. None lets the launcher list its chats, so a chat is told by its link, which [howToLink] says where to
+ * another's chats. None lets the launcher search its chats, so a chat is told by its link, which [howToLink] says where to
  * get. Its name here is stored with the chats kept for it, so it never changes.
  */
 enum class ChatApp(val packages: List<String>, val noun: String, val howToLink: String) : InputKind {

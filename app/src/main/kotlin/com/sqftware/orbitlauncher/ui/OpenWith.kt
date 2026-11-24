@@ -161,11 +161,12 @@ private fun ChatPrompt(
     }
     SearchDialog(
         title = "Pick a $forWhom ${app.noun}",
-        fieldLabel = "Paste a link, or search",
+        fieldLabel = "Link, or name of a saved ${app.noun}",
         query = query,
         onQueryChange = onQueryChange,
         idle = keptSections(kept),
         idleNote = app.howToLink,
+        missNote = "No saved ${app.noun} found. ${app.howToLink}.",
         find = { typed ->
             sources.findChat(app, typed)?.let { found -> listOf(chats.find { it.link == found.link } ?: found) } ?: chats.matching(typed) { it.label.searchable() }
         },

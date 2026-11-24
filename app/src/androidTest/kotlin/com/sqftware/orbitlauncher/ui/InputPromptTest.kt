@@ -169,6 +169,15 @@ class InputPromptTest {
     }
 
     @Test
+    fun aNameNoSavedChatHasSaysHowToAddOne() {
+        show(InputQuestion(ChatApp.Slack, listOf(slack)))
+
+        compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("orbit")
+
+        compose.awaitSettled("No saved channel found. ${ChatApp.Slack.howToLink}.")
+    }
+
+    @Test
     fun aChatKeptIsFoundByNameOrLinkAndPickedWithoutNamingItAgain() {
         chats = mapOf(ChatApp.Slack to KeptInputs(favorites = listOf(general), recent = listOf(random)))
         show(InputQuestion(ChatApp.Slack, listOf(slack)))
