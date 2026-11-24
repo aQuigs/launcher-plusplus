@@ -41,6 +41,7 @@ import com.sqftware.orbitlauncher.domain.RingItem
 import com.sqftware.orbitlauncher.domain.Theme
 import com.sqftware.orbitlauncher.domain.UnreadCounts
 import com.sqftware.orbitlauncher.domain.ringLayout
+import kotlin.math.atan2
 import kotlin.math.min
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -309,6 +310,29 @@ class HomeRingTest {
         compose.closeFolder().performClick()
 
         assertEquals(1, closes)
+    }
+
+    @Test
+    fun everyThemeAndLookOpensAFolderWithItsAppsTheSameWaysFromTheCenter() {
+        val work = RingItem.Folder(HomePlace.Folder(HomePlace.Ring, 1), listOf(mail) + alphabet.take(3))
+        showItems(listOf(RingItem.App(clock), work))
+        openFolder = work
+        fun ways(): List<Float> {
+            val center = compose.closeFolder().getUnclippedBoundsInRoot().middle
+            return work.apps.map { app ->
+                val (x, y) = compose.ringSlot(app).getUnclippedBoundsInRoot().middle - center
+                atan2(y, x)
+            }
+        }
+        val reference = ways()
+
+        Theme.entries.forEach { shown ->
+            shown.folderLooks.forEach { look ->
+                theme = shown
+                folderLook = look
+                ways().zip(reference).forEach { (way, expected) -> assertEquals("$shown, $look", expected, way, 0.02f) }
+            }
+        }
     }
 
     @Test
