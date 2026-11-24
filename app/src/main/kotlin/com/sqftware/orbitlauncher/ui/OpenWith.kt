@@ -1,5 +1,8 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -8,6 +11,7 @@ import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
+import com.sqftware.orbitlauncher.domain.KeptInputs
 import com.sqftware.orbitlauncher.domain.OpenChoice
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import com.sqftware.orbitlauncher.domain.currentChoice
@@ -39,13 +43,10 @@ fun OpenWithDialog(app: AppEntry, partner: AppEntry?, onChoose: (OpenChoice) -> 
     )
 }
 
-/**
- * What the prompts for an intent's input offer, search and keep: the [recentPlaces], to which [onPlacePicked] adds, and
- * [findPlaces] and [openMaps].
- */
+/** What the prompts for an intent's input offer, search and keep: the [places] ([onPlacesChange]), [findPlaces] and [openMaps]. */
 class InputSources(
-    val recentPlaces: List<PlaceValue>,
-    val onPlacePicked: (PlaceValue) -> Unit,
+    val places: KeptInputs<PlaceValue>,
+    val onPlacesChange: (KeptInputs<PlaceValue>) -> Unit,
     val findPlaces: suspend (String) -> List<PlaceValue>,
     val openMaps: () -> Unit,
 )
@@ -69,8 +70,8 @@ fun InputPrompt(
 }
 
 /**
- * The recent places while nothing is typed, else the places the search finds and, last, what was typed as it is, for an
- * app to look up itself, picked [forWhom]. A place found in the maps app comes back shared, into the field.
+ * The favorite and recent places while nothing is typed, else the places the search finds and, last, what was typed as it
+ * is, for an app to look up itself, picked [forWhom]. A place found in the maps app comes back shared, into the field.
  */
 @Composable
 private fun PlacePrompt(
@@ -86,12 +87,14 @@ private fun PlacePrompt(
         fieldLabel = "Address or place",
         query = query,
         onQueryChange = onQueryChange,
-        idle = sources.recentPlaces,
+        idle = keptSections(sources.places),
+        idleNote = "Places you pick show up here",
         find = { typed -> sources.findPlaces(typed) + typed.trim().let { PlaceValue(label = it, address = it) } },
         label = PlaceValue::label,
         description = { place -> if (place.latitude == null) "As typed" else place.address.takeIf { it != place.label } },
+        actions = { place -> keptActions(place, sources.places, forgets = query.isBlank(), sources.onPlacesChange) },
         onChoose = { place ->
-            sources.onPlacePicked(place)
+            sources.onPlacesChange(sources.places.picked(place))
             onAnswer(place)
         },
         onDismiss = onDismiss,
@@ -99,4 +102,27 @@ private fun PlacePrompt(
         fieldTag = OpenWithTags.FIELD,
         modifier = Modifier.testTag(OpenWithTags.PROMPT),
     )
+}
+
+/** The sections a prompt shows of the values [kept], which the user knows by name, so one line of each description will do. */
+private fun <T : InputValue> keptSections(kept: KeptInputs<T>) =
+    listOf(ChoiceSection("Favorites", kept.favorites, descriptionLines = 1), ChoiceSection("Recent", kept.recent, descriptionLines = 1))
+
+/** What a prompt's row for [value] offers: to make it a favorite or not and, if it [forgets], to delete it from the recent ones. */
+private fun <T : InputValue> keptActions(
+    value: T,
+    kept: KeptInputs<T>,
+    forgets: Boolean,
+    onChange: (KeptInputs<T>) -> Unit,
+): List<ChoiceAction> = buildList {
+    val favorite = kept.isFavorite(value)
+    add(
+        ChoiceAction(
+            glyph = if (favorite) Icons.Default.Star else StarOutlineGlyph,
+            label = if (favorite) "Remove ${value.label} from favorites" else "Add ${value.label} to favorites",
+        ) { onChange(kept.toggledFavorite(value)) },
+    )
+    if (forgets && value in kept.recent) {
+        add(ChoiceAction(Icons.Default.Close, "Delete ${value.label} from recent") { onChange(kept.forgotten(value)) })
+    }
 }

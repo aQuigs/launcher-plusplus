@@ -89,13 +89,13 @@ import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.OpenChoice
+import com.sqftware.orbitlauncher.domain.KeptInputs
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import com.sqftware.orbitlauncher.domain.answered
 import com.sqftware.orbitlauncher.domain.asks
 import com.sqftware.orbitlauncher.domain.openedAs
 import com.sqftware.orbitlauncher.domain.placeQueryFromShare
 import com.sqftware.orbitlauncher.domain.withMember
-import com.sqftware.orbitlauncher.domain.withRecent
 import com.sqftware.orbitlauncher.domain.Bounds
 import com.sqftware.orbitlauncher.domain.Cell
 import com.sqftware.orbitlauncher.domain.ClockFace
@@ -247,8 +247,8 @@ data class HomePress(val launcherInFront: Boolean)
  * dock, folder or hand-picked card the app was pressed on, or else of the ring. An app with intents in the catalog, or
  * a pair's app, can be set to open straight to one: the icon changes where it was pressed, or a new one goes on the
  * ring. One whose intent asks for an input, such as a place, prompts for it as it opens, once for both apps of a pair if one shares the other's,
- * offering the [recentPlaces] ([onRecentPlacesChange]); a place shared to the launcher ([sharedPlaces]) fills the open
- * prompt, else joins the recent places. A card's gear opens its settings in a
+ * offering the [places] kept ([onPlacesChange]); a place shared to the launcher ([sharedPlaces]) fills the open
+ * prompt, else is kept as one picked in it. A card's gear opens its settings in a
  * dialog: how many rows it shows while compact, how many apps a built-in card works out, and when it names its apps,
  * each the card's own or the page's default. A long press on the home
  * page's empty space opens the launcher's own menu. Its first row shows the wallpaper alone: the launcher fades away and
@@ -346,8 +346,8 @@ fun LauncherScreen(
     onOpenBadgeSettings: () -> Unit,
     appSettings: AppSettings,
     onAppSettingsChange: (AppSettings) -> Unit,
-    recentPlaces: List<PlaceValue>,
-    onRecentPlacesChange: (List<PlaceValue>) -> Unit,
+    places: KeptInputs<PlaceValue>,
+    onPlacesChange: (KeptInputs<PlaceValue>) -> Unit,
     onOpenNotifications: () -> Unit,
     onSystemBarsShownChange: (Boolean) -> Unit,
     onWallpaperBlurChange: (Int) -> Unit,
@@ -1389,10 +1389,10 @@ fun LauncherScreen(
             confirmingPin = request
         }
     }
-    // A place found in a maps app comes back shared: into the prompt waiting for one, else to the top of the recent ones.
+    // A place found in a maps app comes back shared: into the prompt waiting for one, else kept as one picked.
     val latestActions by rememberUpdatedState(actions)
-    val latestRecentPlaces by rememberUpdatedState(recentPlaces)
-    val latestOnRecentPlacesChange by rememberUpdatedState(onRecentPlacesChange)
+    val latestPlaces by rememberUpdatedState(places)
+    val latestOnPlacesChange by rememberUpdatedState(onPlacesChange)
     val latestOnToast by rememberUpdatedState(onToast)
     LaunchedEffect(sharedPlaces) {
         sharedPlaces.collect { text ->
@@ -1401,8 +1401,8 @@ fun LauncherScreen(
                 asking = asking?.copy(query = query)
             } else {
                 val place = latestActions.findPlaces(query).firstOrNull() ?: PlaceValue(query, query)
-                latestOnRecentPlacesChange(latestRecentPlaces.withRecent(place))
-                latestOnToast("${place.label} is in your recent places")
+                latestOnPlacesChange(latestPlaces.picked(place))
+                latestOnToast("${place.label} is in your ${if (latestPlaces.isFavorite(place)) "favorite" else "recent"} places")
             }
         }
     }
@@ -2068,8 +2068,8 @@ fun LauncherScreen(
                         query = prompt.query,
                         onQueryChange = { asking = prompt.copy(query = it) },
                         sources = InputSources(
-                            recentPlaces = recentPlaces,
-                            onPlacePicked = { onRecentPlacesChange(recentPlaces.withRecent(it)) },
+                            places = places,
+                            onPlacesChange = onPlacesChange,
                             findPlaces = actions.findPlaces,
                             openMaps = { if (actions.openMaps()) onErrand = true },
                         ),

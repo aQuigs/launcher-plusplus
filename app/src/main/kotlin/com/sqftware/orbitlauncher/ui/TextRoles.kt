@@ -45,14 +45,16 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = modifier)
 }
 
-/** A line that explains what is around it: under a title, in a prompt, beside a choice. */
+/** A line that explains what is around it: under a title, in a prompt, beside a choice. Past [maxLines], it is cut off. */
 @Composable
-fun SupportingText(text: String, modifier: Modifier = Modifier, textAlign: TextAlign? = null) {
+fun SupportingText(text: String, modifier: Modifier = Modifier, textAlign: TextAlign? = null, maxLines: Int = Int.MAX_VALUE) {
     Text(
         text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = textAlign,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier,
     )
 }

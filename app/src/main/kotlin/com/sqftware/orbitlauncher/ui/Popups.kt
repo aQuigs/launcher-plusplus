@@ -1,9 +1,12 @@
 package com.sqftware.orbitlauncher.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +20,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
@@ -26,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,7 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -48,11 +57,11 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sqftware.orbitlauncher.ui.theme.Ground
 import com.sqftware.orbitlauncher.ui.theme.Spacing
+import com.sqftware.orbitlauncher.ui.theme.fadingEdges
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
@@ -342,11 +351,21 @@ fun <T> ChoiceDialog(
     )
 }
 
+/** Some of a [SearchDialog]'s [choices], under their [title] if any, each description on [descriptionLines] at most. */
+data class ChoiceSection<T>(val title: String?, val choices: List<T>, val descriptionLines: Int = Int.MAX_VALUE)
+
+/** A button at the end of a choice's row: its [glyph], read out as its [label], calling [onClick]. */
+class ChoiceAction(val glyph: ImageVector, val label: String, val onClick: () -> Unit)
+
 /**
  * Asks for one thing found by a search for the [query] typed in its field, labeled [fieldLabel]: what [find] finds for
- * it, or the [idle] ones while it is blank, each named by its [label] over its [description], if any. A tap on one hands
- * it to [onChoose]; [extra], if any, is a button beside Cancel, and Cancel, Back and a tap outside call [onDismiss]. The
- * query is the caller's, so text from elsewhere can fill it.
+ * it, or the [idle] ones while it is blank ([idleNote] says there are none), each named by its [label] over its
+ * [description], if any, with its [actions]. A tap on one hands it to [onChoose]; [extra], if any, is a button beside
+ * Cancel, and Cancel, Back and a tap outside call [onDismiss]. The query is the caller's, so text from elsewhere can
+ * fill it.
+ *
+ * Rows take no tap while a search for what is now typed is on, nor until they have [settled][rememberSettled], and the
+ * list is one height whatever is in it, so a tap never lands on something that has only just come under the finger.
  */
 @Composable
 fun <T> SearchDialog(
@@ -354,24 +373,30 @@ fun <T> SearchDialog(
     fieldLabel: String,
     query: String,
     onQueryChange: (String) -> Unit,
-    idle: List<T>,
+    idle: List<ChoiceSection<T>>,
+    idleNote: String,
     find: suspend (String) -> List<T>,
     label: (T) -> String,
     onChoose: (T) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     description: (T) -> String? = { null },
+    actions: (T) -> List<ChoiceAction> = { emptyList() },
     extra: (@Composable () -> Unit)? = null,
     fieldTag: String = "",
 ) {
-    var found by remember { mutableStateOf<List<T>>(emptyList()) }
+    var found by remember { mutableStateOf<Found<T>?>(null) }
     // A search a keystroke later replaces it, so only the last of a burst of keystrokes asks.
     LaunchedEffect(query) {
-        if (query.isBlank()) return@LaunchedEffect
-        delay(SEARCH_PAUSE_MILLIS)
-        found = find(query)
+        if (query.isBlank()) {
+            found = null
+        } else {
+            delay(SEARCH_PAUSE_MILLIS)
+            found = Found(query, find(query))
+        }
     }
-    val shown = if (query.isBlank()) idle else found
+    val sections = (if (query.isBlank()) idle else listOf(ChoiceSection(null, found?.choices.orEmpty()))).filter { it.choices.isNotEmpty() }
+    val searching = query.isNotBlank() && found?.query != query
 
     GroundDialog(
         onDismissRequest = onDismiss,
@@ -389,18 +414,21 @@ fun <T> SearchDialog(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     modifier = Modifier.fillMaxWidth().testTag(fieldTag).focusRequester(rememberShownFocus()),
                 )
-                Column(Modifier.padding(top = Spacing.Tight).verticalScroll(rememberScrollState())) {
-                    shown.forEach { choice ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .clickable { onChoose(choice) },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            LabelOver(label(choice), description(choice))
-                        }
-                    }
+                // Starts afresh with what each search finds, and for a prompt after this one, which can offer the same choices.
+                key(title, found) {
+                    SearchChoices(
+                        sections = sections,
+                        searching = searching,
+                        note = when {
+                            query.isBlank() -> idleNote
+                            searching -> "Searching…"
+                            else -> "Nothing found"
+                        },
+                        label = label,
+                        description = description,
+                        actions = actions,
+                        onChoose = onChoose,
+                    )
                 }
             }
         },
@@ -410,12 +438,85 @@ fun <T> SearchDialog(
 
 private const val SEARCH_PAUSE_MILLIS = 300L
 
-/** A choice in a dialog's list: its [label] over its [description], if any. */
+/** The [choices] a search for [query] found. */
+private class Found<T>(val query: String, val choices: List<T>)
+
+/** The choices of a [SearchDialog] in their [sections], or the [note] when there are none. */
 @Composable
-private fun LabelOver(label: String, description: String?) {
-    Column(Modifier.padding(vertical = Spacing.Tight)) {
+private fun <T> SearchChoices(
+    sections: List<ChoiceSection<T>>,
+    searching: Boolean,
+    note: String,
+    label: (T) -> String,
+    description: (T) -> String?,
+    actions: (T) -> List<ChoiceAction>,
+    onChoose: (T) -> Unit,
+) {
+    // The keyboard comes up, moving the dialog, as its window takes focus.
+    val focused = LocalWindowInfo.current.isWindowFocused
+    val settled = rememberSettled(Triple(sections, searching, focused)) && !searching
+    val scroll = rememberScrollState()
+    val alpha by animateFloatAsState(if (settled) 1f else UNSETTLED_ALPHA, label = "settling")
+
+    Column(
+        Modifier
+            .padding(top = Spacing.Tight)
+            .height(SEARCH_LIST_HEIGHT)
+            .graphicsLayer { this.alpha = alpha }
+            .fadingEdges(scroll)
+            .verticalScroll(scroll),
+    ) {
+        if (sections.isEmpty()) EmptyNote(note)
+
+        sections.forEach { section ->
+            section.title?.let { SectionLabel(it, Modifier.padding(top = Spacing.Tight)) }
+            section.choices.forEach { choice ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LabelOver(
+                        label(choice),
+                        description(choice),
+                        Modifier.weight(1f).heightIn(min = 48.dp).clickable(enabled = settled) { onChoose(choice) },
+                        section.descriptionLines,
+                    )
+                    actions(choice).forEach { action ->
+                        IconButton(
+                            onClick = action.onClick,
+                            enabled = settled,
+                            // The whole list dims while it settles.
+                            colors = IconButtonDefaults.iconButtonColors(disabledContentColor = LocalContentColor.current),
+                        ) { Icon(action.glyph, contentDescription = action.label) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val SEARCH_LIST_HEIGHT = 280.dp
+
+/**
+ * Whether what is shown of [content] has been up long enough for a tap on it to be meant for it: not while it has only
+ * just changed, when the tap was on its way to what was there before.
+ */
+@Composable
+private fun rememberSettled(content: Any): Boolean {
+    var settled by remember(content) { mutableStateOf(false) }
+    LaunchedEffect(content) {
+        delay(SETTLE_MILLIS)
+        settled = true
+    }
+    return settled
+}
+
+private const val SETTLE_MILLIS = 500L
+private const val UNSETTLED_ALPHA = 0.5f
+
+/** A choice in a dialog's list: its [label] over its [description], if any, on [descriptionLines] at most. */
+@Composable
+private fun LabelOver(label: String, description: String?, modifier: Modifier = Modifier, descriptionLines: Int = Int.MAX_VALUE) {
+    Column(modifier.padding(vertical = Spacing.Tight), verticalArrangement = Arrangement.Center) {
         Text(label)
-        description?.let { SupportingText(it) }
+        description?.let { SupportingText(it, maxLines = descriptionLines) }
     }
 }
 
