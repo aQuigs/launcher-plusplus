@@ -67,6 +67,6 @@ private fun PlaceValue.isSamePlace(other: PlaceValue): Boolean {
     return WebMercator.groundDistance(here, there) < SAME_PLACE_M
 }
 
-private val PlaceValue.latLon get() = latitude?.let { lat -> longitude?.let { LatLon(lat, it) } }
+internal val PlaceValue.latLon get() = latitude?.let { lat -> longitude?.let { LatLon(lat, it) } }
 
 private const val SAME_PLACE_M = 150.0

@@ -14,8 +14,8 @@ object IntentCatalog {
                 "uber://",
                 "action" to "setPickup",
                 "pickup" to "my_location",
-                "dropoff[latitude]" to place.latitude?.toString(),
-                "dropoff[longitude]" to place.longitude?.toString(),
+                "dropoff[latitude]" to place.latitude?.plain(),
+                "dropoff[longitude]" to place.longitude?.plain(),
                 "dropoff[nickname]" to place.label,
                 "dropoff[formatted_address]" to place.address,
             )
@@ -25,8 +25,8 @@ object IntentCatalog {
             link(
                 "lyft://ridetype",
                 "id" to "lyft",
-                "destination[latitude]" to place.latitude?.toString(),
-                "destination[longitude]" to place.longitude?.toString(),
+                "destination[latitude]" to place.latitude?.plain(),
+                "destination[longitude]" to place.longitude?.plain(),
                 "destination[address]" to place.address,
             )
         },
@@ -36,8 +36,26 @@ object IntentCatalog {
             link(
                 "https://app.waymo.com/route/trip/create",
                 "pickup" to "my_location",
-                "dropoff_latitude" to place.latitude?.toString(),
-                "dropoff_longitude" to place.longitude?.toString(),
+                "dropoff_latitude" to place.latitude?.plain(),
+                "dropoff_longitude" to place.longitude?.plain(),
+            )
+        },
+        mapsDirections("maps.drive", "drive", "Drive to a place", "driving"),
+        mapsDirections("maps.walk", "walk", "Walk to a place", "walking"),
+        mapsDirections("maps.transit", "transit", "Take transit to a place", "transit"),
+        // https://developers.google.com/waze/deeplinks. Without coordinates it searches for the address instead.
+        PlaceIntent("waze.drive", "com.waze", "drive", "Drive to a place") { place ->
+            val ll = place.coordinates
+            link("https://waze.com/ul", "q" to if (ll == null) place.address else place.label, "ll" to ll, "navigate" to "yes")
+        },
+        // https://citymapper.com/news/2386. It finds the destination by its coordinates only, so a typed address without
+        // them opens Citymapper with the destination left to fill in there.
+        PlaceIntent("citymapper.directions", "com.citymapper.app.release", "directions", "Directions to a place") { place ->
+            link(
+                "citymapper://directions",
+                "endcoord" to place.coordinates,
+                "endname" to place.label,
+                "endaddress" to place.address,
             )
         },
     )
@@ -61,6 +79,27 @@ private class PlaceIntent(
 
     override fun request(value: InputValue?) = IntentRequest(packageName, link(value as PlaceValue))
 }
+
+/**
+ * Google Maps directions from here to a place by [travelMode], starting navigation where the mode has it:
+ * https://developers.google.com/maps/documentation/urls/get-started#directions-action
+ */
+private fun mapsDirections(id: String, name: String, label: String, travelMode: String) =
+    PlaceIntent(id, "com.google.android.apps.maps", name, label) { place ->
+        link(
+            "https://www.google.com/maps/dir/",
+            "api" to "1",
+            "destination" to (place.coordinates ?: place.address),
+            "travelmode" to travelMode,
+            "dir_action" to "navigate",
+        )
+    }
+
+/** "latitude,longitude", when both are known. */
+private val PlaceValue.coordinates: String? get() = latLon?.let { "${it.lat.plain()},${it.lon.plain()}" }
+
+/** In plain decimals, as the apps read a coordinate: never 1.0E-4. */
+private fun Double.plain(): String = toBigDecimal().toPlainString()
 
 /** [base] with a query of the [params] that have a value, each URL-encoded; the apps read their brackets unencoded. */
 private fun link(base: String, vararg params: Pair<String, String?>): String =

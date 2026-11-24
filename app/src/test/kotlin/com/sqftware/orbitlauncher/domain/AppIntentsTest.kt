@@ -13,7 +13,11 @@ class AppIntentsTest {
     private val ride = IntentCatalog.forPackage(uber.packageName).single()
     private val lyftRide = IntentCatalog.forPackage(lyft.packageName).single()
     private val waymoRide = IntentCatalog.forPackage("com.waymo.carapp").single()
+    private val mapsDrive = IntentCatalog.byId("maps.drive")!!
+    private val waze = IntentCatalog.byId("waze.drive")!!
+    private val citymapper = IntentCatalog.byId("citymapper.directions")!!
     private val work = PlaceValue("Work | Office!", "1 Main St, Springfield", 37.5, -122.25)
+    private val elm = PlaceValue("Elm St", "Elm St")
 
     @Test
     fun `an app with intents offers to open as usual or straight to each, picked now or each time`() {
@@ -115,7 +119,7 @@ class AppIntentsTest {
         )
         assertEquals(
             "lyft://ridetype?id=lyft&destination[address]=Elm%20St",
-            lyftRide.request(PlaceValue("Elm St", "Elm St")).data,
+            lyftRide.request(elm).data,
         )
         assertEquals(
             IntentRequest(
@@ -126,7 +130,47 @@ class AppIntentsTest {
         )
         assertEquals(
             "https://app.waymo.com/route/trip/create?pickup=my_location",
-            waymoRide.request(PlaceValue("Elm St", "Elm St")).data,
+            waymoRide.request(elm).data,
+        )
+    }
+
+    @Test
+    fun `Maps directions go to the place's coordinates, or to its address without them`() {
+        assertEquals(
+            IntentRequest(
+                "com.google.android.apps.maps",
+                "https://www.google.com/maps/dir/?api=1&destination=37.5%2C-122.25&travelmode=driving&dir_action=navigate",
+            ),
+            mapsDrive.request(work),
+        )
+        assertEquals(
+            "https://www.google.com/maps/dir/?api=1&destination=Elm%20St&travelmode=driving&dir_action=navigate",
+            mapsDrive.request(elm).data,
+        )
+    }
+
+    @Test
+    fun `Waze navigates to the place's coordinates, or searches for its address without them`() {
+        assertEquals("https://waze.com/ul?q=Work%20%7C%20Office%21&ll=37.5%2C-122.25&navigate=yes", waze.request(work).data)
+        assertEquals("https://waze.com/ul?q=Elm%20St&navigate=yes", waze.request(elm).data)
+    }
+
+    @Test
+    fun `Citymapper gets the place's coordinates, name and address`() {
+        assertEquals(
+            "citymapper://directions?endcoord=37.5%2C-122.25&endname=Work%20%7C%20Office%21&endaddress=1%20Main%20St%2C%20Springfield",
+            citymapper.request(work).data,
+        )
+    }
+
+    @Test
+    fun `links write a coordinate near zero in plain decimals`() {
+        val greenwich = PlaceValue("Greenwich", "Greenwich", 51.4778, -0.0001)
+
+        assertEquals("https://waze.com/ul?q=Greenwich&ll=51.4778%2C-0.00010&navigate=yes", waze.request(greenwich).data)
+        assertEquals(
+            "https://app.waymo.com/route/trip/create?pickup=my_location&dropoff_latitude=51.4778&dropoff_longitude=-0.00010",
+            waymoRide.request(greenwich).data,
         )
     }
 
