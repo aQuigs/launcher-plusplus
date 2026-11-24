@@ -18,6 +18,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
+import com.sqftware.orbitlauncher.domain.ChatApp
+import com.sqftware.orbitlauncher.domain.ChatValue
+import com.sqftware.orbitlauncher.domain.FoundChat
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
@@ -38,14 +41,19 @@ class InputPromptTest {
     private val work = PlaceValue("Work", "1 Main St", 37.5, -122.25)
     private val uber = AppEntry("Uber", "com.ubercab", "com.ubercab.Main")
 
+    private val slack = AppEntry("Slack", "com.Slack", "com.Slack.Main")
+    private val general = ChatValue(ChatApp.Slack, "general", "slack://channel?team=T1&id=C1")
+    private val random = ChatValue(ChatApp.Slack, "random", "slack://channel?team=T1&id=C2")
+
+    private var chats by mutableStateOf(emptyMap<ChatApp, KeptInputs<ChatValue>>())
     private var places by mutableStateOf(KeptInputs<PlaceValue>())
     private var query by mutableStateOf("")
     private val answers = mutableListOf<InputValue>()
     private var found = CompletableDeferred<List<PlaceValue>>()
 
-    private fun show() = compose.setContent {
+    private fun show(question: InputQuestion = InputQuestion(InputKind.Place, listOf(uber))) = compose.setContent {
         InputPrompt(
-            question = InputQuestion(InputKind.Place, listOf(uber)),
+            question = question,
             query = query,
             onQueryChange = { query = it },
             sources = InputSources(
@@ -53,6 +61,10 @@ class InputPromptTest {
                 onPlacesChange = { places = it },
                 findPlaces = { found.await() },
                 openMaps = {},
+                chats = chats,
+                onChatsChange = { app, kept -> chats = chats + (app to kept) },
+                findChat = { app, typed -> (app.find(typed) as? FoundChat.Whole)?.chat },
+                pasted = { random.link },
             ),
             onAnswer = answers::add,
             onDismiss = {},
@@ -135,5 +147,39 @@ class InputPromptTest {
 
         compose.onNodeWithText("Home").assertIsNotEnabled().performTouchInput { click() }
         compose.runOnIdle { assertEquals(emptyList<InputValue>(), answers) }
+    }
+
+    @Test
+    fun aChatPastedIsNamedThenPickedAndKept() {
+        show(InputQuestion(ChatApp.Slack, listOf(slack)))
+        compose.onNodeWithText("Pick a Slack channel").assertIsDisplayed()
+        compose.onNodeWithText(ChatApp.Slack.howToLink).assertIsDisplayed()
+
+        compose.onNodeWithText("Paste").performClick()
+        compose.awaitSettled("New channel")
+        compose.onNodeWithText("New channel").performClick()
+        compose.onNodeWithText("Name this channel").assertIsDisplayed()
+        compose.onNodeWithTag(OpenWithTags.NAME).performTextInput(" random ")
+        compose.onNodeWithText("Save").performClick()
+
+        compose.runOnIdle {
+            assertEquals(listOf<InputValue>(random), answers)
+            assertEquals(mapOf(ChatApp.Slack to KeptInputs(recent = listOf(random))), chats)
+        }
+    }
+
+    @Test
+    fun aChatKeptIsFoundByNameOrLinkAndPickedWithoutNamingItAgain() {
+        chats = mapOf(ChatApp.Slack to KeptInputs(favorites = listOf(general), recent = listOf(random)))
+        show(InputQuestion(ChatApp.Slack, listOf(slack)))
+
+        compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("GENE")
+        compose.awaitSettled("general")
+        compose.onNodeWithText("random").assertDoesNotExist()
+        compose.onNodeWithText("Paste").performClick()
+        compose.awaitSettled("random")
+        compose.onNodeWithText("random").performClick()
+
+        compose.runOnIdle { assertEquals(listOf<InputValue>(random), answers) }
     }
 }

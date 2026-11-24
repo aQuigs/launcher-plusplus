@@ -24,6 +24,9 @@ interface AppIntent {
 
     /** What opens it, filled in with [value] when it takes an [input]. */
     fun request(value: InputValue?): IntentRequest
+
+    /** What an icon that opens the app called [appLabel] to it with [saved] is named. */
+    fun savedLabel(appLabel: String, saved: InputValue): String = "$appLabel $name: ${saved.label}"
 }
 
 /** An activity of [packageName] to start for [action] on [data], as an Android intent names one. */
@@ -32,17 +35,16 @@ data class IntentRequest(val packageName: String, val data: String? = null, val 
 const val ACTION_VIEW = "android.intent.action.VIEW"
 
 /** A kind of value an [AppIntent] fills in. Each kind has a prompt of its own, which asks for one. */
-enum class InputKind {
-    Place {
-        override fun decode(text: String): InputValue? {
-            val parts = text.split(FIELD_SEPARATOR).map { URLDecoder.decode(it, "UTF-8") }
-            if (parts.size != 4) return null
-            return PlaceValue(parts[0], parts[1], parts[2].toDoubleOrNull(), parts[3].toDoubleOrNull())
-        }
-    };
-
+sealed interface InputKind {
     /** The value [InputValue.encode] made, or null for text that is not one of this kind. */
-    abstract fun decode(text: String): InputValue?
+    fun decode(text: String): InputValue?
+
+    data object Place : InputKind {
+        override fun decode(text: String): PlaceValue? {
+            val (label, address, latitude, longitude) = decodeFields(text, 4) ?: return null
+            return PlaceValue(label, address, latitude.toDoubleOrNull(), longitude.toDoubleOrNull())
+        }
+    }
 }
 
 /** A value an [AppIntent] is filled in with. */
@@ -65,9 +67,15 @@ data class PlaceValue(
 ) : InputValue {
     override val kind get() = InputKind.Place
 
-    override fun encode() = listOf(label, address, latitude?.toString().orEmpty(), longitude?.toString().orEmpty())
-        .joinToString(FIELD_SEPARATOR) { URLEncoder.encode(it, "UTF-8") }
+    override fun encode() = encodeFields(label, address, latitude?.toString().orEmpty(), longitude?.toString().orEmpty())
 }
+
+/** [fields] as one line of text, whatever is in them, that [decodeFields] reads back. */
+internal fun encodeFields(vararg fields: String): String = fields.joinToString(FIELD_SEPARATOR) { URLEncoder.encode(it, "UTF-8") }
+
+/** The [count] fields [encodeFields] made [text] of, or null if it is not made of that many. */
+internal fun decodeFields(text: String, count: Int): List<String>? =
+    text.split(FIELD_SEPARATOR).takeIf { it.size == count }?.map { URLDecoder.decode(it, "UTF-8") }
 
 // URL-encoding escapes it, and line breaks, so an encoded value is one line of its fields.
 private const val FIELD_SEPARATOR = ","
@@ -162,9 +170,8 @@ fun intentEntryOf(app: AppEntry, intent: AppIntent, source: InputSource?): AppEn
         is InputSource.Saved -> source.value.kind == intent.input
     }
     if (!fits) return null
-    val named = "${app.label} ${intent.name}"
     return app.copy(
-        label = if (source is InputSource.Saved) "$named: ${source.value.label}" else named,
+        label = if (source is InputSource.Saved) intent.savedLabel(app.label, source.value) else "${app.label} ${intent.name}",
         canUninstall = false,
         kind = EntryKind.Intent(app, intent, source),
     )

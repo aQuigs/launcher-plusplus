@@ -3,6 +3,8 @@ package com.sqftware.orbitlauncher.apps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -38,4 +40,11 @@ internal fun HttpURLConnection.response(): Pair<Int, ByteArray> {
 internal suspend fun HttpURLConnection.cancellableResponse(): Pair<Int, ByteArray> = suspendCancellableCoroutine { done ->
     done.invokeOnCancellation { disconnect() }
     Dispatchers.IO.asExecutor().execute { done.resumeWith(runCatching { response() }) }
+}
+
+/** The JSON at [url], got as [cancellableResponse] gets one. Throws an IOException or a JSONException if there is none. */
+internal suspend fun getJson(url: String, timeoutMillis: Int): JSONObject {
+    val (code, body) = getRequest(url, timeoutMillis).cancellableResponse()
+    if (code != HttpURLConnection.HTTP_OK) throw IOException("HTTP $code")
+    return JSONObject(body.decodeToString())
 }

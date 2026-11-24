@@ -58,7 +58,7 @@ object IntentCatalog {
                 "endaddress" to place.address,
             )
         },
-    )
+    ) + ChatApp.entries.flatMap { app -> app.packages.map { ChatIntent(app, it) } }
 
     private val byId = all.associateBy { it.id }
 
@@ -78,6 +78,18 @@ private class PlaceIntent(
     override val input = InputKind.Place
 
     override fun request(value: InputValue?) = IntentRequest(packageName, link(value as PlaceValue))
+}
+
+/** One of [input]'s chats, opened in its [packageName]. */
+private class ChatIntent(override val input: ChatApp, override val packageName: String) : AppIntent {
+    override val id = "$packageName.chat"
+    override val name = input.noun
+    override val label = "Open a ${input.noun}"
+
+    override fun request(value: InputValue?) = IntentRequest(packageName, (value as ChatValue).link)
+
+    // The icon already says which app it is, and a short name is all a label has room for.
+    override fun savedLabel(appLabel: String, saved: InputValue) = saved.label
 }
 
 /**

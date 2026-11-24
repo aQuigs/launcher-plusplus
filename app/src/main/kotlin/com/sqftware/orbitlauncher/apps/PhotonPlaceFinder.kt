@@ -8,7 +8,6 @@ import com.sqftware.orbitlauncher.domain.toPlace
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URLEncoder
 import kotlin.math.roundToLong
 
@@ -27,9 +26,7 @@ class PhotonPlaceFinder(private val near: () -> LatLon?) : PlaceFinder {
     override suspend fun find(query: String): List<PlaceValue> {
         if (query.trim().length < SHORTEST_QUERY) return emptyList()
         return try {
-            val (code, body) = getRequest(url(query), TIMEOUT_MILLIS).cancellableResponse()
-            if (code != HttpURLConnection.HTTP_OK) throw IOException("HTTP $code")
-            places(body.decodeToString())
+            places(getJson(url(query), TIMEOUT_MILLIS))
         } catch (e: IOException) {
             Log.w(TAG, "Cannot find places", e)
             emptyList()
@@ -47,8 +44,8 @@ class PhotonPlaceFinder(private val near: () -> LatLon?) : PlaceFinder {
 
     private fun Double.rounded() = (this * 100).roundToLong() / 100.0
 
-    private fun places(body: String): List<PlaceValue> {
-        val features = JSONObject(body).getJSONArray("features")
+    private fun places(found: JSONObject): List<PlaceValue> {
+        val features = found.getJSONArray("features")
         return (0 until features.length()).mapNotNull { index ->
             val feature = features.getJSONObject(index)
             val properties = feature.getJSONObject("properties")
