@@ -359,10 +359,10 @@ class ChoiceAction(val glyph: ImageVector, val label: String, val onClick: () ->
 
 /**
  * Asks for one thing found by a search for the [query] typed in its field, labeled [fieldLabel]: what [find] finds for
- * it, or the [idle] ones while it is blank ([idleNote] says there are none), each named by its [label] over its
- * [description], if any, with its [actions]. A tap on one hands it to [onChoose]; [extra], if any, is a button beside
- * Cancel, and Cancel, Back and a tap outside call [onDismiss]. The query is the caller's, so text from elsewhere can
- * fill it.
+ * it ([missNote] says nothing), or the [idle] ones while it is blank ([idleNote] says there are none), each named by its
+ * [label] over its [description], if any, with its [actions]. A tap on one hands it to [onChoose]; [extra], if any, is a
+ * button beside Cancel, and Cancel, Back and a tap outside call [onDismiss]. The query is the caller's, so text from
+ * elsewhere can fill it.
  *
  * Rows take no tap while a search for what is now typed is on, nor until they have [settled][rememberSettled], and the
  * list is one height whatever is in it, so a tap never lands on something that has only just come under the finger.
@@ -380,6 +380,7 @@ fun <T> SearchDialog(
     onChoose: (T) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    missNote: String = "Nothing found",
     description: (T) -> String? = { null },
     actions: (T) -> List<ChoiceAction> = { emptyList() },
     extra: (@Composable () -> Unit)? = null,
@@ -422,7 +423,7 @@ fun <T> SearchDialog(
                         note = when {
                             query.isBlank() -> idleNote
                             searching -> "Searching…"
-                            else -> "Nothing found"
+                            else -> missNote
                         },
                         label = label,
                         description = description,
