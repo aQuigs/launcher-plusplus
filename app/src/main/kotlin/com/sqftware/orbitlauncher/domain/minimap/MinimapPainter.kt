@@ -52,6 +52,9 @@ private val FOOT_WAYS = EnumSet.of(WayKind.Walk, WayKind.Path, WayKind.Parking)
 private const val BUILT_UP_COVER = 0.15
 private const val PAVED_COVER = 0.3
 
+/** Share of the ground round a place under roads from which it counts as built up, on a map whose tiles carry no buildings. */
+private const val ROADED_COVER = 0.1
+
 internal const val MAX_DOORS = 2
 internal const val DOOR_PX = TILE_PX
 private const val DOOR_REACH_PX = 6
@@ -68,8 +71,8 @@ internal const val ICON_SPACING_PX = 24.0
 
 /**
  * Paints the map of a [MapScene] in a [MapFrame], the minimap's disc or a stretch of the world map, at
- * [METRES_PER_PIXEL], laid out the way the old game builds its minimap and colored in [style]. In the Old School style every 4 px tile gets a flat ground color; walls are 1 px lines around each structure with a few
- * doors; trees and the dots of people go on top. The map icons and the self marker are left to whoever shows the map,
+ * the frame's scale, laid out the way the old game builds its minimap and colored in [style]. In the Old School style
+ * every 4 px tile gets a flat ground color; walls are 1 px lines around each structure with a few doors; trees and the dots of people go on top. The map icons and the self marker are left to whoever shows the map,
  * so they stay upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
  * it moves.
  */
@@ -85,7 +88,8 @@ class MinimapPainter(private val sprites: MinimapSprites, private val style: Map
 /**
  * The ground a painting has laid out, for a style to color, pixel by pixel of a [width] by [height] view: what each is
  * made of, whether it is a structure's wall, which structure it is in (0 for none), and whether a rail runs over it;
- * the spots [trees] stand on; and the [shade] of each pixel's grass, a smooth field from 0 to 1 keyed by places on Earth.
+ * the spots [trees] stand on; and the [shade] of each pixel's grass, a smooth field from 0 to 1 keyed by places on Earth,
+ * worked out as it is asked for, as a world map's every pixel of it would be as much memory again.
  */
 internal class GroundLayout(
     val width: Int,
@@ -95,15 +99,20 @@ internal class GroundLayout(
     val structure: IntArray,
     val rails: BooleanArray,
     val trees: List<Px>,
-    val shade: DoubleArray,
+    val shade: Shade,
 )
 
-/** The world-wide pixel grid seeded features and the world map keep to, in pixels to the mercator metre. */
-internal fun gridPixelsPerMetre(lat: Double) = WebMercator.gridScale(lat) / METRES_PER_PIXEL
+/** A shade from 0 to 1 for each pixel. */
+internal fun interface Shade {
+    fun at(i: Int): Double
+}
+
+/** The world-wide grid seeded features and the world map keep to, its pixels [span] map pixels across, in pixels to the mercator metre. */
+internal fun gridPixelsPerMetre(lat: Double, span: Int = 1) = WebMercator.gridScale(lat) / (METRES_PER_PIXEL * span)
 
 /** [at] moved to the middle of its pixel of the seeded grid, so maps painted round places near it line up pixel for pixel. */
-internal fun onSeedGrid(at: LatLon): LatLon {
-    val scale = gridPixelsPerMetre(at.lat)
+internal fun onSeedGrid(at: LatLon, span: Int = 1): LatLon {
+    val scale = gridPixelsPerMetre(at.lat, span)
     val m = WebMercator.toMercator(at)
     return WebMercator.toLatLon(Mercator((floor(m.x * scale) + 0.5) / scale, -(floor(-m.y * scale) + 0.5) / scale))
 }
@@ -215,7 +224,7 @@ private class Painting(
     private val originY: Int
 
     init {
-        val scale = gridPixelsPerMetre(scene.centre.lat)
+        val scale = gridPixelsPerMetre(scene.centre.lat, frame.span)
         val centre = WebMercator.toMercator(scene.centre)
         originX = floor(centre.x * scale).toInt() - w / 2
         originY = floor(-centre.y * scale).toInt() - h / 2
@@ -226,67 +235,27 @@ private class Painting(
     private val twX = w / TILE_PX + 2
     private val twY = h / TILE_PX + 2
 
-    private val cls = Array(w * h) { Ground.Grass }
-    private val img = IntArray(w * h)
+    // Roads narrow more slowly than the ground does as the map coarsens, so they still read from far out.
+    private val wayMetresPerPixel = METRES_PER_PIXEL * sqrt(frame.span.toDouble())
 
-    private fun px(p: Local) = Px(cx + p.east / METRES_PER_PIXEL, cy - p.north / METRES_PER_PIXEL)
+    private val cls = Array(w * h) { Ground.Grass }
+
+    // Allocated once the ground is laid, whose own working memory is then let go.
+    private lateinit var img: IntArray
+
+    private fun px(p: Local) = Px(cx + p.east / frame.metresPerPixel, cy - p.north / frame.metresPerPixel)
 
     private fun pxRings(polygon: Polygon) = polygon.map { ring -> ring.map(::px) }
 
     fun run(): PaintedMap<Pixels> {
-        // 1. footprints, whose cover says whether the place is built up
-        val bid = IntArray(w * h)
-        scene.buildings.forEachIndexed { i, b -> scanPolygon(pxRings(b.polygon)) { bid[it] = i + 1 } }
-        val cover = around(BooleanArray(w * h) { bid[it] != 0 })
-        for (i in 0 until w * h) cls[i] = if (cover.share(i) >= PAVED_COVER) Ground.Plaza else Ground.Grass
-
-        // 2. ground: areas biggest first, then piers, paths and roads, the widest last
-        scene.areas.map { it to areaOf(it) }
-            .sortedWith(compareBy({ -it.second }, { it.first.order }))
-            .forEach { (area, _) ->
-                area.polygons.forEach { polygon ->
-                    scanPolygon(pxRings(polygon)) { if (!area.builtUpOnly || cover.share(it) >= BUILT_UP_COVER) cls[it] = area.ground }
-                }
-            }
-        val strokes = scene.ways.filter { it.kind == WayKind.Pier } +
-            scene.ways.filter { it.kind in FOOT_WAYS } +
-            scene.ways.filter { it.kind == WayKind.Road }.sortedBy { it.widthM }
-        strokes.forEach { strokeBuffer(it.points.map(::px), it.widthM / METRES_PER_PIXEL, groundOf(it.kind)) }
-
-        // 3. touching footprints merge into one structure with one floor and only its outer wall, as a game building is
-        // one walled shape rather than a wall per footprint
-        val comp = IntArray(w * h)
-        var structures = 0
-        val stack = IntArray(w * h)
-        val members = IntArray(w * h)
-        for (i in 0 until w * h) {
-            if (bid[i] == 0 || comp[i] != 0) continue
-            val mark = ++structures
-            var count = 0
-            var top = 0
-            comp[i] = mark
-            stack[top++] = i
-            while (top > 0) {
-                val j = stack[--top]
-                members[count++] = j
-                forNeighbours(j) { k ->
-                    if (bid[k] != 0 && comp[k] == 0) {
-                        comp[k] = mark
-                        stack[top++] = k
-                    }
-                }
-            }
-            var seed = Long.MAX_VALUE
-            for (m in 0 until count) seed = minOf(seed, scene.buildings[bid[members[m]] - 1].seed)
-            val floor = if (stableRandom(seed) < WOOD_FLOOR_SHARE) Ground.FloorWood else Ground.FloorStone
-            for (m in 0 until count) cls[members[m]] = floor
-        }
+        val comp = layGround()
+        img = IntArray(w * h)
         val walls = BooleanArray(w * h) { comp[it] != 0 && anyNeighbour(it) { k -> comp[k] == 0 } }
         val rails = BooleanArray(w * h).also { rails ->
             scene.ways.filter { it.kind == WayKind.Rail }.forEach { rail -> linePixels(rail.points.map(::px)) { rails[it] = true } }
         }
         val noise = grassNoise()
-        val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), DoubleArray(w * h) { noise[tileOf(it % w, it / w)] })
+        val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), { noise[tileOf(it % w, it / w)] })
 
         val smooth = style.smooth
         val icons = if (smooth != null) {
@@ -302,16 +271,75 @@ private class Painting(
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
         // A smooth map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
-        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
+        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place, frame.span)
         icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
-        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
+        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList(), span = frame.span)
     }
+
+    /**
+     * Lays the ground in [cls], and returns which structure each pixel is in, 0 for none. Apart from the painting, so what it
+     * works with, several times a painting's memory, is let go before the painting takes its own.
+     */
+    private fun layGround(): IntArray {
+        // 1. footprints, whose cover says whether the place is built up
+        val bid = IntArray(w * h)
+        scene.buildings.forEachIndexed { i, b -> scanPolygon(pxRings(b.polygon)) { bid[it] = i + 1 } }
+        val cover = around(if (scene.buildingsMapped) BooleanArray(w * h) { bid[it] != 0 } else roadMarks())
+        val paved = if (scene.buildingsMapped) PAVED_COVER else ROADED_COVER
+        for (i in 0 until w * h) cls[i] = if (cover.share(i) >= paved) Ground.Plaza else Ground.Grass
+
+        // 2. ground: areas biggest first, then piers, paths and roads, the widest last
+        scene.areas.map { it to areaOf(it) }
+            .sortedWith(compareBy({ -it.second }, { it.first.order }))
+            .forEach { (area, _) ->
+                area.polygons.forEach { polygon ->
+                    scanPolygon(pxRings(polygon)) { if (!area.builtUpOnly || cover.share(it) >= BUILT_UP_COVER) cls[it] = area.ground }
+                }
+            }
+        val strokes = scene.ways.filter { it.kind == WayKind.Pier } +
+            scene.ways.filter { it.kind in FOOT_WAYS } +
+            scene.ways.filter { it.kind == WayKind.Road }.sortedBy { it.widthM }
+        strokes.forEach { way -> groundOf(way.kind).let { ground -> stroke(way) { cls[it] = ground } } }
+
+        // 3. touching footprints merge into one structure with one floor and only its outer wall, as a game building is
+        // one walled shape rather than a wall per footprint
+        val comp = IntArray(w * h)
+        var structures = 0
+        val members = IntArray(bid.count { it != 0 })
+        for (i in 0 until w * h) {
+            if (bid[i] == 0 || comp[i] != 0) continue
+            val mark = ++structures
+            var count = 0
+            comp[i] = mark
+            members[count++] = i
+            var next = 0
+            while (next < count) {
+                forNeighbours(members[next++]) { k ->
+                    if (bid[k] != 0 && comp[k] == 0) {
+                        comp[k] = mark
+                        members[count++] = k
+                    }
+                }
+            }
+            var seed = Long.MAX_VALUE
+            for (m in 0 until count) seed = minOf(seed, scene.buildings[bid[members[m]] - 1].seed)
+            val floor = if (stableRandom(seed) < WOOD_FLOOR_SHARE) Ground.FloorWood else Ground.FloorStone
+            for (m in 0 until count) cls[members[m]] = floor
+        }
+        return comp
+    }
+
+    private fun roadMarks() = BooleanArray(w * h).also { marks ->
+        scene.ways.filter { it.kind == WayKind.Road }.forEach { road -> stroke(road) { marks[it] = true } }
+    }
+
+    private inline fun stroke(way: Way, set: (Int) -> Unit) = strokeBuffer(way.points.map(::px), way.widthM / wayMetresPerPixel, set)
 
     private fun paintOldSchool(layout: GroundLayout) {
         // flat tiles: one color per ground, grass shaded only by a smooth field across tiles
         for (i in 0 until w * h) {
             img[i] = when (val g = cls[i]) {
-                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, layout.shade[i])
+                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, layout.shade.at(i))
                 Ground.Water -> if (anyNeighbour(i) { cls[it] != Ground.Water }) WATER_EDGE else WATER_BASE
                 else -> GROUND_COLOUR[g.ordinal]
             }
@@ -483,10 +511,13 @@ private class Painting(
             if (wood[i] && cls[i] == Ground.Grass) spots += Px(x, y)
             true
         }
-        val mapped = around(BooleanArray(w * h).also { marks -> spots.forEach { marks[it.y.toInt() * w + it.x.toInt()] = true } })
         val placed = Spaced(DECOR_SPACING_PX, w, h)
         standing(spots.filter { cls[it.y.toInt() * w + it.x.toInt()] !in NO_TREES }, TREE_SPACING_PX).forEach { placed += it }
 
+        // From far out, a scattered tree would be as wide as a block.
+        if (frame.span > 1) return placed.all
+
+        val mapped = around(BooleanArray(w * h).also { marks -> spots.forEach { marks[it.y.toInt() * w + it.x.toInt()] = true } })
         // Decoration where the map gives no trees: a few seeded spots per world cell, the first clear one standing.
         val decor = mutableListOf<Px>()
         seededSpots(DECOR_CELL_PX, DECOR_SALT, DECOR_TRIES) { x, y ->
@@ -659,7 +690,8 @@ private class Painting(
 
     private fun ceilHalf(v: Double) = ceil(v - 0.5).toInt()
 
-    private fun strokeBuffer(pts: List<Px>, widthPx: Double, value: Ground) {
+    /** A round-ended line [widthPx] wide along [pts]; [set] gets each pixel under it. */
+    private inline fun strokeBuffer(pts: List<Px>, widthPx: Double, set: (Int) -> Unit) {
         val r = maxOf(widthPx / 2, 0.5)
         for (k in 0 until pts.size - 1) {
             val a = pts[k]
@@ -672,7 +704,7 @@ private class Painting(
                     val px = x + 0.5
                     val py = y + 0.5
                     val t = (((px - a.x) * dx + (py - a.y) * dy) / ll).coerceIn(0.0, 1.0)
-                    if (sq(px - a.x - t * dx) + sq(py - a.y - t * dy) <= r * r) cls[y * w + x] = value
+                    if (sq(px - a.x - t * dx) + sq(py - a.y - t * dy) <= r * r) set(y * w + x)
                 }
             }
         }

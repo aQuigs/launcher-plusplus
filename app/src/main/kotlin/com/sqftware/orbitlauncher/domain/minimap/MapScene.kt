@@ -54,7 +54,10 @@ data class Place(val name: String, val at: LatLon) {
         get() = "$name@${(at.lat * 100).roundToLong()},${(at.lon * 100).roundToLong()}"
 }
 
-/** Everything a minimap centred on [centre] draws, in ground metres around it, and the [place] it is in, if known. */
+/**
+ * Everything a minimap centred on [centre] draws, in ground metres around it, and the [place] it is in, if known. A map from
+ * far out, whose tiles carry no buildings, is not [buildingsMapped], so its roads say where it is built up.
+ */
 data class MapScene(
     val centre: LatLon,
     val areas: List<Area> = emptyList(),
@@ -63,4 +66,5 @@ data class MapScene(
     val pois: List<Poi> = emptyList(),
     val figures: List<Figure> = emptyList(),
     val place: Place? = null,
+    val buildingsMapped: Boolean = true,
 )

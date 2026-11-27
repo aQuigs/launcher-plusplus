@@ -197,7 +197,7 @@ class LauncherScreenTest {
     private val worldMap = object : WorldMap {
         override suspend fun paint(centre: LatLon, frame: MapFrame): PaintedMap<ImageBitmap> {
             worldMapPaints += WorldMapPaint(centre, frame)
-            return PaintedMap(centre, ImageBitmap(frame.width, frame.height), emptyList())
+            return PaintedMap(centre, ImageBitmap(frame.width, frame.height), emptyList(), span = frame.span)
         }
     }
     private var isHomeApp by mutableStateOf(true)

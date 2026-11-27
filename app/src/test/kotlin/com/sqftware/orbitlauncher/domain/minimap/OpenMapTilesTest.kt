@@ -13,6 +13,13 @@ class OpenMapTilesTest {
     private fun scene(vararg layers: Pair<String, List<VectorFeature>>) =
         OpenMapTiles.scene(centre, mapOf(id to VectorTile(layers.associate { (name, features) -> name to VectorLayer(name, EXTENT, features) })), MapFrame.MINIMAP)
 
+    private fun farOut(vararg layers: Pair<String, List<VectorFeature>>): MapScene {
+        val frame = MapFrame.worldMap(400, 400, span = 8)
+        val tile = TileId(11, id.x shr 3, id.y shr 3)
+        val middle = WebMercator.toLatLon(WebMercator.fromTile(tile, EXTENT, TilePoint(2048, 2048)))
+        return OpenMapTiles.scene(middle, mapOf(tile to VectorTile(layers.associate { (name, features) -> name to VectorLayer(name, EXTENT, features) })), frame)
+    }
+
     private fun square(tags: Map<String, Any>, size: Int = 20) = VectorFeature(
         GeometryType.Polygon,
         tags,
@@ -48,6 +55,15 @@ class OpenMapTilesTest {
         )
         assertTrue(areas.single { it.woodland }.ground == Ground.Grass)
         assertTrue(areas.single { it.ground == Ground.Plaza }.builtUpOnly)
+    }
+
+    @Test
+    fun aCoarserMapTakesLowerZoomTilesAndPavesSettledLandWhereTheyCarryNoBuildings() {
+        assertEquals(listOf(14, 13, 12, 11), listOf(1, 2, 4, 8).map { OpenMapTiles.tilesFor(centre, MapFrame.worldMap(64, 64, it)).first().z })
+
+        val town = square(mapOf("class" to "residential"), size = 800)
+        assertEquals(listOf(Ground.Plaza), farOut("landuse" to listOf(town)).areas.map { it.ground })
+        assertTrue(scene("landuse" to listOf(town)).areas.isEmpty())
     }
 
     @Test

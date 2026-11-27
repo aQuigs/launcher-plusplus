@@ -44,6 +44,9 @@ import kotlin.math.roundToInt
 private val PLAYER_HALF = 14.dp
 private val QUEST_HALF = 16.dp
 
+/** How many steps the map zooms out past the old game's, to about 5 km across a phone: the games' maps pull back over their whole land. */
+private const val FAR_STEPS = 3
+
 /** The thinnest the route is drawn, however far out the map is zoomed. */
 private val ROUTE_THINNEST = 4.dp
 
@@ -61,6 +64,7 @@ private const val ICON_OF_SPACING = 0.85f
 internal class HudWorldMap(private val look: HudLook, private val drift: Drift?) : WorldMapArt {
     override val void = look.colors.fog
     override val ink = look.colors.ink
+    override val farSteps = FAR_STEPS
 
     // Smooth, as the local map is drawn, not in crisp pixels like the old game's, its icons upright and of one size.
     override fun DrawScope.drawPainting(painting: PaintedMap<ImageBitmap>, topLeft: IntOffset, scale: Float) {

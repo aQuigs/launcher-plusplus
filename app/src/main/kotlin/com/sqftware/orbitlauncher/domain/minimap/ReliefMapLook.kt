@@ -52,7 +52,7 @@ internal fun paintRelief(layout: GroundLayout, into: IntArray, tint: LightTint) 
 
     val light = DoubleArray(w * h) { i ->
         val ground = layout.ground[i]
-        if (ground == Ground.Grass) GRASS_FROM + (GRASS_TO - GRASS_FROM) * layout.shade[i] else GROUND_LIGHT[ground.ordinal].toDouble()
+        if (ground == Ground.Grass) GRASS_FROM + (GRASS_TO - GRASS_FROM) * layout.shade.at(i) else GROUND_LIGHT[ground.ordinal].toDouble()
     }
     for (i in 0 until w * h) {
         val x = i % w
@@ -74,22 +74,21 @@ internal fun paintRelief(layout: GroundLayout, into: IntArray, tint: LightTint) 
         }
     }
 
-    val soft = softened(w, h, light)
-    for (i in 0 until w * h) into[i] = tint.tint(soft[i])
+    for (i in 0 until w * h) into[i] = tint.tint(softened(w, h, i) { light[it] })
 }
 
-/** [values] over a [w] by [h] view softened by a 3 by 3 binomial blur, its weights summing to 16, its edges held. */
-internal fun softened(w: Int, h: Int, values: DoubleArray): DoubleArray {
-    val weights = intArrayOf(1, 2, 1)
-    return DoubleArray(w * h) { i ->
-        val x = i % w
-        val y = i / w
-        var sum = 0.0
-        for (dy in -1..1) for (dx in -1..1) {
-            sum += values[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)] * weights[dx + 1] * weights[dy + 1]
-        }
-        sum / 16
+/**
+ * Pixel [i] of a [w] by [h] view of [value]s softened by a 3 by 3 binomial blur, its weights summing to 16, its edges held.
+ * A pixel at a time, as a world map's worth of blurred values would be more memory than a small heap has.
+ */
+internal inline fun softened(w: Int, h: Int, i: Int, value: (Int) -> Double): Double {
+    val x = i % w
+    val y = i / w
+    var sum = 0.0
+    for (dy in -1..1) for (dx in -1..1) {
+        sum += value((y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)) * (2 - dx * dx) * (2 - dy * dy)
     }
+    return sum / 16
 }
 
 /** Skyrim's gray of [light], tinted a touch toward blue as the game's northern light is. */
