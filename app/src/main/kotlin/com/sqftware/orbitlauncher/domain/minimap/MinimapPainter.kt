@@ -98,12 +98,12 @@ internal class GroundLayout(
     val shade: DoubleArray,
 )
 
-/** The world-wide pixel grid seeded features and the world map keep to, in pixels to the mercator metre. */
-internal fun gridPixelsPerMetre(lat: Double) = WebMercator.gridScale(lat) / METRES_PER_PIXEL
+/** The world-wide grid seeded features and the world map keep to, its pixels [span] map pixels across, in pixels to the mercator metre. */
+internal fun gridPixelsPerMetre(lat: Double, span: Int = 1) = WebMercator.gridScale(lat) / (METRES_PER_PIXEL * span)
 
 /** [at] moved to the middle of its pixel of the seeded grid, so maps painted round places near it line up pixel for pixel. */
-internal fun onSeedGrid(at: LatLon): LatLon {
-    val scale = gridPixelsPerMetre(at.lat)
+internal fun onSeedGrid(at: LatLon, span: Int = 1): LatLon {
+    val scale = gridPixelsPerMetre(at.lat, span)
     val m = WebMercator.toMercator(at)
     return WebMercator.toLatLon(Mercator((floor(m.x * scale) + 0.5) / scale, -(floor(-m.y * scale) + 0.5) / scale))
 }
@@ -215,7 +215,7 @@ private class Painting(
     private val originY: Int
 
     init {
-        val scale = gridPixelsPerMetre(scene.centre.lat)
+        val scale = gridPixelsPerMetre(scene.centre.lat, frame.span)
         val centre = WebMercator.toMercator(scene.centre)
         originX = floor(centre.x * scale).toInt() - w / 2
         originY = floor(-centre.y * scale).toInt() - h / 2
@@ -226,10 +226,13 @@ private class Painting(
     private val twX = w / TILE_PX + 2
     private val twY = h / TILE_PX + 2
 
+    // Roads narrow more slowly than the ground does as the map coarsens, so they still read from far out.
+    private val wayMetresPerPixel = METRES_PER_PIXEL * sqrt(frame.span.toDouble())
+
     private val cls = Array(w * h) { Ground.Grass }
     private val img = IntArray(w * h)
 
-    private fun px(p: Local) = Px(cx + p.east / METRES_PER_PIXEL, cy - p.north / METRES_PER_PIXEL)
+    private fun px(p: Local) = Px(cx + p.east / frame.metresPerPixel, cy - p.north / frame.metresPerPixel)
 
     private fun pxRings(polygon: Polygon) = polygon.map { ring -> ring.map(::px) }
 
@@ -251,7 +254,7 @@ private class Painting(
         val strokes = scene.ways.filter { it.kind == WayKind.Pier } +
             scene.ways.filter { it.kind in FOOT_WAYS } +
             scene.ways.filter { it.kind == WayKind.Road }.sortedBy { it.widthM }
-        strokes.forEach { strokeBuffer(it.points.map(::px), it.widthM / METRES_PER_PIXEL, groundOf(it.kind)) }
+        strokes.forEach { strokeBuffer(it.points.map(::px), it.widthM / wayMetresPerPixel, groundOf(it.kind)) }
 
         // 3. touching footprints merge into one structure with one floor and only its outer wall, as a game building is
         // one walled shape rather than a wall per footprint
@@ -302,9 +305,9 @@ private class Painting(
 
         frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
         // A smooth map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
-        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place)
+        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place, frame.span)
         icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
-        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList())
+        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList(), span = frame.span)
     }
 
     private fun paintOldSchool(layout: GroundLayout) {
@@ -486,6 +489,9 @@ private class Painting(
         val mapped = around(BooleanArray(w * h).also { marks -> spots.forEach { marks[it.y.toInt() * w + it.x.toInt()] = true } })
         val placed = Spaced(DECOR_SPACING_PX, w, h)
         standing(spots.filter { cls[it.y.toInt() * w + it.x.toInt()] !in NO_TREES }, TREE_SPACING_PX).forEach { placed += it }
+
+        // From far out, a scattered tree would be as wide as a block.
+        if (frame.span > 1) return placed.all
 
         // Decoration where the map gives no trees: a few seeded spots per world cell, the first clear one standing.
         val decor = mutableListOf<Px>()

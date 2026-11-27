@@ -9,7 +9,8 @@ internal const val MAX_NPCS = 10
  * [maxIcons] map icons, [maxPerIcon] of any one, and [maxNpcs] dots of people. A map that [followsUser] is centred on
  * them and turns with them, so its icons come apart to stay upright; it keeps its centre clear for their marker and
  * judges the place as a whole, nearest them first. Any other is painted north up to a world-wide grid and judges each
- * place by its own surroundings, so paintings of one place agree.
+ * place by its own surroundings, so paintings of one place agree. Each of its pixels is [span] map pixels across, a power
+ * of two: one, or more on a world map zoomed far out, which shows a coarser ground.
  */
 class MapFrame(
     val width: Int,
@@ -19,7 +20,13 @@ class MapFrame(
     val maxIcons: Int,
     val maxPerIcon: Int,
     val maxNpcs: Int,
+    val span: Int = 1,
 ) {
+    /** Ground metres per pixel of the painting. */
+    val metresPerPixel: Double
+        get() = METRES_PER_PIXEL * span
+
+
     /**
      * Ground metres to the mercator metre the map is drawn at round [lat]: the true scale round the user; otherwise the
      * world-wide grid's, so every painting's pixels fall on one grid and paintings of one place meet pixel for pixel.
@@ -27,7 +34,7 @@ class MapFrame(
     fun groundScale(lat: Double) = if (followsUser) WebMercator.groundScale(lat) else WebMercator.gridScale(lat)
 
     /** Where a map asked for round [at] is centred: on the user, or on the middle of [at]'s pixel of the world-wide grid. */
-    fun centreFor(at: LatLon) = if (followsUser) at else onSeedGrid(at)
+    fun centreFor(at: LatLon) = if (followsUser) at else onSeedGrid(at, span)
 
     /** Which pixels a round frame shows, row by row, or null when it shows them all. */
     internal val disc: BooleanArray? by lazy {
@@ -42,13 +49,17 @@ class MapFrame(
 
     /** How far round the centre the map gathers features: to the frame's edge, plus room for what reaches into it. */
     val reachM: Double
-        get() = maxOf(width, height) / 2 * METRES_PER_PIXEL + 40
+        get() = maxOf(width, height) / 2 * metresPerPixel + 40
 
     companion object {
         /** The game's minimap: a disc, sparsely marked so the player's surroundings read at a glance. */
         val MINIMAP = MapFrame(MINIMAP_SIZE, MINIMAP_SIZE, round = true, followsUser = true, MAX_ICONS, MAX_PER_ICON, MAX_NPCS)
 
-        /** A [width] by [height] stretch of the game's world map, with every icon that has room and, as in the game, nobody on it. */
-        fun worldMap(width: Int, height: Int) = MapFrame(width, height, round = false, followsUser = false, Int.MAX_VALUE, Int.MAX_VALUE, maxNpcs = 0)
+        /**
+         * A [width] by [height] stretch of the game's world map, its pixels [span] map pixels across, with every icon that
+         * has room and, as in the game, nobody on it.
+         */
+        fun worldMap(width: Int, height: Int, span: Int = 1) =
+            MapFrame(width, height, round = false, followsUser = false, Int.MAX_VALUE, Int.MAX_VALUE, maxNpcs = 0, span)
     }
 }

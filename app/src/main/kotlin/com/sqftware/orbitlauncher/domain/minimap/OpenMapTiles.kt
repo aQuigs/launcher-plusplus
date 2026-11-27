@@ -17,8 +17,11 @@ object OpenMapTiles {
     /** The tags the rules read. */
     val KEYS = setOf("class", "subclass", "brunnel", "service", "layer", "level", "indoor", "ramp", "render_min_height", "name")
 
+    /** The tiles' zoom for a map in [frame]: each doubling of its pixels takes the zoom below, so a painting takes about as many tiles at any. */
+    private fun zoomFor(frame: MapFrame) = ZOOM - frame.span.countTrailingZeroBits()
+
     /** The tiles a map in [frame] centred on [centre] needs. */
-    fun tilesFor(centre: LatLon, frame: MapFrame): List<TileId> = WebMercator.tilesAround(centre, frame.reachM, ZOOM)
+    fun tilesFor(centre: LatLon, frame: MapFrame): List<TileId> = WebMercator.tilesAround(centre, frame.reachM, zoomFor(frame))
 
     fun decode(bytes: ByteArray) = VectorTile.decode(bytes, LAYERS, KEYS)
 
@@ -39,7 +42,7 @@ object OpenMapTiles {
                 val layer = tile[name] ?: continue
                 val placed = placed(id, layer)
                 for (feature in layer.features.filter { it.type == GeometryType.Polygon }) {
-                    val rule = areaRule(name, feature) ?: continue
+                    val rule = areaRule(name, feature, built = id.z >= BUILDINGS_FROM) ?: continue
                     val polygons = placed.polygons(feature)
                     if (polygons.isNotEmpty()) areas += Area(rule.ground, polygons, rule.order, rule.woodland, rule.builtUpOnly)
                 }
@@ -128,10 +131,15 @@ object OpenMapTiles {
     private val FORECOURT = AreaRule(Ground.Plaza, -1, builtUpOnly = true)
     private val LANDUSE = mapOf("cemetery" to GRASS, "pitch" to PITCH, "playground" to PITCH, "commercial" to FORECOURT, "retail" to FORECOURT)
 
-    private fun areaRule(layer: String, feature: VectorFeature): AreaRule? = when (layer) {
+    /** The tile zoom from which tiles carry buildings; below it, what land is used for stands in for them, as [SETTLED]. */
+    private const val BUILDINGS_FROM = 13
+    private val SETTLED = AreaRule(Ground.Plaza, -1)
+    private val SETTLED_LANDUSE = setOf("residential", "commercial", "retail", "industrial")
+
+    private fun areaRule(layer: String, feature: VectorFeature, built: Boolean): AreaRule? = when (layer) {
         "water" -> AreaRule(Ground.Water, 11).takeIf { feature.string("brunnel") != "tunnel" }
         "landcover" -> LANDCOVER[feature.string("class")]
-        "landuse" -> LANDUSE[feature.string("class")]
+        "landuse" -> feature.string("class").let { if (!built && it in SETTLED_LANDUSE) SETTLED else LANDUSE[it] }
         else -> when {
             belowGround(feature) -> null
             feature.string("class") == "pier" -> AreaRule(Ground.Pier, 10)

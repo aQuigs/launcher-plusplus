@@ -70,4 +70,20 @@ class MapViewTest {
         assertTrue(after(0.0, 0.0, scale = 2.0))
         assertTrue(view.needsRepaint(null, steps))
     }
+
+    @Test
+    fun farOutItPaintsAsManyPixelsOfACoarserGround() {
+        val far = ZoomSteps(4, farSteps = 3)
+        val out = view.copy(scale = 0.25)
+        val painting = out.nextPainting(PaintedSpan(bryantPark, 8000, 20000), far)
+        assertEquals(8, painting.span)
+        assertEquals(540 + 1024, painting.width)
+        assertEquals(1200 + 1024, painting.height)
+
+        val painted = PaintedSpan(bryantPark, painting.width, painting.height, painting.span)
+        assertFalse(out.needsRepaint(painted, far))
+        assertFalse(out.copy(centre = bryantPark.shifted(MapShift(400.0, 0.0))).needsRepaint(painted, far))
+        assertTrue(out.copy(centre = bryantPark.shifted(MapShift(600.0, 0.0))).needsRepaint(painted, far))
+        assertTrue(view.needsRepaint(painted, far))
+    }
 }

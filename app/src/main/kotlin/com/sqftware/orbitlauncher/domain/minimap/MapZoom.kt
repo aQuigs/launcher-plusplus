@@ -22,13 +22,17 @@ private const val OVERZOOM_IN = 1.25
 
 /**
  * The world map's zoom steps, in screen pixels to the map pixel, where the minimap's scale is [gamePixel] screen pixels:
- * whole ones, so the map is as crisp as the game's on every step.
+ * whole ones, so the map is as crisp as the game's on every step, then [farSteps] more out from them, each half the last,
+ * for a game whose map pulls back over its whole land. On those a painting's pixels span more map pixels, so it takes no
+ * more room than on the nearest of them.
  */
-class ZoomSteps(gamePixel: Int) {
-    val all: List<Int> = ZOOM_LEVELS.map { maxOf(LEAST_STEP, (gamePixel * it).roundToInt()) }.distinct()
+class ZoomSteps(gamePixel: Int, farSteps: Int = 0) {
+    private val whole = ZOOM_LEVELS.map { maxOf(LEAST_STEP, (gamePixel * it).roundToInt()) }.distinct()
+
+    val all: List<Double> = (farSteps downTo 1).map { whole.first().toDouble() / (1 shl it) } + whole.map { it.toDouble() }
 
     /** The step nearest [scale], judged by ratio, which a pinch let go at [scale] settles on. */
-    fun nearest(scale: Double): Int = all.minBy { abs(ln(it / scale)) }
+    fun nearest(scale: Double): Double = all.minBy { abs(ln(it / scale)) }
 
     /** [scale] as far as a pinch may take it, a little past the farthest steps. */
     fun clamp(scale: Double) = scale.coerceIn(all.first() * OVERZOOM_OUT, all.last() * OVERZOOM_IN)
@@ -37,5 +41,8 @@ class ZoomSteps(gamePixel: Int) {
      * The step a view at [scale] is painted for: the nearest at or out from it, so a painting holds as much ground as any
      * step the view settles on, and one past the farthest step out paints no ground it springs back from.
      */
-    fun paintedAt(scale: Double): Int = all.lastOrNull { it <= scale } ?: all.first()
+    fun paintedAt(scale: Double): Double = all.lastOrNull { it <= scale } ?: all.first()
+
+    /** How many map pixels across each pixel is of the painting for a view at [scale]. */
+    fun spanAt(scale: Double): Int = maxOf(1, (whole.first() / paintedAt(scale)).roundToInt())
 }

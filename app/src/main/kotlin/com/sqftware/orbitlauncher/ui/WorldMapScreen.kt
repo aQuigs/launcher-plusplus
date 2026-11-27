@@ -72,6 +72,9 @@ interface WorldMapArt {
     /** The map's own words: whether it is loading, and the credit for its data. */
     val ink: Color
 
+    /** How many steps the map zooms out past the old game's farthest, each to half the last's scale: by default none. */
+    val farSteps: Int get() = 0
+
     /** Draws [painting] [scale] screen pixels to each of its own, its top left at [topLeft], and its icons if they are apart. */
     fun DrawScope.drawPainting(painting: PaintedMap<ImageBitmap>, topLeft: IntOffset, scale: Float)
 
@@ -129,7 +132,7 @@ fun WorldMapScreen(
         return
     }
     val px = gamePixel
-    val steps = remember(px) { ZoomSteps(px) }
+    val steps = remember(px, art) { ZoomSteps(px, art.farSteps) }
     var view by remember { mutableStateOf(MapView(start, px.toDouble(), 0, 0)) }
     var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
     var unreachable by remember { mutableStateOf(false) }
@@ -137,9 +140,9 @@ fun WorldMapScreen(
     val haptics = LocalHapticFeedback.current
 
     // A fold changes the game's pixel, and so the steps, without starting the activity again.
-    LaunchedEffect(steps) { view = view.copy(scale = steps.nearest(view.scale).toDouble()) }
+    LaunchedEffect(steps) { view = view.copy(scale = steps.nearest(view.scale)) }
 
-    fun span() = painted?.let { PaintedSpan(it.centre, it.ground.width, it.ground.height) }
+    fun span() = painted?.let { PaintedSpan(it.centre, it.ground.width, it.ground.height, it.span) }
     fun stale() = view.width > 0 && view.needsRepaint(span(), steps)
 
     // Each paint shows, however long the pinch or drag goes on, and the next starts from wherever the view has got to by
@@ -184,7 +187,7 @@ fun WorldMapScreen(
                         },
                         // Let go between steps, the map glides on to the nearest, about the same spot under the fingers.
                         onEnd = {
-                            val target = steps.nearest(view.scale).toDouble()
+                            val target = steps.nearest(view.scale)
                             if (target != view.scale) {
                                 settling = launch {
                                     animate(view.scale.toFloat(), target.toFloat(), animationSpec = spring()) { value, _ ->
@@ -216,7 +219,7 @@ fun WorldMapScreen(
                     // its middle pixel.
                     val ground = painting.ground
                     val middle = Offset(ground.width / 2 + 0.5f, ground.height / 2 + 0.5f)
-                    val scale = view.scale.toFloat()
+                    val scale = (view.scale * painting.span).toFloat()
                     with(art) { drawPainting(painting, (view.spot(painting.centre) - middle * scale).round(), scale) }
                 }
             }
