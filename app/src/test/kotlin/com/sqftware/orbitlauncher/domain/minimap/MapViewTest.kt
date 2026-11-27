@@ -85,5 +85,9 @@ class MapViewTest {
         assertFalse(out.copy(centre = bryantPark.shifted(MapShift(400.0, 0.0))).needsRepaint(painted, far))
         assertTrue(out.copy(centre = bryantPark.shifted(MapShift(600.0, 0.0))).needsRepaint(painted, far))
         assertTrue(view.needsRepaint(painted, far))
+
+        // Back in, the coarse painting covers the view but is not its ground, which comes soonest with little room.
+        assertFalse(view.reachesPast(painted, far))
+        assertEquals(334, view.nextPainting(painted, far).width)
     }
 }

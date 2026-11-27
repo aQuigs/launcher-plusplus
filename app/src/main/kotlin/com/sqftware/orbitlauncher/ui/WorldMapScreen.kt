@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,9 +57,15 @@ import com.sqftware.orbitlauncher.domain.minimap.paintRetryDelay
 import com.sqftware.orbitlauncher.ui.theme.Spacing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
+
+/** How near its step, as a share of it, a glide ends: closer than shows at the screen's edge, however far out the step. */
+private const val SETTLED_WITHIN = 0.001
 
 object WorldMapTags {
     const val MAP = "world_map"
@@ -145,6 +152,13 @@ fun WorldMapScreen(
     fun span() = painted?.let { PaintedSpan(it.centre, it.ground.width, it.ground.height, it.span) }
     fun stale() = view.width > 0 && view.needsRepaint(span(), steps)
 
+    // Whether the view shows ground that is not painted: at first, or where the next cannot be had. Derived, so a pan
+    // that changes nothing of it recomposes nothing.
+    val unserved by remember(steps) { derivedStateOf { span()?.let { unreachable && view.reachesPast(it, steps) } ?: true } }
+
+    // Whether, within [wait], the view zooms to ground painted from other tiles, which may well be at hand.
+    suspend fun zoomedWithin(wait: Duration) = withTimeoutOrNull(wait) { snapshotFlow { steps.spanAt(view.scale) }.drop(1).first() } != null
+
     // Each paint shows, however long the pinch or drag goes on, and the next starts from wherever the view has got to by
     // then. Only while the launcher is in sight, as a paint waiting on the network would otherwise ask on in the
     // background.
@@ -156,7 +170,11 @@ fun WorldMapScreen(
                 while (stale()) {
                     val next = map.paint(view.centre, view.nextPainting(span(), steps))
                     unreachable = next == null
-                    if (next != null) painted = next else delay(paintRetryDelay(retry++))
+                    if (next != null) {
+                        painted = next
+                    } else if (zoomedWithin(paintRetryDelay(retry++))) {
+                        retry = 0
+                    }
                 }
             }
         }
@@ -190,7 +208,7 @@ fun WorldMapScreen(
                             val target = steps.nearest(view.scale)
                             if (target != view.scale) {
                                 settling = launch {
-                                    animate(view.scale.toFloat(), target.toFloat(), animationSpec = spring()) { value, _ ->
+                                    animate(view.scale.toFloat(), target.toFloat(), animationSpec = spring(visibilityThreshold = (target * SETTLED_WITHIN).toFloat())) { value, _ ->
                                         view = view.zoomedBy(value / view.scale, anchor.x.toDouble(), anchor.y.toDouble(), steps)
                                     }
                                     view = view.copy(scale = target)
@@ -245,7 +263,7 @@ fun WorldMapScreen(
         art.Over({ view }, moving)
         // The bars are hidden while the map is up, so only a cutout takes room from it.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout)) {
-            if (painted == null) {
+            if (unserved) {
                 val status = if (unreachable) "The map needs a connection." else "Loading - please wait."
                 Text(status, color = art.ink, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.align(Alignment.Center))
             }

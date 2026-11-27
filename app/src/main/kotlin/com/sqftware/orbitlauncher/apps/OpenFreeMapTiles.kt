@@ -17,7 +17,9 @@ import java.net.HttpURLConnection
 private const val TAG = "OpenFreeMapTiles"
 private const val TILE_JSON = "https://tiles.openfreemap.org/planet"
 private const val TIMEOUT_MILLIS = 15_000
-private const val KEPT_TILES = 64
+
+// A world map pulled all the way out takes tiles at four zooms, which must not push out home's.
+private const val KEPT_TILES = 160
 
 /**
  * OpenFreeMap's planet tiles: free, keyless, and in the OpenMapTiles schema. A tile once fetched is kept in the cache

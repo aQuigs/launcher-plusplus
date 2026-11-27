@@ -16,7 +16,9 @@ class MapZoomTest {
         val steps = ZoomSteps(4, farSteps = 3)
         assertEquals(listOf(0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 8.0), steps.all)
         assertEquals(listOf(8, 4, 2, 1, 1, 1, 1), steps.all.map(steps::spanAt))
-        assertEquals(2, steps.spanAt(1.9))
+        assertEquals(1, steps.spanAt(1.9))
+        assertEquals(2, steps.spanAt(1.7))
+        assertEquals(4, steps.spanAt(0.49))
         assertEquals(8, steps.spanAt(0.2))
         assertEquals(0.2, steps.clamp(0.01), 1e-9)
     }

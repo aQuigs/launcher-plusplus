@@ -16,6 +16,9 @@ private val ZOOM_LEVELS = listOf(0.5, 0.75, 1.0, 2.0)
  */
 private const val LEAST_STEP = 2
 
+/** How far past a step a view may stray out before it is painted coarser, so a pinch that only wobbles there repaints nothing. */
+private const val COARSEN_PAST = 1.15
+
 /** How far past the farthest steps out and in a pinch may stretch before it springs back. */
 private const val OVERZOOM_OUT = 0.8
 private const val OVERZOOM_IN = 1.25
@@ -39,10 +42,18 @@ class ZoomSteps(gamePixel: Int, farSteps: Int = 0) {
 
     /**
      * The step a view at [scale] is painted for: the nearest at or out from it, so a painting holds as much ground as any
-     * step the view settles on, and one past the farthest step out paints no ground it springs back from.
+     * step the view settles on, and one past the farthest step out paints no ground it springs back from. A view barely out
+     * from a step whose painting is finer still takes that step's, whose room to pan covers it.
      */
-    fun paintedAt(scale: Double): Double = all.lastOrNull { it <= scale } ?: all.first()
+    fun paintedAt(scale: Double): Double {
+        val step = outFrom(scale)
+        return outFrom(scale * COARSEN_PAST).takeIf { spanOf(it) < spanOf(step) } ?: step
+    }
 
     /** How many map pixels across each pixel is of the painting for a view at [scale]. */
-    fun spanAt(scale: Double): Int = maxOf(1, (whole.first() / paintedAt(scale)).roundToInt())
+    fun spanAt(scale: Double): Int = spanOf(paintedAt(scale))
+
+    private fun outFrom(scale: Double) = all.lastOrNull { it <= scale } ?: all.first()
+
+    private fun spanOf(step: Double) = maxOf(1, (whole.first() / step).roundToInt())
 }

@@ -52,6 +52,9 @@ private val FOOT_WAYS = EnumSet.of(WayKind.Walk, WayKind.Path, WayKind.Parking)
 private const val BUILT_UP_COVER = 0.15
 private const val PAVED_COVER = 0.3
 
+/** Share of the ground round a place under roads from which it counts as built up, on a map whose tiles carry no buildings. */
+private const val ROADED_COVER = 0.1
+
 internal const val MAX_DOORS = 2
 internal const val DOOR_PX = TILE_PX
 private const val DOOR_REACH_PX = 6
@@ -68,7 +71,7 @@ internal const val ICON_SPACING_PX = 24.0
 
 /**
  * Paints the map of a [MapScene] in a [MapFrame], the minimap's disc or a stretch of the world map, at
- * [METRES_PER_PIXEL], laid out the way the old game builds its minimap and colored in [style]. In the Old School style every 4 px tile gets a flat ground color; walls are 1 px lines around each structure with a few
+ * the frame's scale, laid out the way the old game builds its minimap and colored in [style]. In the Old School style every 4 px tile gets a flat ground color; walls are 1 px lines around each structure with a few
  * doors; trees and the dots of people go on top. The map icons and the self marker are left to whoever shows the map,
  * so they stay upright as the map turns. Seeded choices are keyed by places on Earth, so the map keeps its trees and grass as
  * it moves.
@@ -279,7 +282,11 @@ private class Painting(
         val bid = IntArray(w * h)
         scene.buildings.forEachIndexed { i, b -> scanPolygon(pxRings(b.polygon)) { bid[it] = i + 1 } }
         val cover = around(BooleanArray(w * h) { bid[it] != 0 })
-        for (i in 0 until w * h) cls[i] = if (cover.share(i) >= PAVED_COVER) Ground.Plaza else Ground.Grass
+        val roads = if (frame.span > 1 && scene.buildings.isEmpty()) around(roadMarks()) else null
+        for (i in 0 until w * h) {
+            val paved = cover.share(i) >= PAVED_COVER || (roads != null && roads.share(i) >= ROADED_COVER)
+            cls[i] = if (paved) Ground.Plaza else Ground.Grass
+        }
 
         // 2. ground: areas biggest first, then piers, paths and roads, the widest last
         scene.areas.map { it to areaOf(it) }
@@ -292,7 +299,10 @@ private class Painting(
         val strokes = scene.ways.filter { it.kind == WayKind.Pier } +
             scene.ways.filter { it.kind in FOOT_WAYS } +
             scene.ways.filter { it.kind == WayKind.Road }.sortedBy { it.widthM }
-        strokes.forEach { strokeBuffer(it.points.map(::px), it.widthM / wayMetresPerPixel, groundOf(it.kind)) }
+        strokes.forEach { way ->
+            val ground = groundOf(way.kind)
+            strokeBuffer(way.points.map(::px), way.widthM / wayMetresPerPixel) { cls[it] = ground }
+        }
 
         // 3. touching footprints merge into one structure with one floor and only its outer wall, as a game building is
         // one walled shape rather than a wall per footprint
@@ -320,6 +330,10 @@ private class Painting(
             for (m in 0 until count) cls[members[m]] = floor
         }
         return comp
+    }
+
+    private fun roadMarks() = BooleanArray(w * h).also { marks ->
+        scene.ways.filter { it.kind == WayKind.Road }.forEach { road -> strokeBuffer(road.points.map(::px), road.widthM / wayMetresPerPixel) { marks[it] = true } }
     }
 
     private fun paintOldSchool(layout: GroundLayout) {
@@ -677,7 +691,8 @@ private class Painting(
 
     private fun ceilHalf(v: Double) = ceil(v - 0.5).toInt()
 
-    private fun strokeBuffer(pts: List<Px>, widthPx: Double, value: Ground) {
+    /** A round-ended line [widthPx] wide along [pts]; [set] gets each pixel under it. */
+    private inline fun strokeBuffer(pts: List<Px>, widthPx: Double, set: (Int) -> Unit) {
         val r = maxOf(widthPx / 2, 0.5)
         for (k in 0 until pts.size - 1) {
             val a = pts[k]
@@ -690,7 +705,7 @@ private class Painting(
                     val px = x + 0.5
                     val py = y + 0.5
                     val t = (((px - a.x) * dx + (py - a.y) * dy) / ll).coerceIn(0.0, 1.0)
-                    if (sq(px - a.x - t * dx) + sq(py - a.y - t * dy) <= r * r) cls[y * w + x] = value
+                    if (sq(px - a.x - t * dx) + sq(py - a.y - t * dy) <= r * r) set(y * w + x)
                 }
             }
         }

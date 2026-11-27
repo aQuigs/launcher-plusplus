@@ -26,7 +26,6 @@ class MapFrame(
     val metresPerPixel: Double
         get() = METRES_PER_PIXEL * span
 
-
     /**
      * Ground metres to the mercator metre the map is drawn at round [lat]: the true scale round the user; otherwise the
      * world-wide grid's, so every painting's pixels fall on one grid and paintings of one place meet pixel for pixel.
@@ -47,17 +46,20 @@ class MapFrame(
         }
     }
 
-    /** How far round the centre the map gathers features: to the frame's edge, plus room for what reaches into it. */
+    /**
+     * How far round the centre the map gathers features: to the frame's edge, plus room for what reaches into it and for
+     * the grid's scale to differ a little from the ground's.
+     */
     val reachM: Double
-        get() = maxOf(width, height) / 2 * metresPerPixel + 40
+        get() = maxOf(width, height) / 2 * metresPerPixel + 40 * span
 
     companion object {
         /** The game's minimap: a disc, sparsely marked so the player's surroundings read at a glance. */
         val MINIMAP = MapFrame(MINIMAP_SIZE, MINIMAP_SIZE, round = true, followsUser = true, MAX_ICONS, MAX_PER_ICON, MAX_NPCS)
 
         /**
-         * A [width] by [height] stretch of the game's world map, its pixels [span] map pixels across, with every icon that
-         * has room and, as in the game, nobody on it.
+         * A [width] by [height] stretch of the game's world map, its pixels [span] map pixels across, with every icon
+         * that has room and is in its tiles, which from far out are few, and, as in the game, nobody on it.
          */
         fun worldMap(width: Int, height: Int, span: Int = 1) =
             MapFrame(width, height, round = false, followsUser = false, Int.MAX_VALUE, Int.MAX_VALUE, maxNpcs = 0, span)

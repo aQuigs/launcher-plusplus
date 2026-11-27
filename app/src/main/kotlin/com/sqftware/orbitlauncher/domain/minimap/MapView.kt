@@ -56,14 +56,17 @@ data class MapView(val centre: LatLon, val scale: Double, val width: Int, val he
 
     /**
      * The stretch to paint round the view next: the view with room to pan, or, while the view reaches past [painted],
-     * just the view, which paints soonest.
+     * or [painted] is coarser than its zoom takes, just the view, which paints soonest.
      */
     fun nextPainting(painted: PaintedSpan?, steps: ZoomSteps): MapFrame {
-        val room = if (painted == null || roomIn(painted, steps) < 0) COVER_ROOM else PAN_ROOM
         val span = steps.spanAt(scale)
+        val room = if (painted == null || painted.span > span || reachesPast(painted, steps)) COVER_ROOM else PAN_ROOM
         val (reachX, reachY) = reach(steps)
         return MapFrame.worldMap(ceil(reachX / span).toInt() + 2 * room, ceil(reachY / span).toInt() + 2 * room, span)
     }
+
+    /** Whether the view reaches past [painted]. */
+    fun reachesPast(painted: PaintedSpan, steps: ZoomSteps) = roomIn(painted, steps) < 0
 
     // The view in map pixels at the step it is painted for.
     private fun reach(steps: ZoomSteps): Pair<Double, Double> {
