@@ -85,7 +85,8 @@ class MinimapPainter(private val sprites: MinimapSprites, private val style: Map
 /**
  * The ground a painting has laid out, for a style to color, pixel by pixel of a [width] by [height] view: what each is
  * made of, whether it is a structure's wall, which structure it is in (0 for none), and whether a rail runs over it;
- * the spots [trees] stand on; and the [shade] of each pixel's grass, a smooth field from 0 to 1 keyed by places on Earth.
+ * the spots [trees] stand on; and the [shade] of each pixel's grass, a smooth field from 0 to 1 keyed by places on Earth,
+ * worked out as it is asked for, as a world map's every pixel of it would be as much memory again.
  */
 internal class GroundLayout(
     val width: Int,
@@ -95,8 +96,13 @@ internal class GroundLayout(
     val structure: IntArray,
     val rails: BooleanArray,
     val trees: List<Px>,
-    val shade: DoubleArray,
+    val shade: Shade,
 )
+
+/** A shade from 0 to 1 for each pixel. */
+internal fun interface Shade {
+    fun at(i: Int): Double
+}
 
 /** The world-wide grid seeded features and the world map keep to, its pixels [span] map pixels across, in pixels to the mercator metre. */
 internal fun gridPixelsPerMetre(lat: Double, span: Int = 1) = WebMercator.gridScale(lat) / (METRES_PER_PIXEL * span)
@@ -237,6 +243,38 @@ private class Painting(
     private fun pxRings(polygon: Polygon) = polygon.map { ring -> ring.map(::px) }
 
     fun run(): PaintedMap<Pixels> {
+        val comp = layGround()
+        val walls = BooleanArray(w * h) { comp[it] != 0 && anyNeighbour(it) { k -> comp[k] == 0 } }
+        val rails = BooleanArray(w * h).also { rails ->
+            scene.ways.filter { it.kind == WayKind.Rail }.forEach { rail -> linePixels(rail.points.map(::px)) { rails[it] = true } }
+        }
+        val noise = grassNoise()
+        val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), { noise[tileOf(it % w, it / w)] })
+
+        val smooth = style.smooth
+        val icons = if (smooth != null) {
+            smooth.paint(layout, img)
+            placeIcons()
+        } else {
+            paintOldSchool(layout)
+            placeIcons().also { icons ->
+                paintNpcs(icons)
+                paintFigures()
+            }
+        }
+
+        frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
+        // A smooth map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
+        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place, frame.span)
+        icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
+        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList(), span = frame.span)
+    }
+
+    /**
+     * Lays the ground in [cls], and returns which structure each pixel is in, 0 for none. Apart from the painting, so what it
+     * works with, several times a painting's memory, is let go before the painting takes its own.
+     */
+    private fun layGround(): IntArray {
         // 1. footprints, whose cover says whether the place is built up
         val bid = IntArray(w * h)
         scene.buildings.forEachIndexed { i, b -> scanPolygon(pxRings(b.polygon)) { bid[it] = i + 1 } }
@@ -260,22 +298,19 @@ private class Painting(
         // one walled shape rather than a wall per footprint
         val comp = IntArray(w * h)
         var structures = 0
-        val stack = IntArray(w * h)
         val members = IntArray(w * h)
         for (i in 0 until w * h) {
             if (bid[i] == 0 || comp[i] != 0) continue
             val mark = ++structures
             var count = 0
-            var top = 0
             comp[i] = mark
-            stack[top++] = i
-            while (top > 0) {
-                val j = stack[--top]
-                members[count++] = j
-                forNeighbours(j) { k ->
+            members[count++] = i
+            var next = 0
+            while (next < count) {
+                forNeighbours(members[next++]) { k ->
                     if (bid[k] != 0 && comp[k] == 0) {
                         comp[k] = mark
-                        stack[top++] = k
+                        members[count++] = k
                     }
                 }
             }
@@ -284,37 +319,14 @@ private class Painting(
             val floor = if (stableRandom(seed) < WOOD_FLOOR_SHARE) Ground.FloorWood else Ground.FloorStone
             for (m in 0 until count) cls[members[m]] = floor
         }
-        val walls = BooleanArray(w * h) { comp[it] != 0 && anyNeighbour(it) { k -> comp[k] == 0 } }
-        val rails = BooleanArray(w * h).also { rails ->
-            scene.ways.filter { it.kind == WayKind.Rail }.forEach { rail -> linePixels(rail.points.map(::px)) { rails[it] = true } }
-        }
-        val noise = grassNoise()
-        val layout = GroundLayout(w, h, cls, walls, comp, rails, treeSpots(), DoubleArray(w * h) { noise[tileOf(it % w, it / w)] })
-
-        val smooth = style.smooth
-        val icons = if (smooth != null) {
-            smooth.paint(layout, img)
-            placeIcons()
-        } else {
-            paintOldSchool(layout)
-            placeIcons().also { icons ->
-                paintNpcs(icons)
-                paintFigures()
-            }
-        }
-
-        frame.disc?.let { disc -> for (i in 0 until w * h) if (!disc[i]) img[i] = 0 }
-        // A smooth map's icons are drawn smoothly over its ground at a size of their own; the old game's world map's go into it.
-        if (frame.followsUser || smooth != null) return PaintedMap(scene.centre, Pixels(w, h, img), icons, scene.place, frame.span)
-        icons.forEach { blit(it.image, it.x.toInt() - it.image.width / 2, it.y.toInt() - it.image.height / 2) }
-        return PaintedMap(scene.centre, Pixels(w, h, img), emptyList(), span = frame.span)
+        return comp
     }
 
     private fun paintOldSchool(layout: GroundLayout) {
         // flat tiles: one color per ground, grass shaded only by a smooth field across tiles
         for (i in 0 until w * h) {
             img[i] = when (val g = cls[i]) {
-                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, layout.shade[i])
+                Ground.Grass -> lerpRgb(GRASS_DARK, GRASS_LIGHT, layout.shade.at(i))
                 Ground.Water -> if (anyNeighbour(i) { cls[it] != Ground.Water }) WATER_EDGE else WATER_BASE
                 else -> GROUND_COLOUR[g.ordinal]
             }

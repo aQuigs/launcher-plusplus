@@ -58,8 +58,11 @@ internal fun paintFlat(layout: GroundLayout, into: IntArray, ground: FlatGround)
     val flat = IntArray(w * h) { i -> if (layout.rails[i]) opaque(ground.road) else ground.colours[layout.ground[i].ordinal] }
 
     // Softened, so an edge drawn scaled is not stepped.
-    val r = softened(w, h, DoubleArray(w * h) { red(flat[it]).toDouble() })
-    val g = softened(w, h, DoubleArray(w * h) { green(flat[it]).toDouble() })
-    val b = softened(w, h, DoubleArray(w * h) { blue(flat[it]).toDouble() })
-    for (i in 0 until w * h) into[i] = rgb(r[i].roundToInt(), g[i].roundToInt(), b[i].roundToInt())
+    for (i in 0 until w * h) {
+        into[i] = rgb(
+            softened(w, h, i) { red(flat[it]).toDouble() }.roundToInt(),
+            softened(w, h, i) { green(flat[it]).toDouble() }.roundToInt(),
+            softened(w, h, i) { blue(flat[it]).toDouble() }.roundToInt(),
+        )
+    }
 }
