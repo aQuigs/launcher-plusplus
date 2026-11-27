@@ -46,12 +46,9 @@ class MapFrame(
         }
     }
 
-    /**
-     * How far round the centre the map gathers features: to the frame's edge, plus room for what reaches into it and for
-     * the grid's scale to differ a little from the ground's.
-     */
+    /** How far round the centre the map gathers features: to the frame's edge, plus room for what reaches into it. */
     val reachM: Double
-        get() = maxOf(width, height) / 2 * metresPerPixel + 40 * span
+        get() = maxOf(width, height) / 2 * metresPerPixel + 40
 
     companion object {
         /** The game's minimap: a disc, sparsely marked so the player's surroundings read at a glance. */

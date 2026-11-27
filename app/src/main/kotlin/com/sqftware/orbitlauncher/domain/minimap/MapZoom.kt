@@ -26,13 +26,12 @@ private const val OVERZOOM_IN = 1.25
 /**
  * The world map's zoom steps, in screen pixels to the map pixel, where the minimap's scale is [gamePixel] screen pixels:
  * whole ones, so the map is as crisp as the game's on every step, then [farSteps] more out from them, each half the last,
- * for a game whose map pulls back over its whole land. On those a painting's pixels span more map pixels, so it takes no
- * more room than on the nearest of them.
+ * for a game whose map pulls back over its whole land. On those a painting's pixels span more map pixels.
  */
 class ZoomSteps(gamePixel: Int, farSteps: Int = 0) {
-    private val whole = ZOOM_LEVELS.map { maxOf(LEAST_STEP, (gamePixel * it).roundToInt()) }.distinct()
+    private val whole = ZOOM_LEVELS.map { maxOf(LEAST_STEP, (gamePixel * it).roundToInt()).toDouble() }.distinct()
 
-    val all: List<Double> = (farSteps downTo 1).map { whole.first().toDouble() / (1 shl it) } + whole.map { it.toDouble() }
+    val all: List<Double> = (farSteps downTo 1).map { whole.first() / (1 shl it) } + whole
 
     /** The step nearest [scale], judged by ratio, which a pinch let go at [scale] settles on. */
     fun nearest(scale: Double): Double = all.minBy { abs(ln(it / scale)) }
@@ -42,18 +41,11 @@ class ZoomSteps(gamePixel: Int, farSteps: Int = 0) {
 
     /**
      * The step a view at [scale] is painted for: the nearest at or out from it, so a painting holds as much ground as any
-     * step the view settles on, and one past the farthest step out paints no ground it springs back from. A view barely out
-     * from a step whose painting is finer still takes that step's, whose room to pan covers it.
+     * step the view settles on, and one past the farthest step out paints no ground it springs back from. Past the whole
+     * steps, where the next is coarser, a view still takes a step it is barely out from.
      */
-    fun paintedAt(scale: Double): Double {
-        val step = outFrom(scale)
-        return outFrom(scale * COARSEN_PAST).takeIf { spanOf(it) < spanOf(step) } ?: step
-    }
+    fun paintedAt(scale: Double): Double = all.lastOrNull { it <= if (it <= whole.first()) scale * COARSEN_PAST else scale } ?: all.first()
 
     /** How many map pixels across each pixel is of the painting for a view at [scale]. */
-    fun spanAt(scale: Double): Int = spanOf(paintedAt(scale))
-
-    private fun outFrom(scale: Double) = all.lastOrNull { it <= scale } ?: all.first()
-
-    private fun spanOf(step: Double) = maxOf(1, (whole.first() / step).roundToInt())
+    fun spanAt(scale: Double): Int = maxOf(1, (whole.first() / paintedAt(scale)).roundToInt())
 }

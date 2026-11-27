@@ -248,11 +248,11 @@ class MinimapPainterTest {
             val end = 200 * frame.metresPerPixel
             Way(WayKind.Road, 11.0, if (across) listOf(Local(-end, m), Local(end, m)) else listOf(Local(m, -end), Local(m, end)))
         }
-        fun middle(roads: List<Way>) = MinimapPainter(MinimapSprites(), MapStyle.Gta).paint(MapScene(centre, ways = roads), frame).ground[200, 200]
+        fun middle(roads: List<Way>) = MinimapPainter(MinimapSprites(), MapStyle.Gta).paint(MapScene(centre, ways = roads, buildingsMapped = false), frame).ground[200, 200]
 
         // Blocks 30 px wide, the middle of the map in the middle of one; then one road far from it.
         val grid = (-165..195 step 30).flatMap { listOf(line(it, true), line(it, false)) }
-        assertEquals(opaque(GtaDayGround.colours[Ground.Plaza.ordinal] and 0xFFFFFF), middle(grid))
+        assertEquals(GtaDayGround.colours[Ground.Plaza.ordinal], middle(grid))
         assertEquals(opaque(GtaDayGround.land), middle(listOf(line(-165, true))))
     }
 

@@ -62,7 +62,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration
 
 /** How near its step, as a share of it, a glide ends: closer than shows at the screen's edge, however far out the step. */
 private const val SETTLED_WITHIN = 0.001
@@ -139,7 +138,7 @@ fun WorldMapScreen(
         return
     }
     val px = gamePixel
-    val steps = remember(px, art) { ZoomSteps(px, art.farSteps) }
+    val steps = remember(px, art.farSteps) { ZoomSteps(px, art.farSteps) }
     var view by remember { mutableStateOf(MapView(start, px.toDouble(), 0, 0)) }
     var painted by remember { mutableStateOf<PaintedMap<ImageBitmap>?>(null) }
     var unreachable by remember { mutableStateOf(false) }
@@ -149,15 +148,12 @@ fun WorldMapScreen(
     // A fold changes the game's pixel, and so the steps, without starting the activity again.
     LaunchedEffect(steps) { view = view.copy(scale = steps.nearest(view.scale)) }
 
-    fun span() = painted?.let { PaintedSpan(it.centre, it.ground.width, it.ground.height, it.span) }
-    fun stale() = view.width > 0 && view.needsRepaint(span(), steps)
+    fun extent() = painted?.let { PaintedSpan(it.centre, it.ground.width * it.span, it.ground.height * it.span, it.span) }
+    fun stale() = view.width > 0 && view.needsRepaint(extent(), steps)
 
     // Whether the view shows ground that is not painted: at first, or where the next cannot be had. Derived, so a pan
     // that changes nothing of it recomposes nothing.
-    val unserved by remember(steps) { derivedStateOf { span()?.let { unreachable && view.reachesPast(it, steps) } ?: true } }
-
-    // Whether, within [wait], the view zooms to ground painted from other tiles, which may well be at hand.
-    suspend fun zoomedWithin(wait: Duration) = withTimeoutOrNull(wait) { snapshotFlow { steps.spanAt(view.scale) }.drop(1).first() } != null
+    val unserved by remember(steps) { derivedStateOf { extent().let { it == null || unreachable && view.reachesPast(it, steps) } } }
 
     // Each paint shows, however long the pinch or drag goes on, and the next starts from wherever the view has got to by
     // then. Only while the launcher is in sight, as a paint waiting on the network would otherwise ask on in the
@@ -168,12 +164,16 @@ fun WorldMapScreen(
             snapshotFlow { stale() }.filter { it }.collect {
                 var retry = 0
                 while (stale()) {
-                    val next = map.paint(view.centre, view.nextPainting(span(), steps))
+                    val next = map.paint(view.centre, view.nextPainting(extent(), steps))
                     unreachable = next == null
                     if (next != null) {
                         painted = next
-                    } else if (zoomedWithin(paintRetryDelay(retry++))) {
-                        retry = 0
+                    } else {
+                        // Zooming to ground painted from other tiles, which may well be at hand, is tried at once.
+                        withTimeoutOrNull(paintRetryDelay(retry++)) {
+                            snapshotFlow { steps.spanAt(view.scale) }.drop(1).first()
+                            retry = 0
+                        }
                     }
                 }
             }

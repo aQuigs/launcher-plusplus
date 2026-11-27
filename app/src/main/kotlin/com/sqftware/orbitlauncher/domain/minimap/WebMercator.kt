@@ -85,10 +85,10 @@ object WebMercator {
         return Mercator(box.minX + point.x * scale, box.maxY - point.y * scale)
     }
 
-    /** Every tile at zoom [z] that holds ground within [radiusM] metres of [centre]. */
-    fun tilesAround(centre: LatLon, radiusM: Double, z: Int): List<TileId> {
+    /** Every tile at zoom [z] that holds ground within [radiusM] metres of [centre], at [scale] ground metres to the mercator metre. */
+    fun tilesAround(centre: LatLon, radiusM: Double, z: Int, scale: Double = groundScale(centre.lat)): List<TileId> {
         val c = toMercator(centre)
-        val reach = radiusM / groundScale(centre.lat)
+        val reach = radiusM / scale
         val low = tileAt(Mercator(c.x - reach, c.y - reach), z)
         val high = tileAt(Mercator(c.x + reach, c.y + reach), z)
         return (high.y..low.y).flatMap { y -> (low.x..high.x).map { x -> TileId(z, x, y) } }

@@ -22,7 +22,7 @@ private const val REPAINT_MARGIN = PAN_ROOM - 64.0
  */
 private const val COVER_ROOM = 32
 
-/** A painting of the world map: where it is centred, and its [width] and [height] in its own pixels, each [span] map pixels across. */
+/** A painting of the world map: where it is centred, its [width] and [height] in map pixels, and how many of them each of its pixels spans. */
 data class PaintedSpan(val centre: LatLon, val width: Int, val height: Int, val span: Int = 1)
 
 /** The world map as the screen shows it: [centre] in the middle of a [width] by [height] px screen, [scale] screen pixels a map pixel. */
@@ -78,6 +78,6 @@ data class MapView(val centre: LatLon, val scale: Double, val width: Int, val he
     private fun roomIn(painted: PaintedSpan, steps: ZoomSteps): Double {
         val shift = painted.centre.shiftTo(centre)
         val (reachX, reachY) = reach(steps)
-        return min((painted.width * painted.span - reachX) / 2 - abs(shift.x), (painted.height * painted.span - reachY) / 2 - abs(shift.y))
+        return min((painted.width - reachX) / 2 - abs(shift.x), (painted.height - reachY) / 2 - abs(shift.y))
     }
 }

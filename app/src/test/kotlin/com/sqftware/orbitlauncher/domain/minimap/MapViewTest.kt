@@ -80,7 +80,7 @@ class MapViewTest {
         assertEquals(540 + 1024, painting.width)
         assertEquals(1200 + 1024, painting.height)
 
-        val painted = PaintedSpan(bryantPark, painting.width, painting.height, painting.span)
+        val painted = PaintedSpan(bryantPark, painting.width * 8, painting.height * 8, painting.span)
         assertFalse(out.needsRepaint(painted, far))
         assertFalse(out.copy(centre = bryantPark.shifted(MapShift(400.0, 0.0))).needsRepaint(painted, far))
         assertTrue(out.copy(centre = bryantPark.shifted(MapShift(600.0, 0.0))).needsRepaint(painted, far))
