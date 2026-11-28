@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.sqftware.orbitlauncher.domain.ChatApp
-import com.sqftware.orbitlauncher.domain.ChatValue
+import com.sqftware.orbitlauncher.domain.LinkApp
+import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.KeptInputs
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import org.junit.After
@@ -35,11 +35,11 @@ class KeptInputsStoreTest {
 
     @Test
     fun keepsEachAppsChatsApart() {
-        val general = KeptInputs(favorites = listOf(ChatValue(ChatApp.Slack, "general, or so", "slack://channel?team=T1&id=C1")))
-        chatsStore(context, ChatApp.Slack).save(general)
+        val general = KeptInputs(favorites = listOf(LinkValue(LinkApp.Slack, "general, or so", "slack://channel?team=T1&id=C1")))
+        linksStore(context, LinkApp.Slack).save(general)
 
-        assertEquals(general, chatsStore(context, ChatApp.Slack).load())
-        assertEquals(KeptInputs<ChatValue>(), chatsStore(context, ChatApp.Discord).load())
+        assertEquals(general, linksStore(context, LinkApp.Slack).load())
+        assertEquals(KeptInputs<LinkValue>(), linksStore(context, LinkApp.Discord).load())
     }
 
     @Test

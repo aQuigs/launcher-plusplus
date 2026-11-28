@@ -24,7 +24,7 @@ import com.sqftware.orbitlauncher.apps.GeocoderPlaceFinder
 import com.sqftware.orbitlauncher.apps.PhotonPlaceFinder
 import com.sqftware.orbitlauncher.apps.SystemPlaceSearch
 import com.sqftware.orbitlauncher.apps.LauncherAppsRepository
-import com.sqftware.orbitlauncher.apps.LinkChatFinder
+import com.sqftware.orbitlauncher.apps.AppLinkFinder
 import com.sqftware.orbitlauncher.apps.LiveMinimap
 import com.sqftware.orbitlauncher.apps.QuestRoutes
 import com.sqftware.orbitlauncher.apps.NotificationBadges
@@ -69,12 +69,12 @@ import com.sqftware.orbitlauncher.apps.WanderingMinimap
 import com.sqftware.orbitlauncher.apps.WebSlackWorkspaces
 import com.sqftware.orbitlauncher.apps.WindowSystemBars
 import com.sqftware.orbitlauncher.apps.WindowWallpaperBlur
-import com.sqftware.orbitlauncher.apps.chatsStore
+import com.sqftware.orbitlauncher.apps.linksStore
 import com.sqftware.orbitlauncher.apps.colourwayStore
 import com.sqftware.orbitlauncher.apps.folderLookStore
 import com.sqftware.orbitlauncher.apps.placesStore
 import com.sqftware.orbitlauncher.domain.AppEntry
-import com.sqftware.orbitlauncher.domain.ChatApp
+import com.sqftware.orbitlauncher.domain.LinkApp
 import com.sqftware.orbitlauncher.domain.CollectionPages
 import com.sqftware.orbitlauncher.domain.CollectionsPage
 import com.sqftware.orbitlauncher.domain.ForegroundTime
@@ -167,13 +167,13 @@ class MainActivity : ComponentActivity() {
         val gridPagesStore = SharedPreferencesGridPagesStore(this)
         val appSettingsStore = SharedPreferencesAppSettingsStore(this)
         val placesStore = placesStore(this)
-        val chatStores = ChatApp.entries.associateWith { app -> chatsStore(this, app) }
+        val linkStores = LinkApp.entries.associateWith { app -> linksStore(this, app) }
         val clipboard = SystemClipboard(this)
         val appUsage = SystemAppUsage(this)
         val defaultApps = SystemDefaultAppFinder(this)
         val shade = StatusBarNotificationShade(this)
         val toasts = SystemToasts(this)
-        val chatFinder = LinkChatFinder(WebSlackWorkspaces(), onNoWorkspace = { toasts.show("Cannot look up the Slack workspace $it") })
+        val linkFinder = AppLinkFinder(WebSlackWorkspaces(), onNoWorkspace = { toasts.show("Cannot look up the Slack workspace $it") })
         val systemBars = WindowSystemBars(window)
         val wallpaperBlur = WindowWallpaperBlur(window)
         val relauncher = SystemRelauncher(this)
@@ -244,7 +244,7 @@ class MainActivity : ComponentActivity() {
                         uninstall = repository::uninstall,
                         findPlaces = placeSearch::find,
                         openMaps = placeSearch::openMaps,
-                        findChat = chatFinder::find,
+                        findLink = linkFinder::find,
                         pasted = clipboard::text,
                     )
                 }
@@ -260,7 +260,7 @@ class MainActivity : ComponentActivity() {
                 var ambientMotion by remember { mutableStateOf(ambientMotionStore.load()) }
                 var appNames by remember { mutableStateOf(appNamesStore.load()) }
                 var places by remember { mutableStateOf(placesStore.load()) }
-                var chats by remember { mutableStateOf(chatStores.mapValues { (_, store) -> store.load() }) }
+                var links by remember { mutableStateOf(linkStores.mapValues { (_, store) -> store.load() }) }
                 var ringSpin by remember { mutableStateOf(ringSpinStore.load()) }
                 var spinStats by remember { mutableStateOf(spinStatsStore.load()) }
                 var journal by remember { mutableStateOf(journalStore.load()) }
@@ -585,10 +585,10 @@ class MainActivity : ComponentActivity() {
                         places = it
                         placesStore.save(it)
                     },
-                    chats = chats,
-                    onChatsChange = { app, kept ->
-                        chats = chats + (app to kept)
-                        chatStores.getValue(app).save(kept)
+                    links = links,
+                    onLinksChange = { app, kept ->
+                        links = links + (app to kept)
+                        linkStores.getValue(app).save(kept)
                     },
                     onOpenNotifications = shade::open,
                     onSystemBarsShownChange = systemBars::setShown,

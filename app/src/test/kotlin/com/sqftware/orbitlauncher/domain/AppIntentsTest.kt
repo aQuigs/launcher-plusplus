@@ -182,4 +182,18 @@ class AppIntentsTest {
         )
         assertNull(placeQueryFromShare("https://maps.app.goo.gl/abc"))
     }
+
+    @Test
+    fun `an intent that takes nothing is offered once, opens its link, and resolves by its key`() {
+        val obsidian = app("Obsidian", "md.obsidian")
+        val choice = OpenChoice.Intent(IntentCatalog.byId("obsidian.new")!!, asks = false)
+        val icon = openedAs(obsidian, choice)!!
+
+        assertEquals(1, openChoices(obsidian).count { it == choice })
+        assertEquals(choice, currentChoice(icon))
+        assertEquals("Obsidian new note", icon.label)
+        assertEquals(emptyList<InputQuestion>(), icon.asks)
+        assertEquals(IntentRequest("md.obsidian", "obsidian://new"), (icon.kind as EntryKind.Intent).request())
+        assertEquals(icon, AppsByKey(listOf(obsidian))[icon.key])
+    }
 }

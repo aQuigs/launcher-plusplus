@@ -17,3 +17,8 @@ fun cleanName(raw: String, max: Int): String {
     val cut = spaced.split(' ').filter(String::isNotEmpty).joinToString(" ").take(max)
     return (if (cut.lastOrNull()?.isHighSurrogate() == true) cut.dropLast(1) else cut).trimEnd()
 }
+
+/** [noun] after "a" or "an", as its first letter takes it. */
+fun withArticle(noun: String): String = "${if (noun.firstOrNull()?.lowercaseChar() in VOWELS) "an" else "a"} $noun"
+
+private val VOWELS = "aeiou".toSet()
