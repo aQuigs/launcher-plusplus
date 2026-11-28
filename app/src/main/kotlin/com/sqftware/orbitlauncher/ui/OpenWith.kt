@@ -12,13 +12,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.sqftware.orbitlauncher.domain.AppEntry
-import com.sqftware.orbitlauncher.domain.ChatApp
-import com.sqftware.orbitlauncher.domain.ChatValue
+import com.sqftware.orbitlauncher.domain.LinkApp
+import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.KeptInputs
-import com.sqftware.orbitlauncher.domain.MAX_CHAT_NAME
+import com.sqftware.orbitlauncher.domain.MAX_LINK_NAME
 import com.sqftware.orbitlauncher.domain.OpenChoice
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import com.sqftware.orbitlauncher.domain.matching
@@ -55,16 +55,16 @@ fun OpenWithDialog(app: AppEntry, partner: AppEntry?, onChoose: (OpenChoice) -> 
 
 /**
  * What the prompts for an intent's input offer, search and keep: the [places] ([onPlacesChange]), [findPlaces] and
- * [openMaps]; each app's [chats] ([onChatsChange]), [findChat] and what was [pasted].
+ * [openMaps]; each app's [links] ([onLinksChange]), [findLink] and what was [pasted].
  */
 class InputSources(
     val places: KeptInputs<PlaceValue>,
     val onPlacesChange: (KeptInputs<PlaceValue>) -> Unit,
     val findPlaces: suspend (String) -> List<PlaceValue>,
     val openMaps: () -> Unit,
-    val chats: Map<ChatApp, KeptInputs<ChatValue>>,
-    val onChatsChange: (ChatApp, KeptInputs<ChatValue>) -> Unit,
-    val findChat: suspend (ChatApp, String) -> ChatValue?,
+    val links: Map<LinkApp, KeptInputs<LinkValue>>,
+    val onLinksChange: (LinkApp, KeptInputs<LinkValue>) -> Unit,
+    val findLink: suspend (LinkApp, String) -> LinkValue?,
     val pasted: () -> String?,
 )
 
@@ -83,7 +83,7 @@ fun InputPrompt(
 ) {
     when (val kind = question.kind) {
         InputKind.Place -> PlacePrompt(question.forWhom, query, onQueryChange, sources, onAnswer, onDismiss)
-        is ChatApp -> ChatPrompt(kind, question.forWhom, query, onQueryChange, sources, onAnswer, onDismiss)
+        is LinkApp -> LinkPrompt(kind, question.forWhom, query, onQueryChange, sources, onAnswer, onDismiss)
     }
 }
 
@@ -123,44 +123,44 @@ private fun PlacePrompt(
 }
 
 /**
- * The favorite and recent chats of [app] while nothing is typed, else those named like what is, and the one a typed link
- * or phone number tells, picked [forWhom]. A new one is named before it is picked, as hardly any link names its chat.
+ * The favorite and recent chats or notes of [app] while nothing is typed, else those named like what is, and the one a
+ * typed link or phone number tells, picked [forWhom]. A new one is named before it is picked, as few links name theirs.
  */
 @Composable
-private fun ChatPrompt(
-    app: ChatApp,
+private fun LinkPrompt(
+    app: LinkApp,
     forWhom: String,
     query: String,
     onQueryChange: (String) -> Unit,
     sources: InputSources,
-    onAnswer: (ChatValue) -> Unit,
+    onAnswer: (LinkValue) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val kept = sources.chats[app] ?: KeptInputs()
-    val chats = kept.favorites + kept.recent
-    var naming by remember { mutableStateOf<ChatValue?>(null) }
+    val kept = sources.links[app] ?: KeptInputs()
+    val known = kept.favorites + kept.recent
+    var naming by remember { mutableStateOf<LinkValue?>(null) }
 
-    fun pick(chat: ChatValue) {
+    fun pick(value: LinkValue) {
         // The prompt after this one can be in its place, asking for the same app's other build.
         naming = null
-        sources.onChatsChange(app, kept.picked(chat))
-        onAnswer(chat)
+        sources.onLinksChange(app, kept.picked(value))
+        onAnswer(value)
     }
 
-    naming?.let { chat ->
+    naming?.let { value ->
         NameDialog(
             title = "Name this ${app.noun}",
             verb = "Save",
-            maxLength = MAX_CHAT_NAME,
-            onName = { name -> pick(chat.named(name)) },
+            maxLength = MAX_LINK_NAME,
+            onName = { name -> pick(value.named(name)) },
             onDismiss = { naming = null },
             fieldTag = OpenWithTags.NAME,
-            initial = chat.label,
+            initial = value.label,
         )
         return
     }
     SearchDialog(
-        title = "Pick a $forWhom ${app.noun}",
+        title = "Pick a ${app.noun} for $forWhom",
         fieldLabel = "Link, or name of a saved ${app.noun}",
         query = query,
         onQueryChange = onQueryChange,
@@ -168,12 +168,12 @@ private fun ChatPrompt(
         idleNote = app.howToLink,
         missNote = "No saved ${app.noun} found. ${app.howToLink}.",
         find = { typed ->
-            sources.findChat(app, typed)?.let { found -> listOf(chats.find { it.link == found.link } ?: found) } ?: chats.matching(typed) { it.label.searchable() }
+            sources.findLink(app, typed)?.let { found -> listOf(known.find { it.link == found.link } ?: found) } ?: known.matching(typed) { it.label.searchable() }
         },
-        label = { chat -> chat.label.ifEmpty { "New ${app.noun}" } },
-        description = { chat -> chat.link.takeIf { chat !in chats } },
-        actions = { chat -> if (chat !in chats) emptyList() else keptActions(chat, kept, forgets = query.isBlank()) { sources.onChatsChange(app, it) } },
-        onChoose = { chat -> if (chat !in chats) naming = chat else pick(chat) },
+        label = { value -> value.label.ifEmpty { "New ${app.noun}" } },
+        description = { value -> value.link.takeIf { value !in known } },
+        actions = { value -> if (value !in known) emptyList() else keptActions(value, kept, forgets = query.isBlank()) { sources.onLinksChange(app, it) } },
+        onChoose = { value -> if (value !in known) naming = value else pick(value) },
         onDismiss = onDismiss,
         extra = { LauncherButton(onClick = { sources.pasted()?.let { onQueryChange(it.replace('\n', ' ')) } }) { Text("Paste") } },
         fieldTag = OpenWithTags.FIELD,

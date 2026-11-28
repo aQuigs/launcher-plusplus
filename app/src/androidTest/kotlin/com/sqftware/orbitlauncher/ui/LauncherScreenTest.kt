@@ -270,7 +270,7 @@ class LauncherScreenTest {
         uninstall = uninstalled::add,
         findPlaces = { listOf(found) },
         openMaps = { false },
-        findChat = { _, _ -> null },
+        findLink = { _, _ -> null },
         pasted = { null },
     )
 
@@ -371,8 +371,8 @@ class LauncherScreenTest {
             onAppSettingsChange = { appSettings = it },
             places = places,
             onPlacesChange = { places = it },
-            chats = emptyMap(),
-            onChatsChange = { _, _ -> },
+            links = emptyMap(),
+            onLinksChange = { _, _ -> },
             onOpenNotifications = { notificationsOpened++ },
             onSystemBarsShownChange = { barsShown += it },
             onWallpaperBlurChange = {},

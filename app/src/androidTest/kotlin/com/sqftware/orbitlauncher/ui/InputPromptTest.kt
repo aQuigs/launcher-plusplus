@@ -18,13 +18,13 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
-import com.sqftware.orbitlauncher.domain.ChatApp
-import com.sqftware.orbitlauncher.domain.ChatValue
-import com.sqftware.orbitlauncher.domain.FoundChat
+import com.sqftware.orbitlauncher.domain.FoundLink
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.KeptInputs
+import com.sqftware.orbitlauncher.domain.LinkApp
+import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
@@ -42,10 +42,10 @@ class InputPromptTest {
     private val uber = AppEntry("Uber", "com.ubercab", "com.ubercab.Main")
 
     private val slack = AppEntry("Slack", "com.Slack", "com.Slack.Main")
-    private val general = ChatValue(ChatApp.Slack, "general", "slack://channel?team=T1&id=C1")
-    private val random = ChatValue(ChatApp.Slack, "random", "slack://channel?team=T1&id=C2")
+    private val general = LinkValue(LinkApp.Slack, "general", "slack://channel?team=T1&id=C1")
+    private val random = LinkValue(LinkApp.Slack, "random", "slack://channel?team=T1&id=C2")
 
-    private var chats by mutableStateOf(emptyMap<ChatApp, KeptInputs<ChatValue>>())
+    private var links by mutableStateOf(emptyMap<LinkApp, KeptInputs<LinkValue>>())
     private var places by mutableStateOf(KeptInputs<PlaceValue>())
     private var query by mutableStateOf("")
     private val answers = mutableListOf<InputValue>()
@@ -61,9 +61,9 @@ class InputPromptTest {
                 onPlacesChange = { places = it },
                 findPlaces = { found.await() },
                 openMaps = {},
-                chats = chats,
-                onChatsChange = { app, kept -> chats = chats + (app to kept) },
-                findChat = { app, typed -> (app.find(typed) as? FoundChat.Whole)?.chat },
+                links = links,
+                onLinksChange = { app, kept -> links = links + (app to kept) },
+                findLink = { app, typed -> (app.find(typed) as? FoundLink.Whole)?.value },
                 pasted = { random.link },
             ),
             onAnswer = answers::add,
@@ -151,9 +151,9 @@ class InputPromptTest {
 
     @Test
     fun aChatPastedIsNamedThenPickedAndKept() {
-        show(InputQuestion(ChatApp.Slack, listOf(slack)))
-        compose.onNodeWithText("Pick a Slack channel").assertIsDisplayed()
-        compose.onNodeWithText(ChatApp.Slack.howToLink).assertIsDisplayed()
+        show(InputQuestion(LinkApp.Slack, listOf(slack)))
+        compose.onNodeWithText("Pick a channel for Slack").assertIsDisplayed()
+        compose.onNodeWithText(LinkApp.Slack.howToLink).assertIsDisplayed()
 
         compose.onNodeWithText("Paste").performClick()
         compose.awaitSettled("New channel")
@@ -164,23 +164,23 @@ class InputPromptTest {
 
         compose.runOnIdle {
             assertEquals(listOf<InputValue>(random), answers)
-            assertEquals(mapOf(ChatApp.Slack to KeptInputs(recent = listOf(random))), chats)
+            assertEquals(mapOf(LinkApp.Slack to KeptInputs(recent = listOf(random))), links)
         }
     }
 
     @Test
     fun aNameNoSavedChatHasSaysHowToAddOne() {
-        show(InputQuestion(ChatApp.Slack, listOf(slack)))
+        show(InputQuestion(LinkApp.Slack, listOf(slack)))
 
         compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("orbit")
 
-        compose.awaitSettled("No saved channel found. ${ChatApp.Slack.howToLink}.")
+        compose.awaitSettled("No saved channel found. ${LinkApp.Slack.howToLink}.")
     }
 
     @Test
     fun aChatKeptIsFoundByNameOrLinkAndPickedWithoutNamingItAgain() {
-        chats = mapOf(ChatApp.Slack to KeptInputs(favorites = listOf(general), recent = listOf(random)))
-        show(InputQuestion(ChatApp.Slack, listOf(slack)))
+        links = mapOf(LinkApp.Slack to KeptInputs(favorites = listOf(general), recent = listOf(random)))
+        show(InputQuestion(LinkApp.Slack, listOf(slack)))
 
         compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("GENE")
         compose.awaitSettled("general")

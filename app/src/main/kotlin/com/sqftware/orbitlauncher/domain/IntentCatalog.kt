@@ -58,7 +58,9 @@ object IntentCatalog {
                 "endaddress" to place.address,
             )
         },
-    ) + ChatApp.entries.flatMap { app -> app.packages.map { ChatIntent(app, it) } }
+        // https://obsidian.md/help/uri. With no vault named, the note is made in the one last open.
+        PlainIntent("obsidian.new", "md.obsidian", "new note", "New note", "obsidian://new"),
+    ) + LinkApp.entries.flatMap { app -> app.packages.map { LinkIntent(app, it) } }
 
     private val byId = all.associateBy { it.id }
 
@@ -80,13 +82,27 @@ private class PlaceIntent(
     override fun request(value: InputValue?) = IntentRequest(packageName, link(value as PlaceValue))
 }
 
-/** One of [input]'s chats, opened in its [packageName]. */
-private class ChatIntent(override val input: ChatApp, override val packageName: String) : AppIntent {
+/** An intent that takes nothing, and opens [link]. */
+private class PlainIntent(
+    override val id: String,
+    override val packageName: String,
+    override val name: String,
+    override val label: String,
+    private val link: String,
+) : AppIntent {
+    override val input = null
+
+    override fun request(value: InputValue?) = IntentRequest(packageName, link)
+}
+
+/** A chat or note of [input], opened in its [packageName]. */
+private class LinkIntent(override val input: LinkApp, override val packageName: String) : AppIntent {
+    // Older than notes, and stored.
     override val id = "$packageName.chat"
     override val name = input.noun
     override val label = "Open a ${input.noun}"
 
-    override fun request(value: InputValue?) = IntentRequest(packageName, (value as ChatValue).link)
+    override fun request(value: InputValue?) = IntentRequest(packageName, (value as LinkValue).link)
 
     // The icon already says which app it is, and a short name is all a label has room for.
     override fun savedLabel(appLabel: String, saved: InputValue) = saved.label
