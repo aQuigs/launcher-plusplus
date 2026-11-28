@@ -1,9 +1,9 @@
 package com.sqftware.orbitlauncher.apps
 
 import android.util.Log
+import com.sqftware.orbitlauncher.domain.FoundLink
 import com.sqftware.orbitlauncher.domain.LinkApp
 import com.sqftware.orbitlauncher.domain.LinkValue
-import com.sqftware.orbitlauncher.domain.FoundLink
 import com.sqftware.orbitlauncher.domain.slackChannel
 import org.json.JSONException
 import java.io.IOException

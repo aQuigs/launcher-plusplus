@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.sqftware.orbitlauncher.domain.KeptInputs
 import com.sqftware.orbitlauncher.domain.LinkApp
 import com.sqftware.orbitlauncher.domain.LinkValue
-import com.sqftware.orbitlauncher.domain.KeptInputs
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import org.junit.After
 import org.junit.Assert.assertEquals

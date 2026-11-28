@@ -2,11 +2,11 @@ package com.sqftware.orbitlauncher.apps
 
 import android.content.Context
 import androidx.core.content.edit
-import com.sqftware.orbitlauncher.domain.LinkApp
-import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.KeptInputs
+import com.sqftware.orbitlauncher.domain.LinkApp
+import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.PlaceValue
 
 interface KeptInputsStore<T : InputValue> {

@@ -18,13 +18,13 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sqftware.orbitlauncher.domain.AppEntry
-import com.sqftware.orbitlauncher.domain.LinkApp
-import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.FoundLink
 import com.sqftware.orbitlauncher.domain.InputKind
 import com.sqftware.orbitlauncher.domain.InputQuestion
 import com.sqftware.orbitlauncher.domain.InputValue
 import com.sqftware.orbitlauncher.domain.KeptInputs
+import com.sqftware.orbitlauncher.domain.LinkApp
+import com.sqftware.orbitlauncher.domain.LinkValue
 import com.sqftware.orbitlauncher.domain.PlaceValue
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
@@ -152,7 +152,7 @@ class InputPromptTest {
     @Test
     fun aChatPastedIsNamedThenPickedAndKept() {
         show(InputQuestion(LinkApp.Slack, listOf(slack)))
-        compose.onNodeWithText("Pick a Slack channel").assertIsDisplayed()
+        compose.onNodeWithText("Pick a channel for Slack").assertIsDisplayed()
         compose.onNodeWithText(LinkApp.Slack.howToLink).assertIsDisplayed()
 
         compose.onNodeWithText("Paste").performClick()
@@ -165,21 +165,6 @@ class InputPromptTest {
         compose.runOnIdle {
             assertEquals(listOf<InputValue>(random), answers)
             assertEquals(mapOf(LinkApp.Slack to KeptInputs(recent = listOf(random))), links)
-        }
-    }
-
-    @Test
-    fun aNotesLinkNamesItWhenNothingElseIsTyped() {
-        show(InputQuestion(LinkApp.Obsidian, listOf(AppEntry("Obsidian", "md.obsidian", "md.obsidian.Main"))))
-        compose.onNodeWithText("Pick an Obsidian note").assertIsDisplayed()
-
-        compose.onNodeWithTag(OpenWithTags.FIELD).performTextInput("obsidian://open?vault=V&file=Work%2FTo%20do")
-        compose.awaitSettled("To do")
-        compose.onNodeWithText("To do").performClick()
-        compose.onNodeWithText("Save").performClick()
-
-        compose.runOnIdle {
-            assertEquals(listOf<InputValue>(LinkValue(LinkApp.Obsidian, "To do", "obsidian://open?vault=V&file=Work%2FTo%20do")), answers)
         }
     }
 

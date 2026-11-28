@@ -26,9 +26,9 @@ sealed interface FoundLink {
 /**
  * An app that a link opens straight to a chat or a note of its, each a [noun]. Each is a kind of input of its own, as no
  * app opens another's. None lets the launcher search them, so one is told by its link, which [howToLink] says where to
- * get. Its name here is stored with those kept for it, and its [intentId] in icons' keys, so neither ever changes.
+ * get. Its name here is stored with those kept for it, so it never changes.
  */
-enum class LinkApp(val packages: List<String>, val noun: String, val howToLink: String, val intentId: String = "chat") : InputKind {
+enum class LinkApp(val packages: List<String>, val noun: String, val howToLink: String) : InputKind {
     // The app takes the ids of the workspace and the channel: https://docs.slack.dev/interactivity/deep-linking
     Slack(listOf("com.Slack"), "channel", "Copy a channel's link in Slack, then paste it here") {
         override fun read(uri: URI, path: List<String>): FoundLink? {
@@ -113,29 +113,20 @@ enum class LinkApp(val packages: List<String>, val noun: String, val howToLink: 
         override fun ofNumber(number: String) = found("https://signal.me/#p/$number")
     },
 
-    // https://obsidian.md/help/uri. Its Android app (1.15.1) opens no note by a path on the device.
-    Obsidian(
-        listOf("md.obsidian"),
-        "note",
-        "Copy a note's link in Obsidian, from More options, Copy path, as Obsidian URL, then paste it here",
-        intentId = "note",
-    ) {
-        // The links it copies leave other marks unescaped, so a note's name can end its link with one.
-        override val afterLink = "<>[]\""
+    // https://obsidian.md/help/uri
+    Obsidian(listOf("md.obsidian"), "note", "Copy a note's link in Obsidian, from More options, Copy path, as Obsidian URL, then paste it here") {
+        // All of it, as a note's name can end its link with a mark.
+        override fun linksIn(typed: String) = listOf(typed.trim())
 
         override fun read(uri: URI, path: List<String>): FoundLink? {
-            if (uri.scheme != "obsidian") return null
-            val note = when (uri.host) {
-                "open" -> uri.params["file"]?.let { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }
-                "vault" -> path.drop(1).joinToString("/")
-                else -> null
-            }
-            return if (note.isNullOrEmpty()) null else found("$uri", name = note.substringAfterLast('/').removeSuffix(".md"))
+            val note = uri.params["file"].orEmpty()
+            if (uri.scheme != "obsidian" || uri.host != "open" || note.isEmpty()) return null
+            return found("$uri", name = note.substringBefore('#').substringAfterLast('/').removeSuffix(".md"))
         }
     };
 
-    /** The marks that can come after a link in the middle of a text, rather than end it. */
-    protected open val afterLink: String get() = WRAPPING
+    /** What in [typed] could be a link: each word, without the marks around it. */
+    protected open fun linksIn(typed: String): List<String> = typed.split(BLANKS).map { word -> word.trim { it in WRAPPING } }
 
     /** What [uri], whose path has the segments [path], links to; null if nothing of this app's. */
     protected abstract fun read(uri: URI, path: List<String>): FoundLink?
@@ -147,7 +138,7 @@ enum class LinkApp(val packages: List<String>, val noun: String, val howToLink: 
 
     /** What [typed] holds a link to, or is the phone number of; null if neither. */
     fun find(typed: String): FoundLink? =
-        typed.split(BLANKS).firstNotNullOfOrNull { word -> uriOf(word, afterLink)?.let { read(it, it.segments) } }
+        linksIn(typed).firstNotNullOfOrNull { link -> uriOf(link)?.let { read(it, it.segments) } }
             ?: phoneNumber(typed)?.let(::ofNumber)
 
     override fun decode(text: String): LinkValue? = decodeFields(text, 2)?.let { (label, link) -> LinkValue(this, label, link) }
@@ -159,10 +150,9 @@ fun slackChannel(team: String, channel: String): FoundLink.Whole? =
     else null
 
 // With its scheme and host in lower case, and a web link secure, as the apps take them.
-private fun uriOf(word: String, afterLink: String): URI? = try {
-    val bare = word.trimStart { it in WRAPPING }.trimEnd { it in afterLink }
-    val scheme = bare.substringBefore("://", "https").lowercase()
-    val rest = bare.substringAfter("://")
+private fun uriOf(link: String): URI? = try {
+    val scheme = link.substringBefore("://", "https").lowercase()
+    val rest = link.substringAfter("://")
     val host = rest.takeWhile { it !in "/?#" }
     URI("${if (scheme == "http") "https" else scheme}://${host.lowercase()}${rest.drop(host.length)}").takeIf { it.host != null }
 } catch (_: URISyntaxException) {
@@ -178,7 +168,10 @@ private val URI.isWeb get() = scheme == "https"
 private val URI.segments: List<String> get() = path.orEmpty().split('/').filter(String::isNotEmpty)
 
 private val URI.params: Map<String, String>
-    get() = rawQuery.orEmpty().split('&').filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+    get() = rawQuery.orEmpty().split('&').filter { '=' in it }.associate { param ->
+        // A plus is one, not a space.
+        param.substringBefore('=') to URLDecoder.decode(param.substringAfter('=').replace("+", "%2B"), "UTF-8")
+    }
 
 private val String.isNumber get() = isNotEmpty() && all { it in '0'..'9' }
 

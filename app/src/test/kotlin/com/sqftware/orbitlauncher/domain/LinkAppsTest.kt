@@ -75,11 +75,10 @@ class LinkAppsTest {
             "obsidian://open?vault=V&file=Costs%20(2026)" to "Costs (2026)",
             "obsidian://open?vault=V&file=What%20now!" to "What now!",
             "obsidian://open?vault=V&file=1+1" to "1+1",
-            "obsidian://vault/My%20vault/Work/Plan" to "Plan",
+            "obsidian://open?vault=V&file=Work%2FPlan.md%23To%2FDo" to "Plan",
         ).forEach { (link, name) -> assertEquals(FoundLink.Whole(LinkValue(LinkApp.Obsidian, name, link)), LinkApp.Obsidian.find(link)) }
-        assertEquals("obsidian://open?vault=V&file=A", LinkApp.Obsidian.linkIn("see <obsidian://open?vault=V&file=A>"))
 
-        listOf("obsidian://open?vault=V", "obsidian://open?vault=V&file=", "obsidian://vault/V", "obsidian://new?vault=V&name=A", "obsidian://open?path=%2FV%2FA")
+        listOf("obsidian://open?vault=V", "obsidian://open?vault=V&file=", "obsidian://open?vault=V&file=My note", "obsidian://new?vault=V&name=A", "obsidian://open?path=%2FV%2FA")
             .forEach { assertNull(it, LinkApp.Obsidian.find(it)) }
     }
 

@@ -97,7 +97,8 @@ private class PlainIntent(
 
 /** A chat or note of [input], opened in its [packageName]. */
 private class LinkIntent(override val input: LinkApp, override val packageName: String) : AppIntent {
-    override val id = "$packageName.${input.intentId}"
+    // Older than notes, and stored.
+    override val id = "$packageName.chat"
     override val name = input.noun
     override val label = "Open a ${input.noun}"
 

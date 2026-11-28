@@ -3,9 +3,9 @@ package com.sqftware.orbitlauncher.ui
 import androidx.compose.ui.graphics.ImageBitmap
 import com.sqftware.orbitlauncher.domain.AppEntry
 import com.sqftware.orbitlauncher.domain.AppShortcut
+import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.LinkApp
 import com.sqftware.orbitlauncher.domain.LinkValue
-import com.sqftware.orbitlauncher.domain.IconPlace
 import com.sqftware.orbitlauncher.domain.PlaceValue
 
 /** Draws an app's icon as the theme shows it in a place, off the main thread; null while it has none. */

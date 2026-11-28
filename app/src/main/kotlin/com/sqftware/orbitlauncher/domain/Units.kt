@@ -62,7 +62,7 @@ fun yardstickMark(metres: Double): YardstickMark? {
 fun yardstickMarkText(mark: YardstickMark, locale: Locale): String {
     val stick = mark.stick.namedFor(locale)
     if (mark.count > 1) return "${String.format(locale, "%,d", mark.count)} ${stick.many}"
-    return withArticle(stick.one)
+    return "${if (stick.one.first().lowercaseChar() in "aeiou") "an" else "a"} ${stick.one}"
 }
 
 private const val METRES_PER_FOOT = 0.3048

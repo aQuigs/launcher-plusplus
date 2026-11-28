@@ -27,7 +27,6 @@ import com.sqftware.orbitlauncher.domain.intentBase
 import com.sqftware.orbitlauncher.domain.openChoiceLabel
 import com.sqftware.orbitlauncher.domain.openChoices
 import com.sqftware.orbitlauncher.domain.searchable
-import com.sqftware.orbitlauncher.domain.withArticle
 
 object OpenWithTags {
     const val CHOICES = "open_with_choices"
@@ -161,7 +160,7 @@ private fun LinkPrompt(
         return
     }
     SearchDialog(
-        title = "Pick ${withArticle("$forWhom ${app.noun}")}",
+        title = "Pick a ${app.noun} for $forWhom",
         fieldLabel = "Link, or name of a saved ${app.noun}",
         query = query,
         onQueryChange = onQueryChange,
